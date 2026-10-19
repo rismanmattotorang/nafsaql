@@ -1,0 +1,520 @@
+% Nafs-Aql slide deck (Beamer). Build: ../../tools/tectonic nafs_aql_slides.tex
+\documentclass[aspectratio=169,10pt]{beamer}
+\usetheme{metropolis}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,booktabs,array,xcolor,graphicx}
+\usepackage{tikz,pgfplots}\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\input{../shared/nafsstyle.tex}
+\setbeamercolor{progress bar}{fg=teal,bg=teal!20}
+\setbeamercolor{frametitle}{bg=navy,fg=white}
+\setbeamercolor{block title}{bg=navy!85,fg=white}\setbeamercolor{block body}{bg=navy!6}
+\setbeamercolor{block title alerted}{bg=crimson!85,fg=white}\setbeamercolor{block body alerted}{bg=crimson!6}
+\setbeamercolor{block title example}{bg=teal!85,fg=white}\setbeamercolor{block body example}{bg=teal!7}
+\setbeamerfont{block title}{size=\small}\setbeamerfont{block body}{size=\small}
+\renewcommand{\Pr}{\mathbb{P}}
+\newtheorem{proposition}{Proposition}
+\input{../publication/gen/results.tex}
+\title{Nafs-Aql}
+\subtitle{A verifier-gated dual-process architecture on small Qwen models, CPU-only}
+\author{Dirac R\&D Team}
+\date{18 October 2026, v2.0}
+\begin{document}
+\maketitle
+
+\begin{frame}{Outline}
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{enumerate}\item Motivation and constraints\item Concept: the classical self as design metaphor\item Formal model and results\item Architecture\end{enumerate}
+\column{.5\textwidth}
+\begin{enumerate}\setcounter{enumi}{4}\item Implementation stack and measured feasibility\item Specification highlights\item Roadmap and gates\item \textbf{The system as built and measured results}\item Evaluation plan and the road ahead\end{enumerate}
+\end{columns}
+\vspace{2pt}\begin{alertblock}{Status (18 October 2026)}Phases 0--6 are implemented on the CPU reference machine and Phase~7 (CPU inference performance) was added; GPU work is deferred. Results are \emph{measured} on a shared four-core host with small samples, so they are indicative.\end{alertblock}
+\end{frame}
+
+\section{Motivation}
+\begin{frame}{Why a dual-process system}
+\begin{columns}[T]
+\column{.55\textwidth}
+\begin{block}{Observation}
+Reasoning models get hard questions right by spending inference compute (long traces, many samples, verification) and waste it on easy ones. Competence is knowing when to switch.
+\end{block}
+\begin{block}{Constraints of this project}
+\begin{itemize}\item Pretrained Qwen models, small \item CPU-only machine (4 cores, AVX2, 32\,GB) \item Unsloth for fine-tuning \item Rust web app: chat, performance tests, evaluation\end{itemize}
+\end{block}
+\column{.45\textwidth}
+\begin{exampleblock}{What the draft had}
+Twelve sound validation results, a 27B/35B GPU roster, no feasibility study, no specification, no roadmap.
+\end{exampleblock}
+\begin{exampleblock}{What this review delivers}
+Faithful concept grounding; 17 formal results with engineering consequences; verified stack; measured CPU numbers; spec with 94 identified requirements; 7-phase roadmap with gates.
+\end{exampleblock}
+\end{columns}
+\end{frame}
+
+\section{Concept}
+\begin{frame}{The classical self as a design metaphor}
+\begin{columns}[T]
+\column{.58\textwidth}
+\centering\scalebox{0.78}{\input{../shared/figures/fig_mapping.tikz}}
+\column{.42\textwidth}
+\scriptsize
+\begin{itemize}
+\item Qur'anic stages used as mnemonics: commanding (12:53), self-reproaching (75:2), at rest (89:27)
+\item al-Ghazali: heart as king, intellect as vizier, appetite and anger as soldiers
+\item Ibn Sina: estimation (\emph{wahm}) and memory as internal senses
+\item \emph{muhasaba}: self-correction \emph{under a standard}
+\end{itemize}
+\begin{alertblock}{Analogy only}No claim about the soul, consciousness or authority. The \emph{ruh}, divine inspiration and the Active Intellect are not mapped. Scholar review is a release gate.\end{alertblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{One request as a bounded automaton}
+\begin{columns}[T]
+\column{.55\textwidth}
+\centering\scalebox{0.88}{\input{../shared/figures/fig_automaton.tikz}}
+\column{.45\textwidth}
+\small
+\begin{itemize}
+\item $\mathsf A$: fast draft, unverified
+\item $\mathsf L$: flagged by the gate or a verifier
+\item $\mathsf M$: deliberate retry on verifier evidence
+\item $\mathsf T$: accepted, with an assurance level
+\item $\mathsf X$: abstain with an uncertainty notice
+\end{itemize}
+\begin{block}{Lemma 1 (termination)}At most $1+N(R{+}1)$ model calls per request: a hard latency bound, enforced by the gateway.\end{block}
+\end{columns}
+\end{frame}
+
+\section{Formal model}
+\begin{frame}{Objects and objective}
+\small
+Task $x$, answer $y$, correctness $\kappa(x,y)$. Fast path $\pi_1$ (cost $c_1$, accuracy $p_1$); slow path $\pi_2(\cdot\mid x,b)$ with thinking budget $b$; verifier with true-accept $r$ and false-accept $\varphi$; gate $\gamma(s)$ on features $s$; loss $L$ per wrong answer, $L_a$ per abstention, price $\lambda$ per cost unit.
+\begin{equation*}
+\min_{\gamma,b,N,R}\ \mathbb E_x\big[L\,\Pr[\text{wrong}]+L_a\,\Pr[\text{abstain}]+\lambda\,\mathbb E[\text{cost}]\big]
+\end{equation*}
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{block}{Labels}\textbf{[exact]} no further hypotheses; \textbf{[strong]} needs an empirical check; \textbf{[conjecture]} scheduled hypothesis.\end{block}
+\column{.5\textwidth}
+\begin{exampleblock}{Rule}Every result ends with an engineering consequence: a parameter, an algorithm or a gate in the specification.\end{exampleblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Theorem 1: precision is bounded by the verifier}
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{theorem}[Verified-return precision, exact]
+$\rho(p)=\Pr[\text{wrong}\mid\text{accepted}]=\dfrac{\varphi(1-p)}{\varphi(1-p)+rp}$, and $\rho\le\varepsilon\iff\varphi\le\dfrac{\varepsilon rp}{(1-\varepsilon)(1-p)}$.
+\end{theorem}
+\small Hard tasks ($p=0.1$), 1\% target: $\varphi\le1.1\times10^{-3}$. With $\varphi=0.02$: $\rho=15.5\%$.
+\begin{alertblock}{Consequence}Exact verifiers carry the safety case. Each verifier publishes $(r,\varphi)$ from mutation testing (FR-032); consensus is a flag, not a verifier.\end{alertblock}
+\column{.5\textwidth}
+\begin{tikzpicture}
+\begin{axis}[width=\linewidth,height=5cm,xlabel={false-accept rate $\varphi$},ylabel={$\rho$},xmin=0,xmax=0.05,ymin=0,ymax=0.5,legend pos=north west]
+\addplot[navy,thick,domain=0:0.05,samples=60]{x*0.9/(x*0.9+0.098)};\addlegendentry{$p=0.1$}
+\addplot[teal,thick,domain=0:0.05,samples=60]{x*0.5/(x*0.5+0.49)};\addlegendentry{$p=0.5$}
+\addplot[amber,thick,domain=0:0.05,samples=60]{x*0.1/(x*0.1+0.882)};\addlegendentry{$p=0.9$}
+\addplot[crimson,dashed,thick]coordinates{(0,0.01)(0.05,0.01)};\addlegendentry{1\% target}
+\end{axis}
+\end{tikzpicture}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Theorem 2: the gate is a derived threshold, not a tuned one}
+\begin{columns}[T]
+\column{.52\textwidth}
+\begin{theorem}[Optimal gate, exact]
+With $e_1(s)=\Pr[\text{fast wrong}\mid s]$, $e_2(s)$ the error after escalation and $\Delta c(s)$ the extra cost, escalate iff
+$$L\big(e_1(s)-e_2(s)\big)>\lambda\,\Delta c(s).$$
+Under a budget, the rule is a threshold on $(e_1-e_2)/\Delta c$ (Neyman--Pearson).
+\end{theorem}
+\begin{block}{Proposition 1 (price of miscalibration)}Estimation error $\epsilon$ on $\hat e_1$ costs at most $L\epsilon$ per request: the ECE target 0.05 (NFR-020) is a regret bound.\end{block}
+\column{.48\textwidth}
+\begin{tikzpicture}
+\begin{axis}[width=\linewidth,height=4.6cm,xlabel={score $s$},ylabel={error},xmin=0,xmax=1,ymin=0,ymax=0.8,legend pos=north west,title={\scriptsize schematic}]
+\addplot[crimson,thick,domain=0:1]{0.02+0.7*x^2};\addlegendentry{$e_1$}
+\addplot[teal,thick,domain=0:1]{0.05+0.25*x};\addlegendentry{$e_2$}
+\addplot[amber,dashed,thick]coordinates{(0,0.1)(1,0.1)};\addlegendentry{$\lambda\Delta c/L$}
+\addplot[black!70,dotted,thick]coordinates{(0.645,0)(0.645,0.8)};
+\node[font=\tiny,anchor=south west] at (axis cs:0.65,0.02){escalate};
+\node[font=\tiny,anchor=south east] at (axis cs:0.64,0.02){keep};
+\end{axis}
+\end{tikzpicture}
+\scriptsize Same rule as Chow's reject option and the expected value of control; the only tunable is $\lambda$, the ``speed--care'' slider (Prop.\,2).
+\end{columns}
+\end{frame}
+
+\begin{frame}{Theorem 3 and Proposition 3: sampling buys coverage; stopping is a Beta rule}
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{theorem}[Coverage, exact]
+Draw-verify-stop with acceptance probability $a$: coverage $1-(1-a)^M$, expected draws $(1-(1-a)^M)/a$, and the error of an accepted answer is $\rho(q)$ \emph{for every} $M$.
+\end{theorem}
+\begin{proposition}[Optimal cap, strong]
+With $a\sim\mathrm{Beta}(\alpha,\beta)$, draw again iff $\frac{\alpha}{\alpha+\beta+m}L_a>c_p$ (monotone case), so
+$M^\star=\lceil\alpha L_a/c_p-\alpha-\beta\rceil$.
+\end{proposition}
+\column{.5\textwidth}
+\begin{tikzpicture}
+\begin{axis}[width=\linewidth,height=4.6cm,xlabel={draws $M$},ylabel={coverage},xmin=0,xmax=40,ymin=0,ymax=1,legend pos=south east]
+\addplot[navy,thick,domain=0:40,samples=41]{1-(0.884)^x};\addlegendentry{homogeneous $a$}
+\addplot[crimson,thick,domain=0:40,samples=41]{1-0.5*(0.788)^x-0.5*(0.98)^x};\addlegendentry{heterogeneous}
+\end{axis}
+\end{tikzpicture}
+\begin{alertblock}{Consequence}$N$ and $R$ per domain come from the Phase-0 Beta fit and the cost ratio $c_p/L_a$ (FR-021); heterogeneity of $a$ is measured, not averaged.\end{alertblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Theorems 4 and 5: the self-monitoring loop must be verifier-gated}
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{theorem}[Unverified refinement, strong]
+If a refinement fixes a wrong answer w.p.\ $u$ and breaks a right one w.p.\ $d$, then $q_t=q^\star+(q_0-q^\star)(1-u-d)^t$ with $q^\star=u/(u+d)$: iterating \emph{harms} whenever $q_0>q^\star$.
+\end{theorem}
+\begin{theorem}[Verifier-gated loop, exact]
+Accepting only verifier passes gives $\Pr[\text{accepted wrong}]\le\varphi\,\mathbb E[T]$ and conditional error within $[\min_t\rho(q_t),\max_t\rho(q_t)]$, independent of $(u,d)$.
+\end{theorem}
+\column{.5\textwidth}
+\begin{tikzpicture}
+\begin{axis}[width=\linewidth,height=4.6cm,xlabel={refinement round $t$},ylabel={$q_t$},xmin=0,xmax=8,ymin=0,ymax=1,legend pos=north east]
+\addplot[crimson,thick,domain=0:8,samples=9]{0.5+(0.9-0.5)*(0.6)^x};\addlegendentry{$q_0=0.9$ (harmed)}
+\addplot[teal,thick,domain=0:8,samples=9]{0.5+(0.2-0.5)*(0.6)^x};\addlegendentry{$q_0=0.2$ (helped)}
+\addplot[black!60,dashed]coordinates{(0,0.5)(8,0.5)};\addlegendentry{$q^\star=u/(u+d)$}
+\end{axis}
+\end{tikzpicture}
+\scriptsize Matches the empirical finding that LLMs do not self-correct without external feedback. Consequence: no unverified refinement; $R\le1$ on non-verifiable tasks (FR-022); the prompt can change without a new safety case.
+\end{columns}
+\end{frame}
+
+\begin{frame}{Theorem 6, Propositions 4--8: consensus floor, coupling, audits, sizes, roofline}
+\small
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{block}{Plurality voting (exact)}Converges to the modal answer: limiting accuracy $=\Pr_x[\text{mode correct}]$. Consensus is an assurance level, never \texttt{verified}.\end{block}
+\begin{block}{Coupling (exact)}Draft-blind slow path: shared-wrong-answer probability is the collision $\sum_y\pi_1\pi_2$; certifying $<5\%$ with zero hits needs 59 trials (we use 200).\end{block}
+\begin{block}{Audits (exact)}Slow-path accuracy is observed only on escalated tasks; a 5\% audit of kept tasks makes the self-model unbiased (SE $\le0.019$ at $n=10^4$).\end{block}
+\column{.5\textwidth}
+\begin{block}{Sample sizes (exact)}DKW: $n\ge\ln(2/\delta)/(2\varepsilon^2)$: 4\,600 tasks for $\pm2$ points; non-inferiority at 1 point needs about 6\,200 pairs, at 3 points about 700.\end{block}
+\begin{block}{Roofline (exact given the model)}Decode $\le\beta/(W+K)$: at 38\,GB/s a 4B 4-bit model cannot exceed about 15 tok/s; prefill $\le F/(2P)$. Fixes model sizes, context cap, prompt cache and budget cap.\end{block}
+\begin{block}{Distillation (exact)}Label noise $\le\rho$; verifier-measured gains inflate by $1/(r-\varphi)$: promote only on a held-out verifier with confidence bounds.\end{block}
+\end{columns}
+\end{frame}
+
+\section{Architecture}
+\begin{frame}{Request lifecycle}
+\centering\scalebox{1.15}{\input{../shared/figures/fig_flow.tikz}}
+\end{frame}
+
+\begin{frame}{System architecture (single node, CPU)}
+\begin{columns}[T]
+\column{.6\textwidth}
+\centering\scalebox{1.0}{\input{../shared/figures/fig_arch.tikz}}
+\column{.4\textwidth}
+\scriptsize
+\begin{itemize}
+\item Rust workspace: \texttt{nafs-gateway}, \texttt{nafs-core}, \texttt{nafs-verify}, \texttt{nafs-memory}, \texttt{nafs-web}, \texttt{nafs-eval}, \texttt{nafs-bench}, \texttt{nafs-types}
+\item Backends behind one OpenAI-compatible contract: llama-server (macOS, AVX2) or vLLM-CPU (Linux)
+\item Every reply: \texttt{reasoning\_mode}, assurance level, decision record
+\item GPU scale-out swaps only the model servers
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Model profiles (verified on Hugging Face, 2026-10-18)}
+\scriptsize
+\begin{tabular}{@{}p{1.5cm}p{4.9cm}p{5.2cm}@{}}
+\toprule Profile & \Sone & \Stwo\\\midrule
+A (reference) & Qwen3-1.7B, Q4\_K\_M 1.3\,GB, thinking off & Qwen3-4B-Thinking-2507, Q4\_K\_M 2.3\,GB\\
+B (minimal) & Qwen3-4B, \texttt{enable\_thinking=false} & same weights, thinking on\\
+C (upgrade) & Qwen3.5-2B & Qwen3.5-4B (hybrid attention; gate G0 decides)\\
+\bottomrule
+\end{tabular}
+\vspace{2pt}
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{exampleblock}{Facts that shaped the choice}
+\begin{itemize}\item Only Qwen3 and Qwen3.5 have open weights $\le$9B; Qwen3.6/3.8 start at 27B\item Official GGUF exists only for Qwen3; Qwen3-1.7B/4B are on vLLM's validated CPU list\item No official non-autoregressive Qwen exists\end{itemize}
+\end{exampleblock}
+\column{.5\textwidth}
+\begin{alertblock}{Why not Qwen3.5 by default}Hybrid Gated-DeltaNet CPU kernels are newer; vLLM's accelerated path needs AVX-512-BF16 or AMX; no controlled AVX2 benchmark exists. Hypothesis H7 (decode $\ge70\%$ of dense) is measured in Phase~0.\end{alertblock}
+\end{columns}
+\end{frame}
+
+\section{Stack and feasibility}
+\begin{frame}{Implementation stack (verified against current documentation)}
+\scriptsize
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{block}{Serving}
+\begin{itemize}\item vLLM: x86 CPU backend needs Linux; AVX-512 recommended, AVX2 limited; AWQ/GPTQ/INT8; pin 0.31.0\item llama-server v0.7.0: GGUF, logprobs, reasoning budget, n-gram speculation; \texttt{n} capped by slots\end{itemize}
+\end{block}
+\begin{block}{Fine-tuning}Unsloth 2026.10.6 trains only with a GPU; CPU support means inference and data prep. Path: rented 16\,GB GPU, QLoRA (Qwen3) or BF16 LoRA (Qwen3.5), GGUF export, CPU evaluation.\end{block}
+\column{.5\textwidth}
+\begin{block}{Rust (crates.io, 2026-10-18)}
+tokio 1.53, axum 0.8.9, tower-http 0.7, reqwest 0.13, serde, schemars 1.2, utoipa 6.0, sqlx 0.9, tracing, metrics, askama + htmx, figment, criterion, goose.
+\end{block}
+\begin{exampleblock}{Artefacts}\texttt{openapi.yaml} (two linters), 7 JSON Schemas, vLLM and llama-server configs, Cargo workspace, sample TOML.\end{exampleblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Measured on the reference machine (i3-8100, 4 cores, AVX2, 32\,GB)}
+\begin{columns}[T]
+\column{.56\textwidth}
+\scriptsize
+\begin{tabular}{@{}p{3.9cm}rrr@{}}
+\toprule Model (GGUF, llama.cpp 797de63) & Size & Prefill & Decode\\\midrule
+Qwen3-0.6B Q8\_0 & 604\,MiB & 180.6 & 32.6\\
+Qwen3-1.7B Q4\_K\_M & 1.26\,GiB & 94.1 & 15.5\\
+Qwen3-4B Q4\_K\_M & 2.32\,GiB & 38.2 & 6.7\\
+Qwen3-4B-Thinking-2507 Q4\_K\_M & 2.32\,GiB & 38.4 & 7.0\\
+\bottomrule
+\end{tabular}
+\\[2pt]\scriptsize tokens/s, 4 threads, pp512/tg128, mean of 3 runs; implied bandwidth $\approx$20\,GB/s.
+\column{.44\textwidth}\scriptsize
+\begin{exampleblock}{Probe (llama-server, Qwen3-1.7B)}logprobs returned; 4 parallel samples in 3.0\,s with 47/48 prompt tokens cached; thinking toggled per request; a 256-token budget closed the trace and an answer followed; SSE streamed.\end{exampleblock}
+\begin{alertblock}{Consequence}A 1\,024-token slow reply takes 2--3 min here: demos and batch evaluation, not interactive.\end{alertblock}
+\end{columns}
+\end{frame}
+
+\section{Specification}
+\begin{frame}{Specification highlights (99 requirements, RFC 2119)}
+\scriptsize
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{itemize}
+\item \textbf{FR-010--015 Gate:} calibrated $\hat e_1$, per-domain $\hat e_2$, cost ratio; no hand-tuned thresholds in production; failed verification always escalates; decision record per request
+\item \textbf{FR-020--026 Deliberation:} sequential verified sampling; $N$, $R$ from the Beta fit; draft-blind; budget forcing; $R\le1$ on non-verifiable tasks; hard caps
+\item \textbf{FR-030--035 Verification:} exact verifiers at threshold 1.0; published $(r,\varphi)$; assurance levels; judge hard gate; sandbox limits
+\item \textbf{FR-040--042 Ledger:} 5\% audit stream; ``unmeasured'' labels; CUSUM drift
+\end{itemize}
+\column{.5\textwidth}
+\begin{itemize}
+\item \textbf{NFR:} wall-clock cap; TTFT $\le2$\,s and 150-token reply $\le12$\,s p95 (fast); slow $\le240$\,s p95 at $b=1024$; $<8$\,GB resident; ECE $\le0.05$; pinned hashes in every trace (targets)
+\item \textbf{IF:} OpenAPI 3.1; SSE events \texttt{token/decision/verification/retry/done}; JSON Schemas; backend retry and semaphore policy
+\item \textbf{TR:} verified-only data; Unsloth LoRA r=16; GPU path; promotion gate with confidence bounds and human sign-off
+\item \textbf{SR:} injection delimiting; sandbox isolation; privacy; analogy-only religious wording with scholar review
+\item Traceability matrix: requirement $\to$ result $\to$ component $\to$ test $\to$ phase
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Deployment and training pipeline}
+\begin{columns}[T]
+\column{.5\textwidth}\centering\scalebox{0.5}{\input{../shared/figures/fig_deploy.tikz}}
+\column{.5\textwidth}\centering\scalebox{0.78}{\input{../shared/figures/fig_pipeline.tikz}}
+\end{columns}
+\vspace{4pt}\small Training runs on a rented GPU; everything else, including the promotion gate and all evaluation, runs on CPU. The GPU scale-out keeps the gateway, verifiers, memory and UI unchanged.
+\end{frame}
+
+\section{Roadmap}
+\begin{frame}{Eight phases, seven gates (estimates)}
+\begin{columns}[T]
+\column{.46\textwidth}
+\centering\scalebox{0.72}{\input{../shared/figures/fig_gantt.tikz}}
+\column{.54\textwidth}
+\scriptsize
+\begin{itemize}
+\item \textbf{P0} serving, 4\,600-task baseline, verifier rates, H4/H7 \hfill G0
+\item \textbf{P1} CPU MVP: gateway, both paths, fixed-rule gate, chat UI \hfill G1
+\item \textbf{P2} calibrated gate, verified loop, audits; 3-point non-inferiority \hfill G2
+\item \textbf{P3} Unsloth cycle under the promotion gate \hfill G3
+\item \textbf{P4} evaluation suite, performance console, drift \hfill G4
+\item \textbf{P5} hardening, deployment, optional GPU and Profile~C \hfill G5
+\item \textbf{P6} 1-point non-inferiority, scholar review, publication \hfill G6
+\item \textbf{P7} CPU inference performance: latency attribution, engine A/B, early escalation, EAGLE-3 (added)
+\end{itemize}
+61 person-weeks, 42 tasks, every requirement scheduled; backlog exported as CSV and Markdown.
+\end{columns}
+\end{frame}
+
+\begin{frame}{MVP and critical path}
+\begin{columns}[T]
+\column{.45\textwidth}
+\scriptsize
+\begin{block}{MVP (Phase 1)}Profile~A on the reference machine; gateway with chat and SSE; fixed-rule gate with forced escalation on failed verification; code and schema verifiers; draft-blind slow path with budget forcing; assurance levels; decision records; chat UI. Nine acceptance tests (MVP-A1..A9).\end{block}
+\begin{alertblock}{Critical path}serving $\to$ baseline $\to$ calibrated gate $\to$ data pipeline $\to$ training $\to$ promotion $\to$ hardening $\to$ release.\end{alertblock}
+\column{.55\textwidth}
+\centering\scalebox{0.46}{\input{../shared/figures/fig_depgraph.tikz}}
+\end{columns}
+\end{frame}
+
+
+\section{The system as built}
+\begin{frame}{The system as built: chat with an inspectable cascade}
+\begin{columns}[T]
+\column{.64\textwidth}
+\includegraphics[width=\linewidth]{../shared/screenshots/chat.png}
+\column{.36\textwidth}
+\scriptsize
+\begin{itemize}
+\item Rust workspace of 8 crates; 50 documented endpoints (OpenAPI 1.5); OpenAI-compatible chat
+\item System~1 Qwen3-1.7B, System~2 Qwen3-4B-Thinking-2507, Q4\_K\_M on llama-server (vLLM-CPU profile in a VM)
+\item Each answer shows the strip A$\to$L$\to$M$\to$T/X, its assurance and the gate's reason; the inspector shows the decision, features and a per-stage latency waterfall
+\item Here: the draft passed the code tests, so the gate kept it (Theorem~1)
+\item \emph{Both} trials: a person compares System~1 and System~2 answers on the same prompt
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{The laboratory: when should System 2 be consulted?}
+\begin{columns}[T]
+\column{.6\textwidth}
+\includegraphics[width=\linewidth]{../shared/screenshots/lab_insights.png}
+\column{.4\textwidth}
+\scriptsize
+\begin{itemize}
+\item Each combination of the two systems is a \emph{policy}: fast only, deliberate only, gate with verifier, blind gate, draft-conditioned ablation, budget and $\lambda$ sweeps
+\item The policy map pools every run: per domain and price of latency $\lambda$, the policy with the lowest $L(1-\mathrm{acc})+\lambda c$
+\item Now (\PolicyMapRuns{} runs): \PolicyMapSummary
+\item Paired bootstrap CIs, exact McNemar, Bonferroni; exports to Markdown and CSV
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Measured results (indicative)}
+\begin{columns}[T]
+\column{.5\textwidth}
+\scriptsize\textbf{Policies} (run \PhaseTwoRun)\par
+\resizebox{\linewidth}{!}{\PhaseTwoTable}\par\medskip
+Gate with verifier = deliberate-only accuracy at \GatedCostRatio{} of the cost; the blind gate routed \BlindRouting{} correctly (samples agreed with wrong drafts).
+\column{.5\textwidth}
+\scriptsize\textbf{Verifiers} ($r$ true accept, $\varphi$ false accept)\par
+\resizebox{\linewidth}{!}{\VerifierTable}\par\medskip
+\textbf{Profile~C} (System~1 candidates, 30 tasks)\par
+\resizebox{\linewidth}{!}{\ProfileCTable}\par
+Qwen3.5-2B: \ProfileCDelta, but 3.7$\times$ slower $\Rightarrow$ Profile~A stays.
+\end{columns}
+\end{frame}
+
+\begin{frame}{Phase 7: where the time goes on a CPU}
+\begin{columns}[T]
+\column{.55\textwidth}
+\includegraphics[width=\linewidth]{../shared/screenshots/performance_stages.png}
+\column{.45\textwidth}
+\scriptsize
+\begin{itemize}
+\item Every reply records its stages; model stages carry llama-server's prefill, decode and KV-cache reuse
+\item Fast path $\approx$100\% System~1 draft; deliberate path $\approx$97\% System~2 reasoning; the prompt cache serves most prompt tokens $\Rightarrow$ \textbf{decode speed is the bottleneck}
+\item Shared host: 2.6--4.3 tok/s in service vs 22.9 idle
+\end{itemize}
+\resizebox{\linewidth}{!}{\EngineTable}
+\begin{exampleblock}{Adopted after interleaved A/B}
+Skip samples when a verifier decides (13.4$\to$7.9\,s); samples only when the draft is uncertain (factual 12.6$\to$4.3\,s); prompt-cache and verifier warm-up (TTFT 9.8$\to$1\,s); early escalation; 4 System~1 slots
+\end{exampleblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Early escalation, concurrency, and the next engine levers}
+\begin{columns}[T]
+\column{.5\textwidth}
+\scriptsize
+\begin{block}{Early escalation (FR-080)}
+Stop an open-ended draft once its running mean log-prob is below the fixed threshold minus a margin; System~2 takes over. 40 prompts: N\,=\,32, margin 0.04 agrees 100\%, catches 3/10 escalations, saves $\approx$116 tokens each.
+\end{block}
+\centering\resizebox{0.92\linewidth}{!}{\EarlyEscTable}
+\column{.5\textwidth}
+\scriptsize
+\begin{block}{Concurrency (NFR-007)}
+Latest protocol run \ProtocolRun: ratio \NfrSevenRatio. Gate G4 uses the median over eligible runs: \NfrSevenPooled.
+\end{block}
+\begin{exampleblock}{Adaptive reasoning exit (FR-082, new)}
+System~2 reasons in chunks; at reflection points its answer is probed and the exact verifier decides whether to stop. Paired Lab run: \AdaptiveExitSummary.
+\end{exampleblock}
+\begin{alertblock}{Measured, no gain, not adopted}
+0.6B draft and n-gram speculation; flash attention, q8\_0 KV; EAGLE-3 heads (1.04$\times$ / 0.99$\times$); System~1 as judge ($\varphi$ 0.27 vs 0.045).
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Backends and weight formats: measured, not assumed}
+\begin{columns}[T]
+\column{.5\textwidth}
+\scriptsize
+\begin{block}{vLLM CPU backend in Docker (new)}
+\texttt{carstenz/vllm-smoke} image (vLLM 0.30, x86 CPU build), one model in two modes on :8101; the gateway switches backend sets at run time.
+\begin{itemize}
+\item AVX2-only VM: BF16 loads but never returns a token (no oneDNN kernels) $\Rightarrow$ FP32
+\item vLLM's three processes cost $\approx$3\,GB beyond the weights: 1.7B needs an 11--12\,GiB VM, 0.6B about 7
+\item Gateway check (every orchestrator path): \VllmCheckSummary
+\end{itemize}
+\end{block}
+\column{.5\textwidth}
+\scriptsize
+\begin{block}{Weight formats (llama-bench, Qwen3-1.7B)}
+\centering\resizebox{0.7\linewidth}{!}{\QuantTable}\par
+The repack formats buy nothing over Q4\_K\_M on AVX2; the format stays.
+\end{block}
+\begin{block}{A smaller judge?}
+\JudgeCompare. Accepting a quarter of wrong answers is not a verifier (Thm.\,1): the judge stays on System~2.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Muhasaba: drift, alerts, security and the gates}
+\begin{columns}[T]
+\column{.5\textwidth}
+\includegraphics[width=\linewidth]{../shared/screenshots/muhasaba_drift_alerts.png}
+\scriptsize
+CUSUM drift per domain with a shuffled negative control; five alert rules over live traffic (lab traffic tagged). \SecuritySummary; deployment checks: \DeploySummary.
+\column{.5\textwidth}
+\centering\resizebox{\linewidth}{!}{\GatesTable}
+\end{columns}
+\end{frame}
+
+\section{Evaluation}
+\begin{frame}{Evaluation plan and statistically sized gates}
+\begin{columns}[T]
+\column{.5\textwidth}
+\scriptsize
+\begin{itemize}
+\item \textbf{Metrics:} accuracy, selective accuracy and coverage, escalation rate, routing accuracy vs the oracle rule, cost ratio and cost--accuracy curve, ECE (5 bins, $n\ge2\,900$), verifier $(r,\varphi)$ with intervals, adoption rate, robustness, latency quantiles
+\item \textbf{Benchmarks:} GSM8K, MATH, HumanEval, MBPP, schema tasks, MMLU, GPQA, TruthfulQA, SimpleQA, BBH, LiveCodeBench, MT-Bench style; RouteLLM data for calibration
+\item \textbf{Protocol:} paired, seeded, bootstrap CIs, non-inferiority (3 points at G2, 1 point at G6), Bonferroni across domains, CUSUM drift with negative control
+\end{itemize}
+\column{.5\textwidth}
+\centering\scalebox{0.78}{\input{../shared/figures/fig_eval.tikz}}
+\vspace{2pt}\scriptsize
+\begin{block}{Hypotheses H1--H7}Gate accuracy; cost ratio; Beta fit; concave budget curve; coupling; distillation gain; hybrid CPU speed. Each has an experiment, a phase and an engineering effect if false.\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Risks, assumptions, and the first three actions}
+\scriptsize
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{alertblock}{Top risks}
+\begin{itemize}\item Slow path not interactive on CPU (mitigate: smaller budget, Profile~B, GPU profile)\item Gate calibration may fail on uninformative features (budget mode, richer features)\item Verifier false accepts (hidden tests, mutation testing)\item Correlated errors across shared weights (exact verifiers carry the case)\item Version drift of models and runtimes (pins, hashes, regression suite)\end{itemize}
+\end{alertblock}
+\column{.5\textwidth}
+\begin{block}{Key assumptions}CPU-only means the i3-8100 class; Unsloth runs on a rented GPU; vLLM on Linux, llama-server elsewhere, same API; the draft's missing companion documents are inferred from the deck.\end{block}
+\begin{exampleblock}{First three actions}
+\begin{enumerate}\item Run the Phase-0 baseline ($\ge4\,600$ tasks) and fit $e_1$, $e_2$, Beta, budget curves \emph{(harness done; only scaled runs on this CPU)}\item Mutation-test the code, math and schema verifiers; publish $(r,\varphi)$ \emph{(done)}\item llama-bench Qwen3.5-2B/4B vs Qwen3-1.7B/4B on the target CPU \emph{(done: H7 passes; Profile~C not adopted)}\end{enumerate}
+\end{exampleblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{The road ahead (beyond Phase 7)}
+\scriptsize
+\begin{columns}[T]
+\column{.5\textwidth}
+\begin{block}{Phase 8: evidence at scale}
+Faster or idle host (or nightly slices): the 4\,600-task baseline, 700 paired items for G2, 2\,900 labelled drafts to promote the calibrated gate and budget mode, 6\,200 pairs for G6.
+\end{block}
+\begin{block}{Phase 9: Tazkiya cycle}
+5\,000 verified traces, the first Unsloth LoRA on a rented GPU, promotion under TR-007, rollback drill; re-fit the EAGLE-3 head to the distilled System~1.
+\end{block}
+\column{.5\textwidth}
+\begin{block}{Phase 10: engine}
+EAGLE-3 / MTP speculation; repacked 4-bit formats; adaptive early exit from System~2 reasoning; a learned router from the policy map and Both-trial preferences.
+\end{block}
+\begin{block}{Phase 11: product and review}
+Scholar review of the analogy text (SR-005); GPU profile for interactive deliberation; multilingual UI (Indonesian, Arabic); open-domain evidence checks from retrieval.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}[standout]
+Nafs-Aql: deliberate when it pays, accept only on evidence, keep honest accounts.
+\end{frame}
+\end{document}

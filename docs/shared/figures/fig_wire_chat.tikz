@@ -1,0 +1,17 @@
+% Wireframe: chat room; width ~7cm
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\tiny}]
+\draw[thick,rounded corners=3pt,fill=sand!40] (0,0) rectangle (7,5);
+\fill[navy!15] (0,4.4) rectangle (7,5); \node[anchor=west,font=\tiny\bfseries] at (0.15,4.7) {Room: research-sync \quad profile A \quad members 3};
+\fill[white,draw=slate!40] (0.15,1.2) rectangle (5.2,4.3);
+\node[anchor=north west,text width=4.8cm,align=left] at (0.2,4.25) {\textbf{user} How many primes below 100?\\[2pt]
+ \textcolor{leaf}{\textbf{assistant}} 25. \hfill \colorbox{leaf!20}{\scriptsize verified} \colorbox{navy!15}{\scriptsize fast} \colorbox{sand}{\scriptsize 0.8\,s}\\[2pt]
+ \textbf{user} Prove there are infinitely many.\\[2pt]
+ \textcolor{leaf}{\textbf{assistant}} Suppose finitely many \ldots \hfill \colorbox{amber!25}{\scriptsize consensus} \colorbox{violet!15}{\scriptsize slow 612 tok} \colorbox{sand}{\scriptsize 94\,s}\\[1pt]
+ \textcolor{slate}{\scriptsize $\triangleright$ decision: $\hat e_1{=}0.41$, $\hat e_2{=}0.12$, $\lambda\Delta c{=}0.18$ $\to$ escalate; round 1 rejected (judge), round 2 accepted}};
+\fill[white,draw=slate!40] (5.35,1.2) rectangle (6.85,4.3);
+\node[anchor=north west,text width=1.4cm,align=left] at (5.38,4.25) {\textbf{speed--care}\\ $\lambda$ \\[1pt]};
+\draw[thick,slate] (5.5,3.5)--(6.7,3.5); \fill[navy] (5.95,3.5) circle (2pt);
+\node[anchor=north west,text width=1.4cm,align=left] at (5.38,3.3) {\textbf{session}\\ fast 7 / slow 2\\ cost 212\,s\\ abstained 0};
+\fill[white,draw=slate!40] (0.15,0.2) rectangle (6.0,1.0); \node[anchor=west,text=slate] at (0.25,0.6) {Type a message\ldots};
+\fill[navy!80] (6.1,0.2) rectangle (6.85,1.0); \node[white] at (6.47,0.6) {Send};
+\end{tikzpicture}

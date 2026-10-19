@@ -1,0 +1,144 @@
+{
+ "title": "Nafs-Aql",
+ "uid": "nafs-aql",
+ "schemaVersion": 39,
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "panels": [
+  {
+   "id": 1,
+   "type": "timeseries",
+   "title": "Fast-path latency p95 (NFR-003)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 0
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(nafs_latency_seconds_bucket{mode=\"fast\",traffic=\"live\"}[15m])))",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 2,
+   "type": "timeseries",
+   "title": "Slow-path latency p95 (NFR-004)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 0
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    }
+   },
+   "targets": [
+    {
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(nafs_latency_seconds_bucket{mode=\"slow\",traffic=\"live\"}[30m])))",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 3,
+   "type": "timeseries",
+   "title": "Error rate",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(nafs_errors_total[15m])) / clamp_min(sum(rate(nafs_requests_total{traffic=\"live\"}[15m])) + sum(rate(nafs_errors_total[15m])), 1e-9)",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "type": "timeseries",
+   "title": "Escalation rate (System 2 share)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum(rate(nafs_requests_total{mode=\"slow\",traffic=\"live\"}[30m])) / clamp_min(sum(rate(nafs_requests_total{traffic=\"live\"}[30m])), 1e-9)",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 5,
+   "type": "timeseries",
+   "title": "Exact-verifier acceptance",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 16
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    }
+   },
+   "targets": [
+    {
+     "expr": "sum by (verifier) (rate(nafs_verifier_verdicts_total{passed=\"true\"}[1h])) / clamp_min(sum by (verifier) (rate(nafs_verifier_verdicts_total[1h])), 1e-9)",
+     "refId": "A"
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "type": "timeseries",
+   "title": "Alerts firing (incl. calibration drift)",
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 16
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none"
+    }
+   },
+   "targets": [
+    {
+     "expr": "nafs_alert_firing",
+     "refId": "A"
+    }
+   ]
+  }
+ ],
+ "description": "OR-004: latency, error rate, escalation rate, verifier acceptance and calibration drift"
+}

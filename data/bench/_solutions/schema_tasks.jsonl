@@ -1,0 +1,12 @@
+{"id": "schema-01", "solution": {"title": "Kitab al-Shifa", "author": "Ibn Sina", "year": 1500, "available": true}}
+{"id": "schema-02", "solution": ["ID", "MY", "TH"]}
+{"id": "schema-03", "solution": {"title": "Sync", "start": "2026-10-18T09:00:00Z", "duration_minutes": 30, "attendees": ["a@x.org", "b@y.org"]}}
+{"id": "schema-04", "solution": {"primes": [2, 3, 5, 7, 11, 13, 17, 19]}}
+{"id": "schema-05", "solution": {"status": 404, "error": "not_found", "message": "No such page"}}
+{"id": "schema-06", "solution": {"red": "#FF0000", "green": "#00FF00", "blue": "#0000FF"}}
+{"id": "schema-07", "solution": {"sku": "ABC-1234", "price": 9.5, "currency": "IDR", "tags": ["new", "sale"]}}
+{"id": "schema-08", "solution": {"celsius": 100, "fahrenheit": 212}}
+{"id": "schema-09", "solution": {"id": "123e4567-e89b-12d3-a456-426614174000", "name": "Sari", "roles": ["editor"], "active": true}}
+{"id": "schema-10", "solution": {"matrix": [[1, 0], [0, 1]]}}
+{"id": "schema-11", "solution": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]}
+{"id": "schema-12", "solution": {"answer": 391}}

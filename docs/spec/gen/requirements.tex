@@ -1,0 +1,164 @@
+\subsection{Functional requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Functional requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{FR-001} & Chat rooms & The gateway MUST provide multi-user chat rooms with streamed assistant replies. & Must & P1\\
+\textbf{FR-002} & Reply metadata & Every reply MUST carry reasoning\_mode (fast or slow), assurance level, tokens used, thinking budget used and wall-clock cost. & Must & P1\\
+\textbf{FR-003} & Conversation context & The Context Manager MUST assemble prompts from conversation history within the configured context cap and SHOULD preserve prompt-cache prefixes. & Must & P1\\
+\textbf{FR-004} & Speed-care control & Users MAY set a single scalar lambda (speed-care) per conversation; the gate MUST use it as the cost price. & Should & P2\\
+\textbf{FR-005} & Model profiles & Operators MUST be able to select model profile A, B or C by configuration without code changes. & Must & P1\\
+\textbf{FR-006} & Controller events & The gateway MUST stream controller events (gate decision, verification result, retry, abstention) alongside tokens. & Must & P1\\
+\textbf{FR-010} & Gate features & The Aql Gate MUST compute, from the fast draft, the features: mean and minimum token log-probability, agreement among k samples, domain class and, for verifiable tasks, the verifier outcome. & Must & P2\\
+\textbf{FR-011} & Derived gate rule & The gate MUST escalate iff L*(e1\_hat - e2\_hat) > lambda*delta\_c using a calibrated estimator e1\_hat and per-domain e2\_hat; hand-tuned score thresholds MUST NOT be used in production mode. & Must & P2\\
+\textbf{FR-012} & Failed verification escalates & A verifiable task whose fast draft fails verification MUST be escalated and MUST NOT be returned as kept. & Must & P1\\
+\textbf{FR-013} & Decision record & For every request the gate MUST write a decision record containing features, estimates, threshold, lambda, configuration hash and outcome. & Must & P1\\
+\textbf{FR-014} & Budget mode & Operators MAY configure an escalation budget B instead of lambda; the gate MUST then use the multiplier lambda* from the empirical quantile with the DKW sample-size rule. & Could & P2\\
+\textbf{FR-015} & Gate recalibration & The calibration estimator MUST be retrained from the ledger on a configured schedule and MUST NOT be promoted unless NFR-020 holds on held-out data. & Must & P2\\
+\textbf{FR-020} & Sequential verified sampling & System 2 MUST draw candidates sequentially, verify each, stop at the first accepted candidate, and respect caps N per round and R rounds. & Must & P2\\
+\textbf{FR-021} & Caps from Phase-0 fit & N and R per domain MUST be derived from the Phase-0 Beta fit of acceptance rates and the configured cost ratio c\_p/L\_a, and the derivation MUST be recorded with the configuration. & Must & P2\\
+\textbf{FR-022} & No unverified refinement & On non-verifiable tasks R MUST be at most 1 and no refinement MAY replace an earlier candidate without a verifier or judge acceptance. & Must & P2\\
+\textbf{FR-023} & Draft-blind deliberation & System 2 MUST NOT receive the fast draft by default; draft-conditioned mode MAY exist only as an ablation flag that is off in production. & Must & P1\\
+\textbf{FR-024} & Thinking budget and forcing & Each domain MUST have a thinking budget; on exhaustion the controller MUST force the answer by closing the reasoning span and, if no answer results, return an abstention with notice. & Must & P1\\
+\textbf{FR-025} & Evidence-fed retry & A rejected candidate's verifier evidence MUST be included in the next round's prompt. & Must & P2\\
+\textbf{FR-026} & Bounded loop & The orchestrator MUST enforce the model-call cap 1+N(R+1) and a wall-clock cap per request, terminating in state T or X. & Must & P1\\
+\textbf{FR-030} & Exact verifiers & The Verifier Hub MUST provide exact verifiers for code (test execution in a sandbox), mathematics (numeric and symbolic equality against a reference) and JSON Schema validity. & Must & P1\\
+\textbf{FR-031} & Assurance levels & Every reply MUST carry one of the assurance levels verified, consensus, unverified or abstained, and consensus MUST NOT be presented as verified. & Must & P1\\
+\textbf{FR-032} & Verifier rates & Each verifier MUST publish (r, phi) measured by mutation testing; exact verifiers MUST use acceptance threshold 1.0. & Must & P2\\
+\textbf{FR-033} & Consensus not training data & Consensus-assured outputs MUST NOT enter the distillation set without human review. & Must & P3\\
+\textbf{FR-034} & Judge hard gate & The rubric judge MUST apply hard floors honesty $\ge$ 0.5, harm-avoidance $\ge$ 0.5, helpfulness $\ge$ 0.5 and total V $\ge$ 0.7 before any candidate is accepted on non-verifiable tasks. & Should & P2\\
+\textbf{FR-035} & Code sandbox & Code verification MUST run in a subprocess with CPU-time, memory, wall-clock and output limits, no network and an ephemeral file system. & Must & P1\\
+\textbf{FR-040} & Audit stream & A random fraction epsilon (default 0.05) of kept requests MUST also be run through System 2 offline and recorded as audits. & Must & P2\\
+\textbf{FR-041} & Capability table & The Muhasaba Ledger MUST produce per-domain capability statistics keyed by model and adapter hash and MUST report domains without audited data as unmeasured. & Must & P2\\
+\textbf{FR-042} & Drift monitoring & The ledger MUST run a CUSUM chart on calibration error and accuracy per domain with a negative control and raise an alert on change. & Should & P4\\
+\textbf{FR-050} & Evaluation harness & The Eval Harness MUST run benchmark sets through the gateway API for the system and for the fast-only and slow-only baselines and compute the metrics of ER-010. & Must & P0\\
+\textbf{FR-051} & Paired statistics & The harness MUST report paired differences with confidence intervals, non-inferiority tests and Bonferroni correction across domains. & Must & P4\\
+\textbf{FR-052} & Performance console & The performance console MUST run load tests against the gateway and report latency quantiles, throughput, escalation rate and cost per request. & Must & P4\\
+\textbf{FR-053} & Gate dashboard & The dashboard MUST display the go/no-go status of each roadmap gate from stored evaluation runs. & Should & P4\\
+\textbf{FR-060} & Persistent store & Conversations, decision records and traces MUST be stored (SQLite and JSONL) with a configurable retention period. & Must & P1\\
+\textbf{FR-061} & Retrieval memory & The Context Manager MAY retrieve prior verified answers with an embedding index; retrieved text MUST be delimited as data with provenance. & Could & P5\\
+\textbf{FR-070} & Distillation dataset builder & The dataset builder MUST select verified System 2 traces, deduplicate, cap any domain at 30 percent, and add 5 percent abstention examples. & Must & P3\\
+\textbf{FR-080} & Early escalation & Under the fixed rule the gate SHOULD stop an unverifiable draft once its running mean log-prob after a minimum number of tokens is below the threshold minus a margin, and escalate; its decisions MUST agree with full-draft decisions on at least 95\% of a held-out prompt set before it is on by default. & Should & P7\\
+\textbf{FR-081} & Speculative decoding heads & Each model MAY be served with a trained speculative head (EAGLE-3) or an n-gram drafter, enabled only where a measured decode speed-up of at least 1.2x holds with identical greedy output. & Could & P7\\
+\textbf{FR-082} & Adaptive reasoning exit & System 2 reasoning SHOULD be probed at reflection points (and at least every configured interval) for a short answer; on verifiable tasks the exact verifier MAY end the reasoning early, and on other tasks agreement between consecutive probes MAY; the final answer MUST be generated after the reasoning as on the standard path, and the exit reason MUST be recorded. & Should & P7\\
+\end{longtable}
+
+\subsection{Non-functional requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Non-functional requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{NFR-001} & Hard latency bound & Every request MUST terminate within the configured wall-clock cap (default 300 s on the CPU baseline), returning an abstention if necessary. Target. & Must & P1\\
+\textbf{NFR-002} & Fast-path first token & Target: on the reference machine, time to first token of the fast path SHOULD be $\le$ 2 s at p95 for prompts $\le$ 1000 tokens with prompt cache hits. & Should & P1\\
+\textbf{NFR-003} & Fast-path reply latency & Target: a 150-token fast-path reply SHOULD complete within 12 s at p95 on the reference machine (Profile A). & Should & P1\\
+\textbf{NFR-004} & Slow-path latency & Target: a slow-path reply with a 1024-token thinking budget on the 4B model SHOULD complete within 240 s at p95 on the reference machine. & Should & P1\\
+\textbf{NFR-005} & Memory budget & Resident memory of both model servers, KV cache and the gateway MUST stay below 8 GB in Profile A on the CPU baseline. & Must & P1\\
+\textbf{NFR-006} & Context cap & The CPU baseline MUST cap prompts at 4096 tokens and MUST enable prompt caching on the model servers. & Must & P1\\
+\textbf{NFR-007} & Concurrency & Target: the reference machine SHOULD serve 4 concurrent chat sessions with p95 fast-path latency at most twice the single-session value. & Could & P4\\
+\textbf{NFR-010} & Backend resilience & The gateway MUST survive model-server restarts, reconnect automatically and lose no decision records or traces. & Must & P2\\
+\textbf{NFR-011} & Backpressure & In-flight requests per backend MUST be bounded by configuration and excess requests MUST receive HTTP 429 with a retry hint. & Must & P1\\
+\textbf{NFR-012} & Pinned model identity & Model identifiers, revisions, quantisation, chat-template hash and configuration hash MUST be recorded in every trace. & Must & P0\\
+\textbf{NFR-020} & Gate calibration & Target: the calibration error (ECE with 5 bins on $\ge$ 2900 held-out samples) of e1\_hat MUST be $\le$ 0.05 before a calibration is promoted. & Must & P2\\
+\textbf{NFR-021} & Observability & The gateway MUST expose Prometheus metrics, structured JSON logs and OpenTelemetry spans carrying the request identifier. & Must & P1\\
+\textbf{NFR-022} & Access control & API access MUST require a bearer token; rate limits MUST apply per token; secrets MUST NOT appear in logs or traces. & Must & P1\\
+\textbf{NFR-023} & Build reproducibility & Cargo.lock MUST be committed, CI MUST build and test on Linux and macOS, and evaluation runs MUST use recorded random seeds. & Must & P0\\
+\textbf{NFR-030} & Latency attribution & Every reply MUST record per-stage timings (retrieval, draft, samples, verification, deliberation, judge) and, for model stages, the queue wait, prefill and decode time and KV-cache reuse reported by the server; the gateway MUST report each stage's share of wall time. & Must & P7\\
+\textbf{NFR-031} & Interleaved tuning evidence & A serving-flag or weight-format change MUST be justified by an interleaved A/B (alternating order, at least two rounds) on the reference machine, with the host load recorded. & Must & P7\\
+\end{longtable}
+
+\subsection{Interface requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Interface requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{IF-001} & OpenAPI document & The gateway MUST publish an OpenAPI 3.1 document equal to spec/openapi.yaml at /openapi.json. & Must & P1\\
+\textbf{IF-002} & Chat endpoints & The gateway MUST provide POST /v1/chat for complete replies and POST /v1/chat/stream for SSE with event types token, decision, verification, retry, done and error. & Must & P1\\
+\textbf{IF-003} & Reasoning mode in replies & The reply schema MUST include reasoning\_mode, assurance, usage and decision\_id fields. & Must & P1\\
+\textbf{IF-004} & Chat-room WebSocket & Chat rooms MUST be served over WebSocket at /ws/rooms/{room\_id} with JSON frames defined in the schemas. & Must & P1\\
+\textbf{IF-005} & JSON Schemas & ChatRequest, ChatReply, DecisionRecord, TraceRecord and VerifierResult MUST be defined as JSON Schema (draft 2020-12) files and generated from the Rust types. & Must & P1\\
+\textbf{IF-006} & Backend contract & Model backends MUST be reached through the OpenAI-compatible /v1/chat/completions API with logprobs, n and chat\_template\_kwargs, and reasoning content MUST be separated by the server parser. & Must & P1\\
+\textbf{IF-007} & Retry policy & Backend calls MUST be retried at most 3 times with exponential backoff and jitter on connection errors and HTTP 5xx, never on HTTP 4xx, and only when the request is idempotent. & Must & P1\\
+\textbf{IF-008} & Backend backpressure & Each backend MUST have a concurrency semaphore sized to the server's maximum sequences, and queued requests MUST time out with a distinct error. & Must & P1\\
+\textbf{IF-009} & Bench and eval endpoints & The gateway MUST provide /v1/bench/runs and /v1/eval/runs resources to start, list and fetch runs. & Should & P4\\
+\textbf{IF-010} & Telemetry format & Traces MUST be newline-delimited JSON records conforming to TraceRecord with a schema\_version field. & Must & P1\\
+\end{longtable}
+
+\subsection{Model requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Model requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{MR-001} & Pinned models & Profile A MUST pin Qwen/Qwen3-1.7B (System 1) and Qwen/Qwen3-4B-Thinking-2507 (System 2) by repository revision and GGUF file hash. & Must & P0\\
+\textbf{MR-002} & Thinking toggle & The backend layer MUST set thinking on or off per request through chat\_template\_kwargs or model selection, and MUST reject replies whose reasoning content is not separated. & Must & P1\\
+\textbf{MR-003} & Serving configurations & The specification MUST provide a vLLM-CPU launch configuration for Linux and a llama-server command for macOS or AVX2 hosts exposing the same API. & Must & P0\\
+\textbf{MR-004} & Degraded mode & If the System 2 backend is unavailable the gateway MUST answer with the fast path, label the reply unverified, and emit a degraded-mode event. & Must & P2\\
+\textbf{MR-005} & Profile C adoption & Profile C (Qwen3.5) MUST NOT become the default unless hypothesis H7 (decode speed $\ge$ 70 percent of dense Qwen3 at equal size on the target CPU) passes at gate G0 or G5. & Must & P0\\
+\end{longtable}
+
+\subsection{Training requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Training requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{TR-001} & SFT data schema & Training examples MUST follow the JSONL schema with fields id, domain, prompt, answer, rationale ($\le$ 150 tokens), assurance, verifier, source\_trace, adapter\_hash. & Must & P3\\
+\textbf{TR-002} & Verified-only training data & Only traces with assurance verified, plus human-reviewed consensus traces, MAY enter the training set. & Must & P3\\
+\textbf{TR-003} & Synthetic data & Synthetic examples MUST be generated by System 2 on benchmark-like prompts, verified by an exact verifier never used for evaluation, and labelled synthetic. & Should & P3\\
+\textbf{TR-004} & Unsloth configuration & Fine-tuning MUST use Unsloth LoRA with rank 16, alpha 16, learning rate 2e-4, 1 to 3 epochs, effective batch 16, dropout 0 on all attention and MLP projections; QLoRA for Qwen3 checkpoints and BF16 LoRA for Qwen3.5 checkpoints. & Must & P3\\
+\textbf{TR-005} & GPU path & Training MUST run on a GPU host (minimum 16 GB VRAM); the CPU machine MUST NOT be used for training. & Must & P3\\
+\textbf{TR-006} & Checkpoints and export & Each training run MUST produce an adapter with a content hash, a merged GGUF in q4\_k\_m and q8\_0, and a manifest linking data snapshot, configuration and hashes. & Must & P3\\
+\textbf{TR-007} & Promotion gate & An adapter MAY be promoted only if the lower confidence bound of the overall gain on a held-out verifier is above zero with point estimate $\ge$ 2 points, no domain's lower bound is below -1 point, NFR-020 and the coupling test still pass, and a human signs off. & Must & P3\\
+\textbf{TR-008} & Replay and abstention & Training sets MUST include 20 percent replay of general instruction data and 5 percent abstention examples. & Should & P3\\
+\end{longtable}
+
+\subsection{Security, safety and ethics requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Security, safety and ethics requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{SR-001} & Prompt-injection handling & Retrieved content, tool output and verifier evidence MUST be delimited as data in prompts; nothing in model output or observed content MAY change controller parameters or configuration. & Must & P2\\
+\textbf{SR-002} & Sandbox isolation & The code sandbox MUST run without network access, under resource limits and, on Linux, under seccomp or a container; sandbox escapes MUST be tested. & Must & P1\\
+\textbf{SR-003} & Content safety & Replies on non-verifiable tasks MUST pass the judge's harm floor; refused requests MUST return a refusal with an explanation and no partial content. & Must & P2\\
+\textbf{SR-004} & Privacy & Users MUST be informed that conversations may be used for evaluation and training; retention MUST be bounded; personal data MUST be redacted before training; opt-out MUST exclude a conversation. & Must & P3\\
+\textbf{SR-005} & Religious content & User-facing copy MUST describe the nafs and aql terms as analogies, MUST NOT claim religious authority, and the analogy text MUST be reviewed by a scholar of the tradition before release. & Must & P6\\
+\textbf{SR-006} & Transport and secrets & Deployments MUST terminate TLS in front of the gateway and load secrets from the environment or a secret store. & Must & P5\\
+\end{longtable}
+
+\subsection{Operations requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Operations requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{OR-001} & Build and CI & The Cargo workspace MUST build with the pinned toolchain; CI MUST run fmt, clippy, unit and integration tests on every push. & Must & P0\\
+\textbf{OR-002} & Packaging & Releases MUST ship a gateway binary, a model manifest with SHA-256 hashes and the configuration schema. & Must & P5\\
+\textbf{OR-003} & Deployment recipes & The specification MUST include docker-compose for the Linux vLLM-CPU profile and service files for the llama-server profile. & Must & P5\\
+\textbf{OR-004} & Monitoring and alerts & Dashboards and alerts MUST cover latency, error rate, escalation rate, verifier acceptance and calibration drift. & Should & P5\\
+\textbf{OR-005} & Rollback & Adapter or model promotion MUST be a configuration change; the previous artefact MUST be retained and restorable with one command. & Must & P3\\
+\textbf{OR-006} & Configuration management & All runtime parameters MUST live in one TOML file validated against a schema, with environment overrides, and the configuration hash MUST appear in traces. & Must & P1\\
+\end{longtable}
+
+\subsection{Evaluation and test requirements}
+\begin{longtable}{@{}p{1.45cm}p{2.5cm}p{8.1cm}p{1.6cm}p{1.1cm}@{}}
+\caption{Evaluation and test requirements}\\
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endfirsthead
+\toprule ID & Title & Normative statement & Priority & Phase\\\midrule\endhead
+\bottomrule\endfoot
+\textbf{ER-001} & Phase-0 baseline size & The Phase-0 measurement run MUST include at least 4600 tasks across at least five domains. & Must & P0\\
+\textbf{ER-002} & Non-inferiority gates & The cascade MUST be non-inferior to the slow-only baseline within 3 points on $\ge$ 700 pairs at gate G2 and within 1 point on $\ge$ 6200 pairs at gate G6. & Must & P2\\
+\textbf{ER-003} & Verifier mutation tests & Each verifier MUST be evaluated on $\ge$ 200 mutants with Clopper-Pearson intervals on (r, phi). & Must & P2\\
+\textbf{ER-004} & Coupling test & The draft-blind and draft-conditioned modes MUST each be tested on $\ge$ 200 trials for adoption of a wrong draft. & Must & P2\\
+\textbf{ER-005} & Calibration test & Calibration MUST be evaluated with 5 bins on $\ge$ 2900 held-out samples. & Must & P2\\
+\textbf{ER-006} & Unit coverage & Line coverage of nafs-core MUST be $\ge$ 80 percent and every automaton transition MUST have a test. & Must & P1\\
+\textbf{ER-007} & Load test protocol & Load tests MUST use the recorded protocol (goose, fixed prompt set, 1, 2, 4 concurrent sessions) and report p50, p95, p99. & Must & P4\\
+\textbf{ER-008} & Regression suite & A fixed regression suite MUST run on every model, adapter, template or configuration change before promotion. & Must & P3\\
+\textbf{ER-010} & Metric definitions & The harness MUST implement the metrics of the specification Section 10 with the stated formulas and unit tests on synthetic data. & Must & P0\\
+\textbf{ER-011} & Hybrid-model benchmark & Phase 0 MUST benchmark Qwen3.5-2B and 4B against Qwen3-1.7B and 4B with llama-bench on the target CPU. & Must & P0\\
+\textbf{ER-020} & Efficiency frontier & The lab MUST report, per domain, the accuracy-latency frontier of System 1 / System 2 policies including early escalation, with saved draft tokens and routing agreement. & Should & P7\\
+\end{longtable}
+

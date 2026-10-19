@@ -1,0 +1,14 @@
+% Wireframe: performance console; width ~7cm
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\tiny}]
+\draw[thick,rounded corners=3pt,fill=sand!40] (0,0) rectangle (7,5);
+\fill[navy!15] (0,4.4) rectangle (7,5); \node[anchor=west,font=\tiny\bfseries] at (0.15,4.7) {Performance console \quad run \#17 \quad profile A \quad concurrency 4 \quad 300\,s};
+\fill[white,draw=slate!40] (0.15,2.5) rectangle (3.4,4.3);
+\node[anchor=north west,text width=3.1cm,align=left] at (0.2,4.25) {\textbf{latency (ms)}\\ TTFT p50 / p95 / p99\\ total p50 / p95 / p99\\ fast path, slow path separately};
+\fill[white,draw=slate!40] (3.55,2.5) rectangle (6.85,4.3);
+\node[anchor=north west,text width=3.1cm,align=left] at (3.6,4.25) {\textbf{throughput and cost}\\ req/s \quad tokens/s\\ escalation rate $g$\\ CPU-s per request \quad error rate};
+\fill[white,draw=slate!40] (0.15,0.2) rectangle (6.85,2.35);
+\node[anchor=north west] at (0.2,2.3) {\textbf{latency over time} (p95 line, points = requests; colour = path)};
+\draw[slate!50] (0.4,0.4)--(6.6,0.4); \draw[slate!50] (0.4,0.4)--(0.4,2.0);
+\draw[navy,thick] (0.4,0.9) .. controls (2,1.0) and (4,1.6) .. (6.6,1.3);
+\foreach \x/\y in {0.8/0.7,1.5/0.8,2.2/0.75,3.0/1.5,3.7/0.8,4.4/1.7,5.1/0.9,5.8/1.1,6.3/0.8}{\fill[teal] (\x,\y) circle (1pt);}
+\end{tikzpicture}

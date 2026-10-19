@@ -1,0 +1,17 @@
+% Roadmap timeline (weeks); width ~8.6cm; estimates. Phase 7 was added after Phases 0-6 were implemented.
+\begin{tikzpicture}[x=0.197cm,y=0.5cm]
+\foreach \w in {0,4,...,32}{\draw[black!15] (\w,0.3)--(\w,-7.7);\node[font=\tiny] at (\w,0.6){W\w};}
+\foreach \ii/\lbl/\st/\en/\col in {
+ 0/{P0 Foundations}/0/3/navy,
+ 1/{P1 CPU MVP}/3/8/teal,
+ 2/{P2 Gate + loop}/8/13/amber,
+ 3/{P3 Fine-tuning}/12/18/violet,
+ 4/{P4 Eval + bench}/15/21/crimson,
+ 5/{P5 Hardening}/20/25/slate,
+ 6/{P6 Release}/25/28/leaf,
+ 7/{P7 CPU speed (added)}/28/32/teal}
+ {\node[anchor=east,font=\tiny] at (-0.6,-\ii-0.2){\lbl};
+  \fill[\col!75,rounded corners=1.5pt](\st,-\ii-0.5) rectangle (\en,-\ii+0.1);}
+\foreach \x/\n in {3/G0,8/G1,13/G2,18/G3,21/G4,25/G5,28/G6}{\node[diamond,fill=black!75,inner sep=1.3pt] (g\n) at (\x,-8.1){};\node[font=\tiny,below=1pt] at (\x,-8.2){\n};}
+\node[anchor=east,font=\tiny] at (-0.6,-8.1){gates};
+\end{tikzpicture}

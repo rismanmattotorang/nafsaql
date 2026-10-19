@@ -1,0 +1,391 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nafs-aql.example/schemas/ChatReply.schema.json",
+  "title": "ChatReply",
+  "type": "object",
+  "required": [
+    "assurance",
+    "decision",
+    "decision_id",
+    "domain",
+    "message",
+    "reasoning_mode",
+    "reply_id",
+    "states",
+    "trace_state",
+    "usage"
+  ],
+  "properties": {
+    "reply_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "conversation_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "decision_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reasoning_mode": {
+      "type": "string",
+      "enum": [
+        "fast",
+        "slow"
+      ],
+      "description": "Path that produced the reply (IF-003)"
+    },
+    "assurance": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "consensus",
+        "unverified",
+        "abstained"
+      ],
+      "description": "FR-031"
+    },
+    "trace_state": {
+      "type": "string",
+      "enum": [
+        "A",
+        "L",
+        "M",
+        "T",
+        "X"
+      ],
+      "description": "Automaton states: draft, flagged, deliberate, accepted, abstain"
+    },
+    "message": {
+      "type": "object",
+      "required": [
+        "role",
+        "content"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "system",
+            "user",
+            "assistant"
+          ]
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    },
+    "uncertainty_notice": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Present when assurance is abstained or the reply is degraded"
+    },
+    "verifier": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "verifier",
+            "passed"
+          ],
+          "properties": {
+            "verifier": {
+              "type": "string",
+              "description": "code_tests | math_numeric | json_schema | judge | consensus, or a '+'-joined combination"
+            },
+            "passed": {
+              "type": "boolean"
+            },
+            "score": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "evidence": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Failing test, counterexample or schema error fed to the next round (FR-025)"
+            },
+            "rates": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "r": {
+                      "type": "number"
+                    },
+                    "phi": {
+                      "type": "number"
+                    },
+                    "n_mutants": {
+                      "type": "integer"
+                    }
+                  },
+                  "description": "Published verifier rates (FR-032)"
+                }
+              ]
+            },
+            "duration_ms": {
+              "type": "integer"
+            },
+            "exact": {
+              "type": "boolean",
+              "description": "Exact verifiers accept at threshold 1.0 (Theorem 1)"
+            }
+          }
+        }
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "required": [
+        "prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens",
+        "wall_ms",
+        "model_calls",
+        "verifier_calls"
+      ],
+      "properties": {
+        "prompt_tokens": {
+          "type": "integer"
+        },
+        "completion_tokens": {
+          "type": "integer"
+        },
+        "reasoning_tokens": {
+          "type": "integer"
+        },
+        "thinking_budget": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "wall_ms": {
+          "type": "integer"
+        },
+        "model_calls": {
+          "type": "integer",
+          "description": "Bounded by 1+N(R+1) (FR-026)"
+        },
+        "verifier_calls": {
+          "type": "integer"
+        },
+        "ttft_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Time to first visible token"
+        }
+      }
+    },
+    "degraded": {
+      "type": "boolean",
+      "default": false,
+      "description": "MR-004"
+    },
+    "states": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "A",
+          "L",
+          "M",
+          "T",
+          "X"
+        ],
+        "description": "Automaton states: draft, flagged, deliberate, accepted, abstain"
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "backend",
+        "config_hash",
+        "decision_id",
+        "delta_c",
+        "e1_hat",
+        "e2_hat",
+        "escalate",
+        "explanation",
+        "features",
+        "lambda",
+        "model_profile",
+        "request_id",
+        "rule",
+        "timestamp"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "config_hash": {
+          "type": "string"
+        },
+        "model_profile": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ],
+          "description": "Model profile (MR-001)"
+        },
+        "calibration_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "features": {
+          "type": "object",
+          "properties": {
+            "mean_logprob": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "min_logprob": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "k": {
+              "type": "integer"
+            },
+            "agreement": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "domain": {
+              "type": "string",
+              "enum": [
+                "code",
+                "math",
+                "structured",
+                "factual",
+                "open",
+                "other"
+              ]
+            },
+            "verifiable": {
+              "type": "boolean"
+            },
+            "draft_verified": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "prompt_tokens": {
+              "type": "integer"
+            },
+            "draft_tokens": {
+              "type": "integer"
+            }
+          }
+        },
+        "e1_hat": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "e2_hat": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "lambda": {
+          "type": "number"
+        },
+        "delta_c": {
+          "type": "number"
+        },
+        "escalate": {
+          "type": "boolean"
+        },
+        "rule": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "calibrated",
+            "budget",
+            "forced_failed_verification",
+            "forced_override"
+          ]
+        },
+        "audit": {
+          "type": "boolean",
+          "description": "Selected for the 5 percent audit stream (FR-040)"
+        },
+        "backend": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string",
+          "description": "Human-readable reason for the decision"
+        }
+      }
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "code",
+        "math",
+        "structured",
+        "factual",
+        "open",
+        "other"
+      ]
+    },
+    "draft": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The unused System 1 draft when the reply came from System 2"
+    },
+    "reasoning": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "System 2 reasoning content (kept for traces and debugging, not an explanation)"
+    }
+  }
+}

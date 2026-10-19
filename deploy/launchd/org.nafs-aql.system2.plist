@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Paths assume a checkout at /opt/nafs-aql: edit them (or sed the file) for your location.
+     Nafs-Aql system2 on the macOS reference machine (OR-003). Install:
+     cp deploy/launchd/org.nafs-aql.*.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/org.nafs-aql.system2.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>org.nafs-aql.system2</string>
+  <key>ProgramArguments</key><array><string>/opt/nafs-aql/third_party/llama.cpp/build/bin/llama-server</string><string>-m</string><string>models/Qwen3-4B-Thinking-2507-Q4_K_M.gguf</string><string>--alias</string><string>system2</string><string>-t</string><string>4</string><string>-c</string><string>16384</string><string>-np</string><string>2</string><string>--host</string><string>127.0.0.1</string><string>--port</string><string>8002</string><string>--jinja</string><string>--reasoning-format</string><string>deepseek</string><string>--cache-reuse</string><string>256</string><string>--metrics</string></array>
+  <key>WorkingDirectory</key><string>/opt/nafs-aql</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>StandardOutPath</key><string>/opt/nafs-aql/logs/system2.log</string>
+  <key>StandardErrorPath</key><string>/opt/nafs-aql/logs/system2.log</string>
+  <key>EnvironmentVariables</key><dict><key>NAFS_CONFIG</key><string>config/nafs-aql.toml</string></dict>
+</dict>
+</plist>

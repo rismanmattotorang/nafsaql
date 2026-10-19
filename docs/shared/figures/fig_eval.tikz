@@ -1,0 +1,12 @@
+% Evaluation workflow; width ~8.6cm
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[sblk=navy,text width=1.6cm]   (ds) at (0,0)    {Benchmarks\\GSM8K, MATH, HumanEval, \ldots};
+\node[sblk=teal,text width=1.6cm]   (h)  at (2.2,0)  {\Harness\\\texttt{nafs-eval}};
+\node[sblk=violet,text width=1.6cm] (sys) at (4.4,0) {\Sys\\gateway API};
+\node[sblk=amber,text width=1.6cm]  (bl) at (4.4,-1.4) {Baselines\\S1-only, S2-only};
+\node[sblk=slate,text width=1.6cm]  (m)  at (6.6,0)  {Metrics\\accuracy, cost, ECE, routing};
+\node[sblk=crimson,text width=1.6cm](st) at (6.6,-1.4) {Statistics\\paired tests, CIs};
+\node[sblk=leaf,text width=1.6cm]   (db) at (2.2,-1.4) {Dashboard\\reports, gates};
+\draw[arr] (ds)--(h); \draw[arr] (h)--(sys); \draw[arr] (h)--(bl); \draw[arr] (sys)--(m); \draw[arr] (bl)--(m);
+\draw[arr] (m)--(st); \draw[arr] (st)--(db); \draw[dsh] (db)--node[lab,left]{go / no-go}(h);
+\end{tikzpicture}

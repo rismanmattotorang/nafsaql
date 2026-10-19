@@ -1,0 +1,19 @@
+% Request lifecycle: fast path, gate, deliberation, verification; width ~8.6cm
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[blk=navy,text width=1.1cm]   (in)  at (0.1,0)    {Request $x$};
+\node[blk=teal,text width=1.45cm]   (ctx) at (1.95,0)  {\Mem\\history, cache};
+\node[blk=navy,text width=1.45cm]   (s1)  at (3.95,0)  {\Sone\\draft $+$ $k$ samples};
+\node[dm,minimum width=1.6cm]      (g)   at (6.2,0)  {\Gate\\escalate?};
+\node[blk=violet,text width=1.45cm] (s2)  at (6.2,-1.7) {\Stwo\\draft-blind, budget $b$};
+\node[blk=amber,text width=1.45cm]  (v)   at (3.95,-1.7) {\Hub\\$(r,\varphi)$};
+\node[blk=slate,text width=1.45cm]  (tr)  at (1.95,-1.7) {Trace, decision record};
+\node[blk=leaf,text width=1.45cm]   (out) at (6.2,-3.3) {Reply $+$ assurance level};
+\draw[arr] (in)--(ctx); \draw[arr] (ctx)--(s1); \draw[arr] (s1)--(g);
+\draw[arr] (g.south)--node[lab,right]{escalate}(s2.north);
+\draw[arr] (g.east)--++(0.45,0)|-node[lab,pos=.25,right]{keep}(out.east);
+\draw[arr] (s2)--node[lab,above=1pt]{candidate}(v);
+\draw[dsh] (v.south east) to[bend right=28] node[lab,below]{rejected: retry $\le R$} (s2.south west);
+\draw[arr] (v.south)--++(0,-0.75)-|node[lab,pos=.25,below]{accepted}(out.west);
+\draw[dsh] (s1.south)--node[lab,right]{verify kept draft}(v.north);
+\draw[arr] (v)--(tr);
+\end{tikzpicture}

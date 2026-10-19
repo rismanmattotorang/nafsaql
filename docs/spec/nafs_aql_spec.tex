@@ -1,0 +1,405 @@
+% Nafs-Aql Technical Specification. Build: ../../tools/tectonic nafs_aql_spec.tex
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage[utf8]{inputenc}\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs,array,longtable,multirow}
+\usepackage{graphicx,xcolor}
+\usepackage{tikz,pgfplots}\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage{enumitem}\setlist{nosep,leftmargin=*}
+\usepackage{listings}
+\usepackage{microtype}
+\usepackage{url}
+\usepackage[hidelinks,pdfauthor={Dirac R\&D Team}]{hyperref}
+\usepackage{fancyhdr}
+\input{../shared/nafsstyle.tex}
+\input{../roadmap/gen/tasks.tex}
+\lstset{basicstyle=\ttfamily\scriptsize,columns=fullflexible,breaklines=true,frame=single,framerule=0.3pt,keepspaces=true,showstringspaces=false,commentstyle=\color{slate}\itshape,keywordstyle=\bfseries,xleftmargin=4pt}
+\newtheorem{theorem}{Theorem}\newtheorem{proposition}{Proposition}\newtheorem{lemma}{Lemma}
+\renewcommand{\Pr}{\mathbb{P}}
+\newcommand{\MUST}{\textbf{MUST}}\newcommand{\MUSTNOT}{\textbf{MUST NOT}}\newcommand{\SHOULD}{\textbf{SHOULD}}\newcommand{\MAY}{\textbf{MAY}}
+\pagestyle{fancy}\fancyhf{}\lhead{\small Nafs-Aql Technical Specification v1.1}\rhead{\small Dirac R\&D Team}\cfoot{\small\thepage}
+\title{\textbf{Nafs-Aql Technical Specification}\\[4pt]\large Version 1.1 (18 October 2026; adds the Phase 7 requirements NFR-030, NFR-031, FR-080, FR-081 and ER-020)}
+\author{Dirac R\&D Team}
+\date{}
+\begin{document}
+\maketitle
+\begin{abstract}\noindent
+This document specifies \Sys, a verifier-gated dual-process (System~1 / System~2) chat system built from small Qwen models and deployable on a CPU-only machine, in enough detail for an engineering team to implement it without reading the companion technical report. Normative statements use RFC~2119 keywords; every requirement has a unique identifier (\texttt{FR}, \texttt{NFR}, \texttt{IF}, \texttt{MR}, \texttt{TR}, \texttt{SR}, \texttt{OR}, \texttt{ER}) and appears in the traceability matrix of Section~\ref{sec:trace}. Parameters that come from the formal results of the report are marked with the result that determines them. Latency, throughput and memory figures are \emph{targets}, not measurements, except where stated as measured on the reference machine. Machine-readable artefacts (\texttt{openapi.yaml}, JSON Schemas, sample configurations, Cargo workspace skeleton) accompany this document in the same folder.
+\end{abstract}
+\tableofcontents
+\clearpage
+
+\section{Scope, Goals, Non-Goals and Definitions}
+\subsection{Scope}
+This specification covers the gateway, orchestrator, controller, verifier hub, context manager, self-model ledger, evaluation harness, performance console, web UI, model serving configuration, and the fine-tuning pipeline of \Sys. It does not cover model pre-training, the internals of vLLM, llama.cpp or Unsloth, or any multimodal capability.
+\subsection{Goals}
+\begin{enumerate}[label=G\arabic*.]
+\item Answer chat requests with a fast path by default and a deliberate, verified path when the expected value of deliberation exceeds its cost.
+\item Attach an honest assurance level to every reply and never present unverified agreement as verification.
+\item Run end to end on a single CPU-only machine of the reference class (four cores, AVX2, 32\,GB) with bounded latency, and scale out to a GPU without changing the application.
+\item Improve the fast path over time from verified deliberation traces under a statistically sized promotion gate.
+\item Measure itself: routing quality, calibration, cost, verifier error rates and drift, through an evaluation harness and dashboard.
+\end{enumerate}
+\subsection{Non-goals}
+Training a base model; autonomous tool use beyond the verifiers; multimodal input; claims of consciousness, understanding or religious authority; interactive slow-path latency on the CPU baseline.
+\subsection{Keywords}
+The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be interpreted as in RFC~2119. Statements without a key word are informative.
+\subsection{Glossary}
+Table~\ref{tab:glossary} maps each borrowed term to its engineering meaning. \textbf{Every entry is an analogy}; the code uses the engineering names only, and no claim about the metaphysics of the terms is made.
+\begin{table}[h]\centering\small
+\caption{Glossary (analogy mapping)}\label{tab:glossary}
+\begin{tabular}{@{}p{3.2cm}p{5.6cm}p{6.4cm}@{}}
+\toprule Term (source) & Classical sense (summary) & Engineering component (analogy)\\\midrule
+\emph{nafs} (Qur'an 12:53, 75:2, 89:27; al-Ghazali) & the self; in its lower sense the seat of impulse; described in states: commanding, self-reproaching, at rest & the request's trace state: $\mathsf A$ unverified draft, $\mathsf L$ flagged, $\mathsf T$ accepted; plain engineering names $\mathsf M$ (retry) and $\mathsf X$ (abstain) for the rest\\
+\emph{\textquoteleft aql} (al-Ghazali: the vizier) & the deliberating intellect that counsels the heart & \Gate: cost--risk arbitration between fast and slow paths; \Stwo\ deliberation\\
+\emph{qalb} (al-Ghazali: the king) & the integrating executive that consults the intellect and commands the faculties & orchestrator \texttt{nafs-core}: owns the request lifecycle\\
+\emph{wahm}, \emph{dhakira} (Ibn Sina) & estimation (quick particular judgement), memory & gate features (cheap uncertainty signals); \Mem\\
+\emph{muraqaba}, \emph{muhasaba} (al-Muhasibi, al-Ghazali) & vigilance and self-accounting under a standard & \Ledger: audit stream, calibration tables, drift monitor\\
+\emph{tazkiyat al-nafs} & purification: gradual change of disposition & \Distil: verified traces to LoRA, promotion gate\\
+\emph{ruh}, \emph{ilham}, Active Intellect & spirit; inspiration; separate intellect & \textbf{not mapped} (see report, Section~II-A)\\
+\bottomrule\end{tabular}\end{table}
+\subsection{Definitions}
+\begin{description}
+\item[Fast path (\Sone)] a model call in non-thinking mode producing a draft and $k$ cheap samples.
+\item[Slow path (\Stwo)] a model call in thinking mode with a thinking budget $b$, sampled sequentially up to $N$ candidates per round for up to $R$ rounds.
+\item[Verifier] a procedure returning pass/fail with published true-accept rate $r$ and false-accept rate $\varphi$. \emph{Exact} verifiers have $\varphi=0$ on their domain.
+\item[Assurance level] one of \texttt{verified}, \texttt{consensus}, \texttt{unverified}, \texttt{abstained}.
+\item[Decision record] the gate's inputs, estimates, threshold and outcome for one request.
+\item[Trace] the record of one request's path through the automaton.
+\item[Profile] a named pair of model backends (A reference, B minimal, C upgrade).
+\item[Reference machine] Intel Core i3-8100 (4 cores, AVX2, no AVX-512), 32\,GB DDR4-2400, macOS~15.4.1.
+\end{description}
+
+\section{Requirements}
+\label{sec:req}
+Requirements are generated from \texttt{data/requirements.csv}, the single source of truth shared with the roadmap. Priorities use MoSCoW. The phase column refers to the roadmap phase that satisfies the requirement.
+\input{gen/requirements.tex}
+
+\section{System Architecture}
+\label{sec:arch}
+\subsection{Components and responsibilities}
+Figure~\ref{fig:components} shows the components and their interfaces; Table~\ref{tab:resp} lists responsibilities.
+\begin{figure}[h]\centering\input{../shared/figures/fig_components.tikz}\caption{Component diagram with the requirement groups each component satisfies.}\label{fig:components}\end{figure}
+\begin{table}[h]\centering\small\caption{Component responsibilities}\label{tab:resp}
+\begin{tabular}{@{}p{3.2cm}p{12.2cm}@{}}\toprule Component & Responsibility\\\midrule
+\texttt{nafs-gateway} & HTTP API, SSE and WebSocket, authentication, rate limiting, backpressure, metrics, OpenAPI document.\\
+\texttt{nafs-core} & request automaton, \Gate, sequential verified sampling, budget forcing, backend trait and implementations, decision records.\\
+\texttt{nafs-verify} & exact verifiers (code sandbox, math, JSON Schema), soft verifiers (judge, consensus), verifier rate registry.\\
+\texttt{nafs-memory} & conversation store, prompt assembly, prompt-cache affinity, trace writer, retention, optional retrieval.\\
+\Ledger\ (job) & aggregates traces and audits into calibration and capability tables; drift monitor; recalibration input.\\
+\texttt{nafs-eval}, \texttt{nafs-bench} & benchmark runs, metrics and paired statistics; load generation and latency quantiles.\\
+\texttt{nafs-web} & chat room, performance console, evaluation dashboard (server-rendered, htmx).\\
+\texttt{nafs-types} & shared types, JSON Schemas (generated), error taxonomy, configuration schema.\\
+\Distil\ (Python) & dataset builder, Unsloth training, promotion gate, GGUF export (runs on a GPU host).\\
+\bottomrule\end{tabular}\end{table}
+\subsection{Data flow}
+A request enters the gateway, is authenticated and rate-limited, and is passed to \texttt{nafs-core} with the conversation identifier. The context manager assembles the prompt. The fast backend returns a draft and $k$ samples with log-probabilities. The gate computes features and decides. On keep, verifiable drafts are verified; on escalation, the slow backend is sampled and verified sequentially. The reply, the decision record and the trace are persisted; tokens and controller events are streamed to the client as they occur. The ledger consumes traces offline. The harness drives the same API.
+\subsection{Deployment topology}
+\begin{figure}[h]\centering\input{../shared/figures/fig_deploy.tikz}\caption{Deployment topology: single-node CPU baseline (left) and optional GPU scale-out (right).}\label{fig:deploy}\end{figure}
+On the CPU baseline all processes run on one host. The two model servers are pinned to the physical cores; the gateway, web UI and verifiers share the remaining capacity (bursty). Resident memory in Profile~A is about 1.3\,GB (S1) + 2.5\,GB (S2) + KV caches (bounded by the context cap) + the gateway (tens of MB), under the 8\,GB budget of NFR-005. The GPU variant keeps every component except the model servers.
+
+\section{Component Specifications}
+\label{sec:components}
+Each component is specified by purpose, inputs, outputs, state, algorithm, error handling, and budget. Parameters marked [Thm.\,$n$] or [Prop.\,$n$] come from the numbered results of the companion report (Section~III there).
+
+\subsection{\Sone\ (fast path)}
+\textbf{Purpose.} Produce a draft and $k$ cheap samples in one prefill. \textbf{Inputs.} Assembled prompt, $k$, \texttt{max\_tokens}, temperature for samples. \textbf{Outputs.} Draft text, $k$ sample texts, per-token log-probabilities, usage. \textbf{State.} None (the backend holds the prompt cache). \textbf{Algorithm.} One request with \texttt{n=k+1} where the backend supports it (vLLM), otherwise $k+1$ parallel requests against $k+1$ slots (llama-server; verified on the reference machine); the first (temperature~0) is the draft. \textbf{Errors.} Timeout after \texttt{stream\_idle\_timeout\_ms}; retry per IF-007; on repeated failure return \texttt{E\_BACKEND\_UNAVAILABLE}. \textbf{Budget.} Profile~A: 1.7B Q4\_K\_M, about 15 tokens/s decode and 94 tokens/s prefill measured; $k=4$, draft $\le$ 512 tokens, samples $\le$ 32 tokens each (the samples are for agreement, not for display).
+
+\subsection{\Stwo\ (slow path)}
+\textbf{Purpose.} Deliberate under a budget and produce verifiable candidates. \textbf{Inputs.} Prompt without the fast draft (FR-023), evidence from earlier rounds, budget $b$, $N$, $R$. \textbf{Outputs.} Candidate answer, reasoning content (kept in the trace, not shown by default), usage. \textbf{Algorithm.} Algorithm~\ref{alg:loop}. \textbf{Budget forcing.} The backend is asked for $b$ reasoning tokens (\texttt{--reasoning-budget} on llama-server; on vLLM the gateway truncates the reasoning stream at $b$ tokens, appends the closing reasoning tag and re-issues a completion request with the partial reasoning as prefix) [Prop.\,9]. \textbf{Errors.} As for \Sone; additionally \texttt{E\_BUDGET\_EXHAUSTED} leads to abstention. \textbf{Budget.} Profile~A: 4B Q4\_K\_M, about 7 tokens/s measured; $b=1024$ default, so one candidate costs about 150--200\,s on the reference machine; $N$ and $R$ are small (Table~\ref{tab:caps}).
+
+\begin{figure}[h]
+\begin{lstlisting}[language=Python,caption={Request automaton with gate and verified loop (\texttt{nafs-core}); parameters from the companion report},label={alg:loop},mathescape=true]
+def handle(request, cfg):                      # Lemma 1: at most 1+N(R+1) model calls
+    prompt = context.assemble(request, cap=cfg.max_prompt_tokens)          # FR-003, NFR-006
+    draft, samples = s1.sample(prompt, k=cfg.gate.k_samples)                # state A
+    feats = gate.features(draft, samples, request.domain, request.verification)   # FR-010
+    d = gate.decide(feats, cfg)                                             # Thm 2 / FR-011
+    record_decision(d)                                                      # FR-013
+    if not d.escalate:
+        if feats.verifiable:
+            v = hub.verify(draft, request.verification)                     # FR-012
+            if v.passed: return reply(draft, "verified", mode="fast", state="T")
+            d.rule = "forced_failed_verification"; d.escalate = True        # never keep a failed draft
+        else:
+            return reply(draft, "unverified", mode="fast", state="T")
+    # state L -> M loop
+    caps = cfg.deliberation.caps[request.domain]                            # Prop 3: N, R, budget
+    R = min(caps.R, 1) if not feats.verifiable else caps.R                  # FR-022 (Thm 4)
+    evidence, best = None, None
+    for round in range(R + 1):
+        for n in range(caps.N):
+            cand = s2.deliberate(prompt, evidence, budget=caps.budget)      # FR-023 draft-blind; FR-024 forcing
+            v = hub.verify(cand, request.verification) if feats.verifiable else judge.score(cand)
+            best = better(best, cand, v)
+            if v.passed:                                                    # exact: threshold 1.0 (Thm 1)
+                level = "verified" if feats.verifiable else "consensus"     # FR-031
+                return reply(cand, level, mode="slow", state="T")
+            evidence = v.evidence                                           # FR-025 (Thm 5)
+    return reply(best, "abstained", mode="slow", state="X", notice=uncertainty(best))  # FR-024
+
+def decide(feats, cfg):                                                     # Thm 2 (optimal gate)
+    e1 = calibration.e1_hat(feats)                                          # logistic/isotonic, ECE <= 0.05 (NFR-020, Prop 1)
+    e2 = cfg.gate.e2_hat[feats.domain]                                      # Phase-0 estimate
+    dc = cfg.gate.delta_c_s[feats.domain]                                   # expected extra cost (seconds)
+    lam = request.lambda_ or cfg.gate.lambda_default                        # FR-004 (Prop 2)
+    escalate = cfg.gate.loss_wrong * (e1 - e2) > lam * dc
+    return Decision(e1, e2, lam, dc, escalate, rule="calibrated")
+\end{lstlisting}
+\end{figure}
+
+\subsection{\Gate\ (controller)}
+\textbf{Purpose.} Decide whether to deliberate. \textbf{Inputs.} Fast-path features; configuration. \textbf{Outputs.} Decision record. \textbf{State.} Calibration model (versioned file), per-domain $\hat e_2$ and $\Delta c$ tables. \textbf{Features (FR-010).} \texttt{mean\_logprob}, \texttt{min\_logprob} over draft tokens; \texttt{agreement} = fraction of the $k$ samples whose normalised answer equals the draft's; \texttt{domain}; \texttt{verifiable}; \texttt{draft\_verified}; \texttt{prompt\_tokens}. \textbf{Rule [Thm.\,2].} Escalate iff $L(\hat e_1-\hat e_2)>\lambda\,\Delta c$. In \emph{budget} mode (FR-014), $\lambda^\star$ is the smallest multiplier whose escalation rate on the calibration set meets the budget; the calibration set MUST have $n\ge\ln(2/\delta)/(2\varepsilon^2)$ samples for the configured $(\varepsilon,\delta)$ [Prop.\,6]. In \emph{fixed} mode (Phase~1 only) a placeholder threshold on \texttt{mean\_logprob} and \texttt{agreement} is used and the decision record says so. \textbf{Calibration [Prop.\,1].} Logistic regression on the features with isotonic post-correction, trained on labelled Phase-0 outcomes; promoted only if ECE (5 bins, $n\ge2\,900$) $\le0.05$ (NFR-020), which bounds the excess loss by $0.05L$ per request. \textbf{Errors.} Missing calibration file in calibrated mode is a startup error; a feature extraction failure falls back to escalation with rule \texttt{forced\_override} logged. \textbf{Budget.} Negligible compute (microseconds).
+
+\subsection{\Hub\ and arbiter}
+\textbf{Purpose.} Decide what counts as evidence. \textbf{Inputs.} Candidate, verification inputs (tests, reference, schema). \textbf{Outputs.} \texttt{VerifierResult} with \texttt{passed}, \texttt{score}, \texttt{evidence}. \textbf{State.} Verifier rate registry $(r,\varphi,n_{\text{mutants}})$ per verifier (FR-032). \textbf{Verifiers.}
+\begin{itemize}
+\item \texttt{code\_tests}: extract the code block, write to an ephemeral directory, run the tests in a subprocess with limits (FR-035; defaults CPU 10\,s, memory 512\,MB, wall 30\,s, no network); pass iff all tests pass; evidence = first failing test output (truncated to 2\,kB).
+\item \texttt{math\_numeric}: parse the final answer (boxed or last number), compare with the reference within tolerance $10^{-6}$ relative; \texttt{math\_symbolic}: SymPy sidecar equivalence check with a 5\,s timeout; pass iff either passes; evidence = ``expected form not matched'' plus the parsed value.
+\item \texttt{json\_schema}: parse the output as JSON and validate against the schema (draft 2020-12); evidence = first validation error path.
+\item \texttt{judge} (soft): the \Stwo\ model in non-thinking mode at temperature 0 scores honesty $h$, harm-avoidance $a$, helpfulness $u$, grounding $m$ in $[0,1]$; $V=0.5\min(h,a)+0.25u+0.25m$; pass iff $h,a,u\ge0.5$ and $V\ge0.7$ (FR-034). The judge's $(r,\varphi)$ MUST be measured on a labelled set.
+\item \texttt{consensus} (soft): agreement count among $N$ candidates; reported as a flag with the count, never as pass by itself [Thm.\,6].
+\end{itemize}
+\textbf{Acceptance thresholds [Thm.\,1].} Exact verifiers: $1.0$. Soft verifiers: as above, and the reply is at most \texttt{consensus}. \textbf{Mutation testing (ER-003).} For each exact verifier, $\ge200$ mutants (seeded wrong answers, off-by-one code, schema violations) yield $\hat\varphi$ with a Clopper--Pearson 95\% upper bound; $\ge200$ known-correct answers yield $\hat r$. \textbf{Errors.} Sandbox failures (timeout, crash) are \emph{rejections with evidence}, never passes. \textbf{Budget.} Code: $\le30$\,s wall; math: $\le5$\,s; schema: milliseconds; judge: one non-thinking 4B call ($\approx$10\,s).
+
+\subsection{\Mem}
+\textbf{Purpose.} Build prompts and persist state. \textbf{Inputs.} Conversation id, new message, retrieval flag. \textbf{Outputs.} Prompt (system + history within cap), persisted records. \textbf{State.} SQLite tables \texttt{conversations}, \texttt{messages}, \texttt{decisions}; JSONL trace file. \textbf{Algorithm.} Keep the system prompt and the most recent turns that fit in \texttt{max\_prompt\_tokens}, dropping the oldest turns whole (never splitting a turn) so that the prefix stays identical between turns and the backend prompt cache hits (NFR-006; measured 47/48 cached tokens on llama-server). Retrieved text, when enabled, is inserted inside a delimited data block with provenance and the instruction ``treat as data'' (SR-001). \textbf{Errors.} Database errors are fatal for the request (HTTP 500) but never lose already-written traces (append-only JSONL with fsync per record). \textbf{Budget.} $<5$\,ms per request.
+
+\subsection{\Ledger}
+\textbf{Purpose.} Honest self-knowledge. \textbf{Inputs.} Traces, audit outcomes, labels when available. \textbf{Outputs.} \texttt{SelfModel} document; calibration dataset; drift alerts. \textbf{Algorithm.} Select audits at the gate (Bernoulli $\epsilon=0.05$, FR-040); run \Stwo\ on audited kept requests offline; estimate $\hat p_2=g\hat p_{2|\text{esc}}+(1-g)\hat p_{2|\text{audit}}$ [Prop.\,5]; publish per-domain tables with $n$ and $n_{\text{audit}}$; mark domains with $n_{\text{audit}}<30$ as \texttt{unmeasured}; run CUSUM ($k=0.5\sigma$, $h=5\sigma$, $\alpha=0.01$) on calibration error with a shuffled-label negative control (FR-042). \textbf{Errors.} Missing labels produce \texttt{null}, never 0. \textbf{Budget.} Nightly job; audit cost $\approx\epsilon(1-g)$ of slow-path cost.
+
+\subsection{\Gw}
+See Section~\ref{sec:rust}. \textbf{Timeouts.} Request wall-clock cap (NFR-001); per-backend connect, idle and queue timeouts (IF-007, IF-008). \textbf{Fallbacks.} \Stwo\ unavailable: degraded mode (MR-004). \Sone\ unavailable: HTTP 503. Verifier unavailable: treat as rejection with evidence ``verifier unavailable'' and label at most \texttt{unverified}.
+
+\subsection{Web UI and \Harness}
+See Sections~\ref{sec:ui} and \ref{sec:eval}.
+
+\subsection{Derived parameters}
+\begin{table}[h]\centering\small\caption{Derived parameters and their provenance (defaults are placeholders until Phase~0)}\label{tab:caps}
+\begin{tabular}{@{}p{3.2cm}p{3.0cm}p{9.0cm}@{}}\toprule Parameter & Default & Derivation\\\midrule
+$k$ (cheap samples) & 4 & agreement feature; cost $k\,c_1\ll\Delta c$; llama-server slots $\ge k+1$\\
+$\lambda$ & 0.2 & operator price of compute relative to $L$ [Prop.\,2]; UI control\\
+$\hat e_2$ per domain & Phase-0 & slow-only error rate on the Phase-0 suite\\
+$\Delta c$ per domain & Phase-0 & mean slow-path seconds minus fast-path seconds\\
+ECE target & 0.05 & tolerated regret $0.05L$ [Prop.\,1]\\
+$N$, $R$ per domain & code/math 2,2; others 1,1 & $M^\star=\lceil\alpha L_a/c_p-\alpha-\beta\rceil$ from the Beta fit [Prop.\,3]; $N\cdot(R{+}1)\le M^\star$\\
+$b$ per domain & 1024 (code, math), 512 (others) & first-order condition on the accuracy-versus-budget curve [Prop.\,9]\\
+Audit fraction $\epsilon$ & 0.05 & SE $\le0.019$ at $n=10^4$, $g=0.3$ [Prop.\,5]\\
+Calibration set size & $\ge2\,900$ & ECE noise floor [Prop.\,6]\\
+Phase-0 suite size & $\ge4\,600$ & $\varepsilon=0.02$, $\delta=0.05$ [Prop.\,6]\\
+Coupling trials & $\ge200$ & zero-failure rule needs 59; 200 gives margin [Prop.\,4]\\
+\bottomrule\end{tabular}\end{table}
+
+\section{Model Specification}
+\label{sec:models}
+\subsection{Selected models}
+\begin{table}[h]\centering\small\caption{Models by profile (Hugging Face IDs verified 2026-10-18; revisions MUST be pinned to commit hashes in the model manifest, MR-001)}
+\begin{tabular}{@{}p{1.0cm}p{1.7cm}p{4.9cm}p{5.0cm}p{1.9cm}@{}}\toprule Profile & Role & Checkpoint & CPU artefact (GGUF) & Licence\\\midrule
+A & \Sone & \texttt{Qwen/\allowbreak Qwen3-\allowbreak 1.7B} (thinking off) & \texttt{unsloth/\allowbreak Qwen3-\allowbreak 1.7B-\allowbreak GGUF} Q4\_K\_M (1.26\,GiB) or \texttt{Qwen/\allowbreak Qwen3-\allowbreak 1.7B-\allowbreak GGUF} Q8\_0 (1.83\,GB) & Apache-2.0\\
+A & \Stwo & \texttt{Qwen/\allowbreak Qwen3-\allowbreak 4B-\allowbreak Thinking-\allowbreak 2507} & \texttt{unsloth/\allowbreak Qwen3-\allowbreak 4B-\allowbreak Thinking-\allowbreak 2507-\allowbreak GGUF} Q4\_K\_M (2.32\,GiB) & Apache-2.0\\
+A & judge & \Stwo\ weights, thinking off & same file & --\\
+B & both & \texttt{Qwen/\allowbreak Qwen3-\allowbreak 4B} with \texttt{enable\_thinking} toggle & \texttt{Qwen/\allowbreak Qwen3-\allowbreak 4B-\allowbreak GGUF} Q4\_K\_M (2.32\,GiB) & Apache-2.0\\
+C & \Sone & \texttt{Qwen/\allowbreak Qwen3.5-\allowbreak 2B} (thinking off) & \texttt{unsloth/\allowbreak Qwen3.5-\allowbreak 2B-\allowbreak GGUF} Q4\_K\_M (1.28\,GB) & Apache-2.0\\
+C & \Stwo & \texttt{Qwen/\allowbreak Qwen3.5-\allowbreak 4B} (thinking on) & \texttt{unsloth/\allowbreak Qwen3.5-\allowbreak 4B-\allowbreak GGUF} Q4\_K\_M (2.74\,GB) & Apache-2.0\\
+all & embed.\ (opt.) & \texttt{Qwen/\allowbreak Qwen3-\allowbreak Embedding-\allowbreak 0.6B} & \texttt{Qwen/\allowbreak Qwen3-\allowbreak Embedding-\allowbreak 0.6B-\allowbreak GGUF} Q8\_0 & Apache-2.0\\
+GPU & \Stwo\ option & \texttt{Qwen/\allowbreak Qwen3-\allowbreak 8B} or \texttt{Qwen/\allowbreak Qwen3.5-\allowbreak 9B} & BF16 or \texttt{Qwen/\allowbreak Qwen3-\allowbreak 8B-\allowbreak AWQ} under vLLM CUDA & Apache-2.0\\
+\bottomrule\end{tabular}\end{table}
+\textbf{Rationale.} Qwen3 and Qwen3.5 are the only Qwen generations with open weights at or below 9B parameters. Profile~A uses dense grouped-query-attention checkpoints because their CPU kernels are mature on AVX2, official GGUF files exist, and both sizes are on vLLM's validated CPU list. Profile~C uses the hybrid Gated-DeltaNet generation, which is stronger but whose CPU path is newer and unaccelerated in vLLM without AVX-512-BF16 or AMX; it is adopted only if ER-011 and MR-005 pass. There is no official non-autoregressive Qwen; diffusion variants are out of scope for the baseline.
+\subsection{Thinking control (MR-002)}
+\begin{sloppypar}Qwen3: \texttt{chat\_template\_kwargs} $=$ \texttt{\{"enable\_thinking": false\}} for the fast path; the 2507 Thinking checkpoint always thinks. Qwen3.5: same kwarg; the \texttt{/think} soft switch is not supported and MUST NOT be relied on. The backend parser (\texttt{--reasoning-parser qwen3} on vLLM; \texttt{--reasoning-format deepseek} on llama-server) MUST separate \texttt{reasoning\_content} from \texttt{content}; replies without separation are rejected.\end{sloppypar}
+\subsection{vLLM launch configuration (Linux profile)}
+\begin{sloppypar}See \texttt{config/vllm\_launch.yaml}. Key settings: \texttt{dtype=bfloat16}; \texttt{max-model-len 8192}; \texttt{max-num-seqs 4} (matched by the gateway semaphore); \texttt{block-size 128}; \texttt{enable-prefix-caching}; \texttt{reasoning-parser qwen3}; \texttt{max-logprobs 5}; environment \texttt{VLLM\_CPU\_\allowbreak KVCACHE\_\allowbreak SPACE} (GiB) and \texttt{VLLM\_CPU\_\allowbreak OMP\_\allowbreak THREADS\_\allowbreak BIND} pinning inference threads to all but one core; \texttt{LD\_PRELOAD} of Intel OpenMP and TCMalloc. Pin vLLM 0.31.0 (the latest published release at the time of writing). Speculative decoding on the CPU backend is not relied upon. This configuration was taken from the vLLM documentation and is untested on the macOS reference machine.\end{sloppypar}
+\subsection{llama-server configuration (macOS and AVX2 hosts)}
+See \texttt{config/llama\_server\_profile\_a.sh} (tested on the reference machine with llama.cpp commit \texttt{797de63}): \texttt{-t 4}, \texttt{-c 8192}, \texttt{-np} $\ge k+1$ for \Sone\ (the \texttt{n} parameter is capped by the slot count), \texttt{--jinja}, \texttt{--reasoning-format deepseek}, \texttt{--reasoning-budget 1024} for \Stwo, \texttt{--cache-reuse 256}, \texttt{--spec-type ngram-simple}, \texttt{--metrics}.
+\subsection{Fallbacks}
+If the \Stwo\ checkpoint cannot be served (memory), Profile~B applies. If llama.cpp cannot load a Qwen3.5 GGUF on the host, Profile~A applies. If no local serving is possible, the backend trait admits a remote OpenAI-compatible endpoint, which MUST be marked \texttt{remote} in traces.
+
+\section{Training and Fine-Tuning Specification}
+\label{sec:training}
+\subsection{Data schema (TR-001)}
+JSONL, one example per line: \texttt{id}, \texttt{domain}, \texttt{prompt} (messages array), \texttt{answer}, \texttt{rationale} ($\le150$ tokens, distilled from the slow trace), \texttt{assurance} (\texttt{verified} or \texttt{consensus\_reviewed}), \texttt{verifier} (name, pass, rates snapshot), \texttt{source\_trace} (trace id), \texttt{synthetic} (bool), \texttt{adapter\_hash} of the model that produced it, \texttt{created\_at}. Personal data MUST be redacted before the example is written (SR-004).
+\subsection{Dataset construction (FR-070, TR-002, TR-008)}
+Select verified slow-path traces and human-reviewed consensus traces; deduplicate by normalised prompt (MinHash, Jaccard $\ge0.8$); cap any domain at 30\% of the set; add 5\% abstention examples (prompts where the system abstained, target = calibrated refusal text); mix 20\% replay from a general instruction set with a compatible licence; hold out 10\% by prompt cluster for the promotion gate; record the snapshot hash.
+\subsection{Synthetic data (TR-003)}
+Generate prompts by templating from benchmark \emph{training} splits only (never test splits), run \Stwo\ with the production budget, verify with an exact verifier reserved for data collection (not used in ER-002 evaluation), keep passes, label \texttt{synthetic=true}, and cap synthetic examples at 50\% of the set.
+\subsection{Unsloth configuration (TR-004, TR-005)}
+\begin{lstlisting}[language=Python,caption={Unsloth training skeleton (runs on a GPU host; Unsloth Core raises ``You need a GPU'' on CPU)}]
+from unsloth import FastLanguageModel
+model, tok = FastLanguageModel.from_pretrained(
+    "Qwen/Qwen3-1.7B", revision=PINNED, max_seq_length=4096,
+    load_in_4bit=True)              # QLoRA for Qwen3; use load_in_4bit=False (BF16 LoRA) for Qwen3.5
+model = FastLanguageModel.get_peft_model(model, r=16, lora_alpha=16, lora_dropout=0,
+    target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
+    use_gradient_checkpointing="unsloth", random_state=SEED)
+# SFTTrainer: lr=2e-4, epochs=1..3, per_device_batch=2, grad_accum=8, warmup=5%, cosine, adamw_8bit
+# save: model.save_pretrained(adapter_dir); hash adapter; model.save_pretrained_gguf(out, tok, quantization_method="q4_k_m")
+\end{lstlisting}
+Hardware path: a 16\,GB GPU (Colab T4 class) suffices for QLoRA on Qwen3-1.7B and 4B and for BF16 LoRA on Qwen3.5 up to 4B; Qwen3.5-9B needs about 22\,GB. Each run records the Unsloth and transformers versions, the data snapshot hash and the seed.
+\subsection{Stages and acceptance (TR-006, TR-007)}
+\begin{enumerate}
+\item \textbf{Dry run} on 200 examples: loss decreases; GGUF exports and loads in llama-server; regression suite runs. Acceptance: all three.
+\item \textbf{Full run}: 1--3 epochs. Acceptance: held-out verifier accuracy gain with lower 95\% confidence bound $>0$ and point estimate $\ge2$ points; every domain's lower bound $\ge-1$ point; ECE of the gate recomputed on the new fast path $\le0.05$; coupling test passes; escalation rate not increased by more than 2 points at fixed $\lambda$.
+\item \textbf{Promotion}: human sign-off recorded with the adapter hash; configuration change; previous adapter retained (OR-005).
+\end{enumerate}
+Checkpoints every 100 steps; adapter and merged GGUF hashed with SHA-256 and listed in the model manifest.
+
+\section{Interface Specification}
+\label{sec:interfaces}
+\subsection{External API (IF-001--IF-004, IF-009)}
+The normative definition is \texttt{api/openapi.yaml} (OpenAPI 3.1, validated with openapi-spec-validator and Redocly). Authentication: bearer token. Errors: \texttt{\{code, message, request\_id\}} with the taxonomy of Section~\ref{sec:rust}. Endpoints:
+\begin{itemize}
+\item \texttt{POST /v1/chat} (complete reply) and \texttt{POST /v1/chat/stream} (SSE);
+\item \texttt{GET /v1/conversations/\{id\}} and \texttt{GET /v1/decisions/\{id\}};
+\item \texttt{GET /v1/rooms}, \texttt{POST /v1/rooms}, \texttt{GET /ws/rooms/\{id\}} (WebSocket);
+\item \texttt{GET /v1/bench/runs}, \texttt{POST /v1/bench/runs}, \texttt{GET /v1/bench/runs/\{id\}};
+\item \texttt{GET /v1/eval/runs}, \texttt{POST /v1/eval/runs}, \texttt{GET /v1/eval/runs/\{id\}};
+\item \texttt{GET /v1/self-model}, \texttt{GET /healthz}, \texttt{GET /metrics}, \texttt{GET /openapi.json}.
+\end{itemize}
+\paragraph{Streaming.} \texttt{/v1/chat/stream} returns \texttt{text/event-stream}. Event names and payloads:
+\begin{itemize}
+\item \texttt{token}: \texttt{\{text, mode, reasoning\}};
+\item \texttt{decision}: a DecisionRecord; \texttt{verification}: a VerifierResult; \texttt{retry}: \texttt{\{round, of\}};
+\item \texttt{degraded}; \texttt{done}: the full ChatReply; \texttt{error}: an Error object.
+\end{itemize}
+Reasoning tokens are streamed only when the client sets \texttt{show\_reasoning} (default off) and are always marked \texttt{reasoning: true}.
+\paragraph{Reasoning mode exposure.} Every \texttt{ChatReply} and every message in a conversation carries \texttt{reasoning\_mode} (\texttt{fast} or \texttt{slow}), \texttt{assurance} and \texttt{decision\_id}; the decision endpoint returns the full record.
+\subsection{Internal contracts (IF-005, IF-010)}
+\begin{sloppypar}
+JSON Schemas (draft 2020-12) in \texttt{api/schemas/}: \texttt{ChatRequest}, \texttt{ChatReply}, \texttt{DecisionRecord}, \texttt{VerifierResult}, \texttt{StreamEvent}, \texttt{SelfModel}, \texttt{TraceRecord}. The Rust types in \texttt{nafs-types} derive \texttt{schemars::JsonSchema}; CI MUST regenerate the schemas and fail if they differ from the committed files. The trace format is newline-delimited JSON conforming to \texttt{TraceRecord} with \texttt{schema\_version} \texttt{"1.0"}; records are append-only and include the configuration, model and adapter hashes.
+\end{sloppypar}
+\subsection{Backend integration (IF-006--IF-008)}
+\begin{lstlisting}[caption={Backend trait (\texttt{nafs-core})}]
+#[async_trait]
+pub trait ModelBackend: Send + Sync {
+    /// One prefill, k+1 completions with per-token logprobs (n= on vLLM; parallel slots on llama-server).
+    async fn sample(&self, req: SampleRequest) -> Result<SampleResponse, BackendError>;
+    /// Streaming completion with reasoning separated; budget enforced server- or client-side.
+    async fn stream(&self, req: CompletionRequest) -> Result<BoxStream<'static, Result<Delta, BackendError>>, BackendError>;
+    fn capabilities(&self) -> Capabilities; // supports_n, supports_reasoning_budget, max_slots, prompt_cache
+    async fn health(&self) -> Result<(), BackendError>;
+}
+\end{lstlisting}
+Retry (IF-007): at most 3 attempts; backoff $200\,\text{ms}\cdot2^{i}$ with full jitter, capped at 2\,s; retry on connection errors and HTTP 5xx only; never on 4xx; streaming requests are retried only before the first byte. Backpressure (IF-008): a \texttt{tokio::sync::Semaphore} per backend sized to \texttt{max\_in\_flight} (= server slots or \texttt{max-num-seqs}); acquisition waits at most \texttt{queue\_timeout\_ms}, then returns \texttt{E\_QUEUE\_TIMEOUT} (HTTP 429 with \texttt{Retry-After}). Idle stream timeout 60\,s. Health checks every 10\,s drive the degraded mode (MR-004).
+
+\section{Rust Implementation Specification}
+\label{sec:rust}
+\subsection{Workspace}
+\begin{sloppypar}\texttt{rust/} contains the workspace manifest with pinned versions (verified on crates.io, 2026-10-18; \texttt{cargo metadata} resolves and a lockfile was generated). Crates: \texttt{nafs-types}, \texttt{nafs-core}, \texttt{nafs-verify}, \texttt{nafs-memory}, \texttt{nafs-gateway} (binary), \texttt{nafs-web}, \texttt{nafs-eval} (binary), \texttt{nafs-bench} (binary). Toolchain: pinned stable (1.96 on the reference machine; CI MAY use newer stable). Edition 2021.\end{sloppypar}
+\subsection{Crates and rationale}
+\begin{sloppypar}
+tokio (runtime), axum (HTTP, SSE, WebSocket; mainstream and maintained), tower/tower-http (timeouts, limits, CORS, compression), hyper (HTTP/1.1 and 2), reqwest with \texttt{eventsource-stream} (upstream SSE), serde/serde\_json, schemars (schemas from types), jsonschema (schema verifier), utoipa (+swagger-ui) (OpenAPI from handlers), sqlx (SQLite, compile-time checked queries), tracing/tracing-subscriber/opentelemetry (observability), metrics (+prometheus exporter), askama (templates) with htmx (streaming UI updates without a JS build), clap and figment (CLI, layered configuration), thiserror/anyhow (errors), uuid, chrono, governor (rate limiting), criterion (micro-benchmarks), goose (load tests). Front-end frameworks compiled to WebAssembly (Leptos, Dioxus) are not required; they MAY be adopted for the dashboard in Phase~4 if interactivity demands it.
+\end{sloppypar}
+\subsection{Module boundaries and key types}
+\begin{lstlisting}[caption={Key types (\texttt{nafs-types})}]
+pub enum ReasoningMode { Fast, Slow }
+pub enum Assurance { Verified, Consensus, Unverified, Abstained }
+pub enum TraceState { A, L, M, T, X }
+pub struct GateFeatures { mean_logprob: f32, min_logprob: f32, k: u8, agreement: f32, domain: Domain, verifiable: bool, draft_verified: Option<bool>, prompt_tokens: u32 }
+pub struct Decision { id: Uuid, e1_hat: f32, e2_hat: f32, lambda: f32, delta_c: f32, escalate: bool, rule: GateRule, audit: bool, calibration_version: String, config_hash: String }
+pub struct Caps { n: u8, r: u8, budget: u32 }
+pub struct ChatReply { reply_id: Uuid, decision_id: Uuid, reasoning_mode: ReasoningMode, assurance: Assurance, trace_state: TraceState, message: Message, uncertainty_notice: Option<String>, verifier: Option<VerifierResult>, usage: Usage, degraded: bool }
+\end{lstlisting}
+\begin{lstlisting}[caption={Module boundaries (\texttt{nafs-core})}]
+impl Orchestrator { pub fn handle(&self, req: ChatRequest) -> impl Stream<Item = StreamEvent> { .. } }
+impl Gate { pub fn decide(feats: &GateFeatures, cfg: &GateConfig) -> Decision { .. } }   // pure function
+#[async_trait] pub trait Verifier: Send + Sync {
+    async fn verify(&self, cand: &Candidate, inputs: &VerificationInputs) -> VerifierResult;
+    fn rates(&self) -> Rates;   // (r, phi, n_mutants) published per FR-032
+}
+\end{lstlisting}
+\subsection{Concurrency model}
+\begin{sloppypar}One tokio multi-thread runtime; per-request task; per-backend semaphore; blocking work (sandbox, SQLite writes) via \texttt{spawn\_blocking}; cancellation on client disconnect propagates to backend streams; graceful shutdown drains in-flight requests up to the wall-clock cap.\end{sloppypar}
+\subsection{Configuration}
+Single TOML file (\texttt{config/nafs-aql.sample.toml}, validated; OR-006) loaded with figment and overridable by \texttt{NAFS\_\_SECTION\_\_KEY} environment variables; validated at startup against the schema derived from the config struct; its SHA-256 is the \texttt{config\_hash} in every trace.
+\subsection{Logging and tracing}
+\begin{sloppypar}\texttt{tracing} spans per request (\texttt{request\_id}, \texttt{decision\_id}, \texttt{conversation\_id}, \texttt{mode}, \texttt{state}); JSON logs; OpenTelemetry export; Prometheus metrics: \texttt{nafs\_requests\_total\{mode,assurance,domain\}}, \texttt{nafs\_latency\_seconds\{mode,quantile\}}, \texttt{nafs\_ttft\_seconds}, \texttt{nafs\_escalation\_rate}, \texttt{nafs\_backend\_inflight\{backend\}}, \texttt{nafs\_verifier\_pass\_total\{verifier\}}, \texttt{nafs\_budget\_exhausted\_total}, \texttt{nafs\_degraded}. No prompt or reply text in logs at INFO level.\end{sloppypar}
+\subsection{Error taxonomy}
+\begin{sloppypar}\texttt{E\_BAD\_REQUEST}, \texttt{E\_UNAUTHORIZED}, \texttt{E\_RATE\_LIMITED}, \texttt{E\_QUEUE\_TIMEOUT}, \texttt{E\_BACKEND\_UNAVAILABLE}, \texttt{E\_BACKEND\_TIMEOUT}, \texttt{E\_BACKEND\_PROTOCOL} (e.g.\ reasoning not separated), \texttt{E\_BUDGET\_EXHAUSTED} (internal; surfaces as abstention), \texttt{E\_VERIFIER\_UNAVAILABLE}, \texttt{E\_SANDBOX\_LIMIT}, \texttt{E\_STORAGE}, \texttt{E\_CONFIG}, \texttt{E\_INTERNAL}. Each maps to one HTTP status and is a variant of \texttt{NafsError} (\texttt{thiserror}).\end{sloppypar}
+
+\section{Web UI Specification}
+\label{sec:ui}
+\subsection{User stories}
+\begin{itemize}
+\item As a user I can join a room, send a message and watch the reply stream, seeing whether it was fast or slow, its assurance level and its cost, so that I know how much to trust it.
+\item As a user I can move one speed--care control and see the escalation behaviour change.
+\item As an engineer I can run a load test from the browser and read latency quantiles, throughput and escalation rate.
+\item As a researcher I can start an evaluation run, compare the system with the fast-only and slow-only baselines with confidence intervals, inspect calibration, and see which roadmap gates pass.
+\end{itemize}
+\subsection{Screens}
+\begin{figure}[h]\centering
+\begin{tabular}{@{}c@{\hskip 2pt}c@{}}
+\scalebox{0.97}{\input{../shared/figures/fig_wire_chat.tikz}} & \scalebox{0.97}{\input{../shared/figures/fig_wire_bench.tikz}}\\
+\end{tabular}\\[6pt]
+\input{../shared/figures/fig_wire_eval.tikz}
+\caption{Wireframes: chat room (top left), performance console (top right), evaluation dashboard (bottom). Numbers shown are illustrative.}\label{fig:wire}\end{figure}
+\textbf{Chat room.} Message list with badges (mode, assurance, cost), expandable decision summary, speed--care slider, session counters. \textbf{Performance console.} Run form (concurrency, duration, profile, $\lambda$), latency tiles (TTFT and total at p50/p95/p99 by path), throughput and cost tiles, latency-over-time chart. \textbf{Evaluation dashboard.} Paired results with confidence intervals and non-inferiority verdicts, routing tiles ($g$, routing accuracy, ECE, cost ratio), reliability diagram, roadmap gate status with the underlying numbers.
+
+\section{Evaluation and Test Specification}
+\label{sec:eval}
+\subsection{Metrics}
+Let $n$ be the number of evaluated items, $y_i\in\{0,1\}$ correctness, $a_i\in\{0,1\}$ non-abstention, $z_i\in\{0,1\}$ escalation, $o_i\in\{0,1\}$ the oracle decision of Theorem~2 computed from labelled outcomes, $c_i$ the cost in seconds, $\hat p_i$ the gate's $\hat e_1$ and $w_i=\mathbb 1[\text{fast draft wrong}]$.
+\begin{itemize}
+\item Accuracy $=\frac1n\sum_i y_i$; selective accuracy $=\sum_i a_iy_i/\sum_i a_i$; coverage $=\frac1n\sum_i a_i$.
+\item Escalation rate $g=\frac1n\sum_i z_i$; routing accuracy $=\frac1n\sum_i\mathbb 1[z_i=o_i]$.
+\item Mean cost $\bar c=\frac1n\sum_i c_i$; cost ratio $=\bar c/\bar c_{\text{slow-only}}$; area under the cost--accuracy curve from runs at $\lambda\in\{0.05,0.1,0.2,0.4,0.8\}$ (trapezoid).
+\item ECE (5 equal-mass bins $B_j$) $=\sum_j\frac{|B_j|}{n}\big|\overline{w}_{B_j}-\overline{\hat p}_{B_j}\big|$; Brier $=\frac1n\sum_i(\hat p_i-w_i)^2$.
+\item Verifier rates: $\hat r=\#\text{accepted correct}/\#\text{correct}$, $\hat\varphi=\#\text{accepted wrong}/\#\text{wrong}$ with Clopper--Pearson 95\% intervals.
+\item Faithfulness: adoption rate $=$ (number of slow answers equal to a wrong fast draft) $/$ (number of wrong fast drafts); perturbation consistency $=$ fraction of items whose answer is unchanged under meaning-preserving paraphrase.
+\item Robustness: accuracy under paraphrase; injection success rate on the probe set.
+\item Latency: p50, p95, p99 of TTFT and total latency by path; throughput in requests/s.
+\end{itemize}
+\subsection{Benchmarks and licences}
+GSM8K (MIT), MATH (MIT), HumanEval (MIT), MBPP (CC-BY-4.0), MMLU (MIT), GPQA (CC-BY-4.0, gated), TruthfulQA (Apache-2.0), SimpleQA (MIT), BIG-Bench Hard (MIT), LiveCodeBench (code MIT; data licence to confirm), IFEval (Apache-2.0), an in-house JSON-Schema task set (Apache-2.0), RouteLLM routing data (Apache-2.0) for gate calibration. Test splits MUST never be used for training or synthetic data.
+\subsection{Experiment protocol and statistics}
+Paired design on identical items; seeds recorded; temperature 0 for drafts; three repetitions for latency. Differences reported with 95\% confidence intervals (paired bootstrap, 2\,000 resamples). Non-inferiority: one-sided test at $\alpha=0.05$ with margin $m$; sample size $n\ge(z_\alpha+z_\beta)^2\delta/m^2$ with $\delta$ the discordance rate (about 700 pairs for $m=0.03$, 6\,200 for $m=0.01$ at $\delta=0.1$). Rates that must be below a threshold use the zero-failure rule $n\ge\ln\delta/\ln(1-\varepsilon)$ or the Clopper--Pearson upper bound. Bonferroni across five domains ($z=2.326$). Drift: CUSUM with $\alpha=0.01$ and a negative control.
+\subsection{Acceptance thresholds (targets)}
+Routing accuracy $\ge0.70$ at $g\le0.30$ (H1); cost ratio $\le0.60$ at matched accuracy (H2); ECE $\le0.05$ (NFR-020); exact-verifier $\hat\varphi$ upper bound $\le0.01$ (code, math) and $0$ observed (schema); adoption rate upper bound $\le0.05$ (H5); non-inferiority at 3 points (G2) and 1 point (G6); latency targets NFR-002--NFR-004.
+\subsection{Test plans}
+\begin{description}
+\item[Unit (UT-*)] gate rule on synthetic features (all branches of Algorithm~\ref{alg:loop}); automaton transitions (every edge of the automaton; termination within $1+N(R+1)$ calls, property-tested with \texttt{proptest}); verifiers on fixtures and mutants; prompt assembly prefix stability; retry/backoff; config validation; metric formulas on synthetic data with known answers.
+\item[Integration (IT-*)] gateway against a mock backend (recorded responses) and against llama-server on the reference machine; SSE event ordering; WebSocket room semantics; degraded mode on backend kill; trace persistence across restart; OpenAPI contract tests (CT-*) with \texttt{schemathesis} or an equivalent.
+\item[Load (PT-*)] goose scenarios at concurrency 1, 2, 4 for 300\,s with the fixed prompt set; targets NFR-002--NFR-007.
+\item[Security (ST-*)] sandbox escape attempts (network, file system, fork bomb, memory); prompt-injection probe set through retrieval and verifier evidence; auth and rate-limit tests; secret-leak scan of logs.
+\item[Regression (ER-008)] fixed 500-item multi-domain suite on every model, adapter, template or configuration change; blocks promotion on any statistically significant drop.
+\item[CI (CI-*)] fmt, clippy (deny warnings), unit and integration tests, schema regeneration check, OpenAPI lint, coverage report ($\ge80\%$ on \texttt{nafs-core}).
+\end{description}
+
+\section{Security, Safety and Ethics}
+\label{sec:security}
+\subsection{Threat model}
+Assets: user conversations, traces, model artefacts, the host. Adversaries: a malicious user (prompt injection, sandbox abuse, resource exhaustion), poisoned retrieved or tool content (indirect injection), a compromised model artefact (supply chain), and an insider misusing traces. Out of scope: physical access, model-extraction attacks.
+\subsection{Controls}
+\begin{itemize}
+\item \textbf{Prompt injection (SR-001).} Observed content (retrieved text, verifier evidence, tool output) is wrapped in delimited data blocks with a fixed instruction to treat it as data; controller parameters, configuration and tool permissions are never read from model output; evidence fed to retries is truncated and sanitised; the injection probe set is part of CI.
+\item \textbf{Sandbox (SR-002).} No network, resource limits, ephemeral file system, non-root user; on Linux seccomp or a container; escape tests in ST-001.
+\item \textbf{Abuse.} Bearer tokens, per-token rate limits, request wall-clock caps, bounded concurrency, prompt size caps.
+\item \textbf{Content safety (SR-003).} Judge harm floor on non-verifiable replies; refusal path with explanation; no partial unsafe content streamed (the judge runs before the final answer is released on non-verifiable tasks; fast-path replies on open domains are streamed only after a lightweight safety check).
+\item \textbf{Privacy (SR-004).} Consent notice; retention default 90 days; redaction (names, contacts, identifiers) before any training export; opt-out flag per conversation honoured by the dataset builder; traces contain hashes, not raw secrets.
+\item \textbf{Supply chain.} Model files verified against SHA-256 in the manifest; Cargo.lock committed; dependency audit in CI.
+\item \textbf{Religious content (SR-005).} The borrowed vocabulary appears in user-facing copy only as explicit analogy; the system does not claim religious authority and answers religious questions with the same assurance labelling as other non-verifiable domains; the analogy text is reviewed by a scholar of the tradition before release.
+\end{itemize}
+
+\section{Operations}
+\label{sec:ops}
+\textbf{Build.} \texttt{cargo build --release} with the pinned toolchain; CI (GitHub Actions or equivalent) on Linux and macOS runners (OR-001). \textbf{Packaging (OR-002).} A release contains the gateway binary, the web assets, the configuration schema and sample, and \texttt{models/manifest.json} with repository IDs, revisions, file names and SHA-256 hashes. \textbf{Configuration.} One TOML file plus environment overrides; secrets only from the environment. \textbf{Deployment (OR-003).} Linux: \texttt{docker-compose} with \texttt{vllm/vllm-openai-cpu} services for S1 and S2, the gateway and a SymPy sidecar; macOS or AVX2: launchd/systemd units running \texttt{llama-server} twice and the gateway. \textbf{Monitoring (OR-004).} Prometheus scrape of \texttt{/metrics} and the model servers' metrics; alerts on p95 latency above target, error rate $>2\%$, escalation rate drift (CUSUM alarm), verifier acceptance anomalies, degraded mode. \textbf{Rollback (OR-005).} Promotion is a configuration change referencing an artefact hash; \texttt{nafs-gateway --rollback} restores the previous manifest entry; traces record the hash in effect. \textbf{Backups.} Nightly copy of SQLite and JSONL traces with the retention policy applied.
+
+\section{Traceability Matrix}
+\label{sec:trace}
+\input{gen/traceability.tex}
+
+\section{Open Issues and Risks}
+\label{sec:open}
+\begin{enumerate}
+\item \textbf{Phase-0 estimates are placeholders.} $\hat e_2$, $\Delta c$, the Beta fit and the budget curve must be measured before the calibrated gate is enabled (FR-011, FR-021).
+\item \textbf{Hybrid-model CPU performance.} Qwen3.5 on AVX2 has no controlled x86 benchmark in the literature; ER-011 resolves this.
+\item \textbf{vLLM on the reference machine is untested} (requires Docker on Linux); the vLLM configuration is documented, not measured.
+\item \textbf{Judge reliability.} The soft verifier shares weights with \Stwo; its $(r,\varphi)$ may be poor on open domains, which would keep assurance at \texttt{consensus} for most non-verifiable replies.
+\item \textbf{Budget forcing on vLLM} requires a re-issued completion with a partial reasoning prefix; the exact chat-template handling must be validated for each checkpoint.
+\item \textbf{Slow-path latency on CPU} (minutes) limits interactive use; the GPU profile is the mitigation.
+\item \textbf{Licence of LiveCodeBench data} and gating of GPQA must be confirmed before inclusion in the release suite.
+\item \textbf{Unsloth version churn.} The training skeleton targets Unsloth 2026.10.x and transformers v5; pin both.
+\item \textbf{Scholar review} of the analogy text (SR-005) is a release dependency with an external owner.
+\end{enumerate}
+\end{document}

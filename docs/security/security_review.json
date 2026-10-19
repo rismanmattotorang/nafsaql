@@ -1,0 +1,255 @@
+{
+  "reviewed_at": "2026-10-18T13:35:39Z",
+  "base": "http://127.0.0.1:8080",
+  "tests": [
+    {
+      "id": "ST-01",
+      "area": "web",
+      "test": "Cross-origin request is refused",
+      "pass": true,
+      "detail": "HTTP 403",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-02",
+      "area": "web",
+      "test": "DNS-rebinding Host header is refused (auth off)",
+      "pass": true,
+      "detail": "HTTP 403",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-03",
+      "area": "web",
+      "test": "Opaque 'null' origin (sandboxed iframe, file://) is refused",
+      "pass": true,
+      "detail": "HTTP 403",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-04",
+      "area": "web",
+      "test": "UI is served with CSP, nosniff and frame-ancestors none",
+      "pass": true,
+      "detail": "default-src 'self'; script-src 'self'; style-src 'self' 'uns",
+      "severity_if_failed": "medium"
+    },
+    {
+      "id": "ST-05",
+      "area": "web",
+      "test": "No permissive CORS preflight",
+      "pass": true,
+      "detail": "HTTP 403",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-06",
+      "area": "input",
+      "test": "Out-of-range thinking budget rejected with 400 before streaming",
+      "pass": true,
+      "detail": "HTTP 400",
+      "severity_if_failed": "medium"
+    },
+    {
+      "id": "ST-07",
+      "area": "input",
+      "test": "Request bodies over 2 MiB are rejected",
+      "pass": true,
+      "detail": "connection closed before the body was read",
+      "severity_if_failed": "medium"
+    },
+    {
+      "id": "ST-08",
+      "area": "input",
+      "test": "Malformed JSON is rejected without a crash",
+      "pass": true,
+      "detail": "HTTP 400",
+      "severity_if_failed": "low"
+    },
+    {
+      "id": "ST-09",
+      "area": "input",
+      "test": "Path traversal in dataset names is rejected",
+      "pass": true,
+      "detail": "HTTP 400",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-10",
+      "area": "input",
+      "test": "Script injection in evaluation system names is rejected (M5)",
+      "pass": true,
+      "detail": "HTTP 400",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-11",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Read a file in the user's home",
+      "pass": true,
+      "detail": "passed=False in 0.1s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-12",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Read the gateway database",
+      "pass": true,
+      "detail": "passed=False in 0.1s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-13",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Write outside the sandbox",
+      "pass": true,
+      "detail": "passed=False in 0.1s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-14",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Open a network connection",
+      "pass": true,
+      "detail": "passed=False in 0.1s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-15",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Start a child process",
+      "pass": true,
+      "detail": "passed=False in 0.1s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-16",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Fork bomb",
+      "pass": true,
+      "detail": "passed=False in 0.1s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-17",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Memory bomb (3 GB)",
+      "pass": true,
+      "detail": "passed=False in 1.0s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-18",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: CPU spin",
+      "pass": true,
+      "detail": "passed=False in 26.5s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-19",
+      "area": "sandbox",
+      "test": "Escape attempt fails closed: Kill the parent gateway",
+      "pass": true,
+      "detail": "passed=False in 0.1s",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-20",
+      "area": "sandbox",
+      "test": "Escape probe left no file on the host",
+      "pass": true,
+      "detail": "checked /tmp",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-21",
+      "area": "sandbox",
+      "test": "Sandbox environment carries no gateway variables or secrets",
+      "pass": true,
+      "detail": "clean",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-22",
+      "area": "sandbox",
+      "test": "Gateway survived every probe",
+      "pass": true,
+      "detail": "HTTP 200",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-23",
+      "area": "secrets",
+      "test": "No bearer tokens or keys in logs",
+      "pass": true,
+      "detail": "logs clean",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-24",
+      "area": "secrets",
+      "test": "No keys committed in source or configuration",
+      "pass": true,
+      "detail": "clean",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-25",
+      "area": "secrets",
+      "test": "Gateway refuses an unauthenticated network bind (secure default)",
+      "pass": true,
+      "detail": "exit 1",
+      "severity_if_failed": "high"
+    },
+    {
+      "id": "ST-26",
+      "area": "sandbox",
+      "test": "Rust escape and injection unit tests are part of the suite",
+      "pass": true,
+      "detail": "nafs-verify sandbox_escape_attempts_fail_closed, sandbox_environment_carries_no_secrets; nafs-core delimit and retrieval-injection tests",
+      "severity_if_failed": "medium"
+    }
+  ],
+  "tests_passed": 26,
+  "tests_total": 26,
+  "sandbox_escape_tests": "pass",
+  "findings": [
+    {
+      "id": "F-01",
+      "severity": "medium",
+      "status": "accepted",
+      "title": "Docker deployments run the gateway with seccomp=unconfined so the verifier can create network namespaces",
+      "mitigation": "Container still runs as an unprivileged user; prefer the systemd profile on hosts that allow unprivileged user namespaces."
+    },
+    {
+      "id": "F-02",
+      "severity": "medium",
+      "status": "accepted",
+      "title": "Without NAFS_AUTH_TOKENS the API is unauthenticated (loopback only)",
+      "mitigation": "The gateway refuses non-loopback binds without tokens (ST-25); same-origin and Host checks block browser-based attacks (ST-01..03)."
+    },
+    {
+      "id": "F-03",
+      "severity": "low",
+      "status": "accepted",
+      "title": "The sandbox on macOS relies on sandbox-exec, which Apple marks deprecated",
+      "mitigation": "Escape tests run in CI and in this review; Linux uses unshare plus rlimits."
+    },
+    {
+      "id": "F-05",
+      "severity": "high",
+      "status": "fixed",
+      "title": "Sandboxed code could signal (kill) the gateway and other processes of the same user",
+      "mitigation": "Found by ST-19 on 2026-10-18 (it killed the gateway). macOS profile now denies signals except to the process itself; Linux adds a PID namespace (unshare -p --fork --kill-child). Regression test in nafs-verify."
+    },
+    {
+      "id": "F-04",
+      "severity": "low",
+      "status": "fixed",
+      "title": "The review in docs/research/code_review_phase1.md found 4 high-severity issues",
+      "mitigation": "All fixed with tests (resolution table)."
+    }
+  ],
+  "open_high_or_above": 0
+}

@@ -1,0 +1,457 @@
+{
+  "measured_at": "2026-10-18T13:07:35Z",
+  "hypothesis_H7": "pass (79-80% decode speed, benchmarks/reference-machine/h7_result.json)",
+  "n_tasks": 30,
+  "accuracy": {
+    "Qwen3-1.7B (Profile A)": {
+      "all": 0.6666666666666666,
+      "math": 0.5625,
+      "code": 0.75,
+      "structured": 0.8333333333333334
+    },
+    "Qwen3.5-2B (Profile C)": {
+      "all": 0.8333333333333334,
+      "math": 0.8125,
+      "code": 0.75,
+      "structured": 1.0
+    }
+  },
+  "paired_delta_accuracy": 0.16666666666666666,
+  "ci95": [
+    0.06666666666666667,
+    0.3
+  ],
+  "mean_wall_s": {
+    "Qwen3-1.7B (Profile A)": 23.977999999999998,
+    "Qwen3.5-2B (Profile C)": 88.90166666666667
+  },
+  "tokens_per_s": {
+    "Qwen3-1.7B (Profile A)": 4.28170267189368,
+    "Qwen3.5-2B (Profile C)": 1.9182242552633058
+  },
+  "rule": "Adopt Profile C for System 1 only if the paired accuracy difference has a lower 95% bound above -3 points, a non-negative point estimate, and mean latency at most 1.3x Profile A (MR-005 requires H7 first, which passes).",
+  "decision": "Keep Profile A (Qwen3-1.7B) as System 1 default: accuracy 83% vs 67% (delta +17%, 95% CI [+7%, +30%]), mean latency 88.9 s vs 24.0 s on 30 tasks (shared machine). System 2 (Qwen3.5-4B) not evaluated at this scale; GPU scale-out (P5-T03) deferred by the user.",
+  "adopt": false,
+  "rows": [
+    {
+      "task": "gsm8k-0185",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 12.45,
+        "tokens": 80
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 51.88,
+        "tokens": 87
+      }
+    },
+    {
+      "task": "gsm8k-0401",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 48.11,
+        "tokens": 201
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 10.48,
+        "tokens": 74
+      }
+    },
+    {
+      "task": "gsm8k-0307",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 12.11,
+        "tokens": 92
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": false,
+        "wall_s": 87.62,
+        "tokens": 280
+      }
+    },
+    {
+      "task": "gsm8k-0619",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 96.28,
+        "tokens": 174
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 16.4,
+        "tokens": 92
+      }
+    },
+    {
+      "task": "gsm8k-0163",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 67.66,
+        "tokens": 288
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 111.69,
+        "tokens": 303
+      }
+    },
+    {
+      "task": "gsm8k-0376",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 59.24,
+        "tokens": 196
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 9.72,
+        "tokens": 106
+      }
+    },
+    {
+      "task": "gsm8k-0618",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 10.59,
+        "tokens": 107
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 157.98,
+        "tokens": 248
+      }
+    },
+    {
+      "task": "gsm8k-0181",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 35.89,
+        "tokens": 139
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 15.88,
+        "tokens": 170
+      }
+    },
+    {
+      "task": "gsm8k-0720",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 5.69,
+        "tokens": 62
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 86.58,
+        "tokens": 146
+      }
+    },
+    {
+      "task": "gsm8k-0966",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 141.97,
+        "tokens": 318
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 69.08,
+        "tokens": 134
+      }
+    },
+    {
+      "task": "gsm8k-1107",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 17.44,
+        "tokens": 150
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 50.59,
+        "tokens": 154
+      }
+    },
+    {
+      "task": "gsm8k-0789",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": false,
+        "wall_s": 110.49,
+        "tokens": 244
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 10.89,
+        "tokens": 86
+      }
+    },
+    {
+      "task": "gsm8k-0794",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 8.87,
+        "tokens": 86
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 44.41,
+        "tokens": 170
+      }
+    },
+    {
+      "task": "gsm8k-1031",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 30.71,
+        "tokens": 133
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 16.99,
+        "tokens": 127
+      }
+    },
+    {
+      "task": "gsm8k-0830",
+      "domain": "math",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 16.3,
+        "tokens": 134
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": false,
+        "wall_s": 176.17,
+        "tokens": 393
+      }
+    },
+    {
+      "task": "gsm8k-0651",
+      "domain": "math",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 100.34,
+        "tokens": 279
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 20.08,
+        "tokens": 232
+      }
+    },
+    {
+      "task": "mbpp_plus-799",
+      "domain": "code",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 11.93,
+        "tokens": 107
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 256.18,
+        "tokens": 189
+      }
+    },
+    {
+      "task": "mbpp_plus-465",
+      "domain": "code",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 181.27,
+        "tokens": 123
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 10.2,
+        "tokens": 76
+      }
+    },
+    {
+      "task": "mbpp_plus-605",
+      "domain": "code",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 34.58,
+        "tokens": 119
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 138.72,
+        "tokens": 238
+      }
+    },
+    {
+      "task": "mbpp_plus-743",
+      "domain": "code",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": false,
+        "wall_s": 54.88,
+        "tokens": 168
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 30.01,
+        "tokens": 105
+      }
+    },
+    {
+      "task": "mbpp_plus-62",
+      "domain": "code",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 17.42,
+        "tokens": 77
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 64.69,
+        "tokens": 145
+      }
+    },
+    {
+      "task": "mbpp_plus-269",
+      "domain": "code",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 54.53,
+        "tokens": 157
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 47.09,
+        "tokens": 80
+      }
+    },
+    {
+      "task": "mbpp_plus-63",
+      "domain": "code",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 40.18,
+        "tokens": 157
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": false,
+        "wall_s": 246.87,
+        "tokens": 202
+      }
+    },
+    {
+      "task": "mbpp_plus-253",
+      "domain": "code",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 174.3,
+        "tokens": 177
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 75.47,
+        "tokens": 111
+      }
+    },
+    {
+      "task": "schema-09",
+      "domain": "structured",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": false,
+        "wall_s": 12.88,
+        "tokens": 57
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 37.73,
+        "tokens": 76
+      }
+    },
+    {
+      "task": "schema-01",
+      "domain": "structured",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 30.62,
+        "tokens": 47
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 86.73,
+        "tokens": 41
+      }
+    },
+    {
+      "task": "schema-10",
+      "domain": "structured",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 16.29,
+        "tokens": 28
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 10.44,
+        "tokens": 34
+      }
+    },
+    {
+      "task": "schema-08",
+      "domain": "structured",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 8.18,
+        "tokens": 30
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 2.8,
+        "tokens": 27
+      }
+    },
+    {
+      "task": "schema-04",
+      "domain": "structured",
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 4.48,
+        "tokens": 40
+      },
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 10.65,
+        "tokens": 38
+      }
+    },
+    {
+      "task": "schema-11",
+      "domain": "structured",
+      "Qwen3.5-2B (Profile C)": {
+        "correct": true,
+        "wall_s": 8.04,
+        "tokens": 27
+      },
+      "Qwen3-1.7B (Profile A)": {
+        "correct": true,
+        "wall_s": 8.65,
+        "tokens": 35
+      }
+    }
+  ]
+}

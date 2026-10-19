@@ -1,0 +1,13 @@
+0 alone 71.8 s 77 tokens load 13.484375
+0 with_2_samples 13.4 s 81 tokens load 12.92724609375
+1 alone 7.9 s 77 tokens load 12.5322265625
+1 with_2_samples 16.6 s 77 tokens load 11.646484375
+2 alone 7.5 s 77 tokens load 11.43408203125
+2 with_2_samples 10.8 s 77 tokens load 11.2802734375
+alone mean draft wall 29.1 s
+with_2_samples mean draft wall 13.6 s
+
+Interpretation (2026-10-18, shared machine, load average 11-13 from processes outside this project):
+the first "alone" run (71.8 s) waited behind other work and is excluded. Median System 1 draft wall time:
+alone 7.9 s, with two concurrent 384-token samples 13.4 s, so skipping the samples when an exact verifier
+decides makes the verifiable fast path about 40% faster (ASSUMPTIONS A-028).

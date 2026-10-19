@@ -1,0 +1,26 @@
+% Deployment topology: single-node CPU baseline and optional GPU scale-out; width ~15cm
+\begin{tikzpicture}[x=1cm,y=1cm]
+% CPU node
+\node[sblk=navy,text width=2.2cm] (gw) at (0,0) {gateway + web\\:8080, :9090 metrics};
+\node[sblk=violet,text width=2.2cm] (s1) at (0,-1.1) {llama-server S1\\:8001, 4 threads};
+\node[sblk=violet,text width=2.2cm] (s2) at (0,-2.2) {llama-server S2\\:8002, 4 threads};
+\node[sblk=crimson,text width=2.2cm] (sb) at (2.9,-1.1) {sandbox runner\\no network};
+\node[sblk=teal,text width=2.2cm] (db) at (2.9,-2.2) {SQLite + JSONL\\local disk};
+\node[sblk=amber,text width=2.2cm] (sy) at (2.9,0) {SymPy sidecar\\:8010};
+\begin{scope}[on background layer]
+\node[grp=navy,fit=(gw)(s1)(s2)(sb)(db)(sy),inner sep=7pt] (cpu) {};
+\end{scope}
+\node[grplab=navy,anchor=south west] at (cpu.north west) {Single node, CPU baseline (4 cores, 32\,GB; models $\approx$ 4\,GB resident)};
+% GPU variant
+\node[sblk=navy,text width=2.2cm] (ggw) at (8.0,0) {gateway + web\\unchanged};
+\node[sblk=violet,text width=2.4cm] (vl) at (8.0,-1.1) {vLLM (CUDA)\\S1 + S2 resident, BF16/AWQ};
+\node[sblk=violet,text width=2.4cm] (vl2) at (8.0,-2.2) {spec.\ decoding\\EAGLE / MTP, higher $N$, $b$};
+\node[sblk=crimson,text width=2.2cm] (gsb) at (11.0,-1.1) {sandbox (container)};
+\node[sblk=teal,text width=2.2cm] (gdb) at (11.0,-2.2) {SQLite / Postgres\\object store for traces};
+\node[sblk=amber,text width=2.2cm] (gsy) at (11.0,0) {SymPy sidecar};
+\begin{scope}[on background layer]
+\node[grp=violet,fit=(ggw)(vl)(vl2)(gsb)(gdb)(gsy),inner sep=7pt] (gpu) {};
+\end{scope}
+\node[grplab=violet,anchor=south west] at (gpu.north west) {Optional GPU scale-out (Linux, 1 GPU $\ge$ 24\,GB)};
+\draw[dsh,<->] (cpu.east)--node[lab,above]{same API, config, schemas}(gpu.west);
+\end{tikzpicture}

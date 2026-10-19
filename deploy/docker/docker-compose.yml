@@ -1,0 +1,58 @@
+# Linux vLLM-CPU profile (OR-003, MR-003): two vLLM CPU servers, the gateway, a TLS proxy and Prometheus.
+#   echo "$(openssl rand -hex 24)" > deploy/docker/secrets/nafs_tokens     # SR-006: secrets from a file
+#   NAFS_DOMAIN=nafs.example.org docker compose -f deploy/docker/docker-compose.yml up -d
+# Requires an x86-64 host with AVX-512 (BF16 preferred) and about 24 GB RAM for both models at BF16.
+name: nafs-aql
+x-vllm: &vllm
+  build:
+    context: ../../third_party/vllm
+    dockerfile: docker/Dockerfile.cpu
+    target: vllm-openai
+  image: nafs-aql/vllm-cpu:0.31.0
+  environment:
+    VLLM_CPU_KVCACHE_SPACE: "4"
+    VLLM_CPU_OMP_THREADS_BIND: "auto"
+  volumes:
+    - hf-cache:/root/.cache/huggingface
+  shm_size: 4gb
+  restart: unless-stopped
+services:
+  system1:
+    <<: *vllm
+    command: ["Qwen/Qwen3-1.7B", "--served-model-name", "system1", "--port", "8001", "--dtype", "bfloat16", "--max-model-len", "8192",
+              "--max-num-seqs", "4", "--enable-prefix-caching", "--reasoning-parser", "qwen3", "--max-logprobs", "5"]
+    healthcheck: {test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8001/health"], interval: 30s, timeout: 5s, retries: 40}
+  system2:
+    <<: *vllm
+    command: ["Qwen/Qwen3-4B-Thinking-2507", "--served-model-name", "system2", "--port", "8002", "--dtype", "bfloat16", "--max-model-len", "8192",
+              "--max-num-seqs", "2", "--enable-prefix-caching", "--reasoning-parser", "qwen3", "--max-logprobs", "5"]
+    healthcheck: {test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8002/health"], interval: 30s, timeout: 5s, retries: 40}
+  gateway:
+    build: {context: ../.., dockerfile: deploy/docker/Dockerfile.gateway}
+    image: nafs-aql/gateway:0.1
+    environment:
+      NAFS_BIND: "0.0.0.0:8080"
+      NAFS_AUTH_TOKENS_FILE: /run/secrets/nafs_tokens
+    secrets: [nafs_tokens]
+    # The verifier sandbox isolates untrusted code with an unprivileged network namespace (unshare -rn),
+    # which Docker's default seccomp profile forbids; without it the verifier fails closed (SR-002).
+    security_opt: ["seccomp=unconfined"]
+    volumes: ["nafs-data:/app/data/runtime"]
+    depends_on:
+      system1: {condition: service_healthy}
+      system2: {condition: service_healthy}
+    restart: unless-stopped
+  proxy:
+    image: caddy:2.8.4
+    ports: ["443:443", "80:80"]
+    environment: {NAFS_DOMAIN: "${NAFS_DOMAIN:-localhost}"}
+    volumes: ["../tls/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data"]
+    depends_on: [gateway]
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v2.53.2
+    volumes: ["../monitoring/prometheus.docker.yml:/etc/prometheus/prometheus.yml:ro", "../monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro"]
+    restart: unless-stopped
+secrets:
+  nafs_tokens: {file: ./secrets/nafs_tokens}
+volumes: {hf-cache: {}, nafs-data: {}, caddy-data: {}}

@@ -1,0 +1,2817 @@
+openapi: 3.1.0
+info:
+  title: Nafs-Aql Gateway API
+  version: 1.5.1
+  summary: Dual-process (System 1 / System 2) chat gateway with verifier-gated deliberation
+  description: 'External API of the Nafs-Aql Rust gateway (crate `nafs-gateway`). Every reply exposes the
+
+    reasoning mode that produced it (`fast` or `slow`), the assurance level, and the controller
+
+    decision identifier. Streaming uses Server-Sent Events (SSE); chat rooms use WebSocket.
+
+    Requirement IDs (IF-001..IF-010, FR-002, FR-006) refer to the Nafs-Aql Technical Specification.
+
+    Version 1.1 adds conversation management, the verifier playground, system/backend control, dataset browsing, run cancellation
+    and calibration fitting, as implemented by nafs-gateway 0.1 (Phase 1).
+
+    Version 1.2 (Phase 2) adds the rubric judge, the audit stream and self-model (Prop. 5), gate modes (fixed, calibrated,
+    budget), recalibration from the ledger with held-out promotion, measured gate parameters (Beta-fit caps, budget curve),
+    verifier-rate measurement, new evaluation systems (nafs_blind, slow_conditioned, slow_b<N>), request bounds enforced with
+    HTTP 400, and same-origin enforcement (HTTP 403 for foreign Origin or Host).
+
+    Version 1.3 (Phases 3-4) adds human feedback, review and opt-out (Tazkiya), Both-trial preferences, the gates dashboard,
+    drift monitoring, the load-test protocol, McNemar/Bonferroni statistics and report export.
+
+    Version 1.4 (Phase 5) adds alerts with a drill, lab insights, resumable evaluation runs, retrieval memory (retrieve /
+    retrieved) and the security posture in /v1/system.
+
+
+    Version 1.5 (Phase 7) adds per-stage latency in usage.stages (queue, prefill, decode and KV-cache reuse for model stages)
+    and GET /v1/perf/stages, the latency breakdown by stage.
+
+    '
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+- url: http://localhost:8080
+  description: Single-node CPU baseline
+security:
+- bearerAuth: []
+tags:
+- name: chat
+- name: rooms
+- name: bench
+- name: eval
+- name: system
+- name: gate
+- name: ledger
+- name: verifiers
+- name: tazkiya
+- name: phase4
+- name: lab
+- name: phase5
+- name: phase7
+  description: CPU inference performance and latency attribution (Phase 7)
+paths:
+  /v1/chat:
+    post:
+      tags:
+      - chat
+      operationId: chatComplete
+      summary: Complete one chat turn (non-streaming)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Completed reply
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatReply'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/BackendUnavailable'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/chat/stream:
+    post:
+      tags:
+      - chat
+      operationId: chatStream
+      summary: Complete one chat turn as an SSE stream of tokens and controller events
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: '`text/event-stream`. Each event has an `event:` name among `token`, `decision`,
+
+            `verification`, `retry`, `degraded`, `done`, `error` and a JSON `data:` payload
+
+            (see `StreamEvent`). The `done` event carries the full `ChatReply`.
+
+            '
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/StreamEvent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/conversations/{conversation_id}:
+    get:
+      tags:
+      - chat
+      operationId: getConversation
+      summary: Fetch a conversation with per-message reasoning mode and assurance
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    patch:
+      tags:
+      - chat
+      operationId: renameConversation
+      summary: Rename a conversation and/or set its training opt-out (SR-004)
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 120
+                training_opt_out:
+                  type: boolean
+      responses:
+        '204':
+          description: Renamed
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags:
+      - chat
+      operationId: deleteConversation
+      summary: Delete a conversation and its messages
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/decisions/{decision_id}:
+    get:
+      tags:
+      - chat
+      operationId: getDecision
+      summary: Fetch the controller decision record for a reply
+      parameters:
+      - name: decision_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Decision record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionRecord'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/rooms:
+    get:
+      tags:
+      - rooms
+      operationId: listRooms
+      summary: List chat rooms
+      responses:
+        '200':
+          description: Rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Room'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - rooms
+      operationId: createRoom
+      summary: Create a chat room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 80
+                profile:
+                  $ref: '#/components/schemas/ModelProfile'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /ws/rooms/{room_id}:
+    get:
+      tags:
+      - rooms
+      operationId: roomSocket
+      summary: WebSocket upgrade for a chat room (frames are `RoomFrame` JSON objects)
+      parameters:
+      - name: room_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '101':
+          description: Switching Protocols
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/bench/runs:
+    get:
+      tags:
+      - bench
+      operationId: listBenchRuns
+      summary: List performance-test runs
+      responses:
+        '200':
+          description: Runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BenchRun'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - bench
+      operationId: startBenchRun
+      summary: Start a load test (FR-052)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BenchRunRequest'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BenchRun'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/bench/runs/{run_id}:
+    get:
+      tags:
+      - bench
+      operationId: getBenchRun
+      summary: Fetch a performance-test run with latency quantiles
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BenchRun'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/runs:
+    get:
+      tags:
+      - eval
+      operationId: listEvalRuns
+      summary: List evaluation runs
+      responses:
+        '200':
+          description: Runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EvalRun'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - eval
+      operationId: startEvalRun
+      summary: Start an evaluation run (FR-050)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvalRunRequest'
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRun'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/runs/{run_id}:
+    get:
+      tags:
+      - eval
+      operationId: getEvalRun
+      summary: Fetch an evaluation run with metrics and paired statistics
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvalRun'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/self-model:
+    get:
+      tags:
+      - system
+      operationId: getSelfModel
+      summary: Per-domain capability table with the audit-weighted estimator (FR-041, Prop. 5); unmeasured below 30 audits
+      responses:
+        '200':
+          description: Capability table
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SelfModel'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /healthz:
+    get:
+      tags:
+      - system
+      operationId: health
+      summary: Liveness and backend readiness
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                    - ok
+                    - degraded
+                  backends:
+                    type: object
+                    additionalProperties:
+                      type: string
+                      enum:
+                      - ready
+                      - unavailable
+                  backend:
+                    type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /metrics:
+    get:
+      tags:
+      - system
+      operationId: metrics
+      summary: Prometheus metrics (NFR-021)
+      security: []
+      responses:
+        '200':
+          description: Prometheus text exposition
+          content:
+            text/plain:
+              schema:
+                type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /openapi.json:
+    get:
+      tags:
+      - system
+      operationId: openapi
+      summary: This document (IF-001)
+      security: []
+      responses:
+        '200':
+          description: OpenAPI document
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/conversations:
+    get:
+      tags:
+      - chat
+      operationId: listConversations
+      summary: List persisted conversations (most recent first)
+      responses:
+        '200':
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationSummary'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/bench/prompt-sets:
+    get:
+      tags:
+      - bench
+      operationId: listPromptSets
+      summary: Built-in prompt sets for load tests
+      responses:
+        '200':
+          description: Prompt sets
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    label:
+                      type: string
+                    prompts:
+                      type: array
+                      items:
+                        type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/bench/runs/{run_id}/cancel:
+    post:
+      tags:
+      - bench
+      operationId: cancelBenchRun
+      summary: Cancel an active run after in-flight items finish
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Cancelling
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/runs/{run_id}/cancel:
+    post:
+      tags:
+      - eval
+      operationId: cancelEvalRun
+      summary: Cancel an active run after in-flight items finish
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Cancelling
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/datasets:
+    get:
+      tags:
+      - eval
+      operationId: listDatasets
+      summary: Evaluation datasets with task counts, domains and licences
+      responses:
+        '200':
+          description: Datasets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dataset'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/datasets/{name}:
+    get:
+      tags:
+      - eval
+      operationId: previewDataset
+      summary: First tasks of a dataset
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 25
+      responses:
+        '200':
+          description: Tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/runs/{run_id}/calibrate:
+    post:
+      tags:
+      - eval
+      operationId: fitCalibration
+      summary: Fit the e1_hat calibration from a run (k-fold held-out ECE); promoted only if NFR-020 holds (FR-015)
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Fit and promotion verdict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                include_ledger:
+                  type: boolean
+                  default: false
+  /v1/verify:
+    post:
+      tags:
+      - system
+      operationId: verify
+      summary: Run the exact verifiers on an answer (verifier playground, FR-030)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
+      responses:
+        '200':
+          description: Verdict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifierResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/system:
+    get:
+      tags:
+      - system
+      operationId: getSystem
+      summary: Backends (live health), gate, deliberation caps, calibration, host
+      responses:
+        '200':
+          description: System
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemInfo'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/system/backend:
+    post:
+      tags:
+      - system
+      operationId: setBackend
+      summary: Switch the active backend set at runtime (llama | vllm) Refused with 503 when the target backend is not reachable,
+        unless force is true.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              properties:
+                name:
+                  type: string
+                force:
+                  type: boolean
+                  default: false
+                  description: Switch even when the backend does not pass a health check
+      responses:
+        '200':
+          description: Switched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  active_backend:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Target backend not reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/system/activity:
+    get:
+      tags:
+      - system
+      operationId: getActivity
+      summary: Most recent replies (mode, assurance, latency) for dashboards
+      responses:
+        '200':
+          description: Recent replies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/judge:
+    post:
+      tags:
+      - verifiers
+      operationId: judge
+      summary: 'Score an answer with the rubric judge (FR-034): pass iff h, a, u >= 0.5 and V >= 0.7'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - question
+              - answer
+              properties:
+                question:
+                  type: string
+                answer:
+                  type: string
+      responses:
+        '200':
+          description: Judge verdict (verifier = judge, exact = false)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifierResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '503':
+          $ref: '#/components/responses/BackendUnavailable'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/verifiers:
+    get:
+      tags:
+      - verifiers
+      operationId: getVerifierRates
+      summary: Published (r, phi) per verifier (FR-032)
+      responses:
+        '200':
+          description: Rates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rates:
+                    type: object
+                    additionalProperties:
+                      $ref: '#/components/schemas/Rates'
+                  note:
+                    type: string
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/verifiers/runs:
+    get:
+      tags:
+      - verifiers
+      operationId: listRateRuns
+      summary: Verifier measurement runs
+      responses:
+        '200':
+          description: Runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - verifiers
+      operationId: startRateRun
+      summary: Mutation-test the exact verifiers (and optionally the judge) and publish (r, phi) (ER-003)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items_per_dataset:
+                  type: integer
+                  default: 60
+                include_judge:
+                  type: boolean
+                  default: false
+                concurrency:
+                  type: integer
+                  default: 3
+                code_datasets:
+                  type: array
+                  items:
+                    type: string
+                  default:
+                  - mbpp
+                  - humaneval
+                  description: Code datasets for mutants; humaneval_plus and mbpp_plus carry the EvalPlus test suites
+                judge_only:
+                  type: boolean
+                  default: false
+      responses:
+        '202':
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/verifiers/runs/{run_id}:
+    get:
+      tags:
+      - verifiers
+      operationId: getRateRun
+      summary: One measurement run
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Run
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/verifiers/runs/{run_id}/cancel:
+    post:
+      tags:
+      - verifiers
+      operationId: cancelRateRun
+      summary: Cancel a measurement run
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Cancelling
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/gate:
+    get:
+      tags:
+      - gate
+      operationId: getGate
+      summary: Gate mode, promotion verdict, calibration and parameter provenance
+      responses:
+        '200':
+          description: Gate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GateState'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - gate
+      operationId: setGate
+      summary: Set the gate mode (FR-014 budget mode) and escalation budget at runtime
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum:
+                  - fixed
+                  - calibrated
+                  - budget
+                escalation_budget:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+      responses:
+        '200':
+          description: Gate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GateState'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/gate/recalibrate:
+    post:
+      tags:
+      - gate
+      operationId: recalibrate
+      summary: Refit e1_hat from the ledger (verified drafts and exact-labelled audits) plus optional eval runs; promote only
+        if NFR-020 holds (FR-015)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                run_ids:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                    format: uuid
+                min_n:
+                  type: integer
+                  default: 10
+                apply:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Fit and promotion verdict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalibrationResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/gate/derive:
+    post:
+      tags:
+      - gate
+      operationId: deriveParams
+      summary: Derive e2_hat, delta_c, Beta-fit caps (Prop. 3) and b* (Prop. 9) from evaluation runs; apply = true installs
+        them (FR-011, FR-021)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                run_ids:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: string
+                    format: uuid
+                min_n:
+                  type: integer
+                  default: 10
+                apply:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Derived parameters
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/gate/params:
+    get:
+      tags:
+      - gate
+      operationId: getParams
+      summary: Measured parameters and their provenance
+      responses:
+        '200':
+          description: Parameters
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags:
+      - gate
+      operationId: resetParams
+      summary: Discard measured parameters and use the configuration placeholders
+      responses:
+        '200':
+          description: Parameters
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/audits:
+    get:
+      tags:
+      - ledger
+      operationId: listAudits
+      summary: Audit stream records and counts (FR-040)
+      parameters:
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          maximum: 1000
+      responses:
+        '200':
+          description: Audits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  counts:
+                    type: object
+                  audits:
+                    type: array
+                    items:
+                      type: object
+                  worker:
+                    type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/audits/run-next:
+    post:
+      tags:
+      - ledger
+      operationId: runNextAudit
+      summary: Run the oldest pending audit now (normally done by the idle worker)
+      responses:
+        '200':
+          description: Result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  completed:
+                    type: boolean
+                  counts:
+                    type: object
+        '503':
+          $ref: '#/components/responses/BackendUnavailable'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/replies/{reply_id}/feedback:
+    post:
+      tags:
+      - chat
+      operationId: rateReply
+      summary: 'Human rating of a reply (+1 / -1): a soft signal shown in the ledger, never a calibration label'
+      parameters:
+      - name: reply_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - rating
+              properties:
+                rating:
+                  type: integer
+                  enum:
+                  - 1
+                  - -1
+                note:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '204':
+          description: Recorded
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/tazkiya:
+    get:
+      tags:
+      - tazkiya
+      operationId: getTazkiya
+      summary: Training-data readiness per domain, opt-outs, feedback, reviews and the model registry (Phase 3)
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/tazkiya/review:
+    get:
+      tags:
+      - tazkiya
+      operationId: reviewQueue
+      summary: Consensus answers awaiting human review before they may enter training (FR-033)
+      parameters:
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          maximum: 500
+      responses:
+        '200':
+          description: Queue
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/tazkiya/review/{reply_id}:
+    post:
+      tags:
+      - tazkiya
+      operationId: reviewReply
+      summary: Approve or reject a consensus answer for the distillation set (FR-033)
+      parameters:
+      - name: reply_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - approved
+              properties:
+                approved:
+                  type: boolean
+                reviewer:
+                  type: string
+                note:
+                  type: string
+      responses:
+        '204':
+          description: Recorded
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/gates:
+    get:
+      tags:
+      - phase4
+      operationId: getGates
+      summary: 'Roadmap gates G0-G4: go/no-go per criterion from stored runs, acceptance results, H7, the model registry and
+        protocol runs (FR-053)'
+      responses:
+        '200':
+          description: Gates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gate:
+                          type: string
+                        title:
+                          type: string
+                        week:
+                          type: integer
+                        status:
+                          type: string
+                          enum:
+                          - pass
+                          - fail
+                          - pending
+                        criteria:
+                          type: array
+                          items:
+                            type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/drift:
+    get:
+      tags:
+      - phase4
+      operationId: getDrift
+      summary: CUSUM drift charts of calibration error and fast-path accuracy per domain with a shuffled negative control
+        (FR-042)
+      parameters:
+      - name: k
+        in: query
+        schema:
+          type: number
+      - name: h
+        in: query
+        schema:
+          type: number
+      - name: reference
+        in: query
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: Drift charts
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/bench/protocol:
+    post:
+      tags:
+      - bench
+      - phase4
+      operationId: startProtocol
+      summary: Recorded load-test protocol at 1, 2 and 4 sessions with p50/p95/p99 and the NFR-007 verdict (ER-007)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                prompt_set:
+                  type: string
+                  default: chat-short
+                mode:
+                  type: string
+                  default: fast
+                levels:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 1
+                    maximum: 16
+                  default:
+                  - 1
+                  - 2
+                  - 4
+                requests_per_session:
+                  type: integer
+                  default: 8
+                max_tokens:
+                  type: integer
+      responses:
+        '202':
+          description: Started; poll GET /v1/bench/runs/{run_id}
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/runs/{run_id}/export:
+    get:
+      tags:
+      - eval
+      - phase4
+      operationId: exportRun
+      summary: 'Report export: Markdown summary, item CSV or full JSON (P4-T01)'
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: format
+        in: query
+        schema:
+          type: string
+          enum:
+          - md
+          - csv
+          - json
+          default: md
+      responses:
+        '200':
+          description: Report file
+          content:
+            text/markdown:
+              schema:
+                type: string
+            text/csv:
+              schema:
+                type: string
+            application/json:
+              schema:
+                type: object
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/preferences:
+    get:
+      tags:
+      - lab
+      operationId: getPreferences
+      summary: Value of deliberation per domain from Both trials (share preferring System 2, Clopper-Pearson CI)
+      responses:
+        '200':
+          description: Preference statistics
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - lab
+      operationId: addPreference
+      summary: 'Record a Both trial: the same prompt answered by System 1 and System 2 and the person''s choice'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - prompt
+              - fast_reply_id
+              - slow_reply_id
+              - preferred
+              properties:
+                prompt:
+                  type: string
+                domain:
+                  type: string
+                fast_reply_id:
+                  type: string
+                  format: uuid
+                slow_reply_id:
+                  type: string
+                  format: uuid
+                preferred:
+                  type: string
+                  enum:
+                  - fast
+                  - slow
+                  - tie
+                  - both_bad
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Recorded
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/alerts:
+    get:
+      tags:
+      - phase5
+      operationId: getAlerts
+      summary: 'Alert rules over the recent window: fast-path latency, error rate, escalation rate, verifier acceptance, calibration
+        drift (OR-004)'
+      responses:
+        '200':
+          description: Alert states
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/alerts/drill:
+    post:
+      tags:
+      - phase5
+      operationId: alertDrill
+      summary: 'Alert drill: every rule reports firing for the given seconds (10..3600, default 120)'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                seconds:
+                  type: integer
+                  minimum: 10
+                  maximum: 3600
+      responses:
+        '200':
+          description: Drill started
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/lab/insights:
+    get:
+      tags:
+      - lab
+      operationId: labInsights
+      summary: 'Pooled policy map: best System 1 / System 2 policy per domain and price of latency (Prop. 2), value of deliberation,
+        human preferences'
+      parameters:
+      - name: lambda
+        in: query
+        schema:
+          type: number
+          minimum: 0
+          maximum: 1
+      responses:
+        '200':
+          description: Insights
+          content:
+            application/json:
+              schema:
+                type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/eval/runs/{run_id}/resume:
+    post:
+      tags:
+      - eval
+      operationId: resumeEvalRun
+      summary: Resume an interrupted or cancelled evaluation run, keeping completed items (runs interrupted by a restart resume
+        automatically)
+      parameters:
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '202':
+          description: Resumed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/perf/stages:
+    get:
+      tags:
+      - phase7
+      operationId: getPerfStages
+      summary: Latency breakdown by stage and engine speed (prefill, decode, cache reuse) over recent replies (NFR-030, P7-T01)
+      parameters:
+      - name: hours
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 2160
+          default: 24
+      - name: lab
+        in: query
+        description: Include evaluation and load-test traffic
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: 'Per path (fast, slow): stage shares with p50/p95 and the unattributed overhead; per model stage: prefill
+            and decode tokens per second, cache reuse and queue p95'
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - paths
+                - engine
+                - replies
+                properties:
+                  paths:
+                    type: array
+                    items:
+                      type: object
+                  engine:
+                    type: array
+                    items:
+                      type: object
+                  replies:
+                    type: integer
+                  hours:
+                    type: integer
+                  lab_included:
+                    type: boolean
+        '403':
+          $ref: '#/components/responses/Forbidden'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    BadRequest:
+      description: Malformed request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    TooManyRequests:
+      description: Rate limit or backpressure (NFR-011); includes Retry-After
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: seconds
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BackendUnavailable:
+      description: No model backend available
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Cross-origin request, or a Host header that does not name this machine while auth is off (DNS-rebinding
+        guard)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          description: Error taxonomy code, e.g. E_BACKEND_TIMEOUT
+        message:
+          type: string
+        request_id:
+          type: string
+    ModelProfile:
+      type: string
+      enum:
+      - A
+      - B
+      - C
+      description: Model profile (MR-001)
+    ReasoningMode:
+      type: string
+      enum:
+      - fast
+      - slow
+      description: Path that produced the reply (IF-003)
+    Assurance:
+      type: string
+      enum:
+      - verified
+      - consensus
+      - unverified
+      - abstained
+      description: FR-031
+    Domain:
+      type: string
+      enum:
+      - code
+      - math
+      - structured
+      - factual
+      - open
+      - other
+    ChatRequest:
+      type: object
+      required:
+      - messages
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Message'
+          maxItems: 400
+        domain_hint:
+          $ref: '#/components/schemas/Domain'
+        lambda:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Speed-care control; price of compute relative to error cost (FR-004)
+        force_mode:
+          $ref: '#/components/schemas/ReasoningMode'
+          description: Operator override for experiments; ignored in production mode
+        verification:
+          type: object
+          description: Optional verifier inputs for verifiable tasks
+          properties:
+            tests:
+              type: array
+              items:
+                type: string
+              description: Unit tests (code domain)
+            reference_answer:
+              type: string
+              description: Reference (math domain)
+            json_schema:
+              type: object
+              description: Schema the answer must satisfy
+            test_code:
+              type: string
+              description: HumanEval-style test program defining check(candidate)
+            entry_point:
+              type: string
+            code_prefix:
+              type: string
+              description: Prepended when the answer is only a function body
+        max_tokens:
+          type: integer
+          minimum: 1
+          maximum: 4096
+          default: 512
+        thinking_budget:
+          type: integer
+          minimum: 16
+          maximum: 8192
+          description: Per-request System 2 reasoning budget (FR-024); defaults to the per-domain cap
+        show_reasoning:
+          type: boolean
+          default: false
+          description: 'Stream System 2 reasoning tokens (marked reasoning: true)'
+        ephemeral:
+          type: boolean
+          default: false
+          description: Do not persist the conversation (evaluation and benchmark traffic)
+        audit:
+          type: boolean
+          description: 'Force (true) or suppress (false) audit selection for a kept reply (FR-040). Default: random with probability
+            epsilon on live, persisted traffic.'
+        ablation_draft_conditioned:
+          type: boolean
+          description: 'Coupling ablation only (ER-004): System 2 sees the System 1 draft. Rejected with 400 when disabled
+            in configuration.'
+        retrieve:
+          type: boolean
+          description: 'FR-061: use (true) or skip (false) retrieval of earlier verified answers, quoted as delimited data
+            with provenance; default from configuration'
+        adaptive_exit:
+          type: boolean
+          description: 'FR-082: use (true) or skip (false) the adaptive reasoning exit (probe-and-verify early stop of System
+            2 reasoning); default from configuration'
+    Message:
+      type: object
+      required:
+      - role
+      - content
+      properties:
+        role:
+          type: string
+          enum:
+          - system
+          - user
+          - assistant
+        content:
+          type: string
+    Usage:
+      type: object
+      required:
+      - prompt_tokens
+      - completion_tokens
+      - reasoning_tokens
+      - wall_ms
+      - model_calls
+      - verifier_calls
+      properties:
+        prompt_tokens:
+          type: integer
+        completion_tokens:
+          type: integer
+        reasoning_tokens:
+          type: integer
+        thinking_budget:
+          type:
+          - integer
+          - 'null'
+        wall_ms:
+          type: integer
+        model_calls:
+          type: integer
+          description: Bounded by 1+N(R+1) (FR-026)
+        verifier_calls:
+          type: integer
+        ttft_ms:
+          type:
+          - integer
+          - 'null'
+          description: Time to first visible token
+        stages:
+          type: array
+          items:
+            $ref: '#/components/schemas/StageTiming'
+          description: Where the time went, in order (NFR-030). Cheap samples run in parallel with the draft.
+    ChatReply:
+      type: object
+      required:
+      - assurance
+      - decision
+      - decision_id
+      - domain
+      - message
+      - reasoning_mode
+      - reply_id
+      - states
+      - trace_state
+      - usage
+      properties:
+        reply_id:
+          type: string
+          format: uuid
+        conversation_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        decision_id:
+          type: string
+          format: uuid
+        reasoning_mode:
+          $ref: '#/components/schemas/ReasoningMode'
+        assurance:
+          $ref: '#/components/schemas/Assurance'
+        trace_state:
+          $ref: '#/components/schemas/TraceState'
+        message:
+          $ref: '#/components/schemas/Message'
+        uncertainty_notice:
+          type:
+          - string
+          - 'null'
+          description: Present when assurance is abstained or the reply is degraded
+        verifier:
+          oneOf:
+          - type: 'null'
+          - $ref: '#/components/schemas/VerifierResult'
+        usage:
+          $ref: '#/components/schemas/Usage'
+        degraded:
+          type: boolean
+          default: false
+          description: MR-004
+        states:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraceState'
+        decision:
+          $ref: '#/components/schemas/DecisionRecord'
+        domain:
+          $ref: '#/components/schemas/Domain'
+        draft:
+          type:
+          - string
+          - 'null'
+          description: The unused System 1 draft when the reply came from System 2
+        reasoning:
+          type:
+          - string
+          - 'null'
+          description: System 2 reasoning content (kept for traces and debugging, not an explanation)
+        rounds:
+          type: array
+          description: One record per System 2 attempt (absent on the fast path)
+          items:
+            type: object
+            properties:
+              round:
+                type: integer
+              candidate_tokens:
+                type: integer
+              reasoning_tokens:
+                type: integer
+              verifier:
+                type: string
+                description: exact verifier name, judge, or none
+              passed:
+                type: boolean
+        draft_conditioned:
+          type: boolean
+          description: True only in the coupling ablation
+        retrieved:
+          type: array
+          description: Earlier verified answers used as reference (reply_id, score, created_at, question)
+          items:
+            type: object
+    VerifierResult:
+      type: object
+      required:
+      - verifier
+      - passed
+      properties:
+        verifier:
+          type: string
+          description: code_tests | math_numeric | json_schema | judge | consensus, or a '+'-joined combination
+        passed:
+          type: boolean
+        score:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        evidence:
+          type:
+          - string
+          - 'null'
+          description: Failing test, counterexample or schema error fed to the next round (FR-025)
+        rates:
+          oneOf:
+          - $ref: '#/components/schemas/Rates'
+          - type: 'null'
+        duration_ms:
+          type: integer
+        exact:
+          type: boolean
+          description: Exact verifiers accept at threshold 1.0 (Theorem 1)
+        details:
+          type:
+          - object
+          - 'null'
+          description: Judge scores {honesty, harm_avoidance, helpfulness, grounding, V, reason} for verifier = judge
+    DecisionRecord:
+      type: object
+      required:
+      - backend
+      - config_hash
+      - decision_id
+      - delta_c
+      - e1_hat
+      - e2_hat
+      - escalate
+      - explanation
+      - features
+      - lambda
+      - model_profile
+      - request_id
+      - rule
+      - timestamp
+      properties:
+        decision_id:
+          type: string
+          format: uuid
+        request_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        config_hash:
+          type: string
+        model_profile:
+          $ref: '#/components/schemas/ModelProfile'
+        calibration_version:
+          type:
+          - string
+          - 'null'
+        features:
+          type: object
+          properties:
+            mean_logprob:
+              type:
+              - number
+              - 'null'
+            min_logprob:
+              type:
+              - number
+              - 'null'
+            k:
+              type: integer
+            agreement:
+              type:
+              - number
+              - 'null'
+              minimum: 0
+              maximum: 1
+            domain:
+              $ref: '#/components/schemas/Domain'
+            verifiable:
+              type: boolean
+            draft_verified:
+              type:
+              - boolean
+              - 'null'
+            prompt_tokens:
+              type: integer
+            draft_tokens:
+              type: integer
+        e1_hat:
+          type: number
+          minimum: 0
+          maximum: 1
+        e2_hat:
+          type: number
+          minimum: 0
+          maximum: 1
+        lambda:
+          type: number
+        delta_c:
+          type: number
+        escalate:
+          type: boolean
+        rule:
+          type: string
+          enum:
+          - fixed
+          - calibrated
+          - budget
+          - forced_failed_verification
+          - forced_override
+        audit:
+          type: boolean
+          description: Selected for the 5 percent audit stream (FR-040)
+        backend:
+          type: string
+        explanation:
+          type: string
+          description: Human-readable reason for the decision
+    StreamEvent:
+      description: SSE frame payload; the SSE event name equals `event`. Discriminated by `event`.
+      oneOf:
+      - title: start
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: start
+          data:
+            type: object
+            required:
+            - request_id
+            - domain
+            - backend
+            properties:
+              request_id:
+                type: string
+              conversation_id:
+                type:
+                - string
+                - 'null'
+              domain:
+                $ref: '#/components/schemas/Domain'
+              backend:
+                type: string
+      - title: phase
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: phase
+          data:
+            type: object
+            required:
+            - state
+            - label
+            properties:
+              state:
+                $ref: '#/components/schemas/TraceState'
+              label:
+                type: string
+      - title: token
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: token
+          data:
+            type: object
+            required:
+            - text
+            - mode
+            - reasoning
+            - round
+            properties:
+              text:
+                type: string
+              mode:
+                $ref: '#/components/schemas/ReasoningMode'
+              reasoning:
+                type: boolean
+              round:
+                type: integer
+      - title: decision
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: decision
+          data:
+            $ref: '#/components/schemas/DecisionRecord'
+      - title: verification
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: verification
+          data:
+            type: object
+            required:
+            - round
+            - result
+            properties:
+              round:
+                type: integer
+              result:
+                $ref: '#/components/schemas/VerifierResult'
+      - title: retry
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: retry
+          data:
+            type: object
+            required:
+            - round
+            - of
+            properties:
+              round:
+                type: integer
+              of:
+                type: integer
+              evidence:
+                type:
+                - string
+                - 'null'
+      - title: degraded
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: degraded
+          data:
+            type: object
+            required:
+            - reason
+            properties:
+              reason:
+                type: string
+      - title: done
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: done
+          data:
+            $ref: '#/components/schemas/ChatReply'
+      - title: error
+        type: object
+        required:
+        - event
+        - data
+        properties:
+          event:
+            const: error
+          data:
+            type: object
+            required:
+            - code
+            - message
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+    Conversation:
+      type: object
+      required:
+      - conversation_id
+      - messages
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        room_id:
+          type: string
+          format: uuid
+        messages:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/Message'
+            - type: object
+              properties:
+                reasoning_mode:
+                  $ref: '#/components/schemas/ReasoningMode'
+                assurance:
+                  $ref: '#/components/schemas/Assurance'
+                decision_id:
+                  type: string
+                  format: uuid
+        training_opt_out:
+          type: boolean
+    Room:
+      type: object
+      required:
+      - room_id
+      - name
+      - profile
+      properties:
+        room_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        profile:
+          type: string
+        members:
+          type: integer
+        conversation_id:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+    RoomFrame:
+      type: object
+      required:
+      - type
+      properties:
+        type:
+          type: string
+          enum:
+          - join
+          - leave
+          - user_message
+          - assistant_token
+          - assistant_event
+          - assistant_done
+          - presence
+          - error
+        user:
+          type: string
+        payload:
+          type: object
+    BenchRunRequest:
+      type: object
+      required:
+      - concurrency
+      properties:
+        concurrency:
+          type: integer
+          minimum: 1
+          maximum: 64
+        duration_s:
+          type: integer
+          minimum: 1
+          maximum: 3600
+        prompt_set:
+          type: string
+          default: bench-default-v1
+        profile:
+          $ref: '#/components/schemas/ModelProfile'
+        lambda:
+          type: number
+        requests:
+          type: integer
+          minimum: 1
+        mode:
+          type: string
+          enum:
+          - auto
+          - fast
+          - slow
+        max_tokens:
+          type: integer
+        thinking_budget:
+          type: integer
+    BenchRun:
+      type: object
+      required:
+      - run_id
+      - status
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - queued
+          - running
+          - done
+          - failed
+        request:
+          $ref: '#/components/schemas/BenchRunRequest'
+        results:
+          type: object
+          properties:
+            requests:
+              type: integer
+            throughput_rps:
+              type: number
+            ttft_ms:
+              $ref: '#/components/schemas/Quantiles'
+            latency_ms:
+              $ref: '#/components/schemas/Quantiles'
+            escalation_rate:
+              type: number
+            cost_per_request_s:
+              type: number
+            error_rate:
+              type: number
+    Quantiles:
+      type: object
+      properties:
+        p50:
+          type: number
+        p95:
+          type: number
+        p99:
+          type: number
+        mean:
+          type: number
+    EvalRunRequest:
+      type: object
+      required:
+      - benchmark
+      properties:
+        benchmark:
+          type: string
+          description: Dataset name under data/bench (see GET /v1/eval/datasets), e.g. gsm8k, humaneval, mbpp, schema_tasks,
+            open_prompts, smoke_mixed
+        subset:
+          type: string
+        systems:
+          type: array
+          minItems: 1
+          maxItems: 12
+          uniqueItems: true
+          default:
+          - nafs_aql
+          - fast_only
+          - slow_only
+          items:
+            type: string
+            pattern: ^(nafs_aql|nafs_blind|fast_only|slow_only|slow_conditioned|slow_noexit|slow_b[0-9]{2,4}|nafs_aql_l[0-9]{1,3}|nafs_blind_l[0-9]{1,3})$
+          description: 'nafs_aql: full system. nafs_blind: verifier hidden at run time (routing and ECE test). fast_only /
+            slow_only: baselines. slow_conditioned: coupling ablation (ER-004). slow_b<N>: deliberate-only with thinking budget
+            N (budget curve). nafs_aql_l<NN> / nafs_blind_l<NN>: the gated system at lambda = NN/100 (frontier, Prop. 2).'
+        seed:
+          type: integer
+          default: 0
+        lambda:
+          type: number
+          minimum: 0
+          maximum: 1
+        max_items:
+          type: integer
+          minimum: 1
+          maximum: 20000
+        offset:
+          type: integer
+          minimum: 0
+        thinking_budget:
+          type: integer
+          minimum: 16
+          maximum: 8192
+        shuffle:
+          type: boolean
+    EvalRun:
+      type: object
+      required:
+      - run_id
+      - status
+      properties:
+        run_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - running
+          - done
+          - failed
+          - cancelled
+          - interrupted
+        request:
+          $ref: '#/components/schemas/EvalRunRequest'
+        metrics:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              accuracy:
+                type: number
+              selective_accuracy:
+                type: number
+              coverage:
+                type: number
+              escalation_rate:
+                type: number
+              routing_accuracy:
+                type: number
+              ece:
+                type: number
+              brier:
+                type: number
+              mean_cost_s:
+                type: number
+              n:
+                type: integer
+        paired:
+          type: array
+          items:
+            type: object
+            properties:
+              a:
+                type: string
+              b:
+                type: string
+              n_pairs:
+                type: integer
+              delta_accuracy:
+                type: number
+              ci95:
+                type:
+                - array
+                - 'null'
+              mcnemar_p:
+                type: number
+              p_bonferroni:
+                type: number
+              per_domain:
+                type: array
+                items:
+                  type: object
+              discordant:
+                type: object
+        calibration:
+          type:
+          - object
+          - 'null'
+        coupling:
+          type:
+          - object
+          - 'null'
+        budget_curve:
+          type:
+          - object
+          - 'null'
+        routing:
+          type:
+          - object
+          - 'null'
+          description: Per gated system (nafs_blind measures the gate; nafs_aql is verifier-driven)
+        frontier:
+          type:
+          - array
+          - 'null'
+          items:
+            type: object
+            properties:
+              system:
+                type: string
+              accuracy:
+                type: number
+              mean_cost_s:
+                type: number
+              n:
+                type: integer
+              cost_vs_slow:
+                type:
+                - number
+                - 'null'
+              pareto:
+                type: boolean
+    SelfModel:
+      type: object
+      required:
+      - model_hash
+      - adapter_hash
+      - domains
+      properties:
+        model_hash:
+          type: string
+        adapter_hash:
+          type: string
+        backend:
+          type: string
+        audit_fraction:
+          type: number
+        audits:
+          type: object
+        calibration:
+          $ref: '#/components/schemas/Calibration'
+        gate:
+          type: object
+        note:
+          type: string
+        domains:
+          type: array
+          items:
+            type: object
+            required:
+            - domain
+            - n
+            - status
+            properties:
+              domain:
+                type: string
+              n:
+                type: integer
+              escalation_rate:
+                type:
+                - number
+                - 'null'
+              verified:
+                type: integer
+              consensus:
+                type: integer
+              abstained:
+                type: integer
+              n_audit:
+                type: integer
+              n_audit_labelled:
+                type: integer
+              p2_given_escalated:
+                type:
+                - number
+                - 'null'
+              p2_given_audit:
+                type:
+                - number
+                - 'null'
+              p2_hat:
+                type:
+                - number
+                - 'null'
+                description: 'Prop. 5: g p2|esc + (1-g) p2|audit'
+              p2_se_bound:
+                type:
+                - number
+                - 'null'
+              p1_kept_audited:
+                type:
+                - number
+                - 'null'
+              kept_vs_slow_agreement:
+                type:
+                - number
+                - 'null'
+              status:
+                type: string
+                enum:
+                - measured
+                - unmeasured
+    TraceState:
+      type: string
+      enum:
+      - A
+      - L
+      - M
+      - T
+      - X
+      description: 'Automaton states: draft, flagged, deliberate, accepted, abstain'
+    ConversationSummary:
+      type: object
+      properties:
+        conversation_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        room_id:
+          type:
+          - string
+          - 'null'
+        updated_at:
+          type: string
+        messages:
+          type: integer
+    Dataset:
+      type: object
+      properties:
+        name:
+          type: string
+        tasks:
+          type: integer
+        verifiable:
+          type: integer
+        domains:
+          type: object
+          additionalProperties:
+            type: integer
+        license:
+          type:
+          - string
+          - 'null'
+        source:
+          type:
+          - string
+          - 'null'
+    Calibration:
+      type: object
+      properties:
+        version:
+          type: string
+        fitted_at:
+          type: string
+        n:
+          type: integer
+        ece:
+          type: number
+          description: Held-out (k-fold, out-of-fold) ECE with 5 equal-mass bins
+        brier:
+          type: number
+        weights:
+          type: array
+          items:
+            type: number
+        feature_names:
+          type: array
+          items:
+            type: string
+        source_run:
+          type:
+          - string
+          - 'null'
+        n_pos:
+          type: integer
+        n_neg:
+          type: integer
+        folds:
+          type: integer
+        ece_in_sample:
+          type:
+          - number
+          - 'null'
+        isotonic:
+          type: array
+          items:
+            type: array
+            items:
+              type: number
+        lambda_quantiles:
+          type: array
+          items:
+            type: number
+        reliability:
+          type: array
+          items:
+            type: array
+    VerifyRequest:
+      type: object
+      required:
+      - answer
+      - verification
+      properties:
+        answer:
+          type: string
+        verification:
+          type: object
+          description: Optional verifier inputs for verifiable tasks
+          properties:
+            tests:
+              type: array
+              items:
+                type: string
+              description: Unit tests (code domain)
+            reference_answer:
+              type: string
+              description: Reference (math domain)
+            json_schema:
+              type: object
+              description: Schema the answer must satisfy
+            test_code:
+              type: string
+              description: HumanEval-style test program defining check(candidate)
+            entry_point:
+              type: string
+            code_prefix:
+              type: string
+              description: Prepended when the answer is only a function body
+    SystemInfo:
+      type: object
+      description: Backends with live health, gate and deliberation configuration, calibration, host facts
+      additionalProperties: true
+      properties:
+        version:
+          type: string
+        config_hash:
+          type: string
+        active_backend:
+          type: string
+        auth_enabled:
+          type: boolean
+        backends:
+          type: array
+          items:
+            type: object
+        gate:
+          type: object
+        deliberation:
+          type: object
+        security:
+          type: object
+          description: auth, bind, sandbox isolation, retention
+    Rates:
+      type: object
+      description: Mutation-measured verifier quality (FR-032)
+      properties:
+        r:
+          type: number
+        phi:
+          type: number
+        n_mutants:
+          type: integer
+        n_correct:
+          type: integer
+        phi_upper95:
+          type:
+          - number
+          - 'null'
+        measured_at:
+          type:
+          - string
+          - 'null'
+    CalibrationResult:
+      type: object
+      properties:
+        calibration:
+          $ref: '#/components/schemas/Calibration'
+        promoted:
+          type: boolean
+        active:
+          type: boolean
+        reason:
+          type:
+          - string
+          - 'null'
+        requirements:
+          type: object
+        note:
+          type: string
+        n_ledger:
+          type: integer
+        n_eval:
+          type: integer
+    GateState:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum:
+          - fixed
+          - calibrated
+          - budget
+        escalation_budget:
+          type: number
+        lambda_star:
+          type:
+          - number
+          - 'null'
+        effective_rule:
+          type: string
+        promoted:
+          type: boolean
+        promotion_reason:
+          type:
+          - string
+          - 'null'
+        calibration:
+          $ref: '#/components/schemas/Calibration'
+        requirements:
+          type: object
+        params:
+          type: object
+        derived:
+          type: object
+        recalibrate_every_h:
+          type: integer
+    StageTiming:
+      type: object
+      required:
+      - stage
+      - ms
+      description: One stage of a request (NFR-030). Model stages carry the server timings.
+      properties:
+        stage:
+          type: string
+          enum:
+          - retrieval
+          - draft
+          - sample
+          - verify_draft
+          - deliberate
+          - probe
+          - verify
+          - judge
+        ms:
+          type: integer
+          description: Stage wall time including queue wait
+        queue_ms:
+          type: integer
+          description: Wait for a backend slot in the gateway
+        prefill_ms:
+          type: number
+          description: Prompt evaluation time reported by the server
+        decode_ms:
+          type: number
+          description: Generation time reported by the server
+        prompt_n:
+          type: integer
+          description: Prompt tokens evaluated
+        cache_n:
+          type: integer
+          description: Prompt tokens reused from the KV cache
+        tokens:
+          type: integer
+          description: Tokens generated
+        note:
+          type: string
+          description: Free text, e.g. how an adaptive reasoning exit ended (P7-T08)

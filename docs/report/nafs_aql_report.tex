@@ -1,0 +1,62 @@
+% Nafs-Aql technical report (IEEEtran journal style). Build: ../../tools/tectonic nafs_aql_report.tex
+\documentclass[journal]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs,array,multirow}
+\usepackage{graphicx,xcolor}
+\usepackage{tikz,pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc,backgrounds}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
+\usepackage{listings}
+\usepackage{microtype}
+\usepackage{url}
+\usepackage[hidelinks,pdfauthor={Dirac R\&D Team}]{hyperref}
+\usepackage{cite}
+\input{../shared/nafsstyle.tex}
+\newcommand{\MEASUREDROWS}{Qwen3-4B Q4\_K\_M & 2.32\,GiB & $38.2\pm0.6$ & $6.7\pm0.8$ \\ Qwen3-4B-Thinking-2507 Q4\_K\_M & 2.32\,GiB & $38.4\pm1.5$ & $7.0\pm0.9$ \\}
+\newcommand{\NREQ}{99}
+\input{../publication/gen/results.tex}
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\renewcommand{\Pr}{\mathbb{P}}
+\lstset{basicstyle=\ttfamily\scriptsize,columns=fullflexible,breaklines=true,frame=single,framerule=0.3pt,
+  keepspaces=true,showstringspaces=false,commentstyle=\color{slate}\itshape,keywordstyle=\bfseries}
+\hyphenation{Nafs-Aql}
+
+\begin{document}
+\title{Nafs-Aql: A Verifier-Gated Dual-Process Architecture on Small Qwen Models for CPU-Only Deployment}
+\author{Dirac~R\&D~Team%
+\thanks{Manuscript prepared 18 October 2026 (version 2.0: design and implementation). Contact: Dirac R\&D Team. Section~\ref{sec:impl} reports measured results of the implemented system; elsewhere, performance figures are targets or estimates unless marked as measured.}}
+\markboth{Nafs-Aql Technical Report, v2.0, October 2026}{Dirac R\&D Team: Nafs-Aql}
+\maketitle
+
+\begin{abstract}
+We present \Sys, a hybrid System~1 / System~2 language-model architecture built from small, openly licensed Qwen models and designed to run on a CPU-only machine. The design borrows its vocabulary, as an explicit analogy, from the classical Islamic account of the self: the impulsive \emph{nafs}, the arbitrating \emph{\textquoteleft aql}, the integrating \emph{qalb}, and the practices of self-accounting (\emph{muhasaba}) and purification (\emph{tazkiya}). We turn this inspiration into a formal model with explicit state spaces, operators, costs and losses, and prove the properties that drive the engineering choices: the gate between the fast and slow paths is a threshold rule on a calibrated error estimate; precision on verifiable tasks is bounded by the verifier's false-accept rate and not by model strength; unverified self-refinement converges to a fixed point that can be worse than the first draft, while a verifier-gated loop has risk linear in the false-accept rate; plurality voting cannot repair confidently wrong tasks; and a Beta-prior optimal-stopping rule yields the retry cap. Each result is mapped to a parameter or an algorithm of the specification. We verify the stack against current documentation: Qwen3 and Qwen3.5 are the only Qwen generations with open weights at or below 9B parameters; vLLM's CPU backend requires Linux and prefers AVX-512; Unsloth requires a GPU for training, so fine-tuning is scheduled on rented GPUs with GGUF export for CPU inference; and a Rust gateway (axum, tokio) fronts both vLLM and llama-server through the OpenAI-compatible API. On the reference machine (Intel i3-8100, AVX2, 32\,GB) we measured 15.5 decoded tokens/s for Qwen3-1.7B in 4-bit, consistent with a memory-bandwidth roofline. We give the architecture, the implementation stack, the evaluation plan with statistically sized gates, and a summary of the companion specification and roadmap. Version~2.0 adds the implemented system and its measurements on a shared four-core CPU. With an exact verifier visible, the gate matched deliberate-only accuracy at about a third of its cost. Stage-level latency attribution shows that System~1 decode speed dominates the fast path, and an early-escalation rule removes the remainder of drafts the gate will reject anyway. A Qwen3.5-2B System~1 was 17 points more accurate but 3.7 times slower, so it was not adopted. These quality results are indicative: sample sizes are far below the release gates.
+\end{abstract}
+
+\begin{IEEEkeywords}
+dual-process reasoning, test-time compute, routing, verification, small language models, Qwen, CPU inference, Islamic philosophy of mind, Rust.
+\end{IEEEkeywords}
+
+\input{sections/intro.tex}
+\input{sections/background.tex}
+\input{sections/math.tex}
+\input{sections/architecture.tex}
+\input{sections/stack.tex}
+\input{sections/features.tex}
+\input{sections/specroadmap.tex}
+\input{sections/evaluation.tex}
+\input{sections/implementation.tex}
+\input{sections/limitations.tex}
+\input{sections/conclusion.tex}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+\end{document}

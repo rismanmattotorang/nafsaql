@@ -1,0 +1,175 @@
+\section{Architecture and Design}
+\label{sec:arch}
+
+\subsection{Design Principles}
+Four principles follow from Section~\ref{sec:math}. (1)~\emph{The gate is
+derived, not tuned}: the controller compares a calibrated error estimate with
+a cost ratio (Theorem~\ref{thm:gate}). (2)~\emph{Acceptance needs evidence}:
+no answer is marked verified unless an exact verifier accepted it; consensus
+and judge scores are assurance levels, not proofs
+(Theorems~\ref{thm:precision} and \ref{thm:plurality}). (3)~\emph{Every loop is
+bounded}: $N$, $R$ and the thinking budget are configuration limits enforced
+by the gateway (Lemma~\ref{lem:termination}). (4)~\emph{Self-knowledge is
+audited}: the self-model is built from traces plus a random audit stream and
+reports unmeasured capabilities as such (Proposition~\ref{prop:audit}).
+
+\subsection{Concept-to-Component Mapping}
+Fig.~\ref{fig:mapping} gives the mapping. The orchestrator (\texttt{nafs-core})
+plays al-Ghazali's king: it owns the request and consults the controller. The
+controller (\Gate) plays the vizier: it arbitrates between the fast draft and
+deliberation on a cost--risk basis. The fast path (\Sone) is the impulsive
+draft; the slow path (\Stwo) is deliberation; the \Hub\ supplies external
+evidence; the \Ledger\ performs the nightly accounting; \Distil\ is the long-run
+change of disposition. The gate's cheap features play the role of Avicenna's
+estimative faculty, a fast particular judgement that is useful and
+error-prone, which is exactly why it is calibrated and audited.
+
+\begin{figure}[t]
+\centering
+\input{../shared/figures/fig_mapping.tikz}
+\caption{Concept-to-component mapping. Every arrow is an analogy; component
+names in code are the engineering names on the right.}
+\label{fig:mapping}
+\end{figure}
+
+\subsection{Request Lifecycle}
+Fig.~\ref{fig:flow} shows one request and Fig.~\ref{fig:nafs-automaton} its
+state automaton. The \Mem\ assembles the prompt from the conversation and any
+retrieved memory with provenance. \Sone\ produces a draft in non-thinking mode
+together with $k$ cheap samples in one request (the \texttt{n} parameter of
+the OpenAI-compatible API, so the prompt is prefilled once). The \Gate\
+computes features: mean and minimum token log-probability of the draft,
+agreement among the $k$ samples, the domain class, and, for verifiable tasks,
+the verifier outcome on the draft. A calibrated model maps the features to
+$\hat e_1$; the gate escalates if $L(\hat e_1-\hat e_2)>\lambda\Delta c$. A
+verifiable task whose draft fails verification is never eligible for the
+keep branch (this closes the draft's defect~10, where the router pseudo-code
+disagreed with its prose). On escalation, \Stwo\ runs draft-blind in thinking
+mode with budget $b$ and sequential sampling: each candidate is verified and
+the first accepted one is returned; a rejected candidate's evidence (failing
+test, counterexample, schema error) is fed into the next round, up to $R$
+rounds. If the budget is exhausted the reply is an explicit abstention with
+the best candidate and an uncertainty notice. Every reply carries an
+\emph{assurance level}: \texttt{verified} (exact verifier passed),
+\texttt{consensus} (soft agreement only), \texttt{unverified} (kept fast
+draft on a non-verifiable task) or \texttt{abstained}. The decision record of
+the gate and the trace of the loop are written for the \Ledger.
+
+\begin{figure}[t]
+\centering
+\input{../shared/figures/fig_flow.tikz}
+\caption{Request lifecycle. Solid arrows are the main path; dashed arrows are
+the verification and retry edges.}
+\label{fig:flow}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\input{../shared/figures/fig_automaton.tikz}
+\caption{Trace-state automaton of one request. The three Qur'anic stage names
+are used as mnemonics for $\mathsf A$, $\mathsf L$ and $\mathsf T$; the
+automaton is a bounded retry loop (Lemma~\ref{lem:termination}).}
+\label{fig:nafs-automaton}
+\end{figure}
+
+\subsection{Components}
+\label{sec:components}
+\begin{itemize}
+\item \textbf{\Gw\ (\texttt{nafs-gateway}).} HTTP API (OpenAPI 3.1), SSE
+streaming of tokens and of controller events, WebSocket chat rooms,
+authentication, rate limits, Prometheus metrics.
+\item \textbf{Orchestrator and \Gate\ (\texttt{nafs-core}).} Implements the
+automaton, the gate, sequential verified sampling, budget forcing, timeouts
+and fallbacks; emits the decision record.
+\item \textbf{\Sone\ and \Stwo\ backends.} Two OpenAI-compatible model
+servers (or one server with two modes in the single-model profile), reached
+over HTTP with retry and backpressure.
+\item \textbf{\Hub\ (\texttt{nafs-verify}).} Exact verifiers: code sandbox
+(subprocess with CPU, memory, wall-clock and network limits), numeric and
+symbolic mathematics (reference-answer equality, SymPy via a sidecar), JSON
+Schema validation, format checks. Soft verifiers: rubric judge (the \Stwo\
+model in non-thinking mode at temperature~0) and sample consensus. Each
+verifier publishes $(r,\varphi)$ from mutation tests.
+\item \textbf{\Mem\ (\texttt{nafs-memory}).} Conversation store (SQLite),
+prompt assembly within a context cap, prompt-cache affinity hints for the
+model server, episodic trace store (JSONL), and a retrieval index built with
+Qwen3-Embedding-0.6B when retrieval is enabled.
+\item \textbf{\Ledger.} Offline job that aggregates traces and the $5\%$ audit
+stream into per-domain calibration tables (escalation rate, $\hat e_1$
+calibration error, verifier acceptance rates, latency quantiles), keyed by
+model and adapter hash; feeds the dashboard and the gate's recalibration.
+\item \textbf{\Harness\ (\texttt{nafs-eval}) and performance console
+(\texttt{nafs-bench}).} Dataset loaders, metric definitions, paired
+statistical tests, load generation, and report export.
+\item \textbf{Web UI (\texttt{nafs-web}).} Chat room with the assurance level
+and the reasoning mode visible per message, a performance-test console, and an
+evaluation dashboard; server-rendered HTML with htmx for streaming updates.
+\item \textbf{\Distil\ (Python, GPU).} Dataset builder from verified traces,
+Unsloth LoRA training, promotion gate, GGUF export.
+\end{itemize}
+
+\begin{figure}[t]
+\centering
+\input{../shared/figures/fig_arch.tikz}
+\caption{System architecture, single-node CPU baseline. The GPU scale-out
+variant replaces the model servers with vLLM on CUDA and keeps every other
+component unchanged.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Model Profiles}
+\label{sec:models}
+Table~\ref{tab:profiles} defines three profiles. Profile~A is the reference:
+two dense Qwen3 checkpoints, one per role, chosen because dense
+grouped-query attention has the most mature CPU kernels, official GGUF files
+exist, and both are on vLLM's validated CPU list. Profile~B serves one
+switchable Qwen3-4B for both roles, halving resident memory at the price of a
+slower fast path; the gate then decides \emph{whether to think}, exactly the
+decision studied by the adaptive-thinking literature. Profile~C is the
+upgrade path to Qwen3.5, which is stronger and multimodal but uses hybrid
+linear attention whose CPU kernels are newer and, on AVX2 without
+AVX-512-BF16 or AMX, unaccelerated in vLLM; Phase~0 of the roadmap benchmarks
+it against Profile~A on the target machine before any commitment. The
+upgrade decision is a go/no-go gate with a measurable criterion.
+
+\begin{table}[t]
+\caption{Model profiles (Hugging Face IDs verified 2026-10-18; sizes are GGUF file sizes)}
+\label{tab:profiles}
+\centering\scriptsize
+\begin{tabular}{@{}p{0.7cm}>{\raggedright\arraybackslash}p{3.6cm}>{\raggedright\arraybackslash}p{3.6cm}@{}}
+\toprule
+Profile & \Sone & \Stwo \\
+\midrule
+A (ref.) & \texttt{Qwen/\allowbreak Qwen3-1.7B}, GGUF Q4\_K\_M 1.3\,GB (\texttt{unsloth/\allowbreak Qwen3-1.7B-GGUF}) or Q8\_0 1.8\,GB (\texttt{Qwen/\allowbreak Qwen3-1.7B-GGUF}); thinking off & \texttt{Qwen/\allowbreak Qwen3-4B-\allowbreak Thinking-2507}, GGUF Q4\_K\_M 2.5\,GB (\texttt{unsloth/\allowbreak Qwen3-4B-\allowbreak Thinking-2507-\allowbreak GGUF}); 262K context \\
+B (min.) & \texttt{Qwen/\allowbreak Qwen3-4B} Q4\_K\_M 2.5\,GB (\texttt{Qwen/\allowbreak Qwen3-4B-GGUF}), \texttt{enable\_thinking=false} & same weights, \texttt{enable\_thinking=true} \\
+C (upgr.) & \texttt{Qwen/\allowbreak Qwen3.5-2B} Q4\_K\_M 1.3\,GB (\texttt{unsloth/\allowbreak Qwen3.5-2B-GGUF}) & \texttt{Qwen/\allowbreak Qwen3.5-4B} Q4\_K\_M 2.7\,GB (\texttt{unsloth/\allowbreak Qwen3.5-4B-GGUF}) \\
+\midrule
+\multicolumn{3}{@{}p{8.2cm}@{}}{Judge: the \Stwo\ model in non-thinking mode. Embeddings: \texttt{Qwen/\allowbreak Qwen3-Embedding-0.6B-GGUF} Q8\_0. All Apache-2.0. GPU scale-out: the same IDs in BF16 or AWQ under vLLM CUDA, with \texttt{Qwen/Qwen3-8B} as the \Stwo\ option.} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Deployment Topology}
+The CPU baseline is a single node: one gateway process, one or two model
+servers pinned to the physical cores (the gateway reserves none, since the
+gateway's own CPU use is small and bursty), a sandbox runner, SQLite and
+JSONL on local disk. The model servers are either \texttt{llama-server}
+(macOS or any x86) or vLLM-CPU (Linux, AVX-512 recommended), both behind the
+same OpenAI-compatible API, so the Rust code has one backend trait and two
+thin implementations. The optional GPU scale-out variant moves the model
+servers to vLLM on CUDA with both models resident, raises $N$ and the
+thinking budget, and enables EAGLE or multi-token-prediction speculative
+decoding; the gateway, verifiers, memory and UI are unchanged.
+
+\subsection{What Changed from the Draft}
+The draft's twelve validation results are retained where exact (precision,
+coverage, cascade cost, router threshold, consensus, value-score algebra,
+coupling, audit, measurement floors, distillation noise, capacity, cascade
+identity) and are restated here with explicit assumptions. We added the
+miscalibration bound, the frontier proposition, the optimal-stopping cap, the
+two refinement-loop theorems, the plurality limit, the roofline and the
+thinking-budget condition. We removed the mapping of the Active Intellect to
+``external verifiers'' and of \emph{ilham} to any component, following the
+guidance in Section~\ref{sec:islamic}; we replaced the GPU roster with CPU
+profiles; and we turned the draft's ten defects into requirements with tests
+in the specification.

@@ -1,0 +1,138 @@
+# Container configuration for deploy/docker/docker-compose.yml (Linux vLLM-CPU profile).
+# Nafs-Aql gateway configuration (OR-006). Values marked "Phase-0 placeholder" are replaced by measurements.
+schema_version = "1.0"
+
+[server]
+bind = "127.0.0.1:8080"
+auth_tokens_env = "NAFS_AUTH_TOKENS"   # comma-separated bearer tokens; unset = local dev mode without auth (NFR-022)
+rate_limit_per_token_rpm = 120
+request_wall_clock_cap_s = 900         # NFR-001 hard bound (CPU baseline: slow path takes minutes)
+max_prompt_tokens = 4096               # NFR-006
+
+[assistant]
+profile = "A"
+system_prompt = "You are Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, say you are Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design. Be accurate and concise. If you are unsure, say so."
+
+[backend]
+active = "vllm"                       # llama | vllm (switchable at runtime from the System page)
+
+[backends.llama]
+label = "llama.cpp (native macOS, GGUF Q4_K_M)"
+kind = "llama"
+system1 = { url = "http://127.0.0.1:8001/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "GGUF Q4_K_M (unsloth/Qwen3-1.7B-GGUF)", thinking = false, max_in_flight = 4 }
+system2 = { url = "http://127.0.0.1:8002/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 2 }
+
+[backends.vllm]
+label = "vLLM 0.31 CPU (docker compose, Linux AVX-512 host): Profile A at BF16"
+kind = "vllm"
+# One vLLM server serves both roles (Profile B pattern): System 1 = thinking off, System 2 = thinking on + thinking_token_budget.
+# Two models at BF16 (~19 GB) do not fit beside macOS on a 32 GB host; see scripts/serve_vllm.sh start-s1|start-s2 for larger hosts.
+system1 = { url = "http://system1:8001/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "BF16", thinking = false, max_in_flight = 4 }
+system2 = { url = "http://system2:8002/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "BF16", thinking = true, max_in_flight = 2 }
+
+[backend_retry]                        # IF-007 / IF-008
+max_attempts = 3
+base_backoff_ms = 200
+max_backoff_ms = 2000
+connect_timeout_ms = 2000
+stream_idle_timeout_ms = 180000
+queue_timeout_ms = 900000
+
+[gate]                                 # FR-010..FR-015 (Theorem 2)
+mode = "calibrated"                    # uses the fitted calibration when it exists and passes ECE; otherwise the fixed rule
+k_samples = 2                          # cheap System 1 samples for the agreement feature
+sample_max_tokens = 160
+sample_temperature = 0.8
+lambda_default = 0.2                   # price per cost unit (speed-care slider default)
+loss_wrong = 1.0
+cost_unit_s = 60.0                     # one cost unit = one minute of extra latency on this machine
+calibration_file = "data/runtime/gate_calibration.json"
+calibration_max_ece = 0.05             # NFR-020
+audit_fraction = 0.05                  # FR-040
+e2_hat = { code = 0.25, math = 0.15, structured = 0.10, factual = 0.30, open = 0.35, other = 0.35 }     # Phase-0 placeholder
+delta_c_s = { code = 150, math = 150, structured = 90, factual = 90, open = 120, other = 120 }         # Phase-0 placeholder (reference machine)
+
+calibration_min_n = 2900               # NFR-020 / ER-005: held-out samples needed before promotion
+calibration_min_per_class = 30         # refuse fits with fewer right or wrong drafts (review H1)
+escalation_budget = 0.30               # FR-014 budget mode: target escalation rate B
+budget_epsilon = 0.025                 # DKW: n >= ln(2/delta) / (2 eps^2) = 2,952 for lambda*
+budget_delta = 0.05
+recalibrate_every_h = 24               # FR-015: refit from the ledger; promoted only if NFR-020 holds out of sample
+params_file = "data/runtime/gate_params.json"   # measured e2_hat, delta_c, caps, budgets (Phase 0)
+sample_max_tokens_hard = 384           # math/code samples need room for 'Answer:' (review M11)
+samples_on_verifiable = false          # speed: skip the k samples when an exact verifier decides (Thm 1)
+samples_when_uncertain = true        # P7-T02: draw the k samples after the draft, only when its log-prob is within the band of the threshold
+uncertain_band = 0.10                  # nats around the fixed threshold (benchmarks/samples_ab_factual.json: samples tripled factual draft time)
+early_escalation_tokens = 32           # P7-T03 / FR-080: stop an unconfident open-ended draft after N tokens (0 = off)
+early_escalation_margin = 0.04          # below the fixed threshold by this much; 100% agreement on 40 prompts (benchmarks/early_escalation_study.json)
+
+[gate.fixed]                           # Phase-1 placeholder rule until a calibration passes NFR-020
+mean_logprob_threshold = -0.30
+agreement_threshold = 0.5
+escalate_open_domains = true
+
+[deliberation]                         # FR-020..FR-026
+draft_blind = true
+draft_max_tokens = 512
+draft_temperature = 0.2
+slow_temperature = 0.6
+answer_max_tokens = 768
+non_verifiable_max_rounds = 1          # FR-022
+caps = { code = { N = 1, R = 2, budget = 1024 }, math = { N = 1, R = 2, budget = 1024 }, structured = { N = 1, R = 2, budget = 512 }, factual = { N = 1, R = 0, budget = 512 }, open = { N = 1, R = 0, budget = 512 }, other = { N = 1, R = 0, budget = 512 } }
+caps_provenance = "Phase-1 defaults sized for the reference CPU; replace with the Prop. 3 cap from the Phase-0 Beta fit"
+cost_ratio = 0.15                      # c_p / L_a for the Prop. 3 cap M* = ceil(alpha/cost_ratio - alpha - beta)
+max_rounds_cap = 4                     # Lemma 1 bound on derived R
+allow_draft_conditioned_ablation = true   # ER-004 coupling test only; never used for user traffic
+
+
+[deliberation.adaptive_exit]           # P7-T08 / FR-082: probe-and-verify early exit from System 2 reasoning
+enabled = true                         # llama-server only (raw continuation with a cached prefix); vLLM uses the standard path
+probe_every_tokens = 256               # probe at the latest after this many reasoning tokens without a reflection signal
+min_gap_tokens = 64                    # never probe sooner than this after the previous probe (DTSR k = 64)
+probe_max_tokens = 24                  # the probe asks for the answer alone, in a few tokens
+consistency = 2                        # non-verifiable domains: stop when this many consecutive probes agree (Dynasor-CoT)
+domains = ["math", "factual"]          # exact verifier decides for math; answer consistency for factual
+
+[judge]                                # FR-034 / SR-003 rubric judge on non-verifiable slow-path answers
+enabled = true
+thinking_budget = 64                   # System 2 is thinking-only; llama-server treats 0 as unlimited and 1 leaks reasoning into the answer, 32-64 gives clean JSON in ~10 s
+max_tokens = 160
+floor = 0.5                            # h, a, u >= 0.5
+pass_v = 0.7                           # V = 0.5 min(h,a) + 0.25 u + 0.25 m >= 0.7
+max_retries = 1                        # R <= 1 on non-verifiable tasks (FR-022)
+backend = "system2"                    # P7-T09: "system1" scores the rubric with the fast model (measure its r and phi first)
+
+[audit]                                # FR-040 audit stream, FR-041 capability table
+enabled = true
+idle_only = true                       # audits run only when no user request is in flight
+poll_s = 15
+min_audits_measured = 30
+
+[alerts]                               # OR-004: evaluated over the last window_min minutes; drill with POST /v1/alerts/drill
+window_min = 60
+min_samples = 10
+fast_p95_ms = 12000                    # NFR-003
+error_rate = 0.05
+escalation_rate_max = 0.60
+verifier_acceptance_min = 0.30
+
+[retrieval]                            # FR-061 optional retrieval memory of prior verified answers (BM25, delimited as data)
+enabled = false
+top_k = 2
+min_score = 0.35
+
+[verifiers]                            # FR-030..FR-035
+python = "python3"
+cpu_time_s = 20                        # EvalPlus suites need several CPU-seconds on a loaded host
+wall_clock_s = 60
+deny_network = true
+numeric_tolerance = 1e-6
+memory_mb = 1024                       # RSS cap per verifier subprocess (FR-033); some MBPP+ tests need > 512 MB
+sympy_python = "python3.10"            # interpreter with SymPy; "" disables symbolic math checks
+rates_file = "data/runtime/verifier_rates.json"   # mutation-measured (r, phi), FR-035
+
+[storage]
+sqlite_path = "data/runtime/nafs.sqlite"
+trace_path = "data/runtime/traces/trace.jsonl"
+retention_days = 90                    # SR-004 bounded retention (spec default 90 days; 0 = keep forever)
+registry_file = "config/models.registry.json"   # active and previous model artefacts (OR-005, Tazkiya promotion)

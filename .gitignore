@@ -1,0 +1,39 @@
+# macOS / editors
+.DS_Store
+# LaTeX intermediates (PDFs are kept as deliverables; remove the next line to ignore them)
+*.aux
+*.bbl
+*.blg
+*.log
+*.xdv
+*.out
+# Python
+__pycache__/
+*.pyc
+# Large downloaded artefacts
+models/*
+!models/.gitkeep
+!models/README.md
+tools/tectonic
+# Rust
+rust/target/
+# Third-party checkouts and their build output (re-create with the commands in third_party/README.md)
+third_party/*/
+run/
+logs/
+data/runtime/
+
+deploy/docker/secrets/nafs_tokens
+dist/
+
+# Local tool environments and converted/quantized weights
+tools/venv-convert/
+tools/tectonic
+*.gguf
+*.safetensors
+*.bin
+# Machine-local state
+*.bak
+*.bak-nafs
+.env
+.env.*

@@ -1,0 +1,31 @@
+# Lima VM for running vLLM's CPU backend on macOS (Intel) without Docker.
+# vLLM's x86 CPU backend needs Linux (gcc >= 12.3, libnuma, torch 2.14 CPU wheels), which macOS/x86 cannot provide natively.
+# Create:  limactl create --name=nafs-vllm deploy/lima/nafs-vllm.yaml && limactl start nafs-vllm
+vmType: vz
+os: Linux
+arch: x86_64
+cpus: 4
+memory: "16GiB"
+disk: "60GiB"
+images:
+  - location: "https://cloud-images.ubuntu.com/releases/noble/release/ubuntu-24.04-server-cloudimg-amd64.img"
+    arch: "x86_64"
+mounts:
+  # The checkout is expected at ~/nafs-aql: edit both locations if yours is elsewhere.
+  # Model weights are downloaded once on the host and shared read-only with the VM.
+  - location: "~/nafs-aql/models"
+    mountPoint: "/models"
+    writable: false
+  - location: "~/nafs-aql"
+    mountPoint: "/nafs-aql"
+    writable: true
+mountType: virtiofs
+portForwards:
+  # vLLM System 1 / System 2 servers inside the VM -> host localhost
+  - guestPort: 8101
+    hostPort: 8101
+  - guestPort: 8102
+    hostPort: 8102
+containerd:
+  system: false
+  user: false

@@ -1,0 +1,39 @@
+# Prometheus alert rules for Nafs-Aql (OR-004): latency, error rate, escalation rate, verifier acceptance and
+# calibration drift. Thresholds match [alerts] in config/nafs-aql.toml. Validate: promtool check rules alerts.yml
+groups:
+  - name: nafs-aql
+    rules:
+      - alert: NafsGatewayDown
+        expr: up{job="nafs-gateway"} == 0
+        for: 2m
+        labels: {severity: page}
+        annotations: {summary: "Nafs-Aql gateway is not answering /metrics"}
+      - alert: NafsFastPathLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(nafs_latency_seconds_bucket{mode="fast",traffic="live"}[15m]))) > 12
+        for: 10m
+        labels: {severity: warn}
+        annotations: {summary: "p95 fast-path latency above 12 s (NFR-003)", value: "{{ $value | humanize }} s"}
+      - alert: NafsErrorRateHigh
+        expr: sum(rate(nafs_errors_total[15m])) / clamp_min(sum(rate(nafs_requests_total{traffic="live"}[15m])) + sum(rate(nafs_errors_total[15m])), 1e-9) > 0.05
+        for: 10m
+        labels: {severity: page}
+        annotations: {summary: "More than 5% of requests fail", value: "{{ $value | humanizePercentage }}"}
+      - alert: NafsEscalationRateHigh
+        expr: sum(rate(nafs_requests_total{mode="slow",traffic="live"}[30m])) / clamp_min(sum(rate(nafs_requests_total{traffic="live"}[30m])), 1e-9) > 0.60
+        for: 30m
+        labels: {severity: warn}
+        annotations: {summary: "More than 60% of requests go to System 2 (cost)", value: "{{ $value | humanizePercentage }}"}
+      - alert: NafsVerifierAcceptanceLow
+        expr: sum(rate(nafs_verifier_verdicts_total{passed="true",verifier!="judge"}[1h])) / clamp_min(sum(rate(nafs_verifier_verdicts_total{verifier!="judge"}[1h])), 1e-9) < 0.30
+        for: 30m
+        labels: {severity: warn}
+        annotations: {summary: "Exact-verifier acceptance below 30%", value: "{{ $value | humanizePercentage }}"}
+      - alert: NafsCalibrationDrift
+        expr: max(nafs_alert_firing{rule="calibration_drift"}) == 1
+        for: 5m
+        labels: {severity: warn}
+        annotations: {summary: "CUSUM drift alarm on the gate's calibration error (FR-042)"}
+      - alert: NafsDegradedMode
+        expr: increase(nafs_degraded_total[15m]) > 0
+        labels: {severity: warn}
+        annotations: {summary: "System 2 unavailable; answers fall back to unverified drafts (MR-004)"}

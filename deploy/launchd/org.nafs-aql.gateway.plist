@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Paths assume a checkout at /opt/nafs-aql: edit them (or sed the file) for your location.
+     Nafs-Aql gateway on the macOS reference machine (OR-003). Install:
+     cp deploy/launchd/org.nafs-aql.*.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/org.nafs-aql.gateway.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>org.nafs-aql.gateway</string>
+  <key>ProgramArguments</key><array><string>/opt/nafs-aql/rust/target/release/nafs-gateway</string></array>
+  <key>WorkingDirectory</key><string>/opt/nafs-aql</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>StandardOutPath</key><string>/opt/nafs-aql/logs/gateway.log</string>
+  <key>StandardErrorPath</key><string>/opt/nafs-aql/logs/gateway.log</string>
+  <key>EnvironmentVariables</key><dict><key>NAFS_CONFIG</key><string>config/nafs-aql.toml</string></dict>
+</dict>
+</plist>

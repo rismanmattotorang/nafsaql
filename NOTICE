@@ -1,0 +1,12 @@
+Nafs-Aql
+Copyright 2026 Dirac R&D Team (https://dirac.id)
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Third-party components keep their own licences:
+- Qwen3 models (Alibaba Cloud / Qwen Team): Apache-2.0. Weights are not part of this repository.
+- llama.cpp (ggml authors): MIT. Not vendored; built from a separate checkout.
+- vLLM: Apache-2.0. Not vendored; used through a container image.
+- Evaluation datasets under data/bench keep their original licences (GSM8K MIT, HumanEval MIT,
+  MBPP CC-BY-4.0, EvalPlus Apache-2.0); each task file records its source and licence.
+- EAGLE-3 speculative heads (AngelSlim): Apache-2.0. Not part of this repository.

@@ -1,0 +1,47 @@
+# Nafs-Aql Rust workspace (Phase 0-1). Versions verified on crates.io 2026-10-18.
+[workspace]
+resolver = "2"
+members = ["crates/nafs-types", "crates/nafs-core", "crates/nafs-verify", "crates/nafs-memory", "crates/nafs-gateway", "crates/nafs-web", "crates/nafs-eval", "crates/nafs-bench"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+license = "Apache-2.0"
+authors = ["Dirac R&D Team"]
+repository = "https://github.com/rismanmattotorang/nafsaql"
+homepage = "https://dirac.id"
+
+[workspace.dependencies]
+tokio = { version = "1.53.3", features = ["full"] }
+axum = { version = "0.8.9", features = ["ws", "macros"] }
+tower = "0.5.3"
+tower-http = { version = "0.7.1", features = ["trace", "cors", "timeout", "limit"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "stream"] }
+eventsource-stream = "0.2.3"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+toml = "1.1.8"
+jsonschema = { version = "0.59.0", default-features = false }
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["json", "env-filter"] }
+metrics = "0.24.6"
+metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+thiserror = "2.0.21"
+anyhow = "1.0.104"
+uuid = { version = "1.28.0", features = ["v4", "serde"] }
+chrono = { version = "0.4.45", features = ["serde"] }
+futures = "0.3.34"
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+async-stream = "0.3.6"
+regex = "1"
+fastrand = "2"
+libc = "0.2"
+sha2 = "0.10"
+
+[profile.release]
+opt-level = 3
+debug = false
+codegen-units = 16

@@ -1,0 +1,198 @@
+{
+ "measured_at": "2026-10-19T15:32:39Z",
+ "base": "http://127.0.0.1:8080",
+ "passed": 38,
+ "failed": 0,
+ "results": [
+  {
+   "check": "GET /healthz",
+   "pass": true,
+   "detail": "200 application/json 82 B"
+  },
+  {
+   "check": "GET /metrics",
+   "pass": true,
+   "detail": "200 text/plain 3824 B"
+  },
+  {
+   "check": "GET /openapi.json",
+   "pass": true,
+   "detail": "200 application/json 110712 B"
+  },
+  {
+   "check": "GET /v1/alerts",
+   "pass": true,
+   "detail": "200 application/json 1045 B"
+  },
+  {
+   "check": "GET /v1/audits",
+   "pass": true,
+   "detail": "200 application/json 596 B"
+  },
+  {
+   "check": "GET /v1/bench/prompt-sets",
+   "pass": true,
+   "detail": "200 application/json 1011 B"
+  },
+  {
+   "check": "GET /v1/bench/runs",
+   "pass": true,
+   "detail": "200 application/json 17994 B"
+  },
+  {
+   "check": "GET /v1/conversations",
+   "pass": true,
+   "detail": "200 application/json 3625 B"
+  },
+  {
+   "check": "GET /v1/drift",
+   "pass": true,
+   "detail": "200 application/json 15811 B"
+  },
+  {
+   "check": "GET /v1/eval/datasets",
+   "pass": true,
+   "detail": "200 application/json 1215 B"
+  },
+  {
+   "check": "GET /v1/eval/runs",
+   "pass": true,
+   "detail": "200 application/json 15482 B"
+  },
+  {
+   "check": "GET /v1/gate",
+   "pass": true,
+   "detail": "200 application/json 2162 B"
+  },
+  {
+   "check": "GET /v1/gate/params",
+   "pass": true,
+   "detail": "200 application/json 1351 B"
+  },
+  {
+   "check": "GET /v1/gates",
+   "pass": true,
+   "detail": "200 application/json 4356 B"
+  },
+  {
+   "check": "GET /v1/lab/insights",
+   "pass": true,
+   "detail": "200 application/json 4139 B"
+  },
+  {
+   "check": "GET /v1/perf/stages",
+   "pass": true,
+   "detail": "200 application/json 1995 B"
+  },
+  {
+   "check": "GET /v1/preferences",
+   "pass": true,
+   "detail": "200 application/json 220 B"
+  },
+  {
+   "check": "GET /v1/rooms",
+   "pass": true,
+   "detail": "200 application/json 1475 B"
+  },
+  {
+   "check": "GET /v1/self-model",
+   "pass": true,
+   "detail": "200 application/json 2674 B"
+  },
+  {
+   "check": "GET /v1/system",
+   "pass": true,
+   "detail": "200 application/json 5763 B"
+  },
+  {
+   "check": "GET /v1/system/activity",
+   "pass": true,
+   "detail": "200 application/json 35364 B"
+  },
+  {
+   "check": "GET /v1/tazkiya",
+   "pass": true,
+   "detail": "200 application/json 1238 B"
+  },
+  {
+   "check": "GET /v1/tazkiya/review",
+   "pass": true,
+   "detail": "200 application/json 2842 B"
+  },
+  {
+   "check": "GET /v1/verifiers",
+   "pass": true,
+   "detail": "200 application/json 813 B"
+  },
+  {
+   "check": "GET /v1/verifiers/runs",
+   "pass": true,
+   "detail": "200 application/json 16612 B"
+  },
+  {
+   "check": "chat: verified math reply",
+   "pass": true,
+   "detail": "fast verified 2.1s"
+  },
+  {
+   "check": "chat: stage timings recorded (NFR-030)",
+   "pass": true,
+   "detail": "['draft', 'verify_draft']"
+  },
+  {
+   "check": "stream: SSE start, decision, token, done",
+   "pass": true,
+   "detail": "start,phase,token,decision,done"
+  },
+  {
+   "check": "verify: code tests in the sandbox",
+   "pass": true,
+   "detail": "code_tests"
+  },
+  {
+   "check": "perf: latency breakdown (P7-T01)",
+   "pass": true,
+   "detail": "94 replies"
+  },
+  {
+   "check": "system: switching to a stopped backend is refused",
+   "pass": true,
+   "detail": "503, active stays llama"
+  },
+  {
+   "check": "ui: #chat renders without errors",
+   "pass": true,
+   "detail": "Chat \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #eval renders without errors",
+   "pass": true,
+   "detail": "Lab \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #gate renders without errors",
+   "pass": true,
+   "detail": "Muhasaba \u00b7 gate and ledger \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #tazkiya renders without errors",
+   "pass": true,
+   "detail": "Tazkiya \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #rooms renders without errors",
+   "pass": true,
+   "detail": "Rooms \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #bench renders without errors",
+   "pass": true,
+   "detail": "Performance \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #system renders without errors",
+   "pass": true,
+   "detail": "System \u00b7 Nafs-Aql"
+  }
+ ]
+}

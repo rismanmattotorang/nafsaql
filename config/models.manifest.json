@@ -1,0 +1,182 @@
+{
+  "generated_at": "2026-10-18T04:39:53.621728+00:00",
+  "gguf": [
+    {
+      "file": "Qwen3-1.7B-Q4_K_M.gguf",
+      "repo": "unsloth/Qwen3-1.7B-GGUF",
+      "bytes": 1107409472,
+      "sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+      "revision": "d7f544eead698dbd1f15126ef60b45a1e1933222",
+      "etag": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897"
+    },
+    {
+      "file": "Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
+      "repo": "unsloth/Qwen3-4B-Thinking-2507-GGUF",
+      "bytes": 2497281152,
+      "sha256": "ddd52e18200baab281c5c46f70d544ce4d4fe4846eab1608f2fff48a64554212",
+      "revision": "f40adb104d4d44aee52f398b60597c5866a973a3",
+      "etag": "ddd52e18200baab281c5c46f70d544ce4d4fe4846eab1608f2fff48a64554212"
+    }
+  ],
+  "hf": [
+    {
+      "repo": "Qwen/Qwen3-1.7B",
+      "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+      "files": [
+        {
+          "file": "config.json",
+          "bytes": 726,
+          "sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "044a86ecf7cb32238f3fae4184e55d354787edec"
+        },
+        {
+          "file": "generation_config.json",
+          "bytes": 239,
+          "sha256": "2325da0f15bb848e018c5ae071b7943332e9f871d6b60e2ed22ca97d4cb993d2",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "20a8a9156fc8c3f25295ca067f61fdf120d517c5"
+        },
+        {
+          "file": "model-00001-of-00002.safetensors",
+          "bytes": 3441185608,
+          "sha256": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5"
+        },
+        {
+          "file": "model-00002-of-00002.safetensors",
+          "bytes": 622329984,
+          "sha256": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9"
+        },
+        {
+          "file": "model.safetensors.index.json",
+          "bytes": 25605,
+          "sha256": "0d660e94b165eb912669a5249dff44b83188c4777a07ddb9611fb78d91b0578d",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "986d7db875b47d21f68530f6baac038f1b297b39"
+        },
+        {
+          "file": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "file": "tokenizer_config.json",
+          "bytes": 9732,
+          "sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "417d038a63fa3de29cfde265caedae14d1a58d92"
+        },
+        {
+          "file": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "revision": "70d244cc86ccca08cf5af4e1e306ecf908b1ad5e",
+          "etag": "4783fe10ac3adce15ac8f358ef5462739852c569"
+        }
+      ]
+    },
+    {
+      "repo": "Qwen/Qwen3-4B-Thinking-2507",
+      "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+      "files": [
+        {
+          "file": "config.json",
+          "bytes": 727,
+          "sha256": "5beea1a4a34c62782bfb2f911c606741a3bab8f92d80a118fa053c28af12e8ba",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "6988f134db143052042f2bd6e0c897bc6a605189"
+        },
+        {
+          "file": "generation_config.json",
+          "bytes": 239,
+          "sha256": "2325da0f15bb848e018c5ae071b7943332e9f871d6b60e2ed22ca97d4cb993d2",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "20a8a9156fc8c3f25295ca067f61fdf120d517c5"
+        },
+        {
+          "file": "model-00001-of-00003.safetensors",
+          "bytes": 3957900840,
+          "sha256": "98178c1cddbca8ad76102afdbf76e4df79b64b82377ad4dca34c755cac00571a",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "98178c1cddbca8ad76102afdbf76e4df79b64b82377ad4dca34c755cac00571a"
+        },
+        {
+          "file": "model-00002-of-00003.safetensors",
+          "bytes": 3987450520,
+          "sha256": "57b5bd1f667d420350f169342a90b50e5ffc2aa202ba1819da1af3367ff2261f",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "57b5bd1f667d420350f169342a90b50e5ffc2aa202ba1819da1af3367ff2261f"
+        },
+        {
+          "file": "model-00003-of-00003.safetensors",
+          "bytes": 99630640,
+          "sha256": "e3cccb84e8926f3f18c334465639939a68af310b0729938fccc2de66a9a31953",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "e3cccb84e8926f3f18c334465639939a68af310b0729938fccc2de66a9a31953"
+        },
+        {
+          "file": "model.safetensors.index.json",
+          "bytes": 32819,
+          "sha256": "d6c42883a895dfef5b0080ed2116a1bcd764f558406b98923d675978a1abf29c",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "4747b0297d3109f14db49886972e3369c9a00b2a"
+        },
+        {
+          "file": "tokenizer.json",
+          "bytes": 11422654,
+          "sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4"
+        },
+        {
+          "file": "tokenizer_config.json",
+          "bytes": 10834,
+          "sha256": "60adcfc35f5f251e19a196ec977b4ca0fcfb534852911b3196d68d5e3b146aa0",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "8dec7d58dda385ce95b469aa2d277ec162168e58"
+        },
+        {
+          "file": "vocab.json",
+          "bytes": 2776833,
+          "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+          "revision": "768f209d9ea81521153ed38c47d515654e938aea",
+          "etag": "4783fe10ac3adce15ac8f358ef5462739852c569"
+        }
+      ]
+    }
+  ],
+  "eagle3_heads": [
+    {
+      "file": "Qwen3-1.7B-eagle3-Q8_0.gguf",
+      "bytes": 151614496,
+      "sha256": "b1ce6c0a2fa836594042508ba28fc327a478c59707abda2f5ef3063b4570d6de",
+      "source_repo": "AngelSlim/Qwen3-1.7B_eagle3",
+      "source_revision": "94441b48acc5804677ae12259617c83323b543a9",
+      "source_file": "pytorch_model.bin",
+      "source_sha256": "3646118e83bd0e2e277b367006ba8f80c0d28f1e5237e3f85450539851c6075c",
+      "license": "Apache-2.0 (License_AngelSlim_model_and_dataset.txt)",
+      "converted_with": "third_party/llama.cpp convert_hf_to_gguf.py --outtype q8_0 --target-model-dir (llama.cpp 797de63)",
+      "target": "Qwen3-1.7B-Q4_K_M.gguf",
+      "serve": "EAGLE=1 scripts/serve_llama.sh start"
+    },
+    {
+      "file": "Qwen3-4B-eagle3-Q8_0.gguf",
+      "bytes": 238105504,
+      "sha256": "56e154a8fd89436489cc35f1e445698624a267431f0b758e0df6e3e6091aeb59",
+      "source_repo": "AngelSlim/Qwen3-4B_eagle3",
+      "source_revision": "fd331e59626c8e95c392381a16ee59d518727fbb",
+      "source_file": "model.safetensors",
+      "source_sha256": "58ac5bbfdd71047ebaa5d5535b895c2af37004eb820ca2dda55bd7666658853e",
+      "license": "Apache-2.0 (License_AngelSlim_model_and_dataset.txt)",
+      "converted_with": "third_party/llama.cpp convert_hf_to_gguf.py --outtype q8_0 --target-model-dir (llama.cpp 797de63)",
+      "target": "Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
+      "serve": "EAGLE=1 scripts/serve_llama.sh start"
+    }
+  ]
+}

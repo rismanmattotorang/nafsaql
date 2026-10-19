@@ -1,0 +1,1748 @@
+% lit_s1s2.bib -- verified bibliography for the System 1 / System 2 hybrid LLM design paper.
+% Every entry below was checked against its arXiv abstract page, venue proceedings page,
+% or DOI/Crossref record on 2026-10-18. See lit_s1s2_notes.md for the URL opened per entry.
+% Entries with very long author lists use "and others" after the first few authors.
+
+% ===================================================================
+% Part 1a: Test-time compute, verification, self-correction
+% ===================================================================
+
+@inproceedings{snell2024scaling,
+  title     = {Scaling {LLM} Test-Time Compute Optimally Can Be More Effective than Scaling Parameters for Reasoning},
+  author    = {Snell, Charlie and Lee, Jaehoon and Xu, Kelvin and Kumar, Aviral},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2025},
+  note      = {arXiv preprint (Aug.\ 2024) titled ``Scaling LLM Test-Time Compute Optimally can be More Effective than Scaling Model Parameters''},
+  eprint    = {2408.03314},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2408.03314}
+}
+
+@article{brown2024monkeys,
+  title   = {Large Language Monkeys: Scaling Inference Compute with Repeated Sampling},
+  author  = {Brown, Bradley and Juravsky, Jordan and Ehrlich, Ryan and Clark, Ronald and Le, Quoc V. and R{\'e}, Christopher and Mirhoseini, Azalia},
+  journal = {arXiv preprint arXiv:2407.21787},
+  year    = {2024},
+  eprint  = {2407.21787},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2407.21787}
+}
+
+@inproceedings{wang2023selfconsistency,
+  title     = {Self-Consistency Improves Chain of Thought Reasoning in Language Models},
+  author    = {Wang, Xuezhi and Wei, Jason and Schuurmans, Dale and Le, Quoc and Chi, Ed and Narang, Sharan and Chowdhery, Aakanksha and Zhou, Denny},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  eprint    = {2203.11171},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2203.11171}
+}
+
+@inproceedings{wei2022cot,
+  title     = {Chain-of-Thought Prompting Elicits Reasoning in Large Language Models},
+  author    = {Wei, Jason and Wang, Xuezhi and Schuurmans, Dale and Bosma, Maarten and Ichter, Brian and Xia, Fei and Chi, Ed and Le, Quoc and Zhou, Denny},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {35},
+  year      = {2022},
+  eprint    = {2201.11903},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2201.11903}
+}
+
+@inproceedings{lightman2024verify,
+  title     = {Let's Verify Step by Step},
+  author    = {Lightman, Hunter and Kosaraju, Vineet and Burda, Yura and Edwards, Harri and Baker, Bowen and Lee, Teddy and Leike, Jan and Schulman, John and Sutskever, Ilya and Cobbe, Karl},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2024},
+  eprint    = {2305.20050},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2305.20050}
+}
+
+@article{cobbe2021gsm8k,
+  title   = {Training Verifiers to Solve Math Word Problems},
+  author  = {Cobbe, Karl and Kosaraju, Vineet and Bavarian, Mohammad and Chen, Mark and Jun, Heewoo and Kaiser, Lukasz and Plappert, Matthias and Tworek, Jerry and Hilton, Jacob and Nakano, Reiichiro and Hesse, Christopher and Schulman, John},
+  journal = {arXiv preprint arXiv:2110.14168},
+  year    = {2021},
+  eprint  = {2110.14168},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2110.14168}
+}
+
+@inproceedings{madaan2023selfrefine,
+  title     = {Self-Refine: Iterative Refinement with Self-Feedback},
+  author    = {Madaan, Aman and Tandon, Niket and Gupta, Prakhar and Hallinan, Skyler and Gao, Luyu and Wiegreffe, Sarah and Alon, Uri and Dziri, Nouha and Prabhumoye, Shrimai and Yang, Yiming and Gupta, Shashank and Majumder, Bodhisattwa Prasad and Hermann, Katherine and Welleck, Sean and Yazdanbakhsh, Amir and Clark, Peter},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {36},
+  year      = {2023},
+  eprint    = {2303.17651},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2303.17651}
+}
+
+@inproceedings{shinn2023reflexion,
+  title     = {Reflexion: Language Agents with Verbal Reinforcement Learning},
+  author    = {Shinn, Noah and Cassano, Federico and Gopinath, Ashwin and Narasimhan, Karthik and Yao, Shunyu},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {36},
+  year      = {2023},
+  note      = {arXiv version (2303.11366) additionally lists Edward Berman as an author},
+  eprint    = {2303.11366},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2303.11366}
+}
+
+@inproceedings{huang2024selfcorrect,
+  title     = {Large Language Models Cannot Self-Correct Reasoning Yet},
+  author    = {Huang, Jie and Chen, Xinyun and Mishra, Swaroop and Zheng, Huaixiu Steven and Yu, Adams Wei and Song, Xinying and Zhou, Denny},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2024},
+  eprint    = {2310.01798},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2310.01798}
+}
+
+@article{kamoi2024survey,
+  title   = {When Can {LLMs} Actually Correct Their Own Mistakes? {A} Critical Survey of Self-Correction of {LLMs}},
+  author  = {Kamoi, Ryo and Zhang, Yusen and Zhang, Nan and Han, Jiawei and Zhang, Rui},
+  journal = {Transactions of the Association for Computational Linguistics},
+  volume  = {12},
+  pages   = {1417--1440},
+  year    = {2024},
+  doi     = {10.1162/tacl_a_00713},
+  eprint  = {2406.01297},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2406.01297}
+}
+
+@article{muennighoff2025s1,
+  title   = {s1: Simple Test-Time Scaling},
+  author  = {Muennighoff, Niklas and Yang, Zitong and Shi, Weijia and Li, Xiang Lisa and Fei-Fei, Li and Hajishirzi, Hannaneh and Zettlemoyer, Luke and Liang, Percy and Cand{\`e}s, Emmanuel and Hashimoto, Tatsunori},
+  journal = {arXiv preprint arXiv:2501.19393},
+  year    = {2025},
+  eprint  = {2501.19393},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2501.19393}
+}
+
+@article{deepseek2025r1,
+  title   = {{DeepSeek-R1}: Incentivizing Reasoning Capability in {LLMs} via Reinforcement Learning},
+  author  = {{DeepSeek-AI} and Guo, Daya and Yang, Dejian and Zhang, Haowei and Song, Junxiao and Wang, Peiyi and Zhu, Qihao and Xu, Runxin and Zhang, Ruoyu and Ma, Shirong and Bi, Xiao and others},
+  journal = {arXiv preprint arXiv:2501.12948},
+  year    = {2025},
+  eprint  = {2501.12948},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2501.12948}
+}
+
+@article{guo2025deepseekr1nature,
+  title   = {{DeepSeek-R1} Incentivizes Reasoning in {LLMs} through Reinforcement Learning},
+  author  = {Guo, Daya and Yang, Dejian and Zhang, Haowei and Song, Junxiao and Wang, Peiyi and Zhu, Qihao and Xu, Runxin and Zhang, Ruoyu and Ma, Shirong and Bi, Xiao and others},
+  journal = {Nature},
+  volume  = {645},
+  pages   = {633--638},
+  year    = {2025},
+  doi     = {10.1038/s41586-025-09422-z},
+  url     = {https://doi.org/10.1038/s41586-025-09422-z}
+}
+
+@article{openai2024o1,
+  title   = {{OpenAI} o1 System Card},
+  author  = {{OpenAI} and Jaech, Aaron and Kalai, Adam and Lerer, Adam and Richardson, Adam and El-Kishky, Ahmed and others},
+  journal = {arXiv preprint arXiv:2412.16720},
+  year    = {2024},
+  eprint  = {2412.16720},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2412.16720}
+}
+
+@article{qwen2025qwen3,
+  title   = {{Qwen3} Technical Report},
+  author  = {Yang, An and Li, Anfeng and Yang, Baosong and others},
+  journal = {arXiv preprint arXiv:2505.09388},
+  year    = {2025},
+  eprint  = {2505.09388},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2505.09388}
+}
+
+@article{yang2024qwen25,
+  title   = {{Qwen2.5} Technical Report},
+  author  = {{Qwen} and Yang, An and Yang, Baosong and Zhang, Beichen and others},
+  journal = {arXiv preprint arXiv:2412.15115},
+  year    = {2024},
+  eprint  = {2412.15115},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2412.15115}
+}
+
+% ===================================================================
+% Part 1b: Speculative decoding, routing, cascades, fast/slow architectures
+% ===================================================================
+
+@inproceedings{leviathan2023speculative,
+  title     = {Fast Inference from Transformers via Speculative Decoding},
+  author    = {Leviathan, Yaniv and Kalman, Matan and Matias, Yossi},
+  booktitle = {Proceedings of the 40th International Conference on Machine Learning (ICML)},
+  year      = {2023},
+  eprint    = {2211.17192},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2211.17192}
+}
+
+@article{chen2023speculative,
+  title   = {Accelerating Large Language Model Decoding with Speculative Sampling},
+  author  = {Chen, Charlie and Borgeaud, Sebastian and Irving, Geoffrey and Lespiau, Jean-Baptiste and Sifre, Laurent and Jumper, John},
+  journal = {arXiv preprint arXiv:2302.01318},
+  year    = {2023},
+  eprint  = {2302.01318},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2302.01318}
+}
+
+@inproceedings{cai2024medusa,
+  title     = {Medusa: Simple {LLM} Inference Acceleration Framework with Multiple Decoding Heads},
+  author    = {Cai, Tianle and Li, Yuhong and Geng, Zhengyang and Peng, Hongwu and Lee, Jason D. and Chen, Deming and Dao, Tri},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  series    = {PMLR},
+  volume    = {235},
+  pages     = {5209--5235},
+  year      = {2024},
+  eprint    = {2401.10774},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2401.10774}
+}
+
+@inproceedings{li2024eagle,
+  title     = {{EAGLE}: Speculative Sampling Requires Rethinking Feature Uncertainty},
+  author    = {Li, Yuhui and Wei, Fangyun and Zhang, Chao and Zhang, Hongyang},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  series    = {PMLR},
+  volume    = {235},
+  pages     = {28935--28948},
+  year      = {2024},
+  eprint    = {2401.15077},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2401.15077}
+}
+
+@article{chen2023frugalgpt,
+  title   = {{FrugalGPT}: How to Use Large Language Models While Reducing Cost and Improving Performance},
+  author  = {Chen, Lingjiao and Zaharia, Matei and Zou, James},
+  journal = {arXiv preprint arXiv:2305.05176},
+  year    = {2023},
+  eprint  = {2305.05176},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2305.05176}
+}
+
+@inproceedings{ong2025routellm,
+  title     = {{RouteLLM}: Learning to Route {LLMs} from Preference Data},
+  author    = {Ong, Isaac and Almahairi, Amjad and Wu, Vincent and Chiang, Wei-Lin and Wu, Tianhao and Gonzalez, Joseph E. and Kadous, M Waleed and Stoica, Ion},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2025},
+  note      = {arXiv version titled ``RouteLLM: Learning to Route LLMs with Preference Data''},
+  eprint    = {2406.18665},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2406.18665}
+}
+
+@inproceedings{ding2024hybridllm,
+  title     = {Hybrid {LLM}: Cost-Efficient and Quality-Aware Query Routing},
+  author    = {Ding, Dujian and Mallick, Ankur and Wang, Chi and Sim, Robert and Mukherjee, Subhabrata and Ruhle, Victor and Lakshmanan, Laks V. S. and Awadallah, Ahmed Hassan},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2024},
+  eprint    = {2404.14618},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2404.14618}
+}
+
+@inproceedings{yue2024cascades,
+  title     = {Large Language Model Cascades with Mixture of Thoughts Representations for Cost-Efficient Reasoning},
+  author    = {Yue, Murong and Zhao, Jie and Zhang, Min and Du, Liang and Yao, Ziyu},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2024},
+  eprint    = {2310.03094},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2310.03094}
+}
+
+@inproceedings{saha2025system1x,
+  title     = {{System-1.x}: Learning to Balance Fast and Slow Planning with Language Models},
+  author    = {Saha, Swarnadeep and Prasad, Archiki and Chen, Justin Chih-Yao and Hase, Peter and Stengel-Eskin, Elias and Bansal, Mohit},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2025},
+  eprint    = {2407.14414},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2407.14414}
+}
+
+@inproceedings{su2025dualformer,
+  title     = {Dualformer: Controllable Fast and Slow Thinking by Learning with Randomized Reasoning Traces},
+  author    = {Su, DiJia and Sukhbaatar, Sainbayar and Rabbat, Michael and Tian, Yuandong and Zheng, Qinqing},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2025},
+  eprint    = {2410.09918},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2410.09918}
+}
+
+@inproceedings{booch2021thinking,
+  title     = {Thinking Fast and Slow in {AI}},
+  author    = {Booch, Grady and Fabiano, Francesco and Horesh, Lior and Kate, Kiran and Lenchner, Jon and Linck, Nick and Loreggia, Andrea and Murugesan, Keerthiram and Mattei, Nicholas and Rossi, Francesca and Srivastava, Biplav},
+  booktitle = {Proceedings of the AAAI Conference on Artificial Intelligence},
+  volume    = {35},
+  number    = {17},
+  pages     = {15042--15046},
+  year      = {2021},
+  eprint    = {2010.06002},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2010.06002}
+}
+
+@misc{bengio2019system2,
+  title        = {From {System 1} Deep Learning to {System 2} Deep Learning},
+  author       = {Bengio, Yoshua},
+  howpublished = {Invited talk (Posner Lecture), Conference on Neural Information Processing Systems (NeurIPS)},
+  year         = {2019},
+  url          = {https://neurips.cc/virtual/2019/invited-talk/15488}
+}
+
+@article{graves2016act,
+  title   = {Adaptive Computation Time for Recurrent Neural Networks},
+  author  = {Graves, Alex},
+  journal = {arXiv preprint arXiv:1603.08983},
+  year    = {2016},
+  eprint  = {1603.08983},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/1603.08983}
+}
+
+@article{raposo2024mod,
+  title   = {Mixture-of-Depths: Dynamically Allocating Compute in Transformer-Based Language Models},
+  author  = {Raposo, David and Ritter, Sam and Richards, Blake and Lillicrap, Timothy and Humphreys, Peter Conway and Santoro, Adam},
+  journal = {arXiv preprint arXiv:2404.02258},
+  year    = {2024},
+  eprint  = {2404.02258},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2404.02258}
+}
+
+% ===================================================================
+% Part 1c: Adaptive thinking / learning when to think (2024-2025)
+% ===================================================================
+
+@article{zhang2025adaptthink,
+  title   = {{AdaptThink}: Reasoning Models Can Learn When to Think},
+  author  = {Zhang, Jiajie and Lin, Nianyi and Hou, Lei and Feng, Ling and Li, Juanzi},
+  journal = {arXiv preprint arXiv:2505.13417},
+  year    = {2025},
+  eprint  = {2505.13417},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2505.13417}
+}
+
+@article{fang2025thinkless,
+  title   = {Thinkless: {LLM} Learns When to Think},
+  author  = {Fang, Gongfan and Ma, Xinyin and Wang, Xinchao},
+  journal = {arXiv preprint arXiv:2505.13379},
+  year    = {2025},
+  eprint  = {2505.13379},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2505.13379}
+}
+
+@article{he2025selfroute,
+  title   = {Self-Route: Automatic Mode Switching via Capability Estimation for Efficient Reasoning},
+  author  = {He, Yang and Ding, Xiao and Cai, Bibo and Zhang, Yufei and Xiong, Kai and Sun, Zhouhao and Qin, Bing and Liu, Ting},
+  journal = {arXiv preprint arXiv:2505.20664},
+  year    = {2025},
+  eprint  = {2505.20664},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2505.20664}
+}
+
+@inproceedings{arora2025efficient,
+  title     = {Training Language Models to Reason Efficiently},
+  author    = {Arora, Daman and Zanette, Andrea},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2025},
+  eprint    = {2502.04463},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2502.04463}
+}
+
+@article{hou2025thinkprune,
+  title   = {{ThinkPrune}: Pruning Long Chain-of-Thought of {LLMs} via Reinforcement Learning},
+  author  = {Hou, Bairu and Zhang, Yang and Ji, Jiabao and Liu, Yujian and Qian, Kaizhi and Andreas, Jacob and Chang, Shiyu},
+  journal = {arXiv preprint arXiv:2504.01296},
+  year    = {2025},
+  eprint  = {2504.01296},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2504.01296}
+}
+
+@article{yang2025deer,
+  title   = {Dynamic Early Exit in Reasoning Models},
+  author  = {Yang, Chenxu and Si, Qingyi and Duan, Yongjie and Zhu, Zheliang and Zhu, Chenyu and Li, Qiaowei and Chen, Minghui and Lin, Zheng and Wang, Weiping},
+  journal = {arXiv preprint arXiv:2504.15895},
+  year    = {2025},
+  eprint  = {2504.15895},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2504.15895}
+}
+
+@article{chen2024overthinking,
+  title   = {Do {NOT} Think That Much for 2+3=? {On} the Overthinking of o1-Like {LLMs}},
+  author  = {Chen, Xingyu and Xu, Jiahao and Liang, Tian and He, Zhiwei and Pang, Jianhui and Yu, Dian and Song, Linfeng and Liu, Qiuzhi and Zhou, Mengfei and Zhang, Zhuosheng and Wang, Rui and Tu, Zhaopeng and Mi, Haitao and Yu, Dong},
+  journal = {arXiv preprint arXiv:2412.21187},
+  year    = {2024},
+  eprint  = {2412.21187},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2412.21187}
+}
+
+% ===================================================================
+% Part 1d: Serving, PEFT, quantization
+% ===================================================================
+
+@inproceedings{kwon2023pagedattention,
+  title     = {Efficient Memory Management for Large Language Model Serving with {PagedAttention}},
+  author    = {Kwon, Woosuk and Li, Zhuohan and Zhuang, Siyuan and Sheng, Ying and Zheng, Lianmin and Yu, Cody Hao and Gonzalez, Joseph E. and Zhang, Hao and Stoica, Ion},
+  booktitle = {Proceedings of the 29th ACM Symposium on Operating Systems Principles (SOSP)},
+  year      = {2023},
+  eprint    = {2309.06180},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2309.06180}
+}
+
+@inproceedings{hu2022lora,
+  title     = {{LoRA}: Low-Rank Adaptation of Large Language Models},
+  author    = {Hu, Edward J. and Shen, Yelong and Wallis, Phillip and Allen-Zhu, Zeyuan and Li, Yuanzhi and Wang, Shean and Wang, Lu and Chen, Weizhu},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2022},
+  eprint    = {2106.09685},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2106.09685}
+}
+
+@inproceedings{dettmers2023qlora,
+  title     = {{QLoRA}: Efficient Finetuning of Quantized {LLMs}},
+  author    = {Dettmers, Tim and Pagnoni, Artidoro and Holtzman, Ari and Zettlemoyer, Luke},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {36},
+  year      = {2023},
+  eprint    = {2305.14314},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2305.14314}
+}
+
+@inproceedings{frantar2023gptq,
+  title     = {{GPTQ}: Accurate Post-Training Quantization for Generative Pre-trained Transformers},
+  author    = {Frantar, Elias and Ashkboos, Saleh and Hoefler, Torsten and Alistarh, Dan},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  eprint    = {2210.17323},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2210.17323}
+}
+
+@inproceedings{lin2024awq,
+  title     = {{AWQ}: Activation-Aware Weight Quantization for {LLM} Compression and Acceleration},
+  author    = {Lin, Ji and Tang, Jiaming and Tang, Haotian and Yang, Shang and Chen, Wei-Ming and Wang, Wei-Chen and Xiao, Guangxuan and Dang, Xingyu and Gan, Chuang and Han, Song},
+  booktitle = {Proceedings of Machine Learning and Systems (MLSys)},
+  year      = {2024},
+  eprint    = {2306.00978},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2306.00978}
+}
+
+% ===================================================================
+% Part 1e: Calibration, selective prediction, learning to defer, conformal
+% ===================================================================
+
+@inproceedings{guo2017calibration,
+  title     = {On Calibration of Modern Neural Networks},
+  author    = {Guo, Chuan and Pleiss, Geoff and Sun, Yu and Weinberger, Kilian Q.},
+  booktitle = {Proceedings of the 34th International Conference on Machine Learning (ICML)},
+  year      = {2017},
+  eprint    = {1706.04599},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/1706.04599}
+}
+
+@article{kadavath2022know,
+  title   = {Language Models (Mostly) Know What They Know},
+  author  = {Kadavath, Saurav and Conerly, Tom and Askell, Amanda and Henighan, Tom and Drain, Dawn and Perez, Ethan and others},
+  journal = {arXiv preprint arXiv:2207.05221},
+  year    = {2022},
+  eprint  = {2207.05221},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2207.05221}
+}
+
+@inproceedings{tian2023calibration,
+  title     = {Just Ask for Calibration: Strategies for Eliciting Calibrated Confidence Scores from Language Models Fine-Tuned with Human Feedback},
+  author    = {Tian, Katherine and Mitchell, Eric and Zhou, Allan and Sharma, Archit and Rafailov, Rafael and Yao, Huaxiu and Finn, Chelsea and Manning, Christopher D.},
+  booktitle = {Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2023},
+  eprint    = {2305.14975},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2305.14975}
+}
+
+@article{chow1970reject,
+  title   = {On Optimum Recognition Error and Reject Tradeoff},
+  author  = {Chow, C. K.},
+  journal = {IEEE Transactions on Information Theory},
+  volume  = {16},
+  number  = {1},
+  pages   = {41--46},
+  year    = {1970},
+  doi     = {10.1109/TIT.1970.1054406}
+}
+
+@inproceedings{geifman2017selective,
+  title     = {Selective Classification for Deep Neural Networks},
+  author    = {Geifman, Yonatan and El-Yaniv, Ran},
+  booktitle = {Advances in Neural Information Processing Systems (NIPS)},
+  volume    = {30},
+  year      = {2017},
+  eprint    = {1705.08500},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/1705.08500}
+}
+
+@inproceedings{madras2018defer,
+  title     = {Predict Responsibly: Improving Fairness and Accuracy by Learning to Defer},
+  author    = {Madras, David and Pitassi, Toniann and Zemel, Richard},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {31},
+  year      = {2018},
+  eprint    = {1711.06664},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/1711.06664}
+}
+
+@inproceedings{mozannar2020defer,
+  title     = {Consistent Estimators for Learning to Defer to an Expert},
+  author    = {Mozannar, Hussein and Sontag, David},
+  booktitle = {Proceedings of the 37th International Conference on Machine Learning (ICML)},
+  year      = {2020},
+  eprint    = {2006.01862},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2006.01862}
+}
+
+@article{angelopoulos2023conformal,
+  title   = {Conformal Prediction: A Gentle Introduction},
+  author  = {Angelopoulos, Anastasios N. and Bates, Stephen},
+  journal = {Foundations and Trends in Machine Learning},
+  volume  = {16},
+  number  = {4},
+  pages   = {494--591},
+  year    = {2023},
+  doi     = {10.1561/2200000101},
+  note    = {arXiv version (2107.07511, 2021) titled ``A Gentle Introduction to Conformal Prediction and Distribution-Free Uncertainty Quantification''},
+  eprint  = {2107.07511},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2107.07511}
+}
+
+% ===================================================================
+% Part 1f: Classical statistics
+% ===================================================================
+
+@article{massart1990dkw,
+  title   = {The Tight Constant in the {Dvoretzky-Kiefer-Wolfowitz} Inequality},
+  author  = {Massart, P.},
+  journal = {The Annals of Probability},
+  volume  = {18},
+  number  = {3},
+  pages   = {1269--1283},
+  year    = {1990},
+  doi     = {10.1214/aop/1176990746}
+}
+
+@article{hoeffding1963,
+  title   = {Probability Inequalities for Sums of Bounded Random Variables},
+  author  = {Hoeffding, Wassily},
+  journal = {Journal of the American Statistical Association},
+  volume  = {58},
+  number  = {301},
+  pages   = {13--30},
+  year    = {1963},
+  doi     = {10.1080/01621459.1963.10500830}
+}
+
+@article{clopper1934,
+  title   = {The Use of Confidence or Fiducial Limits Illustrated in the Case of the Binomial},
+  author  = {Clopper, C. J. and Pearson, E. S.},
+  journal = {Biometrika},
+  volume  = {26},
+  number  = {4},
+  pages   = {404--413},
+  year    = {1934},
+  doi     = {10.1093/biomet/26.4.404}
+}
+
+@article{page1954cusum,
+  title   = {Continuous Inspection Schemes},
+  author  = {Page, E. S.},
+  journal = {Biometrika},
+  volume  = {41},
+  number  = {1-2},
+  pages   = {100--115},
+  year    = {1954},
+  doi     = {10.1093/biomet/41.1-2.100}
+}
+
+% ===================================================================
+% Part 1g: Cognitive science / metareasoning
+% ===================================================================
+
+@article{shenhav2013evc,
+  title   = {The Expected Value of Control: An Integrative Theory of Anterior Cingulate Cortex Function},
+  author  = {Shenhav, Amitai and Botvinick, Matthew M. and Cohen, Jonathan D.},
+  journal = {Neuron},
+  volume  = {79},
+  number  = {2},
+  pages   = {217--240},
+  year    = {2013},
+  doi     = {10.1016/j.neuron.2013.07.007}
+}
+
+@article{lieder2020resource,
+  title   = {Resource-Rational Analysis: Understanding Human Cognition as the Optimal Use of Limited Computational Resources},
+  author  = {Lieder, Falk and Griffiths, Thomas L.},
+  journal = {Behavioral and Brain Sciences},
+  volume  = {43},
+  pages   = {e1},
+  year    = {2020},
+  doi     = {10.1017/S0140525X1900061X}
+}
+
+@article{russell1991metareasoning,
+  title   = {Principles of Metareasoning},
+  author  = {Russell, Stuart and Wefald, Eric},
+  journal = {Artificial Intelligence},
+  volume  = {49},
+  number  = {1-3},
+  pages   = {361--395},
+  year    = {1991},
+  doi     = {10.1016/0004-3702(91)90015-C}
+}
+
+@book{kahneman2011thinking,
+  title     = {Thinking, Fast and Slow},
+  author    = {Kahneman, Daniel},
+  publisher = {Farrar, Straus and Giroux},
+  address   = {New York},
+  year      = {2011},
+  isbn      = {9780374275631}
+}
+
+@article{evans2013dual,
+  title   = {Dual-Process Theories of Higher Cognition: Advancing the Debate},
+  author  = {Evans, Jonathan St. B. T. and Stanovich, Keith E.},
+  journal = {Perspectives on Psychological Science},
+  volume  = {8},
+  number  = {3},
+  pages   = {223--241},
+  year    = {2013},
+  doi     = {10.1177/1745691612460685}
+}
+
+@article{sloman1996two,
+  title   = {The Empirical Case for Two Systems of Reasoning},
+  author  = {Sloman, Steven A.},
+  journal = {Psychological Bulletin},
+  volume  = {119},
+  number  = {1},
+  pages   = {3--22},
+  year    = {1996},
+  doi     = {10.1037/0033-2909.119.1.3}
+}
+
+@article{stanovich2000individual,
+  title   = {Individual Differences in Reasoning: Implications for the Rationality Debate?},
+  author  = {Stanovich, Keith E. and West, Richard F.},
+  journal = {Behavioral and Brain Sciences},
+  volume  = {23},
+  number  = {5},
+  pages   = {645--665},
+  year    = {2000},
+  doi     = {10.1017/S0140525X00003435}
+}
+
+% ===================================================================
+% Part 1h: Benchmarks
+% ===================================================================
+
+@inproceedings{hendrycks2021math,
+  title     = {Measuring Mathematical Problem Solving with the {MATH} Dataset},
+  author    = {Hendrycks, Dan and Burns, Collin and Kadavath, Saurav and Arora, Akul and Basart, Steven and Tang, Eric and Song, Dawn and Steinhardt, Jacob},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track},
+  year      = {2021},
+  eprint    = {2103.03874},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2103.03874}
+}
+
+@article{chen2021humaneval,
+  title   = {Evaluating Large Language Models Trained on Code},
+  author  = {Chen, Mark and Tworek, Jerry and Jun, Heewoo and Yuan, Qiming and Pinto, Henrique Ponde de Oliveira and Kaplan, Jared and others},
+  journal = {arXiv preprint arXiv:2107.03374},
+  year    = {2021},
+  eprint  = {2107.03374},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2107.03374}
+}
+
+@inproceedings{rein2024gpqa,
+  title     = {{GPQA}: A Graduate-Level {Google}-Proof {Q\&A} Benchmark},
+  author    = {Rein, David and Hou, Betty Li and Stickland, Asa Cooper and Petty, Jackson and Pang, Richard Yuanzhe and Dirani, Julien and Michael, Julian and Bowman, Samuel R.},
+  booktitle = {First Conference on Language Modeling (COLM)},
+  year      = {2024},
+  eprint    = {2311.12022},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2311.12022}
+}
+
+@inproceedings{hendrycks2021mmlu,
+  title     = {Measuring Massive Multitask Language Understanding},
+  author    = {Hendrycks, Dan and Burns, Collin and Basart, Steven and Zou, Andy and Mazeika, Mantas and Song, Dawn and Steinhardt, Jacob},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2021},
+  eprint    = {2009.03300},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2009.03300}
+}
+
+@inproceedings{zheng2023mtbench,
+  title     = {Judging {LLM}-as-a-Judge with {MT-Bench} and {Chatbot Arena}},
+  author    = {Zheng, Lianmin and Chiang, Wei-Lin and Sheng, Ying and Zhuang, Siyuan and Wu, Zhanghao and Zhuang, Yonghao and Lin, Zi and Li, Zhuohan and Li, Dacheng and Xing, Eric P. and Zhang, Hao and Gonzalez, Joseph E. and Stoica, Ion},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS), Datasets and Benchmarks Track},
+  year      = {2023},
+  eprint    = {2306.05685},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2306.05685}
+}
+
+@article{suzgun2022bbh,
+  title   = {Challenging {BIG-Bench} Tasks and Whether Chain-of-Thought Can Solve Them},
+  author  = {Suzgun, Mirac and Scales, Nathan and Sch{\"a}rli, Nathanael and Gehrmann, Sebastian and Tay, Yi and Chung, Hyung Won and Chowdhery, Aakanksha and Le, Quoc V. and Chi, Ed H. and Zhou, Denny and Wei, Jason},
+  journal = {arXiv preprint arXiv:2210.09261},
+  year    = {2022},
+  eprint  = {2210.09261},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2210.09261}
+}
+
+@article{austin2021mbpp,
+  title   = {Program Synthesis with Large Language Models},
+  author  = {Austin, Jacob and Odena, Augustus and Nye, Maxwell and Bosma, Maarten and Michalewski, Henryk and Dohan, David and Jiang, Ellen and Cai, Carrie and Terry, Michael and Le, Quoc and Sutton, Charles},
+  journal = {arXiv preprint arXiv:2108.07732},
+  year    = {2021},
+  eprint  = {2108.07732},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2108.07732}
+}
+
+@inproceedings{jain2025livecodebench,
+  title     = {{LiveCodeBench}: Holistic and Contamination Free Evaluation of Large Language Models for Code},
+  author    = {Jain, Naman and Han, King and Gu, Alex and Li, Wen-Ding and Yan, Fanjia and Zhang, Tianjun and Wang, Sida and Solar-Lezama, Armando and Sen, Koushik and Stoica, Ion},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2025},
+  eprint    = {2403.07974},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2403.07974}
+}
+
+@article{wei2024simpleqa,
+  title   = {Measuring Short-Form Factuality in Large Language Models},
+  author  = {Wei, Jason and Karina, Nguyen and Chung, Hyung Won and Jiao, Yunxin Joy and Papay, Spencer and Glaese, Amelia and Schulman, John and Fedus, William},
+  journal = {arXiv preprint arXiv:2411.04368},
+  year    = {2024},
+  eprint  = {2411.04368},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2411.04368}
+}
+
+@inproceedings{lin2022truthfulqa,
+  title     = {{TruthfulQA}: Measuring How Models Mimic Human Falsehoods},
+  author    = {Lin, Stephanie and Hilton, Jacob and Evans, Owain},
+  booktitle = {Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (ACL)},
+  year      = {2022},
+  eprint    = {2109.07958},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2109.07958}
+}
+
+% ===================================================================
+% Part 1i: Security (prompt injection, jailbreaks)
+% ===================================================================
+
+@inproceedings{perez2022ignore,
+  title     = {Ignore Previous Prompt: Attack Techniques for Language Models},
+  author    = {Perez, F{\'a}bio and Ribeiro, Ian},
+  booktitle = {NeurIPS ML Safety Workshop},
+  year      = {2022},
+  eprint    = {2211.09527},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2211.09527}
+}
+
+@inproceedings{greshake2023injection,
+  title     = {Not What You've Signed Up For: Compromising Real-World {LLM}-Integrated Applications with Indirect Prompt Injection},
+  author    = {Greshake, Kai and Abdelnabi, Sahar and Mishra, Shailesh and Endres, Christoph and Holz, Thorsten and Fritz, Mario},
+  booktitle = {Proceedings of the 16th ACM Workshop on Artificial Intelligence and Security (AISec)},
+  pages     = {79--90},
+  year      = {2023},
+  doi       = {10.1145/3605764.3623985},
+  eprint    = {2302.12173},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2302.12173}
+}
+
+@article{zou2023universal,
+  title   = {Universal and Transferable Adversarial Attacks on Aligned Language Models},
+  author  = {Zou, Andy and Wang, Zifan and Carlini, Nicholas and Nasr, Milad and Kolter, J. Zico and Fredrikson, Matt},
+  journal = {arXiv preprint arXiv:2307.15043},
+  year    = {2023},
+  eprint  = {2307.15043},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2307.15043}
+}
+
+@inproceedings{wei2023jailbroken,
+  title     = {Jailbroken: How Does {LLM} Safety Training Fail?},
+  author    = {Wei, Alexander and Haghtalab, Nika and Steinhardt, Jacob},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {36},
+  year      = {2023},
+  eprint    = {2307.02483},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2307.02483}
+}
+
+% ===================================================================
+% Part 1j: CoT faithfulness, hallucination
+% ===================================================================
+
+@inproceedings{turpin2023unfaithful,
+  title     = {Language Models Don't Always Say What They Think: Unfaithful Explanations in Chain-of-Thought Prompting},
+  author    = {Turpin, Miles and Michael, Julian and Perez, Ethan and Bowman, Samuel R.},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {36},
+  year      = {2023},
+  eprint    = {2305.04388},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2305.04388}
+}
+
+@article{lanham2023faithfulness,
+  title   = {Measuring Faithfulness in Chain-of-Thought Reasoning},
+  author  = {Lanham, Tamera and Chen, Anna and Radhakrishnan, Ansh and Steiner, Benoit and Denison, Carson and Hernandez, Danny and others},
+  journal = {arXiv preprint arXiv:2307.13702},
+  year    = {2023},
+  eprint  = {2307.13702},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2307.13702}
+}
+
+@article{ji2023hallucination,
+  title   = {Survey of Hallucination in Natural Language Generation},
+  author  = {Ji, Ziwei and Lee, Nayeon and Frieske, Rita and Yu, Tiezheng and Su, Dan and Xu, Yan and Ishii, Etsuko and Bang, Ye Jin and Madotto, Andrea and Fung, Pascale},
+  journal = {ACM Computing Surveys},
+  volume  = {55},
+  number  = {12},
+  pages   = {1--38},
+  year    = {2023},
+  doi     = {10.1145/3571730},
+  eprint  = {2202.03629},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2202.03629}
+}
+
+% ===================================================================
+% Part 2a: Diffusion / block-diffusion language models
+% ===================================================================
+
+@article{nie2025llada,
+  title   = {Large Language Diffusion Models},
+  author  = {Nie, Shen and Zhu, Fengqi and You, Zebin and Zhang, Xiaolu and Ou, Jingyang and Hu, Jun and Zhou, Jun and Lin, Yankai and Wen, Ji-Rong and Li, Chongxuan},
+  journal = {arXiv preprint arXiv:2502.09992},
+  year    = {2025},
+  eprint  = {2502.09992},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2502.09992}
+}
+
+@article{ye2025dream,
+  title   = {Dream 7B: Diffusion Large Language Models},
+  author  = {Ye, Jiacheng and Xie, Zhihui and Zheng, Lin and Gao, Jiahui and Wu, Zirui and Jiang, Xin and Li, Zhenguo and Kong, Lingpeng},
+  journal = {arXiv preprint arXiv:2508.15487},
+  year    = {2025},
+  eprint  = {2508.15487},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2508.15487}
+}
+
+@article{gong2025diffucoder,
+  title   = {{DiffuCoder}: Understanding and Improving Masked Diffusion Models for Code Generation},
+  author  = {Gong, Shansan and Zhang, Ruixiang and Zheng, Huangjie and Gu, Jiatao and Jaitly, Navdeep and Kong, Lingpeng and Zhang, Yizhe},
+  journal = {arXiv preprint arXiv:2506.20639},
+  year    = {2025},
+  eprint  = {2506.20639},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2506.20639}
+}
+
+@inproceedings{arriola2025blockdiffusion,
+  title     = {Block Diffusion: Interpolating Between Autoregressive and Diffusion Language Models},
+  author    = {Arriola, Marianne and Gokaslan, Aaron and Chiu, Justin T. and Yang, Zhihan and Qi, Zhixuan and Han, Jiaqi and Sahoo, Subham Sekhar and Kuleshov, Volodymyr},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2025},
+  eprint    = {2503.09573},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2503.09573}
+}
+
+@article{wu2025fastdllm,
+  title   = {{Fast-dLLM}: Training-Free Acceleration of Diffusion {LLM} by Enabling {KV} Cache and Parallel Decoding},
+  author  = {Wu, Chengyue and Zhang, Hao and Xue, Shuchen and Liu, Zhijian and Diao, Shizhe and Zhu, Ligeng and Luo, Ping and Han, Song and Xie, Enze},
+  journal = {arXiv preprint arXiv:2505.22618},
+  year    = {2025},
+  eprint  = {2505.22618},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2505.22618}
+}
+
+@inproceedings{wu2026fastdllmv2,
+  title     = {{Fast-dLLM} v2: Efficient Block-Diffusion {LLM}},
+  author    = {Wu, Chengyue and Zhang, Hao and Xue, Shuchen and Diao, Shizhe and Fu, Yonggan and Liu, Zhijian and Molchanov, Pavlo and Luo, Ping and Han, Song and Xie, Enze},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2026},
+  eprint    = {2509.26328},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2509.26328}
+}
+
+@article{inception2025mercury,
+  title   = {Mercury: Ultra-Fast Language Models Based on Diffusion},
+  author  = {{Inception Labs} and Khanna, Samar and Kharbanda, Siddhant and Li, Shufan and Varma, Harshit and Wang, Eric and Birnbaum, Sawyer and Luo, Ziyang and Miraoui, Yanis and Palrecha, Akash and Ermon, Stefano and Grover, Aditya and Kuleshov, Volodymyr},
+  journal = {arXiv preprint arXiv:2506.17298},
+  year    = {2025},
+  eprint  = {2506.17298},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2506.17298}
+}
+
+@inproceedings{cheng2026sdar,
+  title     = {{SDAR}: A Synergistic Diffusion-AutoRegression Paradigm for Scalable Sequence Generation},
+  author    = {Cheng, Shuang and Bian, Yihan and Liu, Dawei and Jiang, Yuhua and Liu, Yihao and Zhang, Linfeng and Yao, Qian and Tian, Zhongbo and Wang, Wenhai and Guo, Qipeng and Chen, Kai and Qi, Biqing and Zhou, Bowen},
+  booktitle = {Findings of the Association for Computational Linguistics: ACL 2026},
+  pages     = {22058--22075},
+  year      = {2026},
+  note      = {arXiv version (2510.06303, Oct.\ 2025) lists 11 authors},
+  eprint    = {2510.06303},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2510.06303}
+}
+
+@inproceedings{wang2026trado,
+  title     = {Revolutionizing Reinforcement Learning Framework for Diffusion Large Language Models},
+  author    = {Wang, Yinjie and Yang, Ling and Li, Bowen and Tian, Ye and Shen, Ke and Wang, Mengdi},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2026},
+  note      = {Introduces TraceRL and the TraDo model family},
+  eprint    = {2509.06949},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2509.06949}
+}
+
+% ===================================================================
+% Part 2b: Non-autoregressive / discrete diffusion / parallel decoding foundations
+% ===================================================================
+
+@inproceedings{gu2018nat,
+  title     = {Non-Autoregressive Neural Machine Translation},
+  author    = {Gu, Jiatao and Bradbury, James and Xiong, Caiming and Li, Victor O. K. and Socher, Richard},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2018},
+  eprint    = {1711.02281},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/1711.02281}
+}
+
+@inproceedings{ghazvininejad2019maskpredict,
+  title     = {Mask-Predict: Parallel Decoding of Conditional Masked Language Models},
+  author    = {Ghazvininejad, Marjan and Levy, Omer and Liu, Yinhan and Zettlemoyer, Luke},
+  booktitle = {Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing (EMNLP)},
+  year      = {2019},
+  eprint    = {1904.09324},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/1904.09324}
+}
+
+@inproceedings{austin2021d3pm,
+  title     = {Structured Denoising Diffusion Models in Discrete State-Spaces},
+  author    = {Austin, Jacob and Johnson, Daniel D. and Ho, Jonathan and Tarlow, Daniel and van den Berg, Rianne},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  volume    = {34},
+  year      = {2021},
+  eprint    = {2107.03006},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2107.03006}
+}
+
+@inproceedings{lou2024sedd,
+  title     = {Discrete Diffusion Modeling by Estimating the Ratios of the Data Distribution},
+  author    = {Lou, Aaron and Meng, Chenlin and Ermon, Stefano},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  year      = {2024},
+  eprint    = {2310.16834},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2310.16834}
+}
+
+@inproceedings{sahoo2024mdlm,
+  title     = {Simple and Effective Masked Diffusion Language Models},
+  author    = {Sahoo, Subham Sekhar and Arriola, Marianne and Schiff, Yair and Gokaslan, Aaron and Marroquin, Edgar and Chiu, Justin T. and Rush, Alexander and Kuleshov, Volodymyr},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
+  year      = {2024},
+  eprint    = {2406.07524},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2406.07524}
+}
+
+@inproceedings{santilli2023parallel,
+  title     = {Accelerating Transformer Inference for Translation via Parallel Decoding},
+  author    = {Santilli, Andrea and Severino, Silvio and Postolache, Emilian and Maiorca, Valentino and Mancusi, Michele and Marin, Riccardo and Rodol{\`a}, Emanuele},
+  booktitle = {Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (ACL)},
+  year      = {2023},
+  doi       = {10.18653/v1/2023.acl-long.689},
+  eprint    = {2305.10427},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2305.10427}
+}
+
+@inproceedings{kou2024cllms,
+  title     = {{CLLMs}: Consistency Large Language Models},
+  author    = {Kou, Siqi and Hu, Lanxiang and He, Zhezhi and Deng, Zhijie and Zhang, Hao},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  year      = {2024},
+  eprint    = {2403.00835},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2403.00835}
+}
+
+@inproceedings{gloeckle2024mtp,
+  title     = {Better \& Faster Large Language Models via Multi-Token Prediction},
+  author    = {Gloeckle, Fabian and Idrissi, Badr Youbi and Rozi{\`e}re, Baptiste and Lopez-Paz, David and Synnaeve, Gabriel},
+  booktitle = {Proceedings of the 41st International Conference on Machine Learning (ICML)},
+  series    = {PMLR},
+  volume    = {235},
+  pages     = {15706--15734},
+  year      = {2024},
+  eprint    = {2404.19737},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2404.19737}
+}
+
+@article{li2025dlmsurvey,
+  title   = {A Survey on Diffusion Language Models},
+  author  = {Li, Tianyi and Chen, Mingda and Guo, Bowei and Shen, Zhiqiang},
+  journal = {arXiv preprint arXiv:2508.10875},
+  year    = {2025},
+  note    = {v3 revised June 2026},
+  eprint  = {2508.10875},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2508.10875}
+}
+
+% ===================================================================
+% Part 2c: 2026 work on when-to-think routing and adaptive reasoning budgets
+% ===================================================================
+
+@inproceedings{lin2026planbudget,
+  title     = {Plan and Budget: Effective and Efficient Test-Time Scaling on Reasoning Large Language Models},
+  author    = {Lin, Junhong and Zeng, Xinyue and Zhu, Jie and Wang, Song and Shun, Julian and Wu, Jun and Zhou, Dawei},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2026},
+  eprint    = {2505.16122},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2505.16122}
+}
+
+@inproceedings{guo2026thinkwhenneeded,
+  title     = {Think When Needed: Model-Aware Reasoning Routing for {LLM}-Based Ranking},
+  author    = {Guo, Huizhong and Wei, Tianjun and Wang, Dongxia and Du, Yingpeng and Wang, Ziyan and Zhang, Jie and Sun, Zhu},
+  booktitle = {Proceedings of the 49th International ACM SIGIR Conference on Research and Development in Information Retrieval (SIGIR)},
+  year      = {2026},
+  note      = {Venue per arXiv comment ``Accepted by SIGIR2026''},
+  eprint    = {2601.18146},
+  archivePrefix = {arXiv},
+  url       = {https://arxiv.org/abs/2601.18146}
+}
+
+@article{xu2026stableadaptive,
+  title   = {Stable Adaptive Thinking via Advantage Shaping and Length-Aware Gradient Regulation},
+  author  = {Xu, Zihang and Xie, Haozhi and Miao, Ziqi and Gong, Wuxuan and Qian, Chen and Li, Lijun},
+  journal = {arXiv preprint arXiv:2602.22556},
+  year    = {2026},
+  eprint  = {2602.22556},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2602.22556}
+}
+
+@article{fan2026thinkinghard,
+  title   = {Thinking Hard, Not Smart: Reasoning Models Fail to Ration Test-Time Compute Across Questions},
+  author  = {Fan, Chenrui and Cheng, Yize and Li, Ming and Liang, Yongyuan and Zhou, Tianyi and Feizi, Soheil},
+  journal = {arXiv preprint arXiv:2608.07968},
+  year    = {2026},
+  eprint  = {2608.07968},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2608.07968}
+}
+
+@article{zhou2026bet,
+  title   = {Nice Fold or Hero Call: Learning Budget-Efficient Thinking under Policy-Dependent Solvability},
+  author  = {Zhou, Zhaomeng and Zhang, Lan and Wang, Junyang and Yuan, Mu and Liu, Songlin and Li, Tingzhao and Hu, Yiqing and Zhao, Yumeng},
+  journal = {arXiv preprint arXiv:2605.11625},
+  year    = {2026},
+  eprint  = {2605.11625},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2605.11625}
+}
+
+@article{zhai2026adaptive,
+  title   = {Adaptive Test-Time Compute Allocation for Reasoning {LLMs} via Constrained Policy Optimization},
+  author  = {Zhai, Zhiyuan and Li, Bingcong and Xiao, Bingnan and Li, Ming and Wang, Xin},
+  journal = {arXiv preprint arXiv:2604.14853},
+  year    = {2026},
+  eprint  = {2604.14853},
+  archivePrefix = {arXiv},
+  url     = {https://arxiv.org/abs/2604.14853}
+}
+% islamic.bib -- verified references for the nafs/'aql design paper.
+% Every entry below was checked on 2026-10-18 against a page confirming author,
+% title, year and publisher/venue; the URL used is recorded in the `url` field
+% (or in `note`). See research/islamic_sources.md, "Verification log".
+% Unverified items (EI2 "'Akl", EI2 "Ruh", EQ "Soul", Burckhardt 1983) are
+% deliberately omitted; see the notes file.
+
+%% ---------- Primary texts and translations ----------
+
+@book{AbdelHaleem2008Quran,
+  title     = {The Qur'an},
+  translator = {Abdel Haleem, M. A. S.},
+  author    = {{Abdel Haleem, M. A. S. (trans.)}},
+  year      = {2008},
+  publisher = {Oxford University Press},
+  address   = {Oxford},
+  series    = {Oxford World's Classics},
+  isbn      = {978-0-19-953595-8},
+  url       = {https://books.google.co.id/books?vid=ISBN9780199535958},
+  note      = {Paperback reissue of the Oxford World's Classics translation. Accessed 2026-10-18}
+}
+
+@book{Ghazali2010Marvels,
+  author    = {al-Ghaz{\=a}l{\=i}, Ab{\=u} {\d H}{\=a}mid},
+  translator = {Skellie, Walter James},
+  title     = {Al-Ghazali: The Marvels of the Heart. Science of the Spirit. Book 21 of the Revival of the Religious Sciences (I{\d h}y{\=a}' `Ul{\=u}m al-D{\=i}n)},
+  year      = {2010},
+  publisher = {Fons Vitae},
+  address   = {Louisville, KY},
+  isbn      = {978-1-887752-31-2},
+  pages     = {152},
+  url       = {https://www.fonsvitae.com/product/al-ghazali-the-marvels-of-the-heart/},
+  note      = {Translated by Walter James Skellie; introduction by T. J. Winter. Accessed 2026-10-18}
+}
+
+@book{Ghazali1995Disciplining,
+  author    = {al-Ghaz{\=a}l{\=i}, Ab{\=u} {\d H}{\=a}mid},
+  translator = {Winter, T. J.},
+  title     = {Al-Ghaz{\=a}l{\=i} on Disciplining the Soul (Kit{\=a}b Riy{\=a}{\d d}at al-nafs) and on Breaking the Two Desires (Kit{\=a}b Kasr al-shahwatayn): Books XXII and XXIII of the Revival of the Religious Sciences (I{\d h}y{\=a}' `Ul{\=u}m al-D{\=i}n)},
+  year      = {1995},
+  publisher = {Islamic Texts Society},
+  address   = {Cambridge},
+  isbn      = {978-0-946621-42-2},
+  url       = {https://its.org.uk/},
+  note      = {Translated with an introduction and notes by T. J. Winter. First edition 1995 (confirmed via the 1997 AJISS review essay, DOI 10.35632/ajis.v14i4.2218); ITS catalogue lists the 2016 reprint. Accessed 2026-10-18}
+}
+
+@book{Ghazali1923Mizan,
+  author    = {al-Ghaz{\=a}l{\=i}, Ab{\=u} {\d H}{\=a}mid},
+  editor    = {al-Kurd{\=i}, M. S.},
+  title     = {M{\=i}z{\=a}n al-`amal},
+  year      = {1923},
+  publisher = {al-Ma{\d t}ba`a al-`Arabiyya},
+  address   = {Cairo},
+  note      = {Arabic edition as cited in the bibliography of Griffel's SEP entry "al-Ghazali" (https://plato.stanford.edu/entries/al-ghazali/). No published English translation located (ghazali.org lists only unpublished sample chapters). Accessed 2026-10-18}
+}
+
+@book{Avicenna1952Psychology,
+  author    = {{Ibn S{\=i}n{\=a} (Avicenna)}},
+  translator = {Rahman, Fazlur},
+  title     = {Avicenna's Psychology: An English Translation of Kit{\=a}b al-Naj{\=a}t, Book II, Chapter VI, with Historico-Philosophical Notes and Textual Improvements on the Cairo Edition},
+  year      = {1952},
+  publisher = {Oxford University Press},
+  address   = {London},
+  pages     = {xii + 127},
+  url       = {https://catalogue.bnf.fr/ark:/12148/cb31745014f},
+  note      = {Translation by F. Rahman. Accessed 2026-10-18}
+}
+
+@book{Avicenna1959DeAnima,
+  author    = {{Ibn S{\=i}n{\=a} (Avicenna)}},
+  editor    = {Rahman, Fazlur},
+  title     = {Avicenna's De Anima (Arabic Text): Being the Psychological Part of Kit{\=a}b al-Shif{\=a}'},
+  year      = {1959},
+  publisher = {Oxford University Press},
+  address   = {London and New York},
+  pages     = {x + 298},
+  url       = {https://wellcomecollection.org/works/g9jzxtmj},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Qushayri2007Epistle,
+  author    = {al-Qushayr{\=i}, Ab{\=u} 'l-Q{\=a}sim `Abd al-Kar{\=i}m},
+  translator = {Knysh, Alexander D.},
+  title     = {Al-Qushayri's Epistle on Sufism: Al-Ris{\=a}la al-qushayriyya f{\=i} `ilm al-ta{\d s}awwuf},
+  year      = {2007},
+  publisher = {Garnet Publishing},
+  address   = {Reading},
+  series    = {Great Books of Islamic Civilization},
+  isbn      = {978-1-85964-186-6},
+  pages     = {460},
+  url       = {https://books.google.co.id/books?vid=ISBN9781859641866},
+  note      = {Translated by Alexander D. Knysh. Accessed 2026-10-18}
+}
+
+@book{Hujwiri1911Kashf,
+  author    = {al-Hujw{\=i}r{\=i}, `Al{\=i} b. `Uthm{\=a}n al-Jull{\=a}b{\=i}},
+  translator = {Nicholson, Reynold A.},
+  title     = {The Kashf al-Ma{\d h}j{\'u}b: The Oldest Persian Treatise on {\d S}{\'u}fiism},
+  year      = {1911},
+  publisher = {E. J. Brill and Luzac \& Co.},
+  address   = {Leyden and London},
+  series    = {E. J. W. Gibb Memorial Series},
+  volume    = {XVII},
+  url       = {https://gutenberg.org/files/64786/64786-h/64786-h.htm},
+  note      = {Translated by Reynold A. Nicholson. Accessed 2026-10-18}
+}
+
+%% ---------- Encyclopaedia entries ----------
+
+@incollection{Gutas2025SEPIbnSina,
+  author    = {Gutas, Dimitri},
+  title     = {Ibn Sina [Avicenna]},
+  booktitle = {The Stanford Encyclopedia of Philosophy},
+  editor    = {Zalta, Edward N. and Nodelman, Uri},
+  publisher = {Metaphysics Research Lab, Stanford University},
+  year      = {2025},
+  url       = {https://plato.stanford.edu/entries/ibn-sina/},
+  note      = {First published 15 September 2016; substantive revision 31 October 2025. Accessed 2026-10-18}
+}
+
+@incollection{Ivry2012SEPArabicMind,
+  author    = {Ivry, Alfred},
+  title     = {Arabic and Islamic Psychology and Philosophy of Mind},
+  booktitle = {The Stanford Encyclopedia of Philosophy},
+  editor    = {Zalta, Edward N.},
+  publisher = {Metaphysics Research Lab, Stanford University},
+  year      = {2012},
+  url       = {https://plato.stanford.edu/entries/arabic-islamic-mind/},
+  note      = {Summer 2012 Edition; first published 18 April 2008, substantive revision 29 May 2012. Accessed 2026-10-18}
+}
+
+@incollection{Chittick2025SEPIbnArabi,
+  author    = {Chittick, William C.},
+  title     = {Ibn `Arab{\=i}},
+  booktitle = {The Stanford Encyclopedia of Philosophy},
+  editor    = {Zalta, Edward N. and Nodelman, Uri},
+  publisher = {Metaphysics Research Lab, Stanford University},
+  year      = {2025},
+  url       = {https://plato.stanford.edu/entries/ibn-arabi/},
+  note      = {First published 5 August 2008; substantive revision 5 December 2025. Accessed 2026-10-18}
+}
+
+@incollection{Rizvi2019SEPMullaSadra,
+  author    = {Rizvi, Sajjad},
+  title     = {Mulla Sadra},
+  booktitle = {The Stanford Encyclopedia of Philosophy},
+  editor    = {Zalta, Edward N.},
+  publisher = {Metaphysics Research Lab, Stanford University},
+  year      = {2019},
+  url       = {https://plato.stanford.edu/entries/mulla-sadra/},
+  note      = {First published 9 June 2009; substantive revision 5 February 2019 (Spring 2021 archive edition). Accessed 2026-10-18}
+}
+
+@incollection{Marcotte2019SEPSuhrawardi,
+  author    = {Marcotte, Roxanne},
+  title     = {Suhrawardi},
+  booktitle = {The Stanford Encyclopedia of Philosophy},
+  editor    = {Zalta, Edward N. and Nodelman, Uri},
+  publisher = {Metaphysics Research Lab, Stanford University},
+  year      = {2019},
+  url       = {https://plato.stanford.edu/entries/suhrawardi/},
+  note      = {First published 26 December 2007; substantive revision 29 March 2019 (Spring 2025 archive edition). Accessed 2026-10-18}
+}
+
+@incollection{Griffel2026SEPGhazali,
+  author    = {Griffel, Frank},
+  title     = {al-Ghazali},
+  booktitle = {The Stanford Encyclopedia of Philosophy},
+  editor    = {Zalta, Edward N. and Nodelman, Uri},
+  publisher = {Metaphysics Research Lab, Stanford University},
+  year      = {2026},
+  url       = {https://plato.stanford.edu/entries/al-ghazali/},
+  note      = {First published 14 August 2007; substantive revision 15 January 2026. Accessed 2026-10-18}
+}
+
+@incollection{CalverleyNetton2012Nafs,
+  author    = {Calverley, E. E. and Netton, I. R.},
+  title     = {Nafs},
+  booktitle = {Encyclopaedia of Islam, Second Edition},
+  editor    = {Bearman, P. and Bianquis, Th. and Bosworth, C. E. and van Donzel, E. and Heinrichs, W. P.},
+  publisher = {Brill},
+  address   = {Leiden},
+  year      = {2012},
+  doi       = {10.1163/1573-3912_islam_COM_0833},
+  url       = {https://doi.org/10.1163/1573-3912_islam_COM_0833},
+  note      = {First published online 2012; print edition 1960--2007. Title, container and DOI confirmed on the Crossref DOI record; Brill's pages returned 403 to direct access, so the author line was read from Brill's own citation string as surfaced by web search -- confirm with library access before final submission. Accessed 2026-10-18}
+}
+
+%% ---------- Monographs ----------
+
+@book{Griffel2009,
+  author    = {Griffel, Frank},
+  title     = {Al-Ghaz{\=a}l{\=i}'s Philosophical Theology},
+  year      = {2009},
+  publisher = {Oxford University Press},
+  address   = {Oxford and New York},
+  isbn      = {978-0-19-533162-2},
+  pages     = {408},
+  url       = {https://books.google.co.id/books?vid=ISBN9780195331622},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Gianotti2001,
+  author    = {Gianotti, Timothy J.},
+  title     = {Al-Ghaz{\=a}l{\=i}'s Unspeakable Doctrine of the Soul: Unveiling the Esoteric Psychology and Eschatology of the I{\d h}y{\=a}'},
+  year      = {2001},
+  publisher = {Brill},
+  address   = {Leiden},
+  series    = {Brill's Studies in Intellectual History},
+  volume    = {104},
+  isbn      = {978-90-04-12083-9},
+  pages     = {205},
+  url       = {https://books.google.co.id/books?vid=ISBN9004120831},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Treiger2011,
+  author    = {Treiger, Alexander},
+  title     = {Inspired Knowledge in Islamic Thought: Al-Ghaz{\=a}l{\=i}'s Theory of Mystical Cognition and Its Avicennian Foundation},
+  year      = {2011},
+  publisher = {Routledge},
+  address   = {London and New York},
+  doi       = {10.4324/9780203806487},
+  url       = {https://doi.org/10.4324/9780203806487},
+  note      = {Crossref gives 2011 (e-book); Griffel's SEP bibliography cites it as 2012. Accessed 2026-10-18}
+}
+
+@book{McGinnis2010,
+  author    = {McGinnis, Jon},
+  title     = {Avicenna},
+  year      = {2010},
+  publisher = {Oxford University Press},
+  address   = {Oxford and New York},
+  series    = {Great Medieval Thinkers},
+  isbn      = {978-0-19-533147-9},
+  pages     = {300},
+  url       = {https://books.google.co.id/books?vid=ISBN9780195331479},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Gutas2014,
+  author    = {Gutas, Dimitri},
+  title     = {Avicenna and the Aristotelian Tradition: Introduction to Reading Avicenna's Philosophical Works},
+  edition   = {2nd, revised and enlarged},
+  year      = {2014},
+  publisher = {Brill},
+  address   = {Leiden},
+  series    = {Islamic Philosophy, Theology and Science. Texts and Studies},
+  volume    = {89},
+  isbn      = {978-90-04-25580-7},
+  pages     = {617},
+  url       = {https://books.google.co.id/books?vid=ISBN9789004255807},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Kaukua2015,
+  author    = {Kaukua, Jari},
+  title     = {Self-Awareness in Islamic Philosophy: Avicenna and Beyond},
+  year      = {2015},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge},
+  isbn      = {978-1-107-08879-5},
+  doi       = {10.1017/CBO9781316105238},
+  url       = {https://doi.org/10.1017/CBO9781316105238},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Chittick1989,
+  author    = {Chittick, William C.},
+  title     = {The Sufi Path of Knowledge: Ibn al-`Arabi's Metaphysics of Imagination},
+  year      = {1989},
+  publisher = {State University of New York Press},
+  address   = {Albany, NY},
+  isbn      = {978-0-88706-885-0},
+  pages     = {504},
+  url       = {https://sunypress.edu/Books/T/The-Sufi-Path-of-Knowledge2},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Nicholson1921,
+  author    = {Nicholson, Reynold Alleyne},
+  title     = {Studies in Islamic Mysticism},
+  year      = {1921},
+  publisher = {Cambridge University Press},
+  address   = {Cambridge},
+  url       = {https://archive.org/details/studiesinislamyst00nichuoft},
+  note      = {Chapter II, "The Perfect Man", is a study of `Abd al-Kar{\=i}m al-J{\=i}l{\=i}'s al-Ins{\=a}n al-k{\=a}mil. Accessed 2026-10-18}
+}
+
+@book{Rizvi2009,
+  author    = {Rizvi, Sajjad H.},
+  title     = {Mulla Sadra and Metaphysics: Modulation of Being},
+  year      = {2009},
+  publisher = {Routledge},
+  address   = {London and New York},
+  series    = {Culture and Civilization in the Middle East},
+  isbn      = {978-0-415-49073-3},
+  url       = {https://www.routledge.com/Mulla-Sadra-and-Metaphysics-Modulation-of-Being/Rizvi/p/book/9780415490733},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Kalin2010,
+  author    = {Kalin, Ibrahim},
+  title     = {Knowledge in Later Islamic Philosophy: Mull{\=a} {\d S}adr{\=a} on Existence, Intellect, and Intuition},
+  year      = {2010},
+  publisher = {Oxford University Press},
+  address   = {Oxford and New York},
+  isbn      = {978-0-19-973524-2},
+  pages     = {315},
+  url       = {https://books.google.co.id/books?vid=ISBN9780199735242},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Rahman1975,
+  author    = {Rahman, Fazlur},
+  title     = {The Philosophy of Mull{\=a} {\d S}adr{\=a} ({\d S}adr al-D{\=i}n al-Sh{\=i}r{\=a}z{\=i})},
+  year      = {1975},
+  publisher = {State University of New York Press},
+  address   = {Albany, NY},
+  isbn      = {978-0-87395-300-9},
+  pages     = {277},
+  url       = {https://books.google.co.id/books?vid=ISBN9780873953009},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{HairiYazdi1992,
+  author    = {Ha'iri Yazdi, Mehdi},
+  title     = {The Principles of Epistemology in Islamic Philosophy: Knowledge by Presence},
+  year      = {1992},
+  publisher = {State University of New York Press},
+  address   = {Albany, NY},
+  isbn      = {978-0-7914-0948-0},
+  pages     = {246},
+  url       = {https://sunypress.edu/Books/T/The-Principles-of-Epistemology-in-Islamic-Philosophy},
+  note      = {Foreword by Seyyed Hossein Nasr. Accessed 2026-10-18}
+}
+
+@book{Picken2011,
+  author    = {Picken, Gavin},
+  title     = {Spiritual Purification in Islam: The Life and Works of al-Muhasibi},
+  year      = {2011},
+  publisher = {Routledge},
+  address   = {London and New York},
+  series    = {Routledge Sufi Series},
+  isbn      = {978-0-415-54822-9},
+  pages     = {264},
+  url       = {https://www.routledge.com/Spiritual-Purification-in-Islam-The-Life-and-Works-of-al-Muhasibi/Picken/p/book/9780415548229},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{NasrLeaman1996,
+  editor    = {Nasr, Seyyed Hossein and Leaman, Oliver},
+  title     = {History of Islamic Philosophy},
+  year      = {1996},
+  publisher = {Routledge},
+  address   = {London and New York},
+  series    = {Routledge History of World Philosophies},
+  volume    = {1},
+  isbn      = {978-0-415-05667-0},
+  url       = {https://books.google.co.id/books?vid=ISBN0415056675},
+  note      = {Two parts, 1996; one-volume reprint 2001 (ISBN 978-0-415-25934-7). Accessed 2026-10-18}
+}
+
+@book{Schimmel1975,
+  author    = {Schimmel, Annemarie},
+  title     = {Mystical Dimensions of Islam},
+  year      = {1975},
+  publisher = {University of North Carolina Press},
+  address   = {Chapel Hill, NC},
+  isbn      = {978-0-8078-1271-6},
+  pages     = {506},
+  url       = {https://books.google.co.id/books?vid=ISBN9780807812716},
+  note      = {Accessed 2026-10-18}
+}
+
+@book{Badri1979,
+  author    = {Badri, Malik B.},
+  title     = {The Dilemma of Muslim Psychologists},
+  year      = {1979},
+  publisher = {MWH London Publishers},
+  address   = {London},
+  isbn      = {0-906194-05-9},
+  pages     = {131},
+  url       = {https://library.jamiahamdard.ac.in/bib/7791},
+  note      = {Library catalogue record. Accessed 2026-10-18}
+}
+
+%% ---------- Articles and chapters ----------
+
+@article{Black1993Estimation,
+  author    = {Black, Deborah L.},
+  title     = {Estimation (Wahm) in Avicenna: The Logical and Psychological Dimensions},
+  journal   = {Dialogue: Canadian Philosophical Review},
+  volume    = {32},
+  number    = {2},
+  pages     = {219--258},
+  year      = {1993},
+  doi       = {10.1017/S0012217300014414},
+  url       = {https://doi.org/10.1017/S0012217300014414},
+  note      = {Accessed 2026-10-18}
+}
+
+@article{Marmura1986FlyingMan,
+  author    = {Marmura, Michael E.},
+  title     = {Avicenna's ``Flying Man'' in Context},
+  journal   = {The Monist},
+  volume    = {69},
+  number    = {3},
+  pages     = {383--395},
+  year      = {1986},
+  doi       = {10.5840/monist198669328},
+  url       = {https://doi.org/10.5840/monist198669328},
+  note      = {Accessed 2026-10-18}
+}
+
+@article{Kukkonen2012Receptive,
+  author    = {Kukkonen, Taneli},
+  title     = {Receptive to Reality: Al-Ghaz{\=a}l{\=i} on the Structure of the Soul},
+  journal   = {The Muslim World},
+  volume    = {102},
+  number    = {3--4},
+  pages     = {541--561},
+  year      = {2012},
+  doi       = {10.1111/j.1478-1913.2012.01412.x},
+  url       = {https://doi.org/10.1111/j.1478-1913.2012.01412.x},
+  note      = {Accessed 2026-10-18}
+}
+
+@incollection{Kukkonen2016Error,
+  author    = {Kukkonen, Taneli},
+  title     = {Al-Ghaz{\=a}l{\=i} on Error},
+  booktitle = {Islam and Rationality: The Impact of al-Ghaz{\=a}l{\=i}. Papers Collected on His 900th Anniversary},
+  volume    = {2},
+  editor    = {Griffel, Frank},
+  publisher = {Brill},
+  address   = {Leiden},
+  year      = {2016},
+  pages     = {3--31},
+  doi       = {10.1163/9789004307490_002},
+  url       = {https://doi.org/10.1163/9789004307490_002},
+  note      = {Editor and volume number from the Crossref container record; verify against the printed volume. Accessed 2026-10-18}
+}
+
+@article{RothmanCoyle2018,
+  author    = {Rothman, Abdallah and Coyle, Adrian},
+  title     = {Toward a Framework for Islamic Psychology and Psychotherapy: An Islamic Model of the Soul},
+  journal   = {Journal of Religion and Health},
+  volume    = {57},
+  number    = {5},
+  pages     = {1731--1744},
+  year      = {2018},
+  doi       = {10.1007/s10943-018-0651-x},
+  url       = {https://pmc.ncbi.nlm.nih.gov/articles/PMC6132620/},
+  note      = {Accessed 2026-10-18}
+}
+
+%% ---------- Scripture and hadith (online references) ----------
+
+@misc{QuranCom,
+  title     = {Quran.com (Arabic text with the translation of Mustafa Khattab, The Clear Quran)},
+  howpublished = {\url{https://quran.com/}},
+  year      = {2026},
+  note      = {Verses consulted: 12:53, 75:2, 89:27--28, 91:7--10, 17:85, 13:28, 79:40. Accessed 2026-10-18}
+}
+
+@misc{Bukhari52,
+  author    = {{al-Bukh{\=a}r{\=i}, Mu{\d h}ammad b. Ism{\=a}`{\=i}l}},
+  title     = {{\d S}a{\d h}{\=i}{\d h} al-Bukh{\=a}r{\=i} 52 (Book of Belief, Book 2, Hadith 45): hadith of al-Nu`m{\=a}n b. Bash{\=i}r on the ``piece of flesh'' that is the heart},
+  howpublished = {\url{https://sunnah.com/bukhari:52}},
+  year      = {2026},
+  note      = {Accessed 2026-10-18}
+}
+
+@misc{Muslim1599a,
+  author    = {{Muslim b. al-{\d H}ajj{\=a}j}},
+  title     = {{\d S}a{\d h}{\=i}{\d h} Muslim 1599a (Book of Mus{\=a}q{\=a}t, Book 22, Hadith 133): hadith of al-Nu`m{\=a}n b. Bash{\=i}r on the ``piece of flesh'' that is the heart},
+  howpublished = {\url{https://sunnah.com/muslim:1599a}},
+  year      = {2026},
+  note      = {Accessed 2026-10-18}
+}
+@article{qwen3_2025,
+  title   = {Qwen3 Technical Report},
+  author  = {An Yang and Anfeng Li and Baosong Yang and others},
+  journal = {arXiv preprint arXiv:2505.09388},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2505.09388}
+}
+
+@article{qwen3_embedding_2025,
+  title   = {Qwen3 Embedding: Advancing Text Embedding and Reranking Through Foundation Models},
+  author  = {Yanzhao Zhang and Mingxin Li and Dingkun Long and others},
+  journal = {arXiv preprint arXiv:2506.05176},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2506.05176}
+}
+
+@article{qwen3_vl_embedding_2026,
+  title   = {Qwen3-VL-Embedding and Qwen3-VL-Reranker: A Unified Framework for State-of-the-Art Multimodal Retrieval and Ranking},
+  author  = {Mingxin Li and others},
+  journal = {arXiv preprint arXiv:2601.04720},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2601.04720}
+}
+
+@misc{qwen3_5_blog_2026,
+  title        = {Qwen3.5: Towards Native Multimodal Agents},
+  author       = {{Qwen Team}},
+  howpublished = {\url{https://qwen.ai/blog?id=qwen3.5}},
+  month        = feb,
+  year         = {2026},
+  note         = {No standalone technical report as of 2026-10-18; model cards cite this post}
+}
+
+@article{qwen3_5_omni_2026,
+  title   = {Qwen3.5-Omni Technical Report},
+  author  = {{Qwen Team}},
+  journal = {arXiv preprint arXiv:2604.15804},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2604.15804}
+}
+
+@misc{qwen3_6_35b_blog_2026,
+  title        = {Qwen3.6-35B-A3B: Agentic Coding Power, Now Open to All},
+  author       = {{Qwen Team}},
+  howpublished = {\url{https://qwen.ai/blog?id=qwen3.6-35b-a3b}},
+  month        = apr,
+  year         = {2026}
+}
+
+@misc{qwen3_6_27b_blog_2026,
+  title        = {Qwen3.6-27B: Flagship-Level Coding in a 27B Dense Model},
+  author       = {{Qwen Team}},
+  howpublished = {\url{https://qwen.ai/blog?id=qwen3.6-27b}},
+  month        = apr,
+  year         = {2026}
+}
+
+@misc{qwen3_8_blog_2026,
+  title        = {Qwen3.8-Max: A New Bar for Coding and Cowork},
+  author       = {{Qwen Team}},
+  howpublished = {\url{https://qwen.ai/blog?id=qwen3.8}},
+  month        = aug,
+  year         = {2026},
+  note         = {Cited by the Qwen3.8-27B model card; no technical report}
+}
+
+@article{dream7b_2025,
+  title   = {Dream 7B: Diffusion Large Language Models},
+  author  = {Jiacheng Ye and others},
+  journal = {arXiv preprint arXiv:2508.15487},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2508.15487}
+}
+
+@article{dreamcoder_2025,
+  title   = {Dream-Coder 7B: An Open Diffusion Language Model for Code},
+  author  = {Zhihui Xie and others},
+  journal = {arXiv preprint arXiv:2509.01142},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2509.01142}
+}
+
+@article{diffucoder_2025,
+  title   = {DiffuCoder: Understanding and Improving Masked Diffusion Models for Code Generation},
+  author  = {Shansan Gong and Ruixiang Zhang and Huangjie Zheng and Jiatao Gu and Navdeep Jaitly and Lingpeng Kong and Yizhe Zhang},
+  journal = {arXiv preprint arXiv:2506.20639},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2506.20639}
+}
+
+@article{sdar_2025,
+  title   = {SDAR: A Synergistic Diffusion-AutoRegression Paradigm for Scalable Sequence Generation},
+  author  = {Shuang Cheng and others},
+  journal = {arXiv preprint arXiv:2510.06303},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2510.06303}
+}
+
+@article{trado_2025,
+  title   = {Revolutionizing Reinforcement Learning Framework for Diffusion Large Language Models},
+  author  = {Yinjie Wang and Ling Yang and Bowen Li and Ye Tian and Ke Shen and Mengdi Wang},
+  journal = {arXiv preprint arXiv:2509.06949},
+  year    = {2025},
+  note    = {ICLR 2026},
+  url     = {https://arxiv.org/abs/2509.06949}
+}
+
+@article{fastdllm_v2_2025,
+  title   = {Fast-dLLM v2: Efficient Block-Diffusion LLM},
+  author  = {Chengyue Wu and others},
+  journal = {arXiv preprint arXiv:2509.26328},
+  year    = {2025},
+  url     = {https://arxiv.org/abs/2509.26328}
+}
+
+@article{dqwen3_5_2026,
+  title   = {dQwen3.5: Hybrid-Attention Diffusion Language Models},
+  author  = {Anton Xue and Litu Rout and Aditya Akella and Adam Klivans and Sujay Sanghavi and Sanjay Shakkottai},
+  journal = {arXiv preprint arXiv:2609.20751},
+  year    = {2026},
+  url     = {https://arxiv.org/abs/2609.20751}
+}
+
+@book{chow1971great,
+  author    = {Chow, Yuan Shih and Robbins, Herbert and Siegmund, David},
+  title     = {Great Expectations: The Theory of Optimal Stopping},
+  publisher = {Houghton Mifflin},
+  address   = {Boston, MA, USA},
+  year      = {1971},
+  note      = {Reissued by Dover, 1991, as \emph{The Theory of Optimal Stopping}. Verified via HathiTrust record 000469250, accessed 2026-10-18}
+}
+
+@misc{draft2026,
+  author = {{Dirac R\&D Team}},
+  title  = {Nafs-Aql v0.1: Mathematical validation and technical report of a dual-process agent on {Qwen} (internal draft slide deck)},
+  year   = {2026},
+  month  = oct,
+  note   = {Internal document, \texttt{nafs\_aql\_report.tex}, 18 October 2026}
+}

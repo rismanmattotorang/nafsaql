@@ -1,0 +1,485 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nafs-aql.example/schemas/Config.schema.json",
+  "title": "Nafs-Aql gateway configuration (config/nafs-aql.toml)",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string"
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "bind": {
+          "type": "string"
+        },
+        "auth_tokens_env": {
+          "type": "string"
+        },
+        "rate_limit_per_token_rpm": {
+          "type": "integer"
+        },
+        "request_wall_clock_cap_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_prompt_tokens": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "assistant": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string"
+        },
+        "system_prompt": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "backend": {
+      "type": "object",
+      "properties": {
+        "active": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "backends": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "system1": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "hf_id": {
+                "type": "string"
+              },
+              "quantization": {
+                "type": "string"
+              },
+              "thinking": {
+                "type": "boolean"
+              },
+              "max_in_flight": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          },
+          "system2": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "hf_id": {
+                "type": "string"
+              },
+              "quantization": {
+                "type": "string"
+              },
+              "thinking": {
+                "type": "boolean"
+              },
+              "max_in_flight": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "backend_retry": {
+      "type": "object",
+      "properties": {
+        "max_attempts": {
+          "type": "integer"
+        },
+        "base_backoff_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_backoff_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "connect_timeout_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stream_idle_timeout_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "queue_timeout_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "gate": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "k_samples": {
+          "type": "integer"
+        },
+        "sample_max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_temperature": {
+          "type": "number"
+        },
+        "lambda_default": {
+          "type": "number"
+        },
+        "loss_wrong": {
+          "type": "number"
+        },
+        "cost_unit_s": {
+          "type": "number"
+        },
+        "calibration_file": {
+          "type": "string"
+        },
+        "calibration_max_ece": {
+          "type": "number"
+        },
+        "audit_fraction": {
+          "type": "number"
+        },
+        "e2_hat": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "delta_c_s": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "calibration_min_n": {
+          "type": "integer"
+        },
+        "calibration_min_per_class": {
+          "type": "integer"
+        },
+        "escalation_budget": {
+          "type": "number"
+        },
+        "budget_epsilon": {
+          "type": "number"
+        },
+        "budget_delta": {
+          "type": "number"
+        },
+        "recalibrate_every_h": {
+          "type": "integer"
+        },
+        "params_file": {
+          "type": "string"
+        },
+        "sample_max_tokens_hard": {
+          "type": "integer"
+        },
+        "samples_on_verifiable": {
+          "type": "boolean"
+        },
+        "samples_when_uncertain": {
+          "type": "boolean"
+        },
+        "uncertain_band": {
+          "type": "number"
+        },
+        "early_escalation_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "early_escalation_margin": {
+          "type": "number"
+        },
+        "fixed": {
+          "type": "object",
+          "properties": {
+            "mean_logprob_threshold": {
+              "type": "number"
+            },
+            "agreement_threshold": {
+              "type": "number"
+            },
+            "escalate_open_domains": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "deliberation": {
+      "type": "object",
+      "properties": {
+        "draft_blind": {
+          "type": "boolean"
+        },
+        "draft_max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "draft_temperature": {
+          "type": "number"
+        },
+        "slow_temperature": {
+          "type": "number"
+        },
+        "answer_max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "non_verifiable_max_rounds": {
+          "type": "integer"
+        },
+        "caps": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "N": {
+                "type": "integer"
+              },
+              "R": {
+                "type": "integer"
+              },
+              "budget": {
+                "type": "integer"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "caps_provenance": {
+          "type": "string"
+        },
+        "cost_ratio": {
+          "type": "number"
+        },
+        "max_rounds_cap": {
+          "type": "integer"
+        },
+        "allow_draft_conditioned_ablation": {
+          "type": "boolean"
+        },
+        "adaptive_exit": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "probe_every_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "min_gap_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "probe_max_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "consistency": {
+              "type": "integer"
+            },
+            "domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "judge": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "thinking_budget": {
+          "type": "integer"
+        },
+        "max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "floor": {
+          "type": "number"
+        },
+        "pass_v": {
+          "type": "number"
+        },
+        "max_retries": {
+          "type": "integer"
+        },
+        "backend": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "audit": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "idle_only": {
+          "type": "boolean"
+        },
+        "poll_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "min_audits_measured": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "alerts": {
+      "type": "object",
+      "properties": {
+        "window_min": {
+          "type": "integer"
+        },
+        "min_samples": {
+          "type": "integer"
+        },
+        "fast_p95_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "error_rate": {
+          "type": "number"
+        },
+        "escalation_rate_max": {
+          "type": "number"
+        },
+        "verifier_acceptance_min": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "retrieval": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "top_k": {
+          "type": "integer"
+        },
+        "min_score": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "verifiers": {
+      "type": "object",
+      "properties": {
+        "python": {
+          "type": "string"
+        },
+        "cpu_time_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deny_network": {
+          "type": "boolean"
+        },
+        "numeric_tolerance": {
+          "type": "number"
+        },
+        "memory_mb": {
+          "type": "integer"
+        },
+        "sympy_python": {
+          "type": "string"
+        },
+        "rates_file": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "sqlite_path": {
+          "type": "string"
+        },
+        "trace_path": {
+          "type": "string"
+        },
+        "retention_days": {
+          "type": "integer"
+        },
+        "registry_file": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "server",
+    "assistant",
+    "backend",
+    "backends",
+    "gate",
+    "deliberation",
+    "storage"
+  ]
+}

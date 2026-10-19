@@ -1,0 +1,42 @@
+% Shared palette, TikZ styles and macros for all Nafs-Aql documents
+\definecolor{navy}{HTML}{1F3A5F}
+\definecolor{teal}{HTML}{1B8A8F}
+\definecolor{amber}{HTML}{C97D10}
+\definecolor{crimson}{HTML}{B3263E}
+\definecolor{violet}{HTML}{6A4C9C}
+\definecolor{leaf}{HTML}{3A8F4B}
+\definecolor{slate}{HTML}{5B6770}
+\definecolor{sand}{HTML}{F4EFE6}
+\tikzset{
+  blk/.style={rounded corners=2.5pt,draw=#1!85!black,fill=#1!12,thick,align=center,
+              font=\scriptsize,inner sep=3pt,minimum height=0.72cm},
+  blk/.default=navy,
+  sblk/.style={rounded corners=2.5pt,draw=#1!85!black,fill=#1!12,thick,align=center,
+              font=\tiny,inner sep=2pt,minimum height=0.55cm},
+  sblk/.default=navy,
+  dm/.style={diamond,aspect=2.2,draw=amber!85!black,fill=amber!15,thick,font=\tiny,
+             align=center,inner sep=0.5pt},
+  st/.style={circle,draw=#1!85!black,fill=#1!15,thick,font=\scriptsize,minimum size=0.78cm,inner sep=0pt},
+  st/.default=navy,
+  arr/.style={-{Stealth[length=4pt,width=3pt]},thick,draw=slate},
+  dsh/.style={-{Stealth[length=4pt,width=3pt]},thick,dashed,draw=slate!80},
+  lab/.style={font=\tiny,fill=white,inner sep=1pt,text=black!80},
+  grp/.style={rounded corners=4pt,draw=#1!60,dashed,thick,inner sep=5pt,fill=#1!4},
+  grp/.default=slate,
+  grplab/.style={font=\tiny\bfseries,text=#1!80!black,anchor=north west,inner sep=2pt},
+  grplab/.default=slate
+}
+\pgfplotsset{every axis/.append style={font=\scriptsize,grid=major,grid style={black!10},
+  legend style={font=\tiny,draw=none,fill=white,fill opacity=.85,text opacity=1},
+  tick label style={font=\tiny},label style={font=\scriptsize}}}
+% ---- shared names (single source of truth) ----
+\newcommand{\Sys}{Nafs-Aql}
+\newcommand{\Sone}{System~1}
+\newcommand{\Stwo}{System~2}
+\newcommand{\Gate}{Aql Gate}
+\newcommand{\Hub}{Verifier Hub}
+\newcommand{\Ledger}{Muhasaba Ledger}
+\newcommand{\Distil}{Tazkiya Distillation}
+\newcommand{\Mem}{Context Manager}
+\newcommand{\Gw}{Rust Gateway}
+\newcommand{\Harness}{Eval Harness}

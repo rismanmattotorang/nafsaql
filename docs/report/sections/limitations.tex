@@ -1,0 +1,50 @@
+\section{Limitations and Ethical Considerations}
+\label{sec:limits}
+\textbf{Indicative results.} Section~\ref{sec:impl} reports measurements on
+one shared four-core machine with tens of items per comparison, far below the
+sample sizes of Section~\ref{sec:eval}; the quality claims remain hypotheses
+until the release-scale runs. The formal results hold under their stated assumptions, several of
+which (conditional independence of verifiers, a Beta prior on acceptance,
+homogeneous refinement dynamics, concave budget returns) are modelling
+choices to be checked.
+
+\textbf{Shared weights.} Fast and slow paths from one model family make
+correlated errors; the collision term is measured rather than assumed small,
+and the judge shares the same bias, which is why exact verifiers carry the
+safety case.
+
+\textbf{CPU constraint.} On the reference machine the slow path takes
+minutes; the design is honest about this and makes interactive deliberation
+a GPU-profile feature. Published AVX2 throughput data are sparse; our own
+measurements cover two models and one machine.
+
+\textbf{Verifiers are partial.} Only code, mathematics and structured output
+have exact verifiers; everything else is at best a consensus or judge
+assurance, which Theorem~\ref{thm:plurality} shows has a floor. Test-based
+code verification can be gamed by overfitting to visible tests; hidden tests
+and mutation testing are required.
+
+\textbf{Security.} The system executes model-written code in a sandbox and
+consumes untrusted text; prompt injection through retrieved memory or tool
+output is a first-class threat \cite{greshake2023injection,perez2022ignore}.
+The specification isolates the sandbox, strips instructions from retrieved
+content, and never lets observed content change controller parameters.
+
+\textbf{Religious content.} The classical vocabulary is used as analogy and
+the components have plain names in code. We do not claim that the software
+has a soul, consciousness or moral standing; we do not model the
+\emph{ruh}; and we cite scripture and hadith by number from named
+translations. The analogy section should be reviewed by scholars of the
+tradition, and users of the chat system who ask religious questions receive
+answers with the same assurance labelling as any other non-verifiable
+domain, with no claim of authority.
+
+\textbf{Data and privacy.} Conversation traces feed the self-model and the
+distillation set; the specification requires consent, retention limits,
+redaction of personal data before training, and exclusion of any
+conversation from training on request.
+
+\textbf{Hallucination and faithfulness.} Separating reasoning content from
+the answer does not make the reasoning faithful
+\cite{turpin2023unfaithful,ji2023hallucination}; we treat the trace as
+evidence for debugging and distillation, not as an explanation to the user.

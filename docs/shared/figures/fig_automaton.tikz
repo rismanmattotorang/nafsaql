@@ -1,0 +1,18 @@
+% Trace-state automaton of one request (A/L/M/T/X); width ~8.4cm
+\begin{tikzpicture}[x=0.93cm,y=1cm,>=Stealth]
+\node[st=navy]    (A) at (0,0)   {$\mathsf A$};
+\node[st=crimson] (L) at (2.6,0) {$\mathsf L$};
+\node[st=violet]  (M) at (5.2,0) {$\mathsf M$};
+\node[st=leaf]    (T) at (2.6,-1.9) {$\mathsf T$};
+\node[st=slate]   (X) at (7.6,-1.9) {$\mathsf X$};
+\draw[arr] (-1.1,0) -- (A) node[lab,pos=0.3,above]{request};
+\draw[arr] (A) -- node[lab,above]{flagged} (L);
+\draw[arr] (L) -- node[lab,above]{retry} (M);
+\draw[arr] (A) -- node[lab,left,pos=.55]{kept $\wedge$ verified} (T);
+\draw[arr] (M) -- node[lab,below right,pos=.35]{accepted} (T);
+\draw[arr] (M) to[bend left=35] node[lab,below]{rejected, $t<R$} (L);
+\draw[arr] (M) -- node[lab,above right,pos=.4]{budget out} (X);
+\node[font=\tiny,align=left,anchor=north west,text width=7.9cm] at (-1.05,-2.6)
+ {$\mathsf A$ draft (fast path); $\mathsf L$ flagged by gate or verifier; $\mathsf M$ deliberate retry conditioned on verifier evidence;
+  $\mathsf T$ accepted (assurance level attached); $\mathsf X$ abstain with uncertainty notice.};
+\end{tikzpicture}

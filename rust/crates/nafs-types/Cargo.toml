@@ -1,0 +1,16 @@
+[package]
+name = "nafs-types"
+description = "Shared types, wire contracts (IF-005) and error taxonomy for Nafs-Aql"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }

@@ -1,0 +1,25 @@
+% System architecture (single-node CPU baseline); width ~8.6cm
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[blk=slate,text width=1.4cm] (ui) at (0.1,0) {Web UI\\chat, bench, eval};
+\node[blk=slate,text width=1.4cm] (cli) at (0.1,-1.2) {API clients\\SDK, harness};
+\node[blk=navy,text width=1.8cm] (api) at (3.1,0) {\texttt{nafs-gateway}\\HTTP, SSE, WS};
+\node[blk=navy,text width=1.8cm] (core) at (3.1,-1.2) {\texttt{nafs-core}\\\Gate, loop};
+\node[blk=amber,text width=1.8cm] (hub) at (3.1,-2.4) {\texttt{nafs-verify}\\sandbox, math, schema};
+\node[blk=teal,text width=1.8cm] (mem) at (3.1,-3.6) {\texttt{nafs-memory}\\SQLite, traces};
+\node[blk=violet,text width=1.8cm] (b1) at (6.35,0) {\Sone\ server\\OpenAI-compatible};
+\node[blk=violet,text width=1.8cm] (b2) at (6.35,-1.2) {\Stwo\ server\\thinking mode};
+\node[blk=crimson,text width=1.8cm] (sb) at (6.35,-2.4) {Code sandbox\\subprocess, limits};
+\node[blk=leaf,text width=1.8cm] (obs) at (6.35,-3.6) {Metrics, logs\\Prometheus, JSONL};
+\begin{scope}[on background layer]
+\node[grp=navy,fit=(api)(core)(hub)(mem),inner sep=6pt] (gw) {};
+\node[grp=violet,fit=(b1)(b2),inner sep=6pt] (srv) {};
+\end{scope}
+\node[grplab=navy,anchor=south west] at (gw.north west) {Rust workspace};
+\node[grplab=violet,anchor=south west] at (srv.north west) {vLLM-CPU or llama-server};
+\draw[arr] (ui)--(api); \draw[arr] (cli)--(api);
+\draw[arr] (api)--(core); \draw[arr] (core)--(hub); \draw[arr] (core)--(mem);
+\draw[arr] (core.east)--node[lab,above,pos=.45]{HTTP}(b1.west);
+\draw[arr] (core.east)--(b2.west);
+\draw[arr] (hub)--(sb);
+\draw[dsh] (mem)--(obs);
+\end{tikzpicture}

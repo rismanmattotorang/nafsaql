@@ -1,0 +1,87 @@
+\section{Specification and Roadmap Summary}
+\label{sec:spec}
+The companion \emph{Technical Specification} and \emph{Development Roadmap}
+are standalone documents built from the same sources as this report; this
+section summarises them so that the report is self-contained.
+
+\subsection{Specification}
+The specification uses RFC~2119 keywords and gives every requirement an
+identifier: functional (FR), non-functional (NFR), interface (IF), model
+(MR), training (TR), security (SR), operations (OR) and evaluation (ER). The
+requirement catalogue has \NREQ\ entries; each is traced to the result or
+design decision that motivates it, to the component that implements it and
+to the test that verifies it. Key normative content:
+\begin{itemize}
+\item \textbf{Gate (FR-010--FR-014).} The controller MUST compute the
+decision of Theorem~\ref{thm:gate} from a calibrated estimator and a
+configured cost ratio, MUST never keep a verifiable draft that failed
+verification, and MUST write a decision record with the features, estimates
+and thresholds used.
+\item \textbf{Deliberation (FR-020--FR-024).} Sequential verified sampling
+with configured caps $N$, $R$ and budget $b$ per domain derived from the
+Phase-0 fit; draft-blind by default; budget forcing on exhaustion; abstention
+with notice.
+\item \textbf{Verification (FR-030--FR-033).} Exact verifiers accept at
+threshold $1.0$; every verifier publishes $(r,\varphi)$; assurance levels are
+attached to every reply; consensus never writes training data.
+\item \textbf{Self-model (FR-040--FR-042).} A $5\%$ audit stream; unmeasured
+capabilities reported as unmeasured; statistics keyed by model and adapter
+hash.
+\item \textbf{Distillation (TR-001--TR-008).} Data schema, filtering, Unsloth
+LoRA configuration, GPU path, promotion gate with confidence bounds and
+held-out verifier, human sign-off, GGUF export.
+\item \textbf{Targets (NFR-001--NFR-012).} Hard latency bound from
+Lemma~\ref{lem:termination}; fast-path first token under two seconds and
+150-token reply within twelve seconds at p95 on the reference machine;
+resident memory under 8\,GB for Profile~A; reproducible builds; structured
+telemetry. All targets are labelled as targets.
+\item \textbf{Interfaces (IF-001--IF-010).} OpenAPI 3.1 for the gateway
+with SSE streaming and a \texttt{reasoning\_mode} field on every reply; JSON
+Schemas for the request, reply, decision record and trace; the backend
+contract to vLLM and llama-server with retry, timeout and backpressure
+policy.
+\end{itemize}
+Machine-readable artefacts accompany the document: \texttt{openapi.yaml},
+JSON Schemas, a sample vLLM launch configuration and llama-server command,
+a Cargo workspace skeleton and a sample configuration file, all validated
+with standard tools.
+
+\subsection{Roadmap}
+Fig.~\ref{fig:gantt} shows the seven phases and their gates; effort and dates
+are estimates. Phase~0 (foundations, weeks 0--3) delivers the serving
+baseline on the reference machine and the $4\,600$-task measurement run.
+Phase~1 (CPU MVP, weeks 3--8) delivers the gateway, both paths behind a
+fixed-rule gate, the chat UI and the minimal verifier hub, which is the
+smallest build that demonstrates the idea end to end. Phase~2 (gate and
+loop, weeks 8--13) replaces the fixed rule with the calibrated gate and adds
+the verified retry loop and the audit stream; its exit gate is the
+non-inferiority test at three points. Phase~3 (fine-tuning, weeks 12--18)
+runs the first distillation cycle on a rented GPU under the promotion gate.
+Phase~4 (evaluation suite and performance console, weeks 15--21) completes
+the dashboard and the load tests. Phase~5 (hardening and optional GPU
+scale-out, weeks 20--25) adds security hardening, the vLLM CUDA profile and
+the Qwen3.5 upgrade decision. Phase~6 (release and publication, weeks
+25--28) delivers the one-point non-inferiority gate, documentation and the
+research write-up. Phase~7 (CPU inference performance, added after the
+first six phases were implemented) attributes latency to stages, tunes the
+engine under interleaved A/B tests, adds early escalation, and prepares
+EAGLE-3 speculative heads and repacked weight formats. The MVP is specified with acceptance tests; every phase
+has measurable entry and exit criteria, a risk register with early-warning
+signals, and a research-to-engineering table that schedules hypotheses
+H1--H7.
+
+\begin{figure}[t]
+\centering
+\input{../shared/figures/fig_gantt.tikz}
+\caption{Roadmap timeline (weeks; estimates). Diamonds are decision gates
+G0--G6 with go/no-go criteria defined in the roadmap document.}
+\label{fig:gantt}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\input{../shared/figures/fig_pipeline.tikz}
+\caption{Training and serving pipeline. Training runs on a rented GPU;
+everything else runs on CPU.}
+\label{fig:pipeline}
+\end{figure}

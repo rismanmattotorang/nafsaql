@@ -1,0 +1,17 @@
+% Concept-to-component mapping (analogy only); width ~8.6cm
+\begin{tikzpicture}[x=1cm,y=1cm]
+\foreach \i/\txt/\col/\eng in {
+ 0/{al-nafs al-ammarah\\(Q 12:53) impulsive self}/navy/{\Sone\ draft: fast, unverified},
+ 1/{al-nafs al-lawwamah\\(Q 75:2) self-reproaching self}/crimson/{\Gate\ flag or verifier rejection},
+ 2/{al-nafs al-mutma'innah\\(Q 89:27) self at rest}/leaf/{Accepted answer with assurance level},
+ 3/{'aql (al-Ghazali: vizier)\\deliberating intellect}/amber/{\Gate: cost--risk arbitration; \Stwo\ deliberation},
+ 4/{qalb (al-Ghazali: king)\\integrating executive}/violet/{Orchestrator \texttt{nafs-core}: owns the loop},
+ 5/{wahm, dhakira (Ibn Sina)\\estimation, memory}/teal/{Gate features; \Mem},
+ 6/{muhasaba, muraqaba\\self-accounting, vigilance}/teal/{\Ledger: audits, calibration},
+ 7/{tazkiyat al-nafs\\purification}/slate/{\Distil: verified traces $\to$ LoRA}}
+{ \node[sblk=\col,minimum width=2.9cm,text width=2.75cm] (c\i) at (0,-0.78*\i) {\txt};
+  \node[sblk=\col,minimum width=3.9cm,text width=3.75cm] (e\i) at (4.75,-0.78*\i) {\eng};
+  \draw[arr] (c\i)--(e\i); }
+\node[font=\tiny\bfseries,text=slate] at (0,0.62) {Classical concept (source)};
+\node[font=\tiny\bfseries,text=slate] at (4.75,0.62) {Engineering component (analogy)};
+\end{tikzpicture}

@@ -1,0 +1,55 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{booktabs,amsmath,hyperref,microtype}
+\usepackage[T1]{fontenc}
+\hypersetup{pdfauthor={Dirac R\&D Team},colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black}
+\input{gen/results.tex}
+\title{When should reflection restrain the first impulse?\\[2pt]\large Measured results from the Nafs-Aql System~1 / System~2 laboratory on a 4-core CPU}
+\author{Dirac R\&D Team}
+\date{18 October 2026}
+\begin{document}
+\maketitle
+\begin{abstract}
+Nafs-Aql pairs a fast small language model (System~1, Qwen3-1.7B) with a slower reasoning model (System~2, Qwen3-4B-Thinking-2507) behind a gate that decides when to deliberate, and treats exact verifiers, not model agreement, as the evidence of correctness. This note reports what the running system measured on a shared Intel i3-8100 (4 cores, AVX2, 32\,GB). Every number below is generated from stored evaluation runs by \texttt{scripts/gen\_publication.py}, and each table names its run identifiers. The headline results are indicative: release gates require 700 to 6\,200 paired items, while one CPU produced tens. With an exact verifier visible, the gated system matched deliberate-only accuracy at \GatedCostRatio{} of its cost; with the verifier hidden, the uncalibrated gate routed correctly on only \BlindRouting{} of items, because cheap samples agreed on wrong answers. The vocabulary of the self (\emph{nafs}, \emph{\textquotesingle aql}) is used throughout as a design analogy, not as a religious claim; its text awaits scholar review.
+\end{abstract}
+
+\section{System and laboratory}
+A request is drafted by System~1 (state A, \emph{nafs}). The Aql Gate escalates when the expected error saved outweighs the price of the extra latency, $L(\hat e_1-\hat e_2)>\lambda\Delta c$; an exact-verifier failure always escalates (state L, \emph{lawwāma}). System~2 then reasons within a thinking budget without seeing the draft (state M, \emph{\textquotesingle aql}); an answer is accepted with an assurance level (T, \emph{muṭmaʾinna}) or the system abstains (X, \emph{tawaqquf}). The laboratory compares \emph{policies} for combining the two systems on identical tasks: fast-only, deliberate-only, the gate with the verifier visible, the gate routing on its own estimate (``blind''), a draft-conditioned ablation, budget sweeps and $\lambda$ sweeps, plus human ``Both'' trials in chat. Paired differences carry bootstrap intervals, exact McNemar tests and Bonferroni correction.
+
+\section{Results}
+\subsection{Policies on a mixed task set (run \PhaseTwoRun)}
+\begin{center}\PhaseTwoTable\end{center}
+Exact-verifier accuracy with Clopper--Pearson intervals (6 tasks per system: GSM8K, MBPP, JSON Schema). The gate with the verifier visible equals deliberate-only accuracy at a cost ratio of \GatedCostRatio. The blind gate kept two wrong math drafts whose samples agreed with them (routing accuracy \BlindRouting): sample agreement is a flag, not evidence, and calibration on more labelled data is the remedy.
+
+\subsection{Verifier quality (runs \RatesRuns)}
+\begin{center}\VerifierTable\end{center}
+Correct answers give the true-accept rate $r$; seeded wrong answers (mutants) give the false-accept rate $\varphi$ with a 95\% upper bound. Math meets the $\varphi\le0.01$ target. The code $\varphi$ is an upper bound inflated by behaviourally equivalent mutants: the survivors pass the much larger EvalPlus test suites as well. Measuring on EvalPlus exposed three verifier defects (a Python long-line encoding failure and two resource limits), all fixed. The rubric judge returned valid verdicts on all items once its output was grammar-constrained; its one false accept was a factual error about authorship.
+
+\subsection{Speed on the CPU}
+Skipping cheap System~1 samples when an exact verifier decides cut the median draft time from 13.4\,s to 7.9\,s. Speculative decoding with a 0.6B draft model, or with n-gram lookup, did not help (median 6.5 and 6.6 against 7.3 tokens/s): on four cores the draft competes with the main model for compute and memory bandwidth. The load-test protocol (run \ProtocolRun) gives:
+\begin{center}\ProtocolTable\end{center}
+NFR-007 asks that p95 at four sessions stay within twice the single-session value; the measured ratio is \NfrSevenRatio, so the requirement fails on this shared host and concurrency is documented as a larger-machine feature.
+
+\subsection{Where the time goes (Phase~7)}
+Every reply records its stages, and model stages carry llama-server's own prefill, decode and KV-cache figures (\StageReplies{} replies):
+\begin{center}\StageTable\end{center}
+\begin{center}\EngineTable\end{center}
+The fast path is almost entirely System~1 decoding; the prompt cache already serves most prompt tokens. Early escalation stops an open-ended draft whose running mean log-prob is already below the fixed rule's threshold: \EarlyEscSummary.
+\begin{center}\EarlyEscTable\end{center}
+
+\subsection{Regression baseline and model choice}
+Fast-path baseline on the fixed 500-item regression suite (run \RegressionRun): \RegressionSummary. Profile~C (Qwen3.5) decision: \ProfileCDecision
+\begin{center}\ProfileCTable\end{center}
+
+\subsection{Operations}
+\SecuritySummary; one high-severity issue (sandboxed code could signal other processes) was found by the suite and fixed. Deployment recipes: \DeploySummary.
+
+\section{Roadmap gates}
+\begin{center}\small\GatesTable\end{center}
+
+\section{Limitations}
+All measurements come from one shared 4-core machine whose other workloads raised the load average to 6--15, so absolute speeds are lower bounds and small effects are within noise. Sample sizes are far below the release gates; intervals, not point estimates, should be read. GPU training (Phase~3) and GPU scale-out were deferred. The analogy text has not yet been reviewed by a scholar of the tradition.
+
+\section{Reproducibility}
+Runs, decisions and traces are stored in \texttt{data/runtime/nafs.sqlite}; models are pinned by SHA-256 in \texttt{config/models.manifest.json}; regenerate these tables with \texttt{python3 -I scripts/gen\_publication.py} and the PDF with \texttt{tools/tectonic docs/publication/nafs\_aql\_lab\_results.tex}.
+\end{document}

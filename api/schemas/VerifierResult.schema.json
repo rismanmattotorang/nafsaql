@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nafs-aql.example/schemas/VerifierResult.schema.json",
+  "title": "VerifierResult",
+  "type": "object",
+  "required": [
+    "verifier",
+    "passed"
+  ],
+  "properties": {
+    "verifier": {
+      "type": "string",
+      "description": "code_tests | math_numeric | json_schema | judge | consensus, or a '+'-joined combination"
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "score": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 1
+    },
+    "evidence": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Failing test, counterexample or schema error fed to the next round (FR-025)"
+    },
+    "rates": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "r": {
+              "type": "number"
+            },
+            "phi": {
+              "type": "number"
+            },
+            "n_mutants": {
+              "type": "integer"
+            }
+          },
+          "description": "Published verifier rates (FR-032)"
+        }
+      ]
+    },
+    "duration_ms": {
+      "type": "integer"
+    },
+    "exact": {
+      "type": "boolean",
+      "description": "Exact verifiers accept at threshold 1.0 (Theorem 1)"
+    }
+  }
+}

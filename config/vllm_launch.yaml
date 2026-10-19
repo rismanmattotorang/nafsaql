@@ -1,0 +1,23 @@
+# Sample vLLM launch configuration for the Linux CPU profile (MR-003). Untested on the macOS reference machine.
+# Usage: vllm serve --config config/vllm_launch.yaml   (vLLM >= 0.31.0, CPU wheel: https://wheels.vllm.ai/<ver>/cpu)
+# Environment (set before launch):
+#   VLLM_CPU_KVCACHE_SPACE=4          # GiB of KV cache; or use --kv-cache-memory-bytes
+#   VLLM_CPU_OMP_THREADS_BIND=0-2     # pin inference threads; reserve core 3 for the gateway + front end
+#   VLLM_CPU_NUM_OF_RESERVED_CPU=1
+#   LD_PRELOAD=<libiomp5.so>:<libtcmalloc_minimal.so.4>
+# System 2 server (Profile A). Run a second instance with model Qwen/Qwen3-1.7B on port 8001 for System 1.
+model: Qwen/Qwen3-4B-Thinking-2507
+revision: main            # MR-001: replace with the pinned commit hash from the model manifest
+dtype: bfloat16           # vLLM CPU recommends bfloat16 (FP32 on hosts without AVX512-BF16 if accuracy problems appear)
+max-model-len: 8192       # NFR-006: context cap (prompt <= 4096 + thinking budget + answer)
+max-num-seqs: 4           # bounded in-flight sequences; the gateway semaphore (IF-008) uses the same value
+max-num-batched-tokens: 2048
+block-size: 128           # multiples of 32 for the CPU backend
+enable-prefix-caching: true   # NFR-006: prompt cache
+reasoning-parser: qwen3   # separates reasoning_content (MR-002)
+served-model-name: system2
+host: 127.0.0.1
+port: 8002
+max-logprobs: 5           # gate features (FR-010)
+disable-log-requests: true
+# Optional on the GPU scale-out profile only (not CPU): speculative decoding with an EAGLE or MTP draft.

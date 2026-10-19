@@ -1,0 +1,3 @@
+vLLM 0.31.0 CPU, Lima VM (4 vCPU, 16 GiB), Qwen3-1.7B FP32, --enforce-eager, OMP bind 0-2; host i3-8100
+non-thinking: 100 tokens in 31.5s = 3.18 tok/s end-to-end (prompt 27); logprobs returned: True
+thinking, budget 128: 379 tokens in 122.6s; reasoning separated: True (~107 words); answer: '5 minutes**, which is **215 minutes**.\n\nAnswer: <number> 215'

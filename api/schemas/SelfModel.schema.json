@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nafs-aql.example/schemas/SelfModel.schema.json",
+  "title": "SelfModel",
+  "type": "object",
+  "required": [
+    "model_hash",
+    "adapter_hash",
+    "domains"
+  ],
+  "properties": {
+    "model_hash": {
+      "type": "string"
+    },
+    "adapter_hash": {
+      "type": "string"
+    },
+    "backend": {
+      "type": "string"
+    },
+    "audit_fraction": {
+      "type": "number"
+    },
+    "audits": {
+      "type": "object"
+    },
+    "calibration": {
+      "type": "object"
+    },
+    "gate": {
+      "type": "object"
+    },
+    "note": {
+      "type": "string"
+    },
+    "domains": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "domain",
+          "n",
+          "status"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "escalation_rate": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "verified": {
+            "type": "integer"
+          },
+          "consensus": {
+            "type": "integer"
+          },
+          "abstained": {
+            "type": "integer"
+          },
+          "n_audit": {
+            "type": "integer"
+          },
+          "n_audit_labelled": {
+            "type": "integer"
+          },
+          "p2_given_escalated": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "p2_given_audit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "p2_hat": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Prop. 5: g p2|esc + (1-g) p2|audit"
+          },
+          "p2_se_bound": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "p1_kept_audited": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "kept_vs_slow_agreement": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "measured",
+              "unmeasured"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

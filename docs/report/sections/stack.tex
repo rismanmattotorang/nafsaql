@@ -1,0 +1,150 @@
+\section{Implementation Stack}
+\label{sec:stack}
+
+\subsection{Model Serving}
+\textbf{vLLM.} vLLM \cite{kwon2023pagedattention} is the specified serving
+layer for the Linux deployment profile. Its x86 CPU backend requires Linux,
+supports FP32, FP16 and BF16 with AWQ, GPTQ and INT8 W8A8 quantisation,
+recommends AVX-512 and offers ``limited features'' on AVX2; pre-built CPU
+wheels and the \texttt{vllm/vllm-openai-cpu} image exist. Qwen3-1.7B, 4B and
+8B are on its validated CPU model list. The CPU backend implements hybrid
+Gated-DeltaNet models, but the accelerated path needs AMX or AVX-512-BF16;
+elsewhere it falls back to a generic path. At the time of writing the latest
+published release is v0.31.0 (v0.32.0 is a tag, not a release); the
+specification pins 0.31.0. vLLM exposes OpenAI-compatible chat completions
+with \texttt{logprobs} and \texttt{top\_logprobs}, the \texttt{n} parameter,
+a \texttt{qwen3} reasoning parser that separates \texttt{reasoning\_content},
+and \texttt{chat\_template\_kwargs} for \texttt{enable\_thinking}; these are
+exactly the hooks the gate needs. On the macOS Intel reference machine vLLM
+runs only inside a Linux container.
+
+\textbf{llama.cpp.} \texttt{llama-server} (release v0.7.0, October 2026) is
+the mandated fallback and the primary engine on the reference machine: GGUF
+weights, a mature AVX2 path, OpenAI-compatible chat completions with SSE
+streaming and \texttt{logprobs}, \texttt{--reasoning-format} to separate
+reasoning, \texttt{--reasoning-budget} for budget forcing, n-gram speculative
+decoding without a draft model (\texttt{--spec-type ngram-simple}), and
+explicit thread pinning. Both engines present the same HTTP contract, so the
+Rust gateway has a single backend trait.
+
+\textbf{Ollama} is convenient for demonstrations but its OpenAI endpoint does
+not return log-probabilities, which the gate requires; it is therefore not a
+supported backend.
+
+\subsection{Fine-Tuning}
+Unsloth (2026.10.6) trains with LoRA and QLoRA two to five times faster than
+baseline PEFT and exports merged weights to GGUF directly. Its core trainer
+requires a torch accelerator: the device-selection code raises ``You need a
+GPU'' on CPU-only hosts, and the documented CPU support covers inference and
+data preparation, not training. The feasible path is therefore: collect and
+filter traces on the CPU machine, train on a rented GPU (a 16\,GB T4 covers
+QLoRA on Qwen3-1.7B and 4B \cite{dettmers2023qlora,hu2022lora}, and BF16
+LoRA on Qwen3.5 up to 4B; Unsloth advises against 4-bit training for
+Qwen3.5), export GGUF, and run the promotion gate and all evaluation on CPU.
+Unsloth's default hyperparameters (rank 16--32, $\alpha=r$, learning rate
+$2\times10^{-4}$, one to three epochs, effective batch 16, dropout 0, all
+attention and MLP projections) are the starting point of the training
+specification.
+
+\subsection{Rust Web Application}
+Table~\ref{tab:crates} lists the crates and the versions verified on
+crates.io on 2026-10-18. \textbf{axum} on \textbf{tokio} and \textbf{tower}
+is the mainstream, well-maintained choice for an async HTTP service with
+SSE (\texttt{axum::response::Sse}) and WebSockets built in;
+\textbf{reqwest} with \texttt{eventsource-stream} consumes the model
+servers' SSE; \textbf{serde} and \textbf{schemars} give JSON (de)serialisation
+and JSON-Schema generation from the same Rust types that the OpenAPI document
+is generated from with \textbf{utoipa}; \textbf{sqlx} with SQLite gives
+compile-time-checked queries without a database server; \textbf{tracing}
+with OpenTelemetry export and \textbf{metrics-exporter-prometheus} provide
+observability; \textbf{askama} templates with \textbf{htmx} keep the
+front end server-rendered and dependency-light (a single-page framework such
+as Leptos is an option for a later phase, not a requirement); \textbf{goose}
+provides load generation for the performance console and \textbf{criterion}
+micro-benchmarks. The toolchain is pinned to the stable release current at
+project start (1.96 on the reference machine; 1.99 is current upstream).
+
+\begin{table}[t]
+\caption{Rust crates (versions on crates.io, 2026-10-18)}
+\label{tab:crates}
+\centering\scriptsize
+\begin{tabular}{@{}p{2.6cm}p{1.6cm}p{3.6cm}@{}}
+\toprule
+Crate & Version & Role \\
+\midrule
+tokio & 1.53.3 & async runtime \\
+axum & 0.8.9 & HTTP routing, SSE, WebSocket \\
+tower, tower-http & 0.5.3, 0.7.1 & middleware: timeouts, limits, CORS, compression \\
+hyper & 1.12.0 & HTTP/1.1 and HTTP/2 \\
+reqwest & 0.13.5 & client to model servers (streaming) \\
+eventsource-stream & 0.2.3 & SSE parsing of upstream streams \\
+serde, serde\_json & 1.0.229, 1.0.154 & (de)serialisation \\
+schemars & 1.2.3 & JSON Schema from types \\
+jsonschema & 0.59.0 & schema verifier \\
+utoipa, utoipa-\allowbreak swagger-ui & 6.0.0, 10.0.1 & OpenAPI 3.1 generation and docs UI \\
+sqlx & 0.9.0 & SQLite access, migrations \\
+tracing, tracing-subscriber & 0.1.44, 0.3.23 & structured logs and spans \\
+opentelemetry, tracing-\allowbreak opentelemetry & 0.33.1, 0.34.0 & trace export \\
+metrics, metrics-\allowbreak exporter-\allowbreak prometheus & 0.24.6, 0.18.3 & metrics \\
+askama & 0.16.1 & HTML templates \\
+clap, figment & 4.6.7, 0.10.19 & CLI and layered configuration \\
+thiserror, anyhow & 2.0.21, 1.0.104 & error taxonomy \\
+uuid, chrono & 1.28.0, 0.4.45 & identifiers, time \\
+governor & 0.10.4 & rate limiting \\
+criterion, goose & 0.8.2, 0.18.1 & micro-benchmarks, load tests \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Reference Machine and Measured Feasibility}
+\label{sec:feasibility}
+The reference machine is an Intel Core i3-8100 (four cores, no simultaneous
+multithreading, AVX2 and FMA, no AVX-512), 32\,GB of DDR4, macOS~15.4.1. We
+built llama.cpp from source (commit \texttt{797de63}, 2026-10-17) and ran
+\texttt{llama-bench} with four threads, 512-token prefill and 128-token
+decode, three repetitions. Table~\ref{tab:measured} reports the results. The
+Qwen3-1.7B decode rate of $15.5$ tokens/s against a 1.26\,GiB weight file
+implies an effective bandwidth of about $20$\,GB/s, roughly half the
+theoretical $38.4$\,GB/s of dual-channel DDR4-2400, which is in line with the
+roofline of Proposition~\ref{prop:roofline} and with published AVX2 data
+points. We also confirmed, through Ollama, that Qwen3-1.7B generates in both
+thinking and non-thinking modes on this machine; a 512-token thinking cap was
+exhausted on a simple arithmetic question before the answer was produced,
+which is the empirical reason the controller forces the answer when the
+budget is reached (Proposition~\ref{prop:budget}). We also exercised \texttt{llama-server} through its OpenAI-compatible API with
+Qwen3-1.7B: per-token log-probabilities are returned with \texttt{logprobs};
+the \texttt{n} parameter is capped by the number of server slots, so the
+gate's $k$ cheap samples are issued as $k$ parallel requests against
+$k$ slots (four 12-token samples completed in 3.0\,s with 47 of 48 prompt
+tokens served from the prompt cache); \texttt{enable\_thinking} toggles the
+mode per request; \texttt{--reasoning-budget 256} closed the reasoning span
+after 256 tokens and the model then produced an answer; and SSE streaming
+delivered chunked deltas. These are the exact hooks the specification relies
+on. We did not run vLLM on the
+reference machine because the Docker daemon was not running; the
+specification's vLLM configuration is taken from its documentation and is
+marked as untested on this machine.
+
+\begin{table}[t]
+\caption{Measured throughput on the reference machine (llama.cpp, 4 threads; mean $\pm$ s.d. over 3 runs)}
+\label{tab:measured}
+\centering\scriptsize
+\begin{tabular}{@{}llrr@{}}
+\toprule
+Model (GGUF) & Size & Prefill tok/s & Decode tok/s \\
+\midrule
+Qwen3-0.6B Q8\_0 & 604\,MiB & $180.6\pm2.4$ & $32.6\pm1.8$ \\
+Qwen3-1.7B Q4\_K\_M & 1.26\,GiB & $94.1\pm9.5$ & $15.5\pm3.4$ \\
+\MEASUREDROWS
+\bottomrule
+\end{tabular}
+\end{table}
+
+From these measurements and the roofline we derive the CPU-baseline
+targets of the specification: a fast-path first token under two seconds for
+prompts up to 1\,000 tokens with prompt caching, a fast-path reply of 150
+tokens in about ten seconds, and a slow-path reply with a 1\,024-token
+thinking budget on the 4B model in about two to three minutes; the latter
+is acceptable for a demonstration and for batch evaluation, and is the
+reason the roadmap keeps interactive use of \Stwo\ optional until the GPU
+variant exists.

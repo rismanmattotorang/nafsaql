@@ -1,0 +1,32 @@
+[package]
+name = "nafs-core"
+description = "Orchestrator: request automaton, Aql Gate, sequential verified sampling, OpenAI-compatible backends"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+nafs-types = { path = "../nafs-types" }
+nafs-verify = { path = "../nafs-verify" }
+nafs-memory = { path = "../nafs-memory" }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+eventsource-stream = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+fastrand = { workspace = true }
+sha2 = { workspace = true }
+metrics = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+axum = { workspace = true }
+tokio = { workspace = true }

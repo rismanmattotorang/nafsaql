@@ -1,0 +1,12 @@
+{"id": "open-00", "domain": "factual", "prompt": "What is the capital of Indonesia, and on which island is it located?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-01", "domain": "factual", "prompt": "Who wrote 'The Incoherence of the Philosophers'?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-02", "domain": "factual", "prompt": "In what year did the first crewed Moon landing take place?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-03", "domain": "open", "prompt": "Give three practical tips for writing clear technical documentation.", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-04", "domain": "open", "prompt": "Explain the difference between a process and a thread in two short paragraphs.", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-05", "domain": "open", "prompt": "Summarise the idea of test-time compute in language models for a non-expert.", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-06", "domain": "open", "prompt": "Suggest a name and a one-sentence description for a note-taking app for researchers.", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-07", "domain": "open", "prompt": "What are the trade-offs of running a language model on a CPU instead of a GPU?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-08", "domain": "factual", "prompt": "What is the boiling point of water at sea level in Fahrenheit?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-09", "domain": "open", "prompt": "Write a short, polite email declining a meeting invitation.", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-10", "domain": "open", "prompt": "Explain what a hash map is and when you would use one.", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-11", "domain": "factual", "prompt": "Which planet in our solar system has the most moons as of 2024?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}

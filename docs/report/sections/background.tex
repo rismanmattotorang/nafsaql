@@ -1,0 +1,273 @@
+\section{Background}
+\label{sec:background}
+
+\subsection{The Islamic Account of the Self}
+\label{sec:islamic}
+
+\subsubsection{Scope and disclaimer}
+We summarise the classical vocabulary we borrow, from primary texts in
+verified translations and from standard scholarship. The summary is
+descriptive. We attribute each concept to a specific author and text, note
+where scholars disagree, and do not present ``the Islamic view of the soul'' as
+one fixed scheme. The engineering mapping of Section~\ref{sec:arch} is an
+analogy between faculty descriptions and software components; it is not a
+claim that the software has a soul, a heart or an intellect in the sense of the
+sources. We do not model the \emph{ruh} (spirit), which the Qur'an places
+beyond human analysis (Q~17:85), and we do not map divine inspiration
+(\emph{ilham}), unveiling (\emph{mukashafa}) or the Active Intellect of the
+philosophers onto any component.
+
+\subsubsection{The nafs and its Qur'anic stages}
+\emph{Nafs} most often means simply ``self'' or ``person''. Three verses attach
+a qualifying adjective and these became the seeds of the later Sufi
+``stations'' of the soul \cite{AbdelHaleem2008Quran,CalverleyNetton2012Nafs}:
+\emph{al-nafs al-ammarah bi-l-su\textquoteright}, the self that commands to
+evil (Q~12:53); \emph{al-nafs al-lawwamah}, the self-reproaching self
+(Q~75:2); and \emph{al-nafs al-mutma\textquoteright innah}, the self at rest
+(Q~89:27), addressed in the next verse as ``well pleased and well pleasing''
+(\emph{radiyah}, \emph{mardiyyah}, Q~89:28). Q~91:7--10 says the soul was
+``inspired'' with its wickedness and its God-consciousness and that whoever
+purifies it (\emph{zakkaha}) succeeds. Only the first three are fixed
+noun--adjective pairs in the text. The ``inspired self''
+(\emph{al-nafs al-mulhamah}) is a Sufi coinage from the verb in Q~91:8, and the
+``perfect'' or ``pure'' self (\emph{kamilah}, \emph{safiyyah}, \emph{zakiyyah})
+is a later elaboration. Later manuals arrange seven stages, commonly
+\emph{ammarah}, \emph{lawwamah}, \emph{mulhamah}, \emph{mutma\textquoteright innah},
+\emph{radiyah}, \emph{mardiyyah}, \emph{kamilah}, but the order and the name of
+the highest rung vary by order and author \cite{Schimmel1975}. A recent
+grounded-theory model of the soul for Islamic psychotherapy deliberately keeps
+only the three Qur'anic stages \cite{RothmanCoyle2018}. We follow the same
+restraint: our trace-state automaton (Fig.~\ref{fig:nafs-automaton}) uses the
+three Qur'anic stages as mnemonics and names its other states in plain
+engineering terms.
+
+\subsubsection{Al-Ghazali: heart, intellect, soul, spirit}
+In Book~21 of the \emph{Ihya\textquoteright}, ``The Marvels of the Heart'',
+al-Ghazali (d.~1111) distinguishes two senses of each of four words
+\cite{Ghazali2010Marvels}. \emph{Qalb} is the organ of flesh and also a
+spiritual subtlety that is the knowing, perceiving human being; \emph{ruh} is
+the physicians' subtle vapour and also that same subtlety; \emph{nafs} is the
+aggregate of appetite and anger, the blameworthy lower self of Q~12:53, and
+also the same subtlety named \emph{mutma\textquoteright innah},
+\emph{lawwamah} or \emph{ammarah} according to its state; and
+\emph{\textquoteleft aql} is knowledge of the real natures of things and also
+the perceiving subtlety itself. In their second sense the four words name one
+entity under different aspects. Al-Ghazali's political image is the one we
+borrow: the heart is a king, the intellect is its vizier and counsellor,
+appetite is its provisioner and anger its police; the kingdom is well ordered
+when the king consults the vizier and uses the other two without letting them
+rule. He also describes the heart as a mirror in which the forms of things are
+reflected, tarnished by vice and polished by remembrance and discipline;
+incoming thoughts (\emph{khawatir}) that call to good are \emph{ilham} and
+those that call to evil are \emph{waswasa}. Books~22--23 give the practical
+programme of disciplining the soul \cite{Ghazali1995Disciplining}. Al-Ghazali
+adopts Avicennan faculty psychology in all of this
+\cite{Griffel2009,Griffel2026SEPGhazali,Kukkonen2012Receptive}, and treats
+error as a structural failure of the soul's faculties
+\cite{Kukkonen2016Error}.
+
+\subsubsection{Muraqaba and muhasaba}
+Book~38 of the \emph{Ihya\textquoteright} is devoted to vigilance and
+self-accounting: the servant sets conditions on the self in the morning,
+watches it through the day (\emph{muraqaba}), and audits it at night
+(\emph{muhasaba}), then corrects and strives. The vocabulary goes back to
+al-Harith al-Muhasibi (d.~857), whose name derives from the practice
+\cite{Picken2011}; al-Qushayri's \emph{Risala} has chapters on both and a
+lexicon that distinguishes \emph{nafs}, \emph{qalb}, \emph{ruh} and
+\emph{sirr} as successively subtler faculties \cite{Qushayri2007Epistle}. The
+engineering reading is direct: muhasaba is self-correction \emph{under a
+standard}, which is what an evaluation and monitoring loop does, and
+\emph{tazkiyat al-nafs} (purification) is the long-run change of disposition
+that such a loop is meant to produce.
+
+\subsubsection{Ibn Sina: internal senses and intellect}
+Avicenna (d.~1037) defines the soul as the first perfection of a natural body
+with organs and distinguishes the vegetative, animal and rational souls
+\cite{Avicenna1952Psychology,Avicenna1959DeAnima,McGinnis2010,Gutas2025SEPIbnSina}.
+He systematises five internal senses located in the brain's ventricles
+\cite{Ivry2012SEPArabicMind}: the common sense and the retentive imagination
+in the front ventricle, the estimative faculty (\emph{wahm}) and the
+compositive imagination in the middle, and memory (\emph{dhakira}) in the rear.
+\emph{Wahm} grasps non-sensible ``intentions'' such as the hostility of a wolf;
+it is the quick, particular judgement that animals and humans share and a
+frequent source of error \cite{Black1993Estimation}. The theoretical intellect
+passes from potentiality through habit and act to the ``acquired'' intellect,
+receiving intelligibles from a separate Active Intellect, a doctrine
+al-Ghazali criticised and later philosophers replaced
+\cite{Gutas2014,Rizvi2019SEPMullaSadra}. The ``flying man'' thought experiment
+argues that self-awareness is primitive and does not depend on the body; whether
+it is a demonstration or a pointer is disputed
+\cite{Marmura1986FlyingMan,Kaukua2015}.
+
+\subsubsection{Ibn Arabi, Suhrawardi, Mulla Sadra}
+Ibn Arabi (d.~1240) names the heart from \emph{taqallub}, fluctuation: it
+follows what reason, from \emph{\textquoteleft iqal} (the fetter), cannot
+encompass, and sound knowledge needs both of the heart's ``two eyes'', reason
+and imagination \cite{Chittick1989,Chittick2025SEPIbnArabi}. Suhrawardi
+(d.~1191) holds that the soul knows itself and its states by presence,
+without an intervening form \cite{Marcotte2019SEPSuhrawardi,HairiYazdi1992}.
+Mulla Sadra (d.~1636) teaches substantial motion: the soul is ``bodily in its
+origination, spiritual in its subsistence'', intensifying through sensory,
+imaginal and intellectual stages, and in the act of knowing the knower and
+the known are one \cite{Rizvi2009,Kalin2010,Rahman1975}. The draft design
+mapped substantial motion to distillation (slow reasoning becoming fast); we
+keep the mapping as an illustration of \emph{gradual change of disposition}
+and nothing more.
+
+\subsubsection{Where scholars disagree}
+Whether \emph{nafs} and \emph{ruh} are one entity; whether
+\emph{\textquoteleft aql} is a faculty, a body of knowledge or a substance;
+whether the soul is immaterial from the start (Avicenna), a subtle body (much
+of early kalam), or material in origin and immaterial in subsistence (Sadra);
+whether the Active Intellect is needed; how many stages the \emph{nafs} has;
+and even what al-Ghazali himself believed
+\cite{Gianotti2001,Treiger2011,Griffel2009}: all of these are open in the
+literature. Our analogy does not depend on any of them being settled.
+
+\subsubsection{Rules we follow}
+(1)~Every borrowing is presented as an analogy and the components keep plain
+engineering names in code. (2)~We use the faculty-psychology vocabulary
+(\emph{nafs}, \emph{\textquoteleft aql}, \emph{qalb}, \emph{wahm},
+\emph{dhakira}, \emph{muhasaba}, \emph{tazkiya}) and nothing from the
+vocabulary of revelation. (3)~The stage ladder is not a maturity model or a
+benchmark scale. (4)~Scripture is cited by chapter and verse in a named
+translation and hadith by collection and number; we quote no unsourced
+sayings. (5)~The analogy section should be reviewed by a scholar of the
+tradition before publication.
+
+\subsection{Dual-Process Theory and Metareasoning}
+\label{sec:dualprocess}
+Dual-process accounts distinguish a fast, automatic, associative mode from a
+slow, effortful, rule-based one
+\cite{sloman1996two,stanovich2000individual,kahneman2011thinking}. The
+contemporary formulation of Evans and Stanovich defines Type~1 processing by
+autonomy and Type~2 by its demand on working memory and its capacity for
+hypothetical thought, and treats the question of \emph{when} Type~2 intervenes
+as central \cite{evans2013dual}. Two further lines matter for us. The
+\emph{expected value of control} theory of Shenhav, Botvinick and Cohen models
+the allocation of cognitive control as a cost--benefit decision
+\cite{shenhav2013evc}; resource-rational analysis makes the same move for
+cognition in general \cite{lieder2020resource}; and the metareasoning
+literature in artificial intelligence, from Russell and Wefald onward, asks how
+an agent should decide which computations to run \cite{russell1991metareasoning}.
+Theorem~\ref{thm:gate} is the one-step instance of these ideas: deliberate
+when its expected value exceeds its cost.
+
+\subsection{Fast and Slow Language Models}
+\label{sec:llmbg}
+\subsubsection{Test-time compute}
+Chain-of-thought prompting elicits multi-step reasoning \cite{wei2022cot};
+sampling several chains and voting improves accuracy, by $+17.9$ points on
+GSM8K in the original study \cite{wang2023selfconsistency}. Coverage, the
+chance that at least one of $N$ samples is correct, grows roughly
+log-linearly in $N$ across orders of magnitude, but without an automatic
+verifier the gain from voting or reward models plateaus after a few hundred
+samples \cite{brown2024monkeys}; trained verifiers and process-supervised
+reward models recover much of it \cite{cobbe2021gsm8k,lightman2024verify}.
+Allocating test-time compute per prompt according to difficulty is more than
+four times as efficient as uniform best-of-$N$ and, in a FLOPs-matched
+comparison, can beat a model fourteen times larger on problems the small
+model can sometimes solve \cite{snell2024scaling}. Reinforcement learning
+induces long reasoning traces with self-verification
+\cite{deepseek2025r1,guo2025deepseekr1nature,openai2024o1}; a thousand
+curated examples plus ``budget forcing'' already yields a strong reasoner
+\cite{muennighoff2025s1}. Qwen3 ships both modes in one model with a thinking
+budget \cite{qwen2025qwen3}.
+
+\subsubsection{Self-correction}
+Prompting a model to critique and revise its own answer helps on some tasks
+\cite{madaan2023selfrefine,shinn2023reflexion} but, without external
+feedback, intrinsic self-correction does not improve reasoning and can degrade
+it \cite{huang2024selfcorrect}; a survey concludes that self-correction works
+with reliable external feedback or large-scale fine-tuning
+\cite{kamoi2024survey}. Theorem~\ref{thm:selfrefine} gives the simplest model
+in which this happens. Reasoning models also \emph{over}think simple
+questions \cite{chen2024overthinking}.
+
+\subsubsection{Deciding when to think}
+A rapidly growing literature trains or prompts models to choose between a
+direct answer and a reasoning trace per query
+\cite{zhang2025adaptthink,fang2025thinkless,he2025selfroute,hou2025thinkprune,yang2025deer,arora2025efficient},
+with typical reports of $40$--$90\%$ fewer reasoning tokens at equal or better
+accuracy on mathematics benchmarks. Recent work allocates budgets across
+sub-questions or across a batch of questions
+\cite{lin2026planbudget,zhai2026adaptive,fan2026thinkinghard,zhou2026bet,xu2026stableadaptive,guo2026thinkwhenneeded}.
+Earlier, planning-oriented work combined fast and slow modes in a single
+transformer \cite{su2025dualformer,saha2025system1x}, and the AI community has
+framed the agenda explicitly in dual-process terms
+\cite{booch2021thinking,bengio2019system2}.
+
+\subsubsection{Routing and cascades}
+Routing between a cheap and an expensive model on predicted difficulty
+\cite{ding2024hybridllm,ong2025routellm} or cascading on the weak model's
+answer consistency \cite{yue2024cascades,chen2023frugalgpt} reduces cost by
+$40$--$98\%$ at matched quality in the cited studies. The classical
+foundations are Chow's reject option \cite{chow1970reject}, selective
+classification with risk guarantees \cite{geifman2017selective} and learning
+to defer \cite{madras2018defer,mozannar2020defer}. Calibration of the routing
+signal is the crux \cite{guo2017calibration,kadavath2022know,tian2023calibration};
+conformal methods give distribution-free coverage when a held-out set is
+available \cite{angelopoulos2023conformal}.
+
+\subsubsection{Speculative and parallel decoding}
+Speculative decoding drafts with a cheap model and verifies in parallel with
+the target, preserving the target distribution
+\cite{leviathan2023speculative,chen2023speculative}; Medusa and EAGLE replace
+the draft model with extra heads \cite{cai2024medusa,li2024eagle}, and
+multi-token prediction heads serve the same purpose
+\cite{gloeckle2024mtp}. Learned per-token compute allocation
+\cite{graves2016act,raposo2024mod} is the architectural cousin of our
+per-request gate. In \Sys, speculative decoding is an \emph{inside-the-model}
+accelerator, orthogonal to the System~1/System~2 split; llama.cpp's n-gram
+speculation needs no draft model and is the only variant we plan on the CPU
+baseline (Section~\ref{sec:stack}).
+
+\subsubsection{Autoregressive and non-autoregressive Qwen}
+Non-autoregressive generation began in translation
+\cite{gu2018nat,ghazvininejad2019maskpredict} and is now pursued as discrete
+diffusion \cite{austin2021d3pm,lou2024sedd,sahoo2024mdlm}. LLaDA trains an
+8B masked-diffusion model from scratch \cite{nie2025llada}; Dream~7B and
+Dream-Coder are initialised from Qwen2.5 weights \cite{ye2025dream};
+DiffuCoder adapts Qwen2.5-Coder \cite{gong2025diffucoder}; block diffusion
+interpolates between the two paradigms \cite{arriola2025blockdiffusion}, and
+SDAR and TraDo convert Qwen3 base models (1.7B--30B-A3B) into block-diffusion
+reasoners \cite{cheng2026sdar,wang2026trado}; Fast-dLLM~v2 converts Qwen2.5
+with about a billion tokens \cite{wu2026fastdllmv2}; training-free caching and
+parallel decoding give large throughput gains \cite{wu2025fastdllm};
+commercial diffusion models report thousands of tokens per second on GPUs
+\cite{inception2025mercury}; see the survey \cite{li2025dlmsurvey}. Jacobi-style
+parallel decoding of ordinary autoregressive models is a third route
+\cite{santilli2023parallel,kou2024cllms}. \textbf{Verification result:} as of
+October 2026 there is no official non-autoregressive Qwen model from the Qwen
+team; every Qwen-based diffusion model is a third-party adaptation, and only
+the Dream family runs in llama.cpp's diffusion example on CPU. Diffusion
+decoding is therefore \emph{not} on the critical path of \Sys; it is an
+optional System~1 accelerator evaluated in Phase~5, and only if a
+CPU-capable runtime exists for a Qwen3-derived checkpoint by then.
+
+\subsubsection{Qwen generations}
+Table~\ref{tab:qwengen} summarises the Qwen generations available in
+October 2026. Only Qwen3 \cite{qwen2025qwen3} and Qwen3.5
+\cite{qwen3_5_blog_2026} have open weights at or below 9B parameters; Qwen3.6
+and Qwen3.8 start at 27B dense or 35B-A3B
+\cite{qwen3_6_27b_blog_2026,qwen3_6_35b_blog_2026,qwen3_8_blog_2026}, and
+Qwen3.7 has no open weights. The draft design's roster (Qwen3.6-27B and
+Qwen3.6-35B-A3B) is therefore real but outside any CPU budget considered here
+(about 16--22\,GB at 4 bits).
+
+\begin{table}[t]
+\caption{Qwen generations and open text models $\le$\,9B (verified on Hugging Face, 2026-10-18)}
+\label{tab:qwengen}
+\centering\scriptsize
+\begin{tabular}{@{}p{1.2cm}p{1.4cm}p{2.3cm}p{2.7cm}@{}}
+\toprule
+Generation & Released & Open $\le$9B & Architecture, notes \\
+\midrule
+Qwen3 & Apr 2025; 2507 refresh & 0.6B, 1.7B, 4B, 8B; 4B-Instruct-2507, 4B-Thinking-2507 & Dense GQA (\texttt{Qwen3ForCausalLM}); thinking switch; official GGUF; Apache-2.0 \\
+Qwen3.5 & Feb--Mar 2026 & 0.8B, 2B, 4B, 9B & Hybrid 3:1 Gated DeltaNet : gated attention; vision encoder built in; 262K context; no official GGUF; Apache-2.0 \\
+Qwen3.6 & Apr 2026 & none (27B, 35B-A3B) & Same hybrid family \\
+Qwen3.7 & May 2026 & none (API only) & Closed \\
+Qwen3.8 & Aug 2026 & none (27B, 2.4T-A95B, Flash-Next) & Hybrid; new \texttt{qwen4\_exp} for Flash-Next \\
+\bottomrule
+\end{tabular}
+\end{table}

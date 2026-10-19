@@ -1,0 +1,15 @@
+% Wireframe: evaluation dashboard; width ~7cm
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\tiny}]
+\draw[thick,rounded corners=3pt,fill=sand!40] (0,0) rectangle (7,5);
+\fill[navy!15] (0,4.4) rectangle (7,5); \node[anchor=west,font=\tiny\bfseries] at (0.15,4.7) {Evaluation dashboard \quad run: gsm8k-2026-10-18 \quad systems: nafs / fast / slow};
+\fill[white,draw=slate!40] (0.15,2.6) rectangle (3.4,4.3);
+\node[anchor=north west,text width=3.1cm,align=left] at (0.2,4.25) {\textbf{paired results}\\ nafs $-$ slow: $-1.2$ pts [$-2.9$, $+0.5$]\\ nafs $-$ fast: $+9.8$ pts [$+7.1$, $+12.5$]\\ non-inferior (3 pt): \textcolor{leaf}{yes} \quad (1 pt): \textcolor{crimson}{no}};
+\fill[white,draw=slate!40] (3.55,2.6) rectangle (6.85,4.3);
+\node[anchor=north west,text width=3.1cm,align=left] at (3.6,4.25) {\textbf{routing}\\ $g = 0.27$ \quad routing acc.\ 0.74\\ ECE (5 bins, $n$=3\,100) 0.041\\ cost ratio vs slow 0.52};
+\fill[white,draw=slate!40] (0.15,0.2) rectangle (3.4,2.45);
+\node[anchor=north west] at (0.2,2.4) {\textbf{reliability diagram}};
+\draw[slate!50] (0.5,0.4)--(3.1,0.4)--(3.1,2.1); \draw[slate!50] (0.5,0.4)--(0.5,2.1); \draw[slate!30,dashed] (0.5,0.4)--(3.1,2.1);
+\foreach \x/\y in {0.75/0.55,1.25/0.9,1.8/1.3,2.35/1.65,2.9/1.95}{\fill[navy] (\x,\y) circle (1.2pt);}
+\fill[white,draw=slate!40] (3.55,0.2) rectangle (6.85,2.45);
+\node[anchor=north west,text width=3.1cm,align=left] at (3.6,2.4) {\textbf{roadmap gates}\\ G0 \textcolor{leaf}{go} \quad G1 \textcolor{leaf}{go} \quad G2 \textcolor{amber}{pending}\\ coupling 2/200 (UB 2.5\%) \textcolor{leaf}{pass}\\ verifier $\varphi$: code 0.004, schema 0.000};
+\end{tikzpicture}

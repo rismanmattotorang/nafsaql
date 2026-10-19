@@ -1,0 +1,80 @@
+\section{Evaluation Plan and Metrics}
+\label{sec:eval}
+No result in this section has been measured; the section defines what will be
+measured, how, and what counts as success. The full definitions, formulas and
+test plans are in the specification (Section~10 there).
+
+\subsection{Metrics}
+\begin{itemize}
+\item \textbf{Quality.} Exact-match or test-pass accuracy on verifiable
+benchmarks; pairwise win rate against the slow-only baseline by a held-out
+judge on non-verifiable prompts; abstention rate and accuracy among
+non-abstained answers (selective accuracy at coverage).
+\item \textbf{Routing.} Escalation rate $g$; routing accuracy, defined as the
+fraction of requests on which the gate's decision agrees with the oracle
+decision of Theorem~\ref{thm:gate} computed from labelled outcomes; the
+area under the cost--accuracy curve as $\lambda$ varies
+(Proposition~\ref{prop:frontier}).
+\item \textbf{Cost and latency.} Tokens and CPU-seconds per request by path;
+time to first token and total latency at p50, p95 and p99; throughput under
+load.
+\item \textbf{Calibration.} Expected calibration error of $\hat e_1$ with
+five bins and $n\ge2\,900$ (the noise floor of a ten-bin estimate at $n=500$
+is $0.034$, above the target), and Brier score.
+\item \textbf{Verifier quality.} $(r,\varphi)$ per verifier from mutation
+tests, with Clopper--Pearson intervals \cite{clopper1934}.
+\item \textbf{Faithfulness.} Agreement between the reasoning trace and the
+answer on perturbation tests \cite{turpin2023unfaithful,lanham2023faithfulness},
+and adoption rate of a wrong fast draft by the slow path
+(Proposition~\ref{prop:collision}).
+\item \textbf{Robustness.} Accuracy under paraphrase and under prompt
+injection probes \cite{greshake2023injection,zou2023universal,wei2023jailbroken}.
+\end{itemize}
+
+\subsection{Benchmarks}
+GSM8K \cite{cobbe2021gsm8k} and MATH \cite{hendrycks2021math} (mathematics,
+exact verifiers), HumanEval \cite{chen2021humaneval} and MBPP
+\cite{austin2021mbpp} (code, test verifiers), a JSON-Schema task set generated
+from public schemas (format verifier), MMLU and GPQA
+\cite{hendrycks2021mmlu,rein2024gpqa} (knowledge, label verifier),
+TruthfulQA and SimpleQA \cite{lin2022truthfulqa,wei2024simpleqa} (factuality),
+BIG-Bench Hard \cite{suzgun2022bbh} and LiveCodeBench
+\cite{jain2025livecodebench} as contamination-resistant checks, and MT-Bench
+style judged conversations \cite{zheng2023mtbench}. Licences are MIT,
+Apache-2.0 or CC-BY-4.0 (GPQA is gated). Public routing data from RouteLLM
+\cite{ong2025routellm} seeds the gate's calibration set.
+
+\subsection{Protocol}
+Phase~0 runs the fast-only and slow-only baselines on at least $4\,600$ tasks
+across domains (Proposition~\ref{prop:samples}) to estimate $q$, $(r,\varphi)$,
+$e_1(s)$, $e_2(s)$, the cost ratio and the discordance rate. Every later
+comparison is paired on the same tasks, reports the difference with a
+$95\%$ confidence interval, and uses a non-inferiority margin of three points
+(about $700$ pairs) during development and one point (about $6\,200$ pairs)
+for release. Gates for rates that must be below a threshold use the
+zero-failure binomial rule or the Clopper--Pearson upper bound. Drift in the
+self-model is monitored with a CUSUM chart \cite{page1954cusum} and a negative
+control. Multiple comparisons across five domains use a Bonferroni-corrected
+$z=2.326$.
+
+\begin{figure}[t]
+\centering
+\input{../shared/figures/fig_eval.tikz}
+\caption{Evaluation workflow. The harness drives the system and the two
+baselines through the same API and the dashboard shows gate status.}
+\label{fig:eval}
+\end{figure}
+
+\subsection{Hypotheses Scheduled for Validation}
+H1: the calibrated gate achieves at least $70\%$ routing accuracy against the
+oracle at $g\le0.3$ (Phase~2). H2: at matched accuracy the cascade costs at
+most $60\%$ of the slow-only baseline on the Phase-0 suite (Phase~2). H3: per-task
+acceptance rates are adequately fitted by a Beta distribution per domain,
+judged by a goodness-of-fit test (Phase~2). H4: slow-path accuracy is concave
+in the thinking budget on each domain (Phase~0). H5: the draft-blind slow
+path adopts a wrong fast draft in fewer than $5\%$ of trials at $95\%$
+confidence over at least $200$ trials (Phase~2). H6: one round of distillation
+yields a lower-confidence-bound gain above zero on a held-out verifier without
+a per-domain regression beyond one point (Phase~3). H7: Qwen3.5 hybrid
+models decode at no less than $70\%$ of the speed of same-size dense Qwen3
+models on the target CPU (Phase~0, gate for Profile~C).

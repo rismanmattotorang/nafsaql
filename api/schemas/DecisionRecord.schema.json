@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nafs-aql.example/schemas/DecisionRecord.schema.json",
+  "title": "DecisionRecord",
+  "type": "object",
+  "required": [
+    "backend",
+    "config_hash",
+    "decision_id",
+    "delta_c",
+    "e1_hat",
+    "e2_hat",
+    "escalate",
+    "explanation",
+    "features",
+    "lambda",
+    "model_profile",
+    "request_id",
+    "rule",
+    "timestamp"
+  ],
+  "properties": {
+    "decision_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "config_hash": {
+      "type": "string"
+    },
+    "model_profile": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C"
+      ],
+      "description": "Model profile (MR-001)"
+    },
+    "calibration_version": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "mean_logprob": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "min_logprob": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "k": {
+          "type": "integer"
+        },
+        "agreement": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "domain": {
+          "type": "string",
+          "enum": [
+            "code",
+            "math",
+            "structured",
+            "factual",
+            "open",
+            "other"
+          ]
+        },
+        "verifiable": {
+          "type": "boolean"
+        },
+        "draft_verified": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "prompt_tokens": {
+          "type": "integer"
+        },
+        "draft_tokens": {
+          "type": "integer"
+        }
+      }
+    },
+    "e1_hat": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "e2_hat": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "lambda": {
+      "type": "number"
+    },
+    "delta_c": {
+      "type": "number"
+    },
+    "escalate": {
+      "type": "boolean"
+    },
+    "rule": {
+      "type": "string",
+      "enum": [
+        "fixed",
+        "calibrated",
+        "budget",
+        "forced_failed_verification",
+        "forced_override"
+      ]
+    },
+    "audit": {
+      "type": "boolean",
+      "description": "Selected for the 5 percent audit stream (FR-040)"
+    },
+    "backend": {
+      "type": "string"
+    },
+    "explanation": {
+      "type": "string",
+      "description": "Human-readable reason for the decision"
+    }
+  }
+}

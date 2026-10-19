@@ -1,0 +1,106 @@
+\begin{longtable}{@{}p{1.45cm}p{4.4cm}p{4.2cm}p{3.1cm}p{1.1cm}@{}}
+\caption{Traceability matrix: requirement, motivating result or decision, implementing component, verifying test, phase}\\
+\toprule ID & Motivation & Component & Test & Phase\\\midrule\endfirsthead
+\toprule ID & Motivation & Component & Test & Phase\\\midrule\endhead
+\bottomrule\endfoot
+FR-001 & D-01 product scope & nafs-gateway, nafs-web & IT-010 & P1\\
+FR-002 & Thm gate; Thm plurality & nafs-core & UT-020 & P1\\
+FR-003 & Prop roofline & nafs-memory & UT-030 & P1\\
+FR-004 & Prop frontier & nafs-core, nafs-web & UT-021 & P2\\
+FR-005 & D-02 roster & nafs-core, config & IT-011 & P1\\
+FR-006 & D-03 transparency & nafs-gateway & IT-012 & P1\\
+FR-010 & Thm gate & nafs-core & UT-040 & P2\\
+FR-011 & Thm gate & nafs-core & UT-041, ER-005 & P2\\
+FR-012 & Draft defect 10; Thm precision & nafs-core & UT-042 & P1\\
+FR-013 & Prop audit & nafs-core, nafs-memory & UT-043 & P1\\
+FR-014 & Thm gate (ii); Prop samples (i) & nafs-core & UT-044 & P2\\
+FR-015 & Prop miscal & nafs-core, ledger & ER-005 & P2\\
+FR-020 & Thm coverage; Lemma termination & nafs-core & UT-050 & P2\\
+FR-021 & Prop stopping & config, nafs-eval & UT-051 & P2\\
+FR-022 & Thm selfrefine & nafs-core & UT-052 & P2\\
+FR-023 & Prop collision & nafs-core & UT-053, ER-004 & P1\\
+FR-024 & Prop budget & nafs-core & UT-054 & P1\\
+FR-025 & Thm gatedloop & nafs-core & UT-055 & P2\\
+FR-026 & Lemma termination & nafs-core & UT-056 & P1\\
+FR-030 & Thm precision & nafs-verify & UT-060 & P1\\
+FR-031 & Thm plurality & nafs-core & UT-061 & P1\\
+FR-032 & Thm precision & nafs-verify & ER-003 & P2\\
+FR-033 & Thm plurality; Prop distill & distillation & UT-070 & P3\\
+FR-034 & Draft defect 3 (T6) & nafs-verify & UT-062 & P2\\
+FR-035 & SR threat model & nafs-verify & UT-063, ST-001 & P1\\
+FR-040 & Prop audit & nafs-core, ledger & UT-080 & P2\\
+FR-041 & Prop audit & ledger & UT-081 & P2\\
+FR-042 & Prop samples; draft defect 7 & ledger & UT-082 & P4\\
+FR-050 & Prop samples; Prop cascade & nafs-eval & IT-090 & P0\\
+FR-051 & Prop samples (ii) & nafs-eval & UT-091 & P4\\
+FR-052 & Prop roofline & nafs-bench, nafs-web & IT-092 & P4\\
+FR-053 & Roadmap gates & nafs-web & IT-093 & P4\\
+FR-060 & D-04 operations & nafs-memory & UT-031 & P1\\
+FR-061 & SR-001 & nafs-memory & UT-032 & P5\\
+FR-070 & Prop distill & distillation & UT-071 & P3\\
+NFR-001 & Lemma termination & nafs-core & PT-001 & P1\\
+NFR-002 & Prop roofline; measured 94 tok/s prefill & nafs-core, backends & PT-002 & P1\\
+NFR-003 & Measured 15.5 tok/s decode & backends & PT-003 & P1\\
+NFR-004 & Measured 6.7 tok/s decode & backends & PT-004 & P1\\
+NFR-005 & Prop roofline & backends, config & PT-005 & P1\\
+NFR-006 & Prop roofline & nafs-memory, backends & UT-033 & P1\\
+NFR-007 & Prop roofline & nafs-gateway & PT-006 & P4\\
+NFR-010 & D-04 operations & nafs-gateway & IT-013 & P2\\
+NFR-011 & IF-008 & nafs-gateway & IT-014 & P1\\
+NFR-012 & Draft risk: version drift & config, nafs-memory & UT-034 & P0\\
+NFR-020 & Prop miscal; Prop samples & nafs-core, nafs-eval & ER-005 & P2\\
+NFR-021 & D-04 operations & nafs-gateway & IT-015 & P1\\
+NFR-022 & SR threat model & nafs-gateway & ST-002 & P1\\
+NFR-023 & D-04 operations & workspace, CI & CI-001 & P0\\
+IF-001 & D-03 interfaces & nafs-gateway & CT-001 & P1\\
+IF-002 & FR-006 & nafs-gateway & CT-002 & P1\\
+IF-003 & FR-002 & nafs-gateway & CT-003 & P1\\
+IF-004 & FR-001 & nafs-gateway & CT-004 & P1\\
+IF-005 & D-03 interfaces & nafs-types & CT-005 & P1\\
+IF-006 & D-02 stack & nafs-core (backend trait) & CT-006 & P1\\
+IF-007 & D-04 operations & nafs-core & UT-035 & P1\\
+IF-008 & Prop roofline & nafs-core & UT-036 & P1\\
+IF-009 & FR-050, FR-052 & nafs-gateway & CT-007 & P4\\
+IF-010 & FR-013 & nafs-memory & CT-008 & P1\\
+MR-001 & D-02 roster & config & UT-037 & P0\\
+MR-002 & D-02 stack & nafs-core & UT-038 & P1\\
+MR-003 & A-004 & deployment & IT-016 & P0\\
+MR-004 & NFR-010 & nafs-core & IT-017 & P2\\
+MR-005 & H7 & config & ER-011 & P0\\
+TR-001 & Prop distill & distillation & UT-072 & P3\\
+TR-002 & Prop distill (i) & distillation & UT-073 & P3\\
+TR-003 & Prop distill (ii) & distillation & UT-074 & P3\\
+TR-004 & Unsloth docs & distillation & IT-094 & P3\\
+TR-005 & A-003 & distillation & IT-094 & P3\\
+TR-006 & NFR-012 & distillation & UT-075 & P3\\
+TR-007 & Prop distill (iii) & distillation, nafs-eval & ER-008 & P3\\
+TR-008 & Prop distill (i) & distillation & UT-076 & P3\\
+SR-001 & Threat model & nafs-core, nafs-memory & ST-003 & P2\\
+SR-002 & Threat model & nafs-verify & ST-001 & P1\\
+SR-003 & FR-034 & nafs-verify & ST-004 & P2\\
+SR-004 & Ethics & nafs-memory, distillation & ST-005 & P3\\
+SR-005 & Sec. background rules & nafs-web, docs & RV-001 & P6\\
+SR-006 & Threat model & deployment & ST-006 & P5\\
+OR-001 & D-04 operations & workspace, CI & CI-001 & P0\\
+OR-002 & NFR-012 & deployment & CI-002 & P5\\
+OR-003 & MR-003 & deployment & IT-016 & P5\\
+OR-004 & FR-042 & deployment & IT-018 & P5\\
+OR-005 & TR-007 & deployment, config & IT-019 & P3\\
+OR-006 & NFR-012 & config & UT-039 & P1\\
+ER-001 & Prop samples (i) & nafs-eval & ER-001 & P0\\
+ER-002 & Prop samples (ii); Prop cascade & nafs-eval & ER-002 & P2\\
+ER-003 & Thm precision & nafs-verify, nafs-eval & ER-003 & P2\\
+ER-004 & Prop collision & nafs-eval & ER-004 & P2\\
+ER-005 & Prop samples; draft defect 7 & nafs-eval & ER-005 & P2\\
+ER-006 & Lemma termination & workspace & CI-003 & P1\\
+ER-007 & NFR-007 & nafs-bench & PT-006 & P4\\
+ER-008 & Draft risk: version drift & nafs-eval, CI & ER-008 & P3\\
+ER-010 & Eval plan & nafs-eval & UT-092 & P0\\
+ER-011 & H7 & nafs-bench & ER-011 & P0\\
+NFR-030 & D-07 CPU speed goal & nafs-core, nafs-gateway, nafs-web & UT-110 & P7\\
+NFR-031 & A-044 ordering effect & nafs-bench, scripts & PT-010 & P7\\
+FR-080 & Thm gate; D-07 & nafs-core & UT-111 & P7\\
+FR-081 & D-07; Phase-5 draft-model result & scripts, serving & PT-011 & P7\\
+ER-020 & Lab mission & nafs-eval, nafs-web & ER-020 & P7\\
+FR-082 & Thm 1; DTSR/Dynasor-CoT 2026; D-07 & nafs-core & UT-112 & P7\\
+\end{longtable}

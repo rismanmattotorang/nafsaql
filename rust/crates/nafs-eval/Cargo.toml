@@ -1,0 +1,31 @@
+[package]
+name = "nafs-eval"
+description = "Eval Harness: datasets, metrics (accuracy, routing, ECE, cost), paired statistics, calibration fitting"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+nafs-types = { path = "../nafs-types" }
+nafs-core = { path = "../nafs-core" }
+nafs-verify = { path = "../nafs-verify" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+fastrand = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+
+[[bin]]
+name = "nafs-eval"
+path = "src/main.rs"
+
+[dev-dependencies]
+nafs-memory = { path = "../nafs-memory" }

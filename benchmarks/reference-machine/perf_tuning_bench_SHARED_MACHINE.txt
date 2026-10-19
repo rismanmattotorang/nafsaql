@@ -1,0 +1,30 @@
+# llama-bench 2026-10-18T07:37:34Z load: { 3.83 8.67 9.53 }
+## Qwen3-1.7B-Q4_K_M.gguf -fa off
+| model                          |       size |     params | backend    | threads |  fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --: | --------------: | -------------------: |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   0 |           pp512 |         99.99 ± 4.72 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   0 |           tg128 |         16.93 ± 1.09 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   0 |   tg128 @ d1024 |         14.34 ± 3.70 |
+## Qwen3-1.7B-Q4_K_M.gguf -fa on
+| model                          |       size |     params | backend    | threads |  fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --: | --------------: | -------------------: |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   1 |           pp512 |         75.59 ± 6.90 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   1 |           tg128 |         12.76 ± 1.65 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   1 |   tg128 @ d1024 |         12.75 ± 2.02 |
+## Qwen3-1.7B-Q4_K_M.gguf -fa on -ctk q8_0 -ctv q8_0
+| model                          |       size |     params | backend    | threads | type_k | type_v |  fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | -----: | -----: | --: | --------------: | -------------------: |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   q8_0 |   q8_0 |   1 |           pp512 |         86.33 ± 6.59 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   q8_0 |   q8_0 |   1 |           tg128 |         18.16 ± 1.67 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   q8_0 |   q8_0 |   1 |   tg128 @ d1024 |          8.24 ± 3.64 |
+## Qwen3-4B-Thinking-2507-Q4_K_M.gguf -fa off
+| model                          |       size |     params | backend    | threads |  fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --: | --------------: | -------------------: |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   0 |           pp512 |         31.66 ± 0.43 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   0 |           tg128 |          5.74 ± 0.25 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   0 |   tg128 @ d1024 |          3.70 ± 1.36 |
+## Qwen3-4B-Thinking-2507-Q4_K_M.gguf -fa on
+| model                          |       size |     params | backend    | threads |  fa |            test |                  t/s |
+| ------------------------------ | ---------: | ---------: | ---------- | ------: | --: | --------------: | -------------------: |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   1 |           pp512 |         27.57 ± 1.02 |
+(stopped: load average > 8 from processes outside this project; numbers are not comparable to the idle baseline)

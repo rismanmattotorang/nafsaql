@@ -1,0 +1,33 @@
+\section{Features and Capabilities}
+\label{sec:features}
+\begin{itemize}
+\item \textbf{Dual-process chat.} Every reply shows which path produced it,
+the assurance level, the thinking budget used and the cost; the user can move
+a single ``speed--care'' control, which sets $\lambda$
+(Proposition~\ref{prop:frontier}).
+\item \textbf{Verified answers on code, mathematics and structured output},
+with precision bounded by the verifier (Theorem~\ref{thm:precision}), and
+evidence-fed retries (Theorem~\ref{thm:gatedloop}).
+\item \textbf{Calibrated abstention.} When the budget is exhausted the system
+says so, returns the best candidate with an uncertainty notice, and never
+upgrades consensus to verification (Theorem~\ref{thm:plurality}).
+\item \textbf{Honest self-description.} A per-domain capability table from
+audited traces, with unmeasured domains marked as such
+(Proposition~\ref{prop:audit}).
+\item \textbf{Performance console.} Load tests against the gateway with
+latency quantiles, throughput, escalation rate and cost per request, run from
+the browser.
+\item \textbf{Evaluation dashboard.} Benchmark runs with paired comparisons
+against the fast-only and slow-only baselines, confidence intervals, routing
+accuracy and calibration plots, and the go/no-go status of each roadmap gate.
+\item \textbf{Gradual distillation.} Verified slow-path traces become
+training data for the fast path under a statistically sized promotion gate
+with human sign-off (Proposition~\ref{prop:distill}).
+\item \textbf{Backend portability.} The same gateway runs against
+llama-server on a laptop and vLLM on a server, CPU or GPU.
+\end{itemize}
+Honest limits: non-verifiable domains never exceed the \texttt{consensus}
+assurance level; the fast and slow paths share a model family, so their errors
+are correlated and the collision term of Proposition~\ref{prop:collision} is
+measured, not assumed small; on the reference machine the slow path is not
+interactive.

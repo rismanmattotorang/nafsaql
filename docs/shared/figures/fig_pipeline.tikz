@@ -1,0 +1,16 @@
+% Training (GPU) and serving (CPU) pipeline; width ~8.6cm
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[sblk=teal,text width=1.7cm]   (tr) at (0,0)   {Traces $+$ audits\\(verified only)};
+\node[sblk=navy,text width=1.7cm]   (ds) at (2.2,0) {Dataset build\\filter, dedupe, 5\% abstain};
+\node[sblk=violet,text width=1.7cm] (ft) at (4.4,0) {Unsloth QLoRA\\GPU (cloud or Colab)};
+\node[sblk=amber,text width=1.7cm]  (gate) at (6.6,0) {Promotion gate\\held-out verifier};
+\node[sblk=crimson,text width=1.7cm](exp) at (6.6,-1.5) {Merge $+$ export\\GGUF Q4\_K\_M};
+\node[sblk=leaf,text width=1.7cm]   (srv) at (4.4,-1.5) {Serve on CPU\\llama-server or vLLM};
+\node[sblk=slate,text width=1.7cm]  (hum) at (2.2,-1.5) {Human sign-off\\adapter hash};
+\node[sblk=teal,text width=1.7cm]   (ev) at (0,-1.5) {\Harness\\regression suite};
+\draw[arr] (tr)--(ds); \draw[arr] (ds)--(ft); \draw[arr] (ft)--(gate);
+\draw[arr] (gate)--node[lab,right]{pass}(exp); \draw[arr] (exp)--(srv); \draw[arr] (srv)--(hum);
+\draw[arr] (hum)--(ev);
+\draw[dsh] (ev.south)--++(0,-0.45)-|node[lab,pos=.25,below]{new traces}(tr.south);
+\draw[dsh] (gate.north)--++(0,0.45)-|node[lab,pos=.25,above]{fail: keep current adapter}(ft.north);
+\end{tikzpicture}

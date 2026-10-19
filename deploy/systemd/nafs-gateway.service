@@ -1,0 +1,28 @@
+# Nafs-Aql gateway (OR-003). Secrets come from /etc/nafs-aql/tokens via systemd credentials (SR-006);
+# put a TLS proxy (deploy/tls/) in front of 127.0.0.1:8080.
+[Unit]
+Description=Nafs-Aql gateway
+After=network-online.target nafs-llama-system1.service nafs-llama-system2.service
+Wants=nafs-llama-system1.service nafs-llama-system2.service
+
+[Service]
+Type=simple
+User=nafs
+WorkingDirectory=/opt/nafs-aql
+LoadCredential=nafs_tokens:/etc/nafs-aql/tokens
+Environment=NAFS_AUTH_TOKENS_FILE=%d/nafs_tokens
+Environment=NAFS_CONFIG=/opt/nafs-aql/config/nafs-aql.toml
+Environment=NAFS_LOG_FORMAT=json
+ExecStart=/opt/nafs-aql/rust/target/release/nafs-gateway
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/nafs-aql/data/runtime /opt/nafs-aql/config
+# The verifier sandbox needs unprivileged user namespaces (unshare -rn) for network isolation.
+RestrictNamespaces=false
+
+[Install]
+WantedBy=multi-user.target

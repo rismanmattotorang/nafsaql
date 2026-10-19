@@ -1,0 +1,67 @@
+{
+  "verified_at": "2026-10-18T13:35:41Z",
+  "checks": [
+    {
+      "check": "prometheus alert rules",
+      "status": "pass",
+      "detail": "  SUCCESS: 7 rules found"
+    },
+    {
+      "check": "prometheus config",
+      "status": "pass",
+      "detail": "  SUCCESS: 7 rules found"
+    },
+    {
+      "check": "grafana dashboard",
+      "status": "pass",
+      "detail": "6 panels"
+    },
+    {
+      "check": "docker compose file",
+      "status": "pass",
+      "detail": "valid"
+    },
+    {
+      "check": "launchd service files",
+      "status": "pass",
+      "detail": "deploy/launchd/org.nafs-aql.gateway.plist: OK; deploy/launchd/org.nafs-aql.system1.plist: OK; deploy/launchd/org.nafs-aql.system2.plist: OK"
+    },
+    {
+      "check": "systemd units (structure; systemd-analyze unavailable on this host)",
+      "status": "pass",
+      "detail": "3 units"
+    },
+    {
+      "check": "Caddyfile (structure; caddy not installed)",
+      "status": "pass",
+      "detail": "reverse proxy with streaming flush"
+    },
+    {
+      "check": "nginx TLS config (structure; nginx not installed)",
+      "status": "pass",
+      "detail": "TLS, SSE and WebSocket pass-through"
+    },
+    {
+      "check": "gateway --check config/nafs-aql.toml",
+      "status": "pass",
+      "detail": "{ \"auth_tokens\": 0, \"backend\": \"llama\", \"bind\": \"127.0.0.1:8080\", \"bind_policy\": \"ok\", \"config\": \"config/nafs-aql.toml\", \"config_hash\": \"17e68ed1110865af\", \"retention_days\": 90, \"sandbox_isolation\": t"
+    },
+    {
+      "check": "gateway --check config/nafs-aql.docker.toml",
+      "status": "pass",
+      "detail": "{ \"auth_tokens\": 1, \"backend\": \"vllm\", \"bind\": \"0.0.0.0:8080\", \"bind_policy\": \"ok\", \"config\": \"config/nafs-aql.docker.toml\", \"config_hash\": \"533e5fde96a190f0\", \"retention_days\": 90, \"sandbox_isolation"
+    },
+    {
+      "check": "reference machine stack (make up) healthy",
+      "status": "pass",
+      "detail": "{\"backend\": \"llama\", \"backends\": {\"system1\": \"ready\", \"system2\": \"ready\"}, \"status\": \"ok\"}"
+    },
+    {
+      "check": "Linux vLLM-CPU compose stack started on a clean host",
+      "status": "skipped",
+      "detail": "needs a Linux AVX-512 host; this machine is macOS (A-038)"
+    }
+  ],
+  "all_pass": true,
+  "summary": "11 passed, 0 failed, 1 skipped (tool or host not available)"
+}

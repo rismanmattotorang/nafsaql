@@ -1,0 +1,16 @@
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       3 |   0 |           pp512 |         79.19 ± 0.02 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       3 |   0 |           tg128 |         16.47 ± 1.05 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   0 |           pp512 |         88.90 ± 4.13 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   0 |           tg128 |         15.65 ± 0.17 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       3 |   1 |           pp512 |         86.76 ± 2.00 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       3 |   1 |           tg128 |         16.82 ± 0.11 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   1 |           pp512 |         97.73 ± 1.56 |
+| qwen3 1.7B Q4_K - Medium       |   1.03 GiB |     1.72 B | BLAS       |       4 |   1 |           tg128 |         17.57 ± 0.14 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       3 |   0 |           pp512 |         34.04 ± 0.04 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       3 |   0 |           tg128 |          8.18 ± 0.21 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   0 |           pp512 |         37.98 ± 3.25 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   0 |           tg128 |          7.43 ± 0.26 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       3 |   1 |           pp512 |         32.01 ± 0.74 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       3 |   1 |           tg128 |          6.99 ± 1.34 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   1 |           pp512 |         33.00 ± 1.91 |
+| qwen3 4B Q4_K - Medium         |   2.32 GiB |     4.02 B | BLAS       |       4 |   1 |           tg128 |          7.66 ± 0.65 |

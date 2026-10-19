@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nafs-aql.example/schemas/ChatRequest.schema.json",
+  "title": "ChatRequest",
+  "type": "object",
+  "required": [
+    "messages"
+  ],
+  "properties": {
+    "conversation_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "messages": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "content"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant"
+            ]
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "maxItems": 400
+    },
+    "domain_hint": {
+      "type": "string",
+      "enum": [
+        "code",
+        "math",
+        "structured",
+        "factual",
+        "open",
+        "other"
+      ]
+    },
+    "lambda": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Speed-care control; price of compute relative to error cost (FR-004)"
+    },
+    "force_mode": {
+      "type": "string",
+      "enum": [
+        "fast",
+        "slow"
+      ],
+      "description": "Operator override for experiments; ignored in production mode"
+    },
+    "verification": {
+      "type": "object",
+      "description": "Optional verifier inputs for verifiable tasks",
+      "properties": {
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Unit tests (code domain)"
+        },
+        "reference_answer": {
+          "type": "string",
+          "description": "Reference (math domain)"
+        },
+        "json_schema": {
+          "type": "object",
+          "description": "Schema the answer must satisfy"
+        },
+        "test_code": {
+          "type": "string",
+          "description": "HumanEval-style test program defining check(candidate)"
+        },
+        "entry_point": {
+          "type": "string"
+        },
+        "code_prefix": {
+          "type": "string",
+          "description": "Prepended when the answer is only a function body"
+        }
+      }
+    },
+    "max_tokens": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096,
+      "default": 512
+    },
+    "thinking_budget": {
+      "type": "integer",
+      "minimum": 16,
+      "maximum": 8192,
+      "description": "Per-request System 2 reasoning budget (FR-024); defaults to the per-domain cap"
+    },
+    "show_reasoning": {
+      "type": "boolean",
+      "default": false,
+      "description": "Stream System 2 reasoning tokens (marked reasoning: true)"
+    },
+    "ephemeral": {
+      "type": "boolean",
+      "default": false,
+      "description": "Do not persist the conversation (evaluation and benchmark traffic)"
+    },
+    "audit": {
+      "type": "boolean",
+      "description": "Force (true) or suppress (false) audit selection for a kept reply (FR-040). Default: random with probability epsilon on live, persisted traffic."
+    },
+    "ablation_draft_conditioned": {
+      "type": "boolean",
+      "description": "Coupling ablation only (ER-004): System 2 sees the System 1 draft. Rejected with 400 when disabled in configuration."
+    },
+    "retrieve": {
+      "type": "boolean",
+      "description": "FR-061: use (true) or skip (false) retrieval of earlier verified answers, quoted as delimited data with provenance; default from configuration"
+    }
+  }
+}

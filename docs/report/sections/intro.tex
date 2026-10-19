@@ -1,0 +1,69 @@
+\section{Introduction}
+\label{sec:intro}
+
+Reasoning-tuned language models answer hard questions by spending more
+computation at inference time: they sample long chains of thought, draw several
+candidates, and verify or vote among them
+\cite{wei2022cot,wang2023selfconsistency,snell2024scaling,deepseek2025r1}. The
+gain is real but expensive, and it is wasted on the many requests that a direct
+answer would have handled \cite{chen2024overthinking,zhang2025adaptthink}. This
+is the engineering form of a very old observation: cognition has a fast,
+automatic mode and a slow, effortful one, and competence lies in knowing when to
+switch \cite{kahneman2011thinking,evans2013dual,sloman1996two}.
+
+The Islamic intellectual tradition developed a rich vocabulary for the same
+observation long before dual-process psychology. The Qur'an speaks of the
+\emph{nafs} that ``commands to evil'' (Q~12:53), the \emph{nafs} that reproaches
+itself (Q~75:2) and the \emph{nafs} ``at rest'' (Q~89:27)
+\cite{AbdelHaleem2008Quran}; al-Ghazali describes the heart (\emph{qalb}) as a
+king whose vizier is the intellect (\emph{\textquoteleft aql}) and whose unruly
+soldiers are appetite and anger \cite{Ghazali2010Marvels}; and the Sufi
+disciplines of \emph{muraqaba} (vigilance) and \emph{muhasaba} (self-accounting)
+institutionalise the daily audit of one's own conduct
+\cite{Picken2011,Qushayri2007Epistle}. We use this vocabulary as a design
+metaphor. We make no claim about the metaphysics of the soul, and we say so
+once here and again in Section~\ref{sec:islamic}: every mapping in this paper is
+an analogy between a classical \emph{description of a faculty} and an
+\emph{engineering component}.
+
+\subsection{Problem}
+The project that this report serves has a concrete constraint set: build a
+dual-process assistant from pretrained Qwen models, serve it on a CPU-only
+machine, fine-tune it with Unsloth, and expose it through a Rust web
+application with a chat room, a performance-test console and an evaluation
+dashboard. An existing draft design \cite{draft2026} targeted 27B--35B models
+on 80\,GB GPUs and reviewed twelve formal results; it did not address CPU
+feasibility, the model roster, the serving stack, or a buildable
+specification. This report assesses that draft, keeps what is sound, corrects
+what is not, and extends it into a mathematically principled and feasible
+design.
+
+\subsection{Contributions}
+\begin{enumerate}
+\item A faithful, sourced account of the classical concepts we borrow, with
+the disagreements among scholars noted and the analogy kept separate from
+theology (Section~\ref{sec:islamic}).
+\item A formal model of a verifier-gated dual-process system with
+seventeen stated results, each with explicit assumptions and an engineering
+consequence (Section~\ref{sec:math}). The results correct two defects of the
+draft: its router rule was hand-tuned rather than derived, and its
+self-refinement loop was not shown to be stable.
+\item A verified feasibility study of the stack as of October 2026: which Qwen
+variants exist below 9B parameters, which run in vLLM-CPU and llama.cpp, what
+Unsloth can and cannot do without a GPU, which Rust crates to use, and what a
+four-core AVX2 machine actually delivers (Sections~\ref{sec:stack} and
+\ref{sec:feasibility}).
+\item A component architecture with a termination guarantee, an assurance-level
+model for answers, and a self-model that is unbiased under routing
+(Section~\ref{sec:arch}).
+\item An evaluation plan whose gates are statistically sized, and a summary of
+the companion specification and roadmap (Sections~\ref{sec:spec} and
+\ref{sec:eval}).
+\end{enumerate}
+
+\subsection{What this report does not claim}
+No accuracy, calibration or cost result for \Sys\ has been measured. Where a
+number appears it is (a) a measurement of an existing model on the reference
+machine, clearly marked, (b) a value quoted from a cited paper, or (c) a target
+or estimate. The roadmap (Section~\ref{sec:spec}) schedules every hypothesis
+for validation.

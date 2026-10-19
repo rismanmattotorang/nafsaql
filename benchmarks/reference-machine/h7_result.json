@@ -1,0 +1,4 @@
+{"hypothesis": "H7", "pass": true, "threshold": 0.70, "measured_at": "2026-10-18",
+ "ratios": {"Qwen3.5-2B vs Qwen3-1.7B": 0.79, "Qwen3.5-4B vs Qwen3-4B": 0.80},
+ "summary": "Qwen3.5 hybrid models decode at 79-80% of dense Qwen3 speed on the reference CPU (threshold 70%); Profile A stays the default until accuracy is compared",
+ "source": "benchmarks/reference-machine/llama_bench_h7_qwen35_vs_qwen3.md"}

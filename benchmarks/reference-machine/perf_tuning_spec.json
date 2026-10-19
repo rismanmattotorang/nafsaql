@@ -1,0 +1,179 @@
+{
+ "load_before": [
+  4.96826171875,
+  4.81494140625,
+  5.88232421875
+ ],
+ "runs": {
+  "baseline": [
+   {
+    "wall_s": 94.87,
+    "predicted_n": 320,
+    "tok_s": 3.42769468782002,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 49.25,
+    "predicted_n": 311,
+    "tok_s": 6.607712513519699,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 57.96,
+    "predicted_n": 320,
+    "tok_s": 5.636943915482738,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 45.27,
+    "predicted_n": 320,
+    "tok_s": 7.49641904991889,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   },
+   {
+    "wall_s": 40.69,
+    "predicted_n": 311,
+    "tok_s": 7.959447488020197,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   },
+   {
+    "wall_s": 44.2,
+    "predicted_n": 320,
+    "tok_s": 7.348231661871696,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   }
+  ],
+  "spec_draft_0.6b": [
+   {
+    "wall_s": 52.56,
+    "predicted_n": 320,
+    "tok_s": 6.335906777400308,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 42.64,
+    "predicted_n": 311,
+    "tok_s": 7.581134030047702,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 44.56,
+    "predicted_n": 320,
+    "tok_s": 7.285656666056102,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 55.08,
+    "predicted_n": 320,
+    "tok_s": 5.985946798330976,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   },
+   {
+    "wall_s": 50.59,
+    "predicted_n": 311,
+    "tok_s": 6.425025599063687,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   },
+   {
+    "wall_s": 50.3,
+    "predicted_n": 320,
+    "tok_s": 6.456474486836271,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   }
+  ],
+  "spec_ngram": [
+   {
+    "wall_s": 49.72,
+    "predicted_n": 320,
+    "tok_s": 6.792578935037329,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 47.91,
+    "predicted_n": 302,
+    "tok_s": 6.5278129289299,
+    "draft_n": 64,
+    "draft_accepted": 2,
+    "round": 0
+   },
+   {
+    "wall_s": 40.87,
+    "predicted_n": 320,
+    "tok_s": 7.947173171818208,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 0
+   },
+   {
+    "wall_s": 45.44,
+    "predicted_n": 320,
+    "tok_s": 7.328850435577245,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   },
+   {
+    "wall_s": 49.09,
+    "predicted_n": 302,
+    "tok_s": 6.340678148799201,
+    "draft_n": 64,
+    "draft_accepted": 2,
+    "round": 1
+   },
+   {
+    "wall_s": 49.08,
+    "predicted_n": 320,
+    "tok_s": 6.633707744789327,
+    "draft_n": null,
+    "draft_accepted": null,
+    "round": 1
+   }
+  ]
+ },
+ "protocol": "2 alternating rounds x 3 prompts, temperature 0.6, max 320 tokens, thinking budget 256",
+ "summary": {
+  "baseline": {
+   "median_tok_s": 7.348231661871696,
+   "mean_tok_s": 6.41
+  },
+  "spec_draft_0.6b": {
+   "median_tok_s": 6.456474486836271,
+   "mean_tok_s": 6.68
+  },
+  "spec_ngram": {
+   "median_tok_s": 6.792578935037329,
+   "mean_tok_s": 6.93
+  }
+ },
+ "load_after": [
+  6.36083984375,
+  6.3203125,
+  6.06884765625
+ ]
+}

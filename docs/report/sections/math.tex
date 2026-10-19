@@ -1,0 +1,504 @@
+% ---------------------------------------------------------------------------
+% Section: Mathematical formulation
+% ---------------------------------------------------------------------------
+\section{Mathematical Formulation}
+\label{sec:math}
+
+This section turns the inspiration of Section~\ref{sec:background} into a formal
+model. Nothing here depends on the metaphysical reading: the objects are
+policies, verifiers, costs and losses. Each result ends with its
+\emph{engineering consequence}, which the specification (Section~\ref{sec:spec})
+turns into a parameter or an algorithm. Results are labelled by the strength of
+their assumptions: \textbf{[exact]} holds under the stated model without further
+hypotheses; \textbf{[strong]} needs an assumption that must be checked
+empirically; \textbf{[conjecture]} is a design hypothesis scheduled for
+validation in the roadmap.
+
+\subsection{Objects}
+\label{sec:objects}
+
+\begin{definition}[Task, answer, correctness]
+A \emph{task} is $x\in\mathcal X$ (a query together with its conversational
+context). An \emph{answer} is $y\in\mathcal Y$. Correctness is an unobserved
+indicator $\kappa(x,y)\in\{0,1\}$. A task is \emph{verifiable} if a deterministic
+procedure can evaluate $\kappa$ (unit tests, numeric or symbolic equality,
+schema validity); otherwise it is \emph{non-verifiable}.
+\end{definition}
+
+\begin{definition}[Fast and slow paths]
+The \emph{fast path} (System~1, the analogue of the impulsive
+\emph{nafs}) is a stochastic policy $\pi_1(y\mid x)$ with expected cost
+$c_1(x)$ and correctness probability $p_1(x)=\Pr_{y\sim\pi_1}[\kappa(x,y)=1]$.
+The \emph{slow path} (System~2, deliberation) is a policy $\pi_2(y\mid x,b)$
+parametrised by a \emph{thinking budget} $b\in\mathbb N$ (maximum reasoning
+tokens), with cost $c_2(x,b)$ and correctness $p_2(x,b)$. Costs are measured in
+a common unit (seconds of CPU time or tokens weighted by a tariff).
+\end{definition}
+
+\begin{definition}[Verifier]
+A \emph{verifier} is a map $V:\mathcal X\times\mathcal Y\to\{0,1\}$ with
+true-accept rate $r=\Pr[V=1\mid\kappa=1]$ and false-accept rate
+$\varphi=\Pr[V=1\mid\kappa=0]$. A verifier is \emph{exact} if $\varphi=0$ and
+$r=1$ on its domain. Soft verifiers (rubric judges, consensus) have
+$\varphi>0$ and must publish measured $(r,\varphi)$.
+\end{definition}
+
+\begin{definition}[Gate and trace state]
+After the fast path has run, the \emph{controller} (the \emph{\textquoteleft aql}
+analogue) observes a feature vector $s=\sigma(x,\text{trace}_1)\in\mathcal S$
+(token log-probabilities, agreement among cheap samples, verifier outcome,
+domain class) and chooses, with probability $\gamma(s)\in[0,1]$, to
+\emph{escalate} to the slow path. The lifecycle of one request is a finite
+automaton over the \emph{trace states}
+$\mathcal Z=\{\mathsf{A},\mathsf{L},\mathsf{M},\mathsf{T},\mathsf{X}\}$ of
+Fig.~\ref{fig:nafs-automaton}: $\mathsf A$ (an unverified draft),
+$\mathsf L$ (the draft has been flagged by the gate or a verifier),
+$\mathsf M$ (a deliberate retry conditioned on evidence), $\mathsf T$ (an
+accepted answer) and $\mathsf X$ (abstention with an explicit uncertainty
+notice). The labels are mnemonic for the four classical stages of the
+\emph{nafs} (Section~\ref{sec:islamic}); the automaton itself is an ordinary
+bounded retry loop.
+\end{definition}
+
+\begin{definition}[Losses and objective]
+A wrong answer costs $L>0$, an abstention costs $L_a\in(0,L)$, and compute is
+priced by $\lambda>0$ per cost unit. For a controller
+$\theta=(\gamma,b,N,R)$ (gate, thinking budget, samples per round, retry
+rounds) the design objective is
+\begin{equation}
+\label{eq:objective}
+\begin{split}
+\mathcal J(\theta)=\mathbb E_x\big[&L\,\Pr[\text{wrong}\mid x,\theta]
++L_a\,\Pr[\text{abstain}\mid x,\theta]\\
+&+\lambda\,\mathbb E[\text{cost}\mid x,\theta]\big].
+\end{split}
+\end{equation}
+\end{definition}
+
+\begin{lemma}[Termination] \textnormal{[exact]}
+\label{lem:termination}
+With at most $N$ slow-path samples per round and at most $R$ retry rounds, every
+request makes at most $1+N(R{+}1)$ model calls and at most $1+N(R{+}1)$
+verifier calls before reaching $\mathsf T$ or $\mathsf X$.
+\end{lemma}
+\begin{proof}
+Each transition of the automaton either consumes one of the $N(R{+}1)$ slow
+samples or terminates; the fast path is called once. \qed
+\end{proof}
+\emph{Consequence.} Every request has a hard upper bound on latency
+(NFR-001 in the specification); the gateway MUST enforce $N$ and $R$ as
+configuration limits rather than letting the model decide when to stop.
+
+\subsection{Precision of a verified answer}
+
+\begin{theorem}[Verified-return precision] \textnormal{[exact]}
+\label{thm:precision}
+Let a candidate be correct with prior probability $p$ and let it be accepted
+by a verifier with rates $(r,\varphi)$. Then
+\begin{equation}
+\rho(p)\;=\;\Pr[\text{wrong}\mid\text{accepted}]
+=\frac{\varphi(1-p)}{\varphi(1-p)+r\,p},
+\end{equation}
+and $\rho(p)\le\varepsilon$ if and only if
+$\varphi\le\dfrac{\varepsilon\,r\,p}{(1-\varepsilon)(1-p)}$. If $k$ verifiers
+are applied and their acceptances are conditionally independent given
+$\kappa$, the same holds with $\varphi\leftarrow\prod_i\varphi_i$ and
+$r\leftarrow\prod_i r_i$.
+\end{theorem}
+\begin{proof}
+Bayes' rule with $\Pr[\text{accepted}]=\varphi(1-p)+rp$. Solving
+$\rho\le\varepsilon$ for $\varphi$ gives the bound. Conditional independence
+factorises the joint acceptance probabilities. \qed
+\end{proof}
+\emph{Consequence.} The precision of the system on verifiable tasks is
+bounded by the verifier's false-accept rate, not by the strength of either
+model. Every verifier in the hub MUST publish $(r,\varphi)$ measured by
+mutation testing on a held-out set (FR-030), and the per-verifier acceptance
+threshold is $1.0$ for exact verifiers. For hard tasks ($p=0.1$) a $1\%$
+precision target requires $\varphi\le1.1\times10^{-3}$: only exact verifiers
+qualify, which is why consensus (Theorem~\ref{thm:plurality}) is a flag and not
+a verifier.
+
+\subsection{The gate is a threshold rule}
+
+Let $e_1(s)=\Pr[\text{fast answer wrong}\mid s]$,
+$e_2(s)=\Pr[\text{final answer wrong after escalation}\mid s]$ and
+$\Delta c(s)=\mathbb E[\text{extra cost of escalation}\mid s]$.
+
+\begin{theorem}[Optimal gate] \textnormal{[exact]}
+\label{thm:gate}
+\begin{enumerate}[label=(\roman*)]
+\item The gate minimising \eqref{eq:objective} escalates if and only if
+\begin{equation}
+\label{eq:gate}
+L\,\big(e_1(s)-e_2(s)\big)\;>\;\lambda\,\Delta c(s),
+\end{equation}
+with ties broken arbitrarily.
+\item Under a budget constraint $\mathbb E[\gamma(s)\Delta c(s)]\le B$
+instead of the price $\lambda$, the optimal gate escalates if and only if
+$\big(e_1(s)-e_2(s)\big)/\Delta c(s)>\lambda^\star$, where $\lambda^\star$ is
+the smallest multiplier that meets the budget; randomisation is needed only on
+the level set $\{s:(e_1-e_2)/\Delta c=\lambda^\star\}$.
+\item If $e_1-e_2$ is non-decreasing in a scalar score $s$ and $\Delta c$ is
+constant, the rule is a single threshold $s>\tau$.
+\end{enumerate}
+\end{theorem}
+\begin{proof}
+(i) Conditional on $s$, keeping costs $Le_1(s)$ and escalating costs
+$\lambda\Delta c(s)+Le_2(s)$; the objective is an expectation over $s$ of a
+pointwise choice, so pointwise minimisation is optimal. (ii) The Lagrangian
+$\mathbb E[\gamma(s)(L e_2+\lambda\Delta c-Le_1)]$ is linear in $\gamma$; by the
+Neyman--Pearson lemma the optimal $\gamma$ is an indicator of a likelihood-ratio
+set with randomisation on the boundary. (iii) Immediate from (i). \qed
+\end{proof}
+\emph{Consequence.} The controller is implemented as a calibrated estimator
+$\hat e_1(s)$ (logistic or isotonic regression on the fast-path features),
+a per-domain estimate $\hat e_2$, and the comparison \eqref{eq:gate}. The only
+tunable is the cost ratio $\lambda\Delta c/L$ (or equivalently the budget $B$),
+which the operator sets; the threshold is \emph{derived}, not hand-tuned
+(FR-010--FR-013). The rule coincides with Chow's optimal reject rule
+\cite{chow1970reject} and with the expected-value-of-control account of
+cognitive control \cite{shenhav2013evc}, with ``reject'' read as
+``deliberate''.
+
+\begin{proposition}[Price of miscalibration] \textnormal{[exact]}
+\label{prop:miscal}
+If the plug-in gate uses estimates with
+$\sup_s|\hat e_1(s)-e_1(s)|\le\epsilon_1$ and
+$\sup_s|\hat e_2(s)-e_2(s)|\le\epsilon_2$, its objective exceeds that of the
+optimal gate by at most $L(\epsilon_1+\epsilon_2)$.
+\end{proposition}
+\begin{proof}
+At any $s$ the two gates disagree only if
+$|L(e_1-e_2)-\lambda\Delta c|\le L(\epsilon_1+\epsilon_2)$, and the loss from a
+wrong decision equals that absolute difference. Taking expectations over $s$
+gives the bound. \qed
+\end{proof}
+\emph{Consequence.} The calibration target of the gate (NFR-020) is set from
+the regret the operator tolerates: a maximum calibration error of $0.05$ on
+$\hat e_1$ bounds the excess loss by $0.05L$ per request.
+
+\begin{proposition}[Cost--quality frontier] \textnormal{[exact]}
+\label{prop:frontier}
+The set of achievable pairs (expected cost, expected error) over all gates
+$\gamma$ is convex, and its lower-left boundary is traced by the family of
+threshold gates of Theorem~\ref{thm:gate} as $\lambda$ varies.
+\end{proposition}
+\begin{proof}
+Both coordinates are linear in $\gamma$, so mixtures of gates achieve
+mixtures of pairs; the boundary of a convex set is supported by linear
+functionals, each of which is minimised by a threshold gate by
+Theorem~\ref{thm:gate}. \qed
+\end{proof}
+\emph{Consequence.} The user-facing ``speed--care'' control in the chat UI is
+a single scalar $\lambda$ (FR-014); no other knob can reach a better point.
+
+\subsection{Deliberation: sampling, stopping and retries}
+
+Let a slow-path round draw one candidate and verify it; let
+$a=q\,r+(1-q)\varphi$ be the probability that a draw is accepted, where $q$ is
+the probability that a draw is correct.
+
+\begin{theorem}[Coverage and cost of sequential verified sampling]
+\textnormal{[exact]}
+\label{thm:coverage}
+With at most $M$ draws and stopping at the first acceptance,
+(i) the probability that some candidate is accepted is $1-(1-a)^M$;
+(ii) the expected number of draws is $E(M)=\big(1-(1-a)^M\big)/a$;
+(iii) the conditional error of the accepted candidate is $\rho(q)$ of
+Theorem~\ref{thm:precision}, independent of $M$;
+(iv) if $a$ varies across tasks with mean $\bar a$, the coverage is at most
+$1-(1-\bar a)^M$.
+\end{theorem}
+\begin{proof}
+(i)--(ii) are the truncated geometric distribution. (iii) Each accepted
+candidate, whichever draw produced it, is wrong with probability $\rho(q)$ by
+Bayes' rule. (iv) $u\mapsto(1-u)^M$ is convex, so Jensen's inequality gives
+$\mathbb E[(1-a)^M]\ge(1-\bar a)^M$. \qed
+\end{proof}
+\emph{Consequence.} More samples buy \emph{coverage}, never \emph{precision}:
+the number of draws is chosen from a coverage target and the per-task
+heterogeneity of $a$ must be measured, not averaged (Phase~0 of the roadmap).
+
+\begin{proposition}[Optimal number of draws under uncertainty about $a$]
+\textnormal{[strong: Beta prior, monotone stopping]}
+\label{prop:stopping}
+Suppose the acceptance probability of a task is unknown with prior
+$a\sim\mathrm{Beta}(\alpha,\beta)$, each draw costs $c_p$, and failing to
+produce an accepted candidate costs $L_a$. After $m$ consecutive rejections the
+posterior mean is $a_m=\alpha/(\alpha+\beta+m)$. The policy that draws again if
+and only if $a_m L_a>c_p$ is optimal, so the optimal cap is
+\begin{equation}
+M^\star=\Big\lceil\frac{\alpha L_a}{c_p}-\alpha-\beta\Big\rceil
+\end{equation}
+(the number of $m\ge0$ with $\alpha/(\alpha+\beta+m)>c_p/L_a$),
+when the right-hand side is positive, and $M^\star=0$ otherwise.
+\end{proposition}
+\begin{proof}
+A further draw costs $c_p$ and, with posterior-predictive probability $a_m$,
+saves $L_a$; so the one-step look-ahead rule continues iff $a_mL_a>c_p$.
+Because every continuation happens only after a rejection and $a_m$ is
+decreasing in $m$, once the rule says ``stop'' it says ``stop'' in all
+subsequent states: the problem is monotone, and in the monotone case the
+one-step look-ahead rule is optimal \cite{chow1971great}. The draws made are exactly those indexed by the $m\ge0$ with
+$m<\alpha L_a/c_p-\alpha-\beta$, whose count is the ceiling. \qed
+\end{proof}
+\emph{Consequence.} The retry limit $R$ and the samples per round $N$
+(with $M=N(R{+}1)$) are derived per domain from the Phase-0 fit of
+$(\alpha,\beta)$ and the operator's cost ratio $c_p/L_a$ (FR-021). The Beta
+model is a modelling choice; the roadmap validates it against the empirical
+distribution of acceptance rates (hypothesis H3).
+
+\subsection{Self-monitoring: why the loop must be verifier-gated}
+
+The classical \emph{muhasaba} (self-accounting) is a loop in which a draft is
+re-examined and amended. Let $u$ be the probability that one unverified
+refinement turns a wrong answer into a right one and $d$ the probability that
+it turns a right answer into a wrong one.
+
+\begin{theorem}[Unverified refinement converges to a fixed point]
+\textnormal{[strong: homogeneous Markov refinement]}
+\label{thm:selfrefine}
+If $q_t$ is the probability that the $t$-th draft is correct and
+$q_{t+1}=q_t(1-d)+(1-q_t)u$, then
+$q_t=q^\star+(q_0-q^\star)(1-u-d)^t$ with $q^\star=u/(u+d)$. In particular
+$q_t$ decreases monotonically in $t$ whenever $q_0>q^\star$.
+\end{theorem}
+\begin{proof}
+The recursion is affine with fixed point $q^\star$ and contraction factor
+$1-u-d\in(-1,1)$ for $u+d\in(0,2)$. \qed
+\end{proof}
+\emph{Consequence.} Iterating self-critique without external evidence can only
+help tasks whose first draft is worse than the fixed point; for a strong first
+draft it \emph{harms}. This is consistent with the empirical finding that
+language models do not reliably self-correct without external feedback
+\cite{huang2024selfcorrect,kamoi2024survey}. Nafs-Aql therefore never accepts an
+unverified refinement: on non-verifiable tasks the loop is capped at $R=1$
+(FR-022).
+
+\begin{theorem}[Verifier-gated loop is stable] \textnormal{[exact]}
+\label{thm:gatedloop}
+In a loop that accepts a candidate only when a verifier with rates
+$(r,\varphi)$ passes it, and whose $t$-th candidate is correct with
+probability $q_t$, the probability of terminating with an accepted wrong answer
+is at most $\varphi\,\mathbb E[T]$, where $T$ is the number of candidates
+examined, and the error conditional on acceptance lies in
+$[\min_t\rho(q_t),\max_t\rho(q_t)]$. Neither bound depends on the refinement
+dynamics $(u,d)$.
+\end{theorem}
+\begin{proof}
+A wrong candidate at round $t$ is accepted with probability $\varphi$;
+summing $\Pr[\text{reach }t]\,(1-q_t)\varphi\le\varphi\Pr[\text{reach }t]$
+over $t$ gives $\varphi\,\mathbb E[T]$. Conditional on acceptance at round $t$
+the error is $\rho(q_t)$ by Theorem~\ref{thm:precision}; the overall
+conditional error is a mixture of these values. \qed
+\end{proof}
+\emph{Consequence.} With a verifier in the loop the risk is linear in
+$\varphi$ and in the expected number of rounds, both of which the controller
+bounds (Lemma~\ref{lem:termination}); the refinement prompt can be changed
+freely without re-deriving the safety case.
+
+\subsection{Consensus has a floor}
+
+\begin{theorem}[Plurality voting converges to the modal answer]
+\textnormal{[exact]}
+\label{thm:plurality}
+Let $N$ answers be drawn i.i.d.\ from $\pi(\cdot\mid x)$ over a finite answer
+set with a unique mode $y^\circ(x)$. Then the plurality vote converges almost
+surely to $y^\circ(x)$ as $N\to\infty$, so the limiting accuracy of
+self-consistency is $\Pr_x[\,y^\circ(x)\text{ is correct}\,]$. For finite $N$,
+if the correct answer has mass $q$ and the strongest wrong answer has mass
+$\bar q<q$, the probability that the wrong answer ties or beats the correct one
+is at most $\exp\!\big(-N(q-\bar q)^2/2\big)$.
+\end{theorem}
+\begin{proof}
+The empirical frequencies converge almost surely to $\pi(\cdot\mid x)$
+(strong law), so the arg-max converges to the unique mode. For the finite
+bound let $D_i=\mathbb 1[y_i=y^\star]-\mathbb 1[y_i=\bar y]\in[-1,1]$ with mean
+$q-\bar q$; Hoeffding's inequality \cite{hoeffding1963} gives
+$\Pr[\sum_iD_i\le0]\le\exp(-2N(q-\bar q)^2/4)$. \qed
+\end{proof}
+\emph{Consequence.} Agreement among samples cannot repair tasks on which the
+model is confidently wrong; the mass of such tasks is a floor that no $N$
+removes. Consensus is therefore recorded as an \emph{assurance level}
+(\texttt{consensus}) distinct from \texttt{verified} (FR-031), is never used
+to write training data without a human check, and the number of samples for a
+consensus flag is set from the margin $q-\bar q$ measured in Phase~0.
+
+\subsection{Independence of the two paths}
+
+\begin{proposition}[Anchoring and collision] \textnormal{[exact]}
+\label{prop:collision}
+If the slow path does not see the fast draft, the probability that both
+produce the same wrong answer is the collision probability
+$\sum_{y:\kappa(x,y)=0}\pi_1(y\mid x)\pi_2(y\mid x)$. Passing the draft to the
+slow path can only add anchoring on top of this value. Certifying an adoption
+rate below $5\%$ at confidence $95\%$ with zero observed adoptions needs at
+least $\lceil\ln0.05/\ln0.95\rceil=59$ trials; with observed adoptions the
+Clopper--Pearson interval \cite{clopper1934} applies.
+\end{proposition}
+\emph{Consequence.} The slow path is \emph{draft-blind} by default
+(FR-023); draft-conditioned deliberation is an ablation, and the coupling test
+(hypothesis H5) is a release gate. Because both paths may share weights (the
+single-model profile of Section~\ref{sec:models}), the collision term is not
+small a priori and is measured.
+
+\subsection{Honest self-knowledge under routing}
+
+\begin{proposition}[Unbiased capability estimates need audits]
+\textnormal{[exact]}
+\label{prop:audit}
+Slow-path correctness is observed only on escalated tasks, so the naive
+estimate is $\Pr[\text{slow correct}\mid\text{escalated}]$, a biased estimate of
+$p_2$. If a random fraction $\epsilon>0$ of the kept tasks is also run through
+the slow path, then with escalation rate $g$,
+$\hat p_2=g\,\hat p_{2\mid\mathrm{esc}}+(1-g)\,\hat p_{2\mid\mathrm{audit}}$ is
+unbiased, with standard error at most
+$\tfrac{1}{2}\sqrt{\big(g+(1-g)/\epsilon\big)/n}$ over $n$ requests.
+\end{proposition}
+\begin{proof}
+Inverse-probability weighting with known strata weights $g$ and $1-g$ and
+sampling probabilities $1$ and $\epsilon$; the variance of each stratum mean is
+at most $1/(4\,n_{\text{stratum}})$ with $n_{\text{esc}}=ng$ and
+$n_{\text{audit}}=n(1-g)\epsilon$. \qed
+\end{proof}
+\emph{Consequence.} The self-model (the \emph{muhasaba} ledger) is built only
+from traces plus a $5\%$ audit stream (FR-040); capabilities with no audited
+data are reported as \emph{unmeasured}, never as zero. With $n=10^4$, $g=0.3$
+and $\epsilon=0.05$ the standard error is at most $0.019$.
+
+\subsection{Estimation and gate sample sizes}
+
+\begin{proposition}[Sample sizes] \textnormal{[exact]}
+\label{prop:samples}
+\begin{enumerate}[label=(\roman*)]
+\item (Threshold from a quantile.) If $\tau$ is set as the empirical
+$(1-g^\star)$-quantile of $n$ i.i.d.\ scores, the realised escalation rate is
+within $\varepsilon$ of $g^\star$ with probability at least $1-\delta$ whenever
+$n\ge\ln(2/\delta)/(2\varepsilon^2)$ \cite{massart1990dkw}.
+\item (Non-inferiority.) To show that the cascade loses at most $m$ points of
+accuracy against the slow-only baseline with power $1-\beta$ at level $\alpha$,
+a paired design with discordance rate $\delta$ needs
+$n\ge(z_\alpha+z_\beta)^2\,\delta/m^2$ pairs.
+\item (Binomial gates.) Certifying a rate below $\varepsilon$ with zero failures
+at confidence $1-\delta$ needs $n\ge\ln\delta/\ln(1-\varepsilon)$ trials.
+\end{enumerate}
+\end{proposition}
+\emph{Consequence.} The Phase-0 baseline is at least $4\,600$ tasks
+($\varepsilon=0.02$, $\delta=0.05$), the one-point non-inferiority gate needs
+about $6\,200$ pairs at $\delta=0.1$ (or $700$ for a three-point margin), and
+every release gate in the roadmap states its sample size. With $n=500$ the
+escalation rate is known only to $\pm6$ points.
+
+\subsection{Distillation (\emph{tazkiya}) without self-deception}
+
+\begin{proposition}[Label noise and verifier-inflated gains] \textnormal{[exact]}
+\label{prop:distill}
+\begin{enumerate}[label=(\roman*)]
+\item If a fraction $\eta$ of training labels is wrong, then for every
+hypothesis $h$, $|\mathrm{err}_{\text{noisy}}(h)-\mathrm{err}_{\text{clean}}(h)|\le\eta$;
+with verifier-filtered traces $\eta=\rho$ of Theorem~\ref{thm:precision}.
+\item If accuracy is measured with a verifier of rates $(r,\varphi)$, the
+measured rate is $\varphi+(r-\varphi)\,t$ where $t$ is the true rate; a measured
+gain $\Delta$ corresponds to a true gain $\Delta/(r-\varphi)$, and training on
+verifier-accepted outputs can raise $\varphi$ and inflate the measurement.
+\item A paired promotion gate with discordance $\delta$ resolving a gain of
+$\varepsilon$ needs $n\ge z^2\delta/\varepsilon^2$ pairs per domain.
+\end{enumerate}
+\end{proposition}
+\begin{proof}
+(i) The two error events differ only on examples whose label is wrong.
+(ii) Expand $\Pr[V=1]=r\,t+\varphi(1-t)$. (iii) Normal approximation to the
+paired binomial. \qed
+\end{proof}
+\emph{Consequence.} Promotion of a distilled fast-path adapter requires a
+confidence-bound gain on a verifier that was never used for data collection,
+plus a per-domain non-regression bound and human sign-off (FR-050--FR-053).
+
+\subsection{What a CPU can serve}
+
+\begin{proposition}[Decode and prefill ceilings] \textnormal{[exact given the
+roofline model]}
+\label{prop:roofline}
+For a dense decoder whose active weights occupy $W$ bytes and whose key--value
+cache at context length $\ell$ occupies $K(\ell)$ bytes, the steady-state
+decode rate on a machine with memory bandwidth $\beta$ is at most
+$\beta/(W+K(\ell))$ tokens per second, and the prefill rate on a machine with
+peak throughput $F$ FLOP/s and $P$ active parameters is at most $F/(2P)$
+tokens per second.
+\end{proposition}
+\begin{proof}
+Each decoded token must stream every active weight and the cache from memory
+at least once; each prefill token requires at least $2P$ floating-point
+operations. \qed
+\end{proof}
+\emph{Consequence.} On the reference machine (dual-channel DDR4-2400,
+$\beta\approx38$\,GB/s; AVX2, four cores) a 4-billion-parameter model in 4-bit
+GGUF ($W\approx2.5$\,GB) cannot exceed about 15 tokens/s, a 1.7B model about
+35 tokens/s, and a 1000-token prefill of the 4B model takes seconds to tens of
+seconds. These ceilings fix the model sizes, the thinking-budget cap, the
+context cap and the prompt-cache requirement (NFR-002--NFR-006). Measured
+values on the reference machine are reported in Section~\ref{sec:feasibility}
+and are below the ceilings, as expected.
+
+\begin{proposition}[Thinking budget] \textnormal{[strong: concave returns]}
+\label{prop:budget}
+If $p_2(x,b)$ is concave and non-decreasing in $b$ and the cost is linear,
+$c_2(x,b)=c_2^0+\kappa_{\text{tok}}\,b$, the budget minimising
+$L(1-p_2(x,b))+\lambda c_2(x,b)$ is the unique $b^\star$ with
+$L\,\partial_bp_2(x,b^\star)=\lambda\kappa_{\text{tok}}$ (or the boundary if
+no interior solution exists).
+\end{proposition}
+\emph{Consequence.} The thinking budget is a per-domain configuration value
+estimated from the Phase-0 accuracy-versus-budget curve (hypothesis H4);
+when the budget is exhausted the controller forces the answer by closing the
+reasoning span \cite{muennighoff2025s1} rather than returning nothing.
+
+\subsection{End-to-end identity}
+
+\begin{proposition}[Cascade difference] \textnormal{[exact]}
+\label{prop:cascade}
+Let $\rho_1$ be the error on tasks the gate keeps and $\bar e_2^{\,\text{kept}}$
+the error the slow path alone would make on those tasks. If the slow path
+behaves identically on escalated tasks in both systems,
+$\Pr[\text{cascade wrong}]-\Pr[\text{slow-only wrong}]
+=(1-g)\big(\rho_1-\bar e_2^{\,\text{kept}}\big)$.
+\end{proposition}
+\emph{Consequence.} Non-inferiority within $m$ requires
+$\rho_1\le\bar e_2^{\,\text{kept}}+m/(1-g)$; $\bar e_2^{\,\text{kept}}$ is
+observable only through the audit stream of Proposition~\ref{prop:audit}, which
+is therefore part of the safety case.
+
+\subsection{Summary of engineering consequences}
+Table~\ref{tab:consequences} lists each result with the parameter or
+algorithm it determines; the specification's traceability matrix repeats the
+mapping by requirement ID.
+
+\begin{table}[t]
+\caption{Formal results and what they determine}
+\label{tab:consequences}
+\centering\small
+\begin{tabular}{@{}p{2.2cm}p{5.8cm}@{}}
+\toprule
+Result & Engineering consequence \\
+\midrule
+Lemma~\ref{lem:termination} & Hard caps $N$, $R$; latency bound \\
+Thm.~\ref{thm:precision} & Verifier $(r,\varphi)$ publication; exact-verifier threshold $1.0$ \\
+Thm.~\ref{thm:gate} & Gate $=$ calibrated $\hat e_1$, $\hat e_2$, cost ratio; no hand-tuned $\tau$ \\
+Prop.~\ref{prop:miscal} & Calibration-error target of the gate \\
+Prop.~\ref{prop:frontier} & Single ``speed--care'' scalar in the UI \\
+Thm.~\ref{thm:coverage} & $N$ from coverage target; measure heterogeneity of $a$ \\
+Prop.~\ref{prop:stopping} & $R$, $N$ from Beta fit and $c_p/L_a$ \\
+Thm.~\ref{thm:selfrefine} & No unverified refinement; $R=1$ on non-verifiable tasks \\
+Thm.~\ref{thm:gatedloop} & Loop risk $\le\varphi\,\mathbb E[T]$; prompt changes need no new safety case \\
+Thm.~\ref{thm:plurality} & Consensus is an assurance flag; $N$ from margin \\
+Prop.~\ref{prop:collision} & Draft-blind slow path; coupling test gate \\
+Prop.~\ref{prop:audit} & $5\%$ audit stream; ``unmeasured'' label \\
+Prop.~\ref{prop:samples} & Phase-0 size $\ge4\,600$; gate sample sizes \\
+Prop.~\ref{prop:distill} & Promotion gate: held-out verifier, confidence bounds \\
+Prop.~\ref{prop:roofline} & Model sizes, context cap, prompt cache, budget cap \\
+Prop.~\ref{prop:budget} & Per-domain thinking budget; budget forcing \\
+Prop.~\ref{prop:cascade} & Audit stream is part of the safety case \\
+\bottomrule
+\end{tabular}
+\end{table}

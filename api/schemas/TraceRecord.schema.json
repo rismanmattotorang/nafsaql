@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nafs-aql.example/schemas/TraceRecord.schema.json",
+  "title": "TraceRecord",
+  "type": "object",
+  "required": [
+    "adapter_hash",
+    "assurance",
+    "backend",
+    "config_hash",
+    "decision_id",
+    "domain",
+    "model_hash",
+    "model_profile",
+    "path",
+    "request_id",
+    "schema_version",
+    "states",
+    "timestamp",
+    "usage"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "request_id": {
+      "type": "string"
+    },
+    "decision_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "conversation_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "config_hash": {
+      "type": "string"
+    },
+    "model_profile": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C"
+      ]
+    },
+    "model_hash": {
+      "type": "string"
+    },
+    "adapter_hash": {
+      "type": "string"
+    },
+    "domain": {
+      "type": "string",
+      "enum": [
+        "code",
+        "math",
+        "structured",
+        "factual",
+        "open",
+        "other"
+      ]
+    },
+    "path": {
+      "type": "string",
+      "enum": [
+        "fast",
+        "slow"
+      ]
+    },
+    "states": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "A",
+          "L",
+          "M",
+          "T",
+          "X"
+        ]
+      },
+      "minItems": 2,
+      "description": "Automaton states visited, in order"
+    },
+    "rounds": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "round",
+          "candidate_tokens",
+          "verifier",
+          "passed"
+        ],
+        "properties": {
+          "round": {
+            "type": "integer"
+          },
+          "candidate_tokens": {
+            "type": "integer"
+          },
+          "reasoning_tokens": {
+            "type": "integer"
+          },
+          "verifier": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "evidence_hash": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "assurance": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "consensus",
+        "unverified",
+        "abstained"
+      ]
+    },
+    "audit": {
+      "type": "boolean",
+      "description": "Selected for the 5% audit stream (FR-040); the audit outcome is recorded by the ledger job (Phase 2)"
+    },
+    "usage": {
+      "type": "object",
+      "required": [
+        "prompt_tokens",
+        "completion_tokens",
+        "reasoning_tokens",
+        "wall_ms",
+        "model_calls",
+        "verifier_calls"
+      ],
+      "properties": {
+        "prompt_tokens": {
+          "type": "integer"
+        },
+        "completion_tokens": {
+          "type": "integer"
+        },
+        "reasoning_tokens": {
+          "type": "integer"
+        },
+        "thinking_budget": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "wall_ms": {
+          "type": "integer"
+        },
+        "model_calls": {
+          "type": "integer",
+          "description": "Bounded by 1+N(R+1) (FR-026)"
+        },
+        "verifier_calls": {
+          "type": "integer"
+        },
+        "ttft_ms": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "Time to first visible token"
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "correct": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string"
+        }
+      }
+    },
+    "backend": {
+      "type": "string",
+      "description": "Active backend set (llama | vllm)"
+    }
+  }
+}

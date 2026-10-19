@@ -1,0 +1,42 @@
+{
+  "code_tests": {
+    "r": 0.9945054945054945,
+    "phi": 0.10875331564986737,
+    "n_mutants": 754,
+    "n_correct": 364,
+    "phi_upper95": 0.13318756469946497,
+    "measured_at": "unix:1792317828"
+  },
+  "json_schema": {
+    "r": 1.0,
+    "phi": 0.0,
+    "n_mutants": 53,
+    "n_correct": 24,
+    "phi_upper95": 0.06723454630630116,
+    "measured_at": "unix:1792317828"
+  },
+  "judge": {
+    "r": 0.782608695652174,
+    "phi": 0.2727272727272727,
+    "n_mutants": 22,
+    "n_correct": 23,
+    "phi_upper95": 0.5022212012663487,
+    "measured_at": "2026-10-19T12:59:36.700317+00:00"
+  },
+  "math_numeric": {
+    "r": 1.0,
+    "phi": 0.0,
+    "n_mutants": 2800,
+    "n_correct": 2000,
+    "phi_upper95": 0.0013165894824843094,
+    "measured_at": "unix:1792317828"
+  },
+  "math_symbolic": {
+    "r": 1.0,
+    "phi": 0.0,
+    "n_mutants": 2800,
+    "n_correct": 2000,
+    "phi_upper95": 0.0013165894824843094,
+    "measured_at": "unix:1792317828"
+  }
+}

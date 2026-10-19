@@ -1,0 +1,26 @@
+\section{Conclusion}
+\label{sec:conclusion}
+\Sys\ is a buildable dual-process system: a small Qwen model answers fast, a
+calibrated gate decides when deliberation pays, a second model (or the same
+model in thinking mode) deliberates under a budget, exact verifiers decide
+what counts as known, and an audited ledger keeps the system honest about
+itself. The classical account of the self supplied the vocabulary and, more
+usefully, three disciplines that translate directly into engineering: the
+intellect arbitrates on cost and risk, the self is corrected under an external
+standard, and dispositions change slowly through verified practice. The
+mathematics turned those disciplines into a threshold gate, a verifier-bounded
+precision, a stable loop and a sized set of release gates. The feasibility
+study showed what October 2026 permits on a four-core machine: Qwen3 and
+Qwen3.5 below 9B parameters, llama-server or vLLM-CPU behind one API,
+Unsloth on a rented GPU, and a Rust gateway. The specification and roadmap
+that accompany this report give the team requirements with identifiers,
+machine-readable interfaces, and a phased plan with measurable gates. The
+first three actions are to run the Phase-0 baseline at the required sample
+size, to measure the verifiers' false-accept rates by mutation testing, and
+to benchmark the Qwen3.5 hybrid models against dense Qwen3 on the target
+CPU before choosing the upgrade path. The second and third are done and
+the first runs only at a scaled-down size on one CPU. With the system built,
+the cascade runs end to end on a shared four-core CPU, the verifiers are
+measured, Profile~C was evaluated and not adopted, and latency is
+attributed by stage, which points the next work at decode speed (EAGLE-3 and
+repacked weights) and at release-scale evaluation on a faster host.

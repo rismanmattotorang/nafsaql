@@ -1,0 +1,24 @@
+# Nafs-Aql gateway image (OR-002/OR-003). Multi-stage: build the Rust workspace, ship the binary with
+# Python 3 + SymPy for the verifier sandbox. Build from the repository root:
+#   docker build -f deploy/docker/Dockerfile.gateway -t nafs-aql/gateway:0.1 .
+FROM rust:1.96-bookworm AS build
+WORKDIR /src
+COPY rust/ rust/
+COPY api/ api/
+RUN cd rust && cargo build --release -p nafs-gateway -p nafs-eval
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-sympy python3-numpy util-linux ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* && useradd --system --uid 10001 --home /app nafs
+WORKDIR /app
+COPY --from=build /src/rust/target/release/nafs-gateway /usr/local/bin/nafs-gateway
+COPY --from=build /src/rust/target/release/nafs-eval /usr/local/bin/nafs-eval
+COPY config/ config/
+COPY data/bench/ data/bench/
+COPY benchmarks/ benchmarks/
+RUN mkdir -p data/runtime && chown -R nafs:nafs /app/data
+USER nafs
+ENV NAFS_CONFIG=/app/config/nafs-aql.docker.toml NAFS_LOG_FORMAT=json
+EXPOSE 8080
+HEALTHCHECK --interval=15s --timeout=3s --retries=20 CMD curl -fsS http://127.0.0.1:8080/healthz || exit 1
+ENTRYPOINT ["nafs-gateway"]

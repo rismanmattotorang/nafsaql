@@ -1,0 +1,24 @@
+% Component diagram with interfaces (spec); width ~15cm (text width of the spec)
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[blk=slate,text width=2.2cm] (ui) at (0,0) {\texttt{nafs-web}\\chat, console, dashboard};
+\node[blk=navy,text width=2.4cm] (gw) at (3.6,0) {\texttt{nafs-gateway}\\IF-001..IF-004, IF-009};
+\node[blk=navy,text width=2.4cm] (core) at (7.4,0) {\texttt{nafs-core}\\automaton, \Gate, loop};
+\node[blk=violet,text width=2.4cm] (s1) at (11.4,0.9) {\Sone\ server\\IF-006};
+\node[blk=violet,text width=2.4cm] (s2) at (11.4,-0.9) {\Stwo\ server\\IF-006};
+\node[blk=amber,text width=2.4cm] (hub) at (7.4,-2.3) {\texttt{nafs-verify}\\FR-030..FR-035};
+\node[blk=crimson,text width=2.4cm] (sb) at (11.4,-2.6) {sandbox runner\\SR-002};
+\node[blk=teal,text width=2.4cm] (mem) at (3.6,-2.3) {\texttt{nafs-memory}\\FR-003, FR-060, IF-010};
+\node[blk=teal,text width=2.4cm] (led) at (0,-2.3) {\Ledger\ (job)\\FR-040..FR-042};
+\node[blk=leaf,text width=2.4cm] (ev) at (3.6,-4.2) {\texttt{nafs-eval}, \texttt{nafs-bench}\\FR-050..FR-053};
+\node[blk=slate,text width=2.4cm] (types) at (7.4,-4.2) {\texttt{nafs-types}\\IF-005 schemas, errors};
+\node[blk=slate,text width=2.4cm] (dist) at (0,-4.2) {\Distil\ (Python, GPU)\\TR-001..TR-008};
+\draw[arr] (ui)--node[lab,above]{HTTP, WS}(gw); \draw[arr] (gw)--node[lab,above]{calls}(core);
+\draw[arr] (core.east)--node[lab,above,pos=.6]{HTTP, SSE}(s1.west); \draw[arr] (core.east)--(s2.west);
+\draw[arr] (core)--node[lab,right]{verify}(hub); \draw[arr] (hub)--node[lab,above]{exec}(sb);
+\draw[arr] (core.south west)--node[lab,left,pos=.6]{traces}(mem.north east);
+\draw[arr] (gw)--(mem); \draw[arr] (mem)--node[lab,above]{read}(led);
+\draw[dsh] (led.south)--node[lab,left]{calibration}(dist.north);
+\draw[arr] (ev)--node[lab,right]{gateway API}(gw.south);
+\draw[dsh] (types.north)--(core.south); \draw[dsh] (types.west)--(ev.east);
+\draw[dsh] (dist.east)--node[lab,below]{GGUF adapter}(ev.west);
+\end{tikzpicture}
