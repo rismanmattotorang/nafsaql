@@ -267,6 +267,13 @@ async fn sandbox_escape_attempts_fail_closed() {
     let repo_file = concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml");
     let outside = std::env::temp_dir().join(format!("nafs-escape-{}", std::process::id()));
     let _ = std::fs::remove_file(&outside);
+    // A process outside the sandbox that sandboxed code must not be able to signal (security review ST-19).
+    // macOS denies the signal; on Linux the PID namespace hides the process, so the call raises.
+    let mut sentinel = std::process::Command::new("sleep")
+        .arg("120")
+        .spawn()
+        .expect("start the sentinel process");
+    let sentinel_pid = sentinel.id();
     // Filesystem and process-creation attempts are blocked by the macOS sandbox profile. The Linux sandbox
     // isolates network, PIDs and signals and applies resource limits, but not the filesystem or fork: those
     // attempts run on macOS only (documented limitation; the container recipe is the Linux boundary, SR-002).
@@ -294,17 +301,21 @@ async fn sandbox_escape_attempts_fail_closed() {
             "fork bomb",
             "import os\nwhile True:\n    os.fork()".to_string(),
         ),
+        (
+            "signal the parent (security review ST-19)",
+            "import os, signal\nos.kill(os.getppid(), signal.SIGCONT)".to_string(),
+        ),
     ];
     let portable = [
+        (
+            "signal a process outside the sandbox (security review ST-19)",
+            format!("import os, signal\nos.kill({sentinel_pid}, signal.SIGKILL)"),
+        ),
         (
             "memory bomb",
             "x = bytearray(3 * 1024 ** 3)\nx[-1] = 1".to_string(),
         ),
         ("CPU spin", "while True:\n    pass".to_string()),
-        (
-            "signal the parent (security review ST-19)",
-            "import os, signal\nos.kill(os.getppid(), signal.SIGCONT)".to_string(),
-        ),
         (
             "network",
             "import urllib.request\nurllib.request.urlopen('http://example.com', timeout=3).read()"
@@ -323,6 +334,10 @@ async fn sandbox_escape_attempts_fail_closed() {
         assert!(!r.passed, "escape attempt succeeded: {name}");
     }
     assert!(!outside.exists(), "a file was written outside the sandbox");
+    let alive = sentinel.try_wait().expect("poll the sentinel").is_none();
+    let _ = sentinel.kill();
+    let _ = sentinel.wait();
+    assert!(alive, "sandboxed code killed a process outside the sandbox");
 }
 #[tokio::test]
 async fn sandbox_environment_carries_no_secrets() {
