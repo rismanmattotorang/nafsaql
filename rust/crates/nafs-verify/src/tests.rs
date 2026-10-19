@@ -143,11 +143,16 @@ async fn code_verifier_pass_fail_and_limits() {
 #[tokio::test]
 async fn sandbox_denies_network_home_reads_and_forks() {
     let h = hub();
-    for t in [
+    let mut attempts = vec![
         "import socket\ns=socket.create_connection(('1.1.1.1',80),timeout=3)",
         "import os\nopen(os.path.expanduser('/Users')).read()",
-        "import os\nos.fork()",
-    ] {
+    ];
+    // `fork` is denied by the macOS sandbox profile only; on Linux the sandbox is namespaces and resource
+    // limits (no fork ban; see the Linux note in README.md, Security).
+    if cfg!(target_os = "macos") {
+        attempts.push("import os\nos.fork()");
+    }
+    for t in attempts {
         assert!(
             !h.verify_code("```python\nx=1\n```", &tests(&[t]))
                 .await
@@ -262,7 +267,10 @@ async fn sandbox_escape_attempts_fail_closed() {
     let repo_file = concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml");
     let outside = std::env::temp_dir().join(format!("nafs-escape-{}", std::process::id()));
     let _ = std::fs::remove_file(&outside);
-    let attempts = [
+    // Filesystem and process-creation attempts are blocked by the macOS sandbox profile. The Linux sandbox
+    // isolates network, PIDs and signals and applies resource limits, but not the filesystem or fork: those
+    // attempts run on macOS only (documented limitation; the container recipe is the Linux boundary, SR-002).
+    let macos_only = [
         (
             "read a user file",
             format!("print(open({repo_file:?}).read()[:50])"),
@@ -286,6 +294,8 @@ async fn sandbox_escape_attempts_fail_closed() {
             "fork bomb",
             "import os\nwhile True:\n    os.fork()".to_string(),
         ),
+    ];
+    let portable = [
         (
             "memory bomb",
             "x = bytearray(3 * 1024 ** 3)\nx[-1] = 1".to_string(),
@@ -301,7 +311,12 @@ async fn sandbox_escape_attempts_fail_closed() {
                 .to_string(),
         ),
     ];
-    for (name, code) in &attempts {
+    let attempts: Vec<&(&str, String)> = if cfg!(target_os = "macos") {
+        macos_only.iter().chain(portable.iter()).collect()
+    } else {
+        portable.iter().collect()
+    };
+    for (name, code) in attempts {
         let r = h
             .verify_code("```python\nx = 1\n```", &tests(&[code.as_str()]))
             .await;

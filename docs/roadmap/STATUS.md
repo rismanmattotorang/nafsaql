@@ -216,6 +216,13 @@ The adopted setting meets FR-080's 95% rule with no wrong escalation on this set
   - Known limitation: after a page reload, *Think harder* and *Regenerate* on an old turn no longer carry its reference answer (it is not stored with the conversation), so the new reply is judged, not exactly verified.
 - **Release tooling:** `nafs-gateway --check` printed Rust `{"Ok": …}` wrappers; the config-schema generator needed Python 3.11.
 
+## Linux sandbox: found by CI on the first push (2026-10-20)
+
+GitHub-hosted Ubuntu 24.04 was the first clean machine the suite ran on. It showed two things:
+
+- **Namespaces blocked by default.** AppArmor denies unprivileged user namespaces, so every code verification failed closed while `--check` claimed isolation was available. `isolation_available()` is now a functional probe, CI enables the sysctl, and the runbook documents it (A-053).
+- **The Linux sandbox does not isolate the filesystem or `fork`.** This was already noted in the Phase-1 code review, but the sandbox tests asserted macOS-only guarantees on every platform. They now run the filesystem, `fork` and spawn attempts on macOS only, and every portable attempt (network, memory bomb, CPU spin, signalling the parent) on both. **Open item: a Linux mount namespace that hides the host filesystem and makes it read-only except the scratch directory**, so the Linux sandbox matches the macOS profile instead of relying on a container.
+
 ## Speed
 
 | Change | Effect |
