@@ -4,6 +4,7 @@ on: [push, pull_request]
 jobs:
   rust:
     strategy:
+      fail-fast: false
       matrix: { os: [ubuntu-24.04, macos-14] }
     runs-on: ${{ matrix.os }}
     defaults: { run: { working-directory: rust } }
@@ -13,6 +14,10 @@ jobs:
         with: { components: "rustfmt, clippy" }
       - uses: Swatinem/rust-cache@v2
         with: { workspaces: rust }
+      # The verifier sandbox needs unprivileged user namespaces, which Ubuntu 24.04 blocks through AppArmor by default.
+      - name: Allow unprivileged user namespaces (verifier sandbox)
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --release -- -D warnings
       - run: cargo test --workspace --release

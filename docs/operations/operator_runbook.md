@@ -18,6 +18,8 @@ This runbook is for whoever installs, runs and maintains a Nafs-Aql deployment. 
 
 **vLLM in Docker (reference machine).** `scripts/serve_vllm_docker.sh start && scripts/serve_vllm_docker.sh wait` serves Qwen3-1.7B in BF16 on :8101 from the `carstenz/vllm-smoke:0.1.0-cpu` image, as the gateway's `vllm` backend set expects; switch with *Use this backend* on the System page and check it with `python3 scripts/vllm_check.py`. The Docker VM needs about 6 GiB free (10 GiB allocated here). Expect a load time of several minutes and, on four shared cores, slower decoding than llama-server.
 
+**Linux hosts and the code sandbox.** Verifying model-written code needs unprivileged user, network and PID namespaces. Stock Ubuntu 24.04 blocks them (`kernel.apparmor_restrict_unprivileged_userns=1`); `nafs-gateway --check` then reports `sandbox_isolation: false` and code verification fails closed. Enable them with `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0` (persist it in `/etc/sysctl.d/`), or run the gateway in the provided compose file, which relaxes seccomp for the same reason (A-040).
+
 The gateway refuses to listen on a non-loopback address without tokens (SR-006). Set `NAFS_ALLOW_INSECURE=1` only on an isolated lab network. Browsers must reach the gateway on the same origin. For any other host name, set `NAFS_ALLOWED_HOSTS` or enable tokens.
 
 ## 2. Daily operation

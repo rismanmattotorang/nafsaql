@@ -119,11 +119,27 @@ pub fn resolve_python(name: &str) -> String {
     found.into_iter().next().unwrap_or_else(|| name.to_string())
 }
 
+/// Whether untrusted code can be isolated on this host. On Linux this is a functional probe, not a file
+/// check: the sandbox needs unprivileged user, network and PID namespaces, which stock Ubuntu 24.04 blocks
+/// through AppArmor (`kernel.apparmor_restrict_unprivileged_userns=1`). A host with the `unshare` binary but
+/// without that capability must report "not available", or the readiness check would claim isolation that fails
+/// at the first request. The probe runs once per process.
 pub fn isolation_available() -> bool {
     if cfg!(target_os = "macos") {
         Path::new("/usr/bin/sandbox-exec").exists()
     } else if cfg!(target_os = "linux") {
-        Path::new("/usr/bin/unshare").exists()
+        static PROBE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *PROBE.get_or_init(|| {
+            Path::new("/usr/bin/unshare").exists()
+                && std::process::Command::new("/usr/bin/unshare")
+                    .args(["-r", "-n", "-p", "-f", "--kill-child", "true"])
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false)
+        })
     } else {
         false
     }
@@ -136,7 +152,7 @@ fn command_for(
     entry: &Path,
 ) -> Result<tokio::process::Command, String> {
     if limits.deny_network && !isolation_available() {
-        return Err("sandbox isolation is not available on this host; refusing to run untrusted code (fail closed)".into());
+        return Err("sandbox isolation is not available on this host; refusing to run untrusted code (fail closed). On Linux it needs unprivileged user namespaces: on Ubuntu 24.04 run `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`".into());
     }
     #[cfg(target_os = "macos")]
     if limits.deny_network {
