@@ -7,6 +7,7 @@
 **A verifier-gated dual-process AI that runs on a CPU.**
 A small model answers at once. A reasoning model deliberates only when it pays. Exact checkers, not model agreement, decide what counts as correct.
 
+[![CI](https://github.com/rismanmattotorang/nafsaql/actions/workflows/ci.yml/badge.svg)](https://github.com/rismanmattotorang/nafsaql/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.96+](https://img.shields.io/badge/rust-1.96%2B-orange.svg)](rust/Cargo.toml)
 [![CPU only](https://img.shields.io/badge/inference-CPU--only-teal.svg)](#measured-results)
