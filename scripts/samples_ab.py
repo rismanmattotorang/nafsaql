@@ -36,7 +36,7 @@ def ask(prompt, with_samples):
     draft = next((s for s in u.get("stages", []) if s["stage"] == "draft"), {})
     return {"wall_ms": u["wall_ms"], "ttft_ms": u.get("ttft_ms"), "escalated": v["decision"]["escalate"], "mode": v["reasoning_mode"],
             "draft_ms": draft.get("ms"), "draft_tokens": draft.get("tokens"), "draft_decode_ms": draft.get("decode_ms"), "draft_prefill_ms": draft.get("prefill_ms"),
-            "samples": sum(1 for s in u.get("stages", []) if s["stage"] == "sample"), "elapsed_s": round(time.time() - t, 2)}
+            "samples": sum(1 for s in u.get("stages", []) if s["stage"] in ("sample", "sample_after")), "elapsed_s": round(time.time() - t, 2)}
 
 
 def main():

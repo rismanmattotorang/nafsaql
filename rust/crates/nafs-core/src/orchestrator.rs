@@ -437,7 +437,21 @@ impl Orchestrator {
         match req.messages.iter().rev().find(|m| m.role == "user") {
             None => return bad("messages must contain a user turn"),
             Some(u) if u.content.trim().is_empty() => return bad("empty user message"),
-            _ => {}
+            Some(u) => {
+                // NFR-006: the newest turn is always sent whole (only history is trimmed to the cap), so a turn
+                // that cannot fit beside the system prompt is refused here, not by the model server. The
+                // estimate matches assemble_prompt (3.5 characters per token); 256 tokens are left for the
+                // domain instruction, retrieved evidence and the role markers.
+                let est = (u.content.chars().count() as f64 / 3.5).ceil() as usize;
+                let fixed = (self.cfg.assistant.system_prompt.len() as f64 / 3.5) as usize + 256;
+                let room = self.cfg.server.max_prompt_tokens.saturating_sub(fixed);
+                if est > room {
+                    return Err(NafsError::BadRequest(format!(
+                        "the message is about {est} tokens; at most {room} fit in the {}-token prompt limit",
+                        self.cfg.server.max_prompt_tokens
+                    )));
+                }
+            }
         }
         if let Some(l) = req.lambda {
             if !(0.0..=1.0).contains(&l) || !l.is_finite() {
@@ -847,8 +861,27 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             for s in &samples {
                 usage.prompt_tokens += s.prompt_tokens;
                 usage.completion_tokens += s.completion_tokens;
-                // Samples run concurrently with the draft; their time overlaps it.
-                stages.push(s.stage("sample"));
+            }
+            if sequential && !samples.is_empty() {
+                // Drawn after the draft (P7-T02): the samples run in parallel with each other but add to the
+                // request's wall time, so they are one stage that counts, not overlapping stages. Its time is
+                // the slowest sample's; its tokens are all of them.
+                let slowest = samples
+                    .iter()
+                    .max_by_key(|s| s.wall_ms + s.queue_ms)
+                    .expect("non-empty");
+                let mut st = slowest.stage("sample_after");
+                st.tokens = Some(samples.iter().map(|s| s.completion_tokens).sum());
+                st.note = Some(format!(
+                    "{} samples in parallel, after the draft",
+                    samples.len()
+                ));
+                stages.push(st);
+            } else {
+                // Drawn together with the draft: their time overlaps it and is listed, not counted.
+                for s in &samples {
+                    stages.push(s.stage("sample"));
+                }
             }
             if verifiable {
                 let tv = Instant::now();

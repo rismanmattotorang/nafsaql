@@ -57,6 +57,31 @@ try:
 except Exception as e:
     check("chat: verified math reply", False, e)
 try:
+    # Unverified math: the gate draws its agreement samples after the draft (Phase 8), so the waterfall must count
+    # them: the stages that add to the wall time may not exceed it, and "Gateway and other" may not be inflated by them.
+    st, _, data = http("POST", "/v1/chat", {"messages": [{"role": "user", "content": "What is 12 * 12 + 6?"}], "ephemeral": True})
+    r = json.loads(data)
+    sts = r["usage"].get("stages", [])
+    counted = sum(x["ms"] for x in sts if x["stage"] != "sample")
+    after = [x for x in sts if x["stage"] == "sample_after"]
+    check("chat: unverified math stages add up to the wall time", counted <= r["usage"]["wall_ms"] + 100 and (not after or r["usage"]["wall_ms"] - counted < 2000),
+          f"counted {counted} ms of {r['usage']['wall_ms']} ms; {len(after)} sample_after stage(s)")
+except Exception as e:
+    check("chat: unverified math stages add up to the wall time", False, e)
+for name, path, body, raw in [("malformed JSON", "/v1/eval/runs", b"not json", True),
+                              ("wrong field type", "/v1/eval/runs", json.dumps({"benchmark": "smoke_mixed", "max_items": -3, "systems": ["fast_only"]}).encode(), True),
+                              ("oversized message", "/v1/chat", json.dumps({"messages": [{"role": "user", "content": "word " * 9000}], "ephemeral": True}).encode(), True)]:
+    try:
+        req = urllib.request.Request(BASE + path, data=body, method="POST", headers={"content-type": "application/json"})
+        try:
+            urllib.request.urlopen(req, timeout=60)
+            check(f"errors: {name} is refused with the JSON envelope", False, "accepted")
+        except urllib.error.HTTPError as e:
+            b = json.loads(e.read())
+            check(f"errors: {name} is refused with the JSON envelope", e.code in (400, 422) and b.get("code") == "E_BAD_REQUEST", f"{e.code} {b.get('code')}: {str(b.get('message'))[:60]}")
+    except Exception as e:
+        check(f"errors: {name} is refused with the JSON envelope", False, e)
+try:
     req = urllib.request.Request(BASE + "/v1/chat/stream", data=json.dumps({"messages": [{"role": "user", "content": "Say hello in one short sentence."}],
                                  "ephemeral": True, "force_mode": "fast"}).encode(), headers={"content-type": "application/json"})
     events = []

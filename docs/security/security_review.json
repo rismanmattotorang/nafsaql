@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-10-18T13:35:39Z",
+  "reviewed_at": "2026-10-20T12:02:02Z",
   "base": "http://127.0.0.1:8080",
   "tests": [
     {
@@ -135,7 +135,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Memory bomb (3 GB)",
       "pass": true,
-      "detail": "passed=False in 1.0s",
+      "detail": "passed=False in 1.2s",
       "severity_if_failed": "high"
     },
     {
@@ -143,7 +143,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: CPU spin",
       "pass": true,
-      "detail": "passed=False in 26.5s",
+      "detail": "passed=False in 21.3s",
       "severity_if_failed": "high"
     },
     {

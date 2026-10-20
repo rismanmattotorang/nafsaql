@@ -52,7 +52,7 @@ a{color:var(--accent)}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
 .card-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border)}
 .card-h h2,.card-h h3{margin:0;font-size:14.5px;font-weight:650}
-.card-b{padding:14px 16px}
+.card-b{padding:14px 16px} .card-b:has(> table), .card-b:has(> .tbl){overflow-x:auto}
 .grid{display:grid;gap:16px}
 .g2{grid-template-columns:repeat(2,minmax(0,1fr))} .g3{grid-template-columns:repeat(3,minmax(0,1fr))} .g4{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:1100px){.g3,.g4{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -92,7 +92,7 @@ dialog::backdrop{background:rgba(10,15,25,.45)}
 /* ---------------- Chat ---------------- */
 .chat{display:grid;grid-template-columns:260px minmax(0,1fr) 340px;height:100%}
 .chat.noinspect{grid-template-columns:260px minmax(0,1fr) 0}
-@media (max-width:1250px){.chat,.chat.noinspect{grid-template-columns:220px minmax(0,1fr) 0} .inspector{display:none} .chat.showinspect .inspector{display:block;position:fixed;right:0;top:56px;bottom:0;width:min(360px,92vw);z-index:15;box-shadow:var(--shadow-lg)}}
+@media (max-width:1250px){.chat,.chat.noinspect{grid-template-columns:220px minmax(0,1fr) 0} .inspector{display:none} .chat.showinspect .inspector{display:block;position:fixed;right:0;top:56px;bottom:0;width:min(360px,92vw);z-index:15;box-shadow:var(--shadow-lg)} .chat.showinspect .thread{padding-right:min(360px,92vw)}}
 @media (max-width:760px){.chat,.chat.noinspect{grid-template-columns:1fr} .convs{display:none}}
 .convs{border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0}
 .convs .head{padding:12px;display:flex;gap:8px} .convs .list{overflow:auto;flex:1;padding:4px 8px 12px}

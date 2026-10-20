@@ -230,6 +230,23 @@ Phase 8 asked what quantum theories of consciousness and the neuroscience of dec
 
 What was deliberately **not** changed: the mean-based early escalation (kept at its measured N = 32, margin 0.04 and labelled a heuristic), the probe schedule, and anything suggested by quantum-consciousness theories.
 
+## Web UI test pass (2026-10-20)
+
+The UI was driven in a real browser (every page, the chat with streaming, Inspector, search, theme toggle and shortcuts, Rooms over WebSocket, the alert drill, the judge and verifier playgrounds, the Lab presets) with a console and network error collector, plus API probes of every form the UI submits. No JavaScript error and no failed request occurred; the defects below were layout, accounting and error-handling faults. All are fixed and covered by the sweep (now 42 checks) or a unit test.
+
+| Defect | Cause | Fix |
+|---|---|---|
+| The latency waterfall said "Gateway and other 8.3 s" on a 13.4 s reply: the samples' time was counted as overhead | Samples drawn after the draft (P7-T02, now on every unverified math draft) were still recorded as overlapping the draft | One `sample_after` stage with the group's wall time, counted in the totals; Inspector, breakdown API and publication script know it; unit test and sweep check that the stages add up |
+| Tables in half-width cards (Run history, Muhasaba verifier quality, Tazkiya training data, System ledger) spilled outside their card | `.card-b` had no overflow handling | Cards that hold a table scroll horizontally |
+| Run history printed raw ids (`slow_exit_posterior`) in its Other column | The label helper was not applied there | Uses the Lab's system labels |
+| With the Inspector open at widths up to 1250 px, the composer, its controls and the Send button were hidden under the drawer | The drawer overlays the chat column | The thread reserves the drawer's width |
+| Searching conversations with no match said "No conversations yet" | One message for two cases | "No conversation matches your search." |
+| An invalid JSON schema in the verifier playground left the previous verdict on screen | The handler returned before clearing the result | The result is replaced by the error |
+| A 9,000-word message returned HTTP 500 with the model server's internal message | NFR-006's prompt cap trimmed only history; the newest turn was sent whole | The newest turn is checked against the cap (HTTP 400 with the token count); a backend "exceeds the context size" reply also maps to 400 |
+| Malformed request bodies (`max_items: -3`, invalid JSON) came back as plain text, an unknown dataset leaked an OS error | Framework rejections bypassed the error envelope | One outermost layer rewrites them to `{code, message}`; "unknown dataset 'x'" |
+
+Checked and found correct: HTML in a room name is escaped; an empty room name creates nothing; an infinite loop in the playground stops at the 20 s CPU cap; empty verification input and out-of-range parameters are refused with clear messages; the alert drill and judge errors show inline. Not changed: rooms cannot be deleted (no endpoint; the acceptance test leaves `acceptance-*` rooms behind), and at half width the System ledger's last column needs a horizontal scroll.
+
 ## Linux sandbox: found by CI on the first push (2026-10-20)
 
 GitHub-hosted Ubuntu 24.04 was the first clean machine the suite ran on. It showed two things:

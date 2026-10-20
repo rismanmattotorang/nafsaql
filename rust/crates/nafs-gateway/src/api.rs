@@ -220,7 +220,54 @@ pub fn router(state: AppState) -> Router {
         .layer(tower_http::limit::RequestBodyLimitLayer::new(
             2 * 1024 * 1024,
         ))
+        // Outermost: extractor rejections (malformed JSON, wrong field types, oversized bodies) arrive as plain
+        // text from the framework; clients of this API get the same {code, message} envelope as every other error.
+        .layer(middleware::from_fn(json_error_envelope))
         .with_state(state)
+}
+
+/// Rewrite a framework-generated plain-text 4xx rejection into the JSON error envelope.
+async fn json_error_envelope(req: Request, next: Next) -> Response {
+    let resp = next.run(req).await;
+    let status = resp.status();
+    let plain = resp
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.starts_with("text/plain"));
+    if !plain
+        || !matches!(
+            status,
+            StatusCode::BAD_REQUEST
+                | StatusCode::PAYLOAD_TOO_LARGE
+                | StatusCode::UNSUPPORTED_MEDIA_TYPE
+                | StatusCode::UNPROCESSABLE_ENTITY
+        )
+    {
+        return resp;
+    }
+    let (parts, body) = resp.into_parts();
+    let bytes = axum::body::to_bytes(body, 4096).await.unwrap_or_default();
+    let text = String::from_utf8_lossy(&bytes);
+    let msg = if text.trim().is_empty() {
+        status
+            .canonical_reason()
+            .unwrap_or("bad request")
+            .to_string()
+    } else {
+        text.trim().to_string()
+    };
+    let mut r = (
+        status,
+        Json(json!({"code": "E_BAD_REQUEST", "message": format!("bad request: {msg}")})),
+    )
+        .into_response();
+    for (k, v) in parts.headers.iter() {
+        if k != header::CONTENT_TYPE && k != header::CONTENT_LENGTH {
+            r.headers_mut().insert(k.clone(), v.clone());
+        }
+    }
+    r
 }
 
 async fn serve_asset(State(s): State<AppState>, name: &'static str) -> Response {
@@ -1321,8 +1368,19 @@ async fn start_eval(
     Json(req): Json<nafs_eval::EvalRunRequest>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     req.validate().map_err(NafsError::BadRequest)?;
-    nafs_eval::load_tasks(&s.cfg.eval.datasets_dir, &req.benchmark)
-        .map_err(|e| NafsError::BadRequest(format!("dataset: {e}")))?;
+    nafs_eval::load_tasks(&s.cfg.eval.datasets_dir, &req.benchmark).map_err(|e| {
+        let missing = e
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|io| io.kind() == std::io::ErrorKind::NotFound);
+        NafsError::BadRequest(if missing {
+            format!(
+                "unknown dataset '{}'; see GET /v1/eval/datasets",
+                req.benchmark.chars().take(40).collect::<String>()
+            )
+        } else {
+            format!("dataset: {e}")
+        })
+    })?;
     let id = Uuid::new_v4();
     let base = json!({"run_id": id, "kind": "eval", "status": "running", "request": req, "created_at": chrono::Utc::now(), "progress": {"done": 0, "total": 0}});
     s.store.save_run("eval", id, "running", &base)?;

@@ -51,7 +51,7 @@ if pcd and "accuracy" in pcd:
     out.append(r"\newcommand{\ProfileCDelta}{" + f"{100 * pcd['paired_delta_accuracy']:+.0f} points, 95\\% CI [{100 * pcd['ci95'][0]:+.0f}, {100 * pcd['ci95'][1]:+.0f}], $n={pcd['n_tasks']}$" + "}")
 # P7-T01: where the time goes (all replies with stage timings, lab runs included)
 st = get("/v1/perf/stages?hours=2160&lab=true")
-names = {"draft": "System 1 draft", "sample": "cheap samples", "verify_draft": "verify draft", "deliberate": "System 2 deliberation", "verify": "verify", "judge": "judge", "retrieval": "retrieval"}
+names = {"draft": "System 1 draft", "sample": "cheap samples", "sample_after": "cheap samples (after the draft)", "verify_draft": "verify draft", "deliberate": "System 2 deliberation", "verify": "verify", "judge": "judge", "retrieval": "retrieval"}
 rows = []
 for pth in st.get("paths", []):
     for x in pth["stages"]:

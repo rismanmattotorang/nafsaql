@@ -356,7 +356,8 @@ fn qs(sorted: &[f64], p: f64) -> Option<f64> {
 
 /// Where the time goes (P7-T01): per path, each stage's share of wall time with p50/p95, the
 /// unattributed overhead, and the engine's prefill and decode speed, KV-cache reuse and queue wait per
-/// model stage. "sample" stages overlap the draft and are excluded from the shares.
+/// model stage. "sample" stages overlap the draft and are excluded from the shares; "sample_after" (samples
+/// drawn after the draft) adds to the wall time and is counted.
 pub fn latency_breakdown(rows: &[StageRow]) -> Value {
     let mut paths = vec![];
     for mode in ["fast", "slow"] {
@@ -400,7 +401,7 @@ pub fn latency_breakdown(rows: &[StageRow]) -> Value {
     }
     // Engine view per model stage.
     let mut engine = vec![];
-    for stage in ["draft", "sample", "deliberate"] {
+    for stage in ["draft", "sample", "sample_after", "deliberate"] {
         let sts: Vec<&nafs_types::StageTiming> = rows
             .iter()
             .flat_map(|r| r.2.iter())

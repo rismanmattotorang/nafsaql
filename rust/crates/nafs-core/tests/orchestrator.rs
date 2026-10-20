@@ -859,6 +859,32 @@ async fn unverified_math_drafts_always_get_the_agreement_samples() {
     );
     assert_eq!(reply.decision.features.agreement, Some(1.0));
     assert!(!reply.decision.escalate);
+    // Samples drawn after the draft are one stage that counts toward the wall time (not "overlapping").
+    let after: Vec<_> = reply
+        .usage
+        .stages
+        .iter()
+        .filter(|s| s.stage == "sample_after")
+        .collect();
+    assert_eq!(after.len(), 1, "{:?}", reply.usage.stages);
+    assert!(after[0]
+        .note
+        .as_deref()
+        .unwrap()
+        .contains("2 samples in parallel"));
+    assert!(!reply.usage.stages.iter().any(|s| s.stage == "sample"));
+    let counted: u64 = reply
+        .usage
+        .stages
+        .iter()
+        .filter(|s| s.stage != "sample")
+        .map(|s| s.ms)
+        .sum();
+    assert!(
+        counted <= reply.usage.wall_ms + 50,
+        "stages {counted} ms exceed wall {} ms",
+        reply.usage.wall_ms
+    );
     // Without the domain in the list, the confident draft skips the samples as before (P7-T02).
     let (o2, _mock2, _d2) = setup_with(true, |c| {
         c.gate.samples_on_unverified_domains.clear();
@@ -866,4 +892,38 @@ async fn unverified_math_drafts_always_get_the_agreement_samples() {
     .await;
     let reply2 = o2.handle(r, Emitter(None)).await.unwrap();
     assert_eq!(reply2.decision.features.k, 0);
+}
+
+#[tokio::test]
+async fn an_oversized_message_is_refused_before_it_reaches_the_model() {
+    // NFR-006: the newest turn is sent whole, so a message that cannot fit the prompt cap is a 400 from the
+    // gateway, not a 500 from the model server (found by driving the UI with a 9,000-word message).
+    let (o, mock, _d) = setup(true).await;
+    let big = "word ".repeat(9000);
+    let r = ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: big,
+        }],
+        ephemeral: Some(true),
+        ..Default::default()
+    };
+    let e = o.handle(r, Emitter(None)).await.unwrap_err();
+    assert!(matches!(e, NafsError::BadRequest(_)), "{e}");
+    assert!(e.to_string().contains("tokens"), "{e}");
+    assert!(
+        mock.calls.lock().unwrap().is_empty(),
+        "no model call was made"
+    );
+    // A message that fits is accepted.
+    let ok = ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: "word ".repeat(300),
+        }],
+        ephemeral: Some(true),
+        force_mode: Some(ReasoningMode::Fast),
+        ..Default::default()
+    };
+    assert!(o.handle(ok, Emitter(None)).await.is_ok());
 }

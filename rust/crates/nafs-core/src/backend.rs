@@ -353,6 +353,15 @@ impl Backend {
                 Ok(r) if r.status().is_client_error() => {
                     let s = r.status();
                     let t = r.text().await.unwrap_or_default();
+                    // A prompt longer than the model's context window is the caller's error, not a protocol
+                    // fault: the character-based estimate of the prompt cap can undercount code and CJK text.
+                    if t.contains("exceeds the available context size")
+                        || t.contains("context_length_exceeded")
+                    {
+                        return Err(NafsError::BadRequest(
+                            "the prompt is longer than the model's context window; shorten it or start a new conversation".into(),
+                        ));
+                    }
                     return Err(NafsError::BackendProtocol(format!(
                         "{} returned {}: {}",
                         self.role,

@@ -138,7 +138,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | A sequential test on the mean-log-prob early escalation | Wald's bound: ≥ 260 tokens to separate the threshold from its 0.04 margin at 5 % error; drafts are 47–291 tokens | kept as a measured heuristic, never made more aggressive |
 | Quantum-consciousness mechanisms (Orch OR and descendants) | decoherence 10⁻¹³ s against 10⁻³ s dynamics; a CPU can follow at most ~30 two-level systems | nothing transfers as an algorithm; negative result, `docs/research/quantum_neuro_review.md` |
 
-**Quality of the build**: 82 Rust tests, 9 Python tests, a 26-probe security suite (one real sandbox-escape found and fixed), a 38-check end-to-end sweep over every endpoint and UI page, `clippy -D warnings` clean.
+**Quality of the build**: 83 Rust tests, 9 Python tests, a 26-probe security suite (one real sandbox-escape found and fixed), a 42-check end-to-end sweep over every endpoint and UI page, `clippy -D warnings` clean.
 
 ## Quick start
 
