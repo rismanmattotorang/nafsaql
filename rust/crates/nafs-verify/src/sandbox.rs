@@ -1,6 +1,10 @@
 //! Process sandbox for model-written code (FR-035, SR-002).
 //! - macOS: `sandbox-exec` profile denying network, forking, writes outside the sandbox directory and
-//!   reads of user data (/Users, /Volumes, other temp dirs); Linux: `unshare -rn` (no network).
+//!   reads of user data (/Users, /Volumes, other temp dirs).
+//! - Linux: `unshare` into new user, network, PID and mount namespaces; shell stages (`linux_mountns.sh`,
+//!   `linux_enter.sh`) hide user data, make every mount read-only except the sandbox directory, replace /proc and drop
+//!   all capabilities; a seccomp stage (`linux_seccomp.py`) denies fork/spawn and mount-table changes before the
+//!   interpreter runs the code.
 //! - Fails closed: if the isolation tool is missing and network denial is required, nothing runs.
 //! - Own process group (setsid), killed as a whole on exit, timeout, memory or output overrun.
 //! - CPU and file-size rlimits; memory enforced by RSS polling (macOS ignores RLIMIT_AS).
@@ -120,29 +124,132 @@ pub fn resolve_python(name: &str) -> String {
 }
 
 /// Whether untrusted code can be isolated on this host. On Linux this is a functional probe, not a file
-/// check: the sandbox needs unprivileged user, network and PID namespaces, which stock Ubuntu 24.04 blocks
-/// through AppArmor (`kernel.apparmor_restrict_unprivileged_userns=1`). A host with the `unshare` binary but
-/// without that capability must report "not available", or the readiness check would claim isolation that fails
-/// at the first request. The probe runs once per process.
+/// check: it runs the whole isolation stack (user, network, PID and mount namespaces, the shell stage, the seccomp
+/// stage) around a script that asserts the sandbox is actually in force (scratch writable, rest of the filesystem
+/// read-only, fork denied). Stock Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor
+/// (`kernel.apparmor_restrict_unprivileged_userns=1`), and hosts differ in mount layout and seccomp support; a host
+/// that fails any step must report "not available", or the readiness check would claim isolation that fails at the
+/// first request. The probe runs once per process.
+#[cfg(target_os = "macos")]
 pub fn isolation_available() -> bool {
-    if cfg!(target_os = "macos") {
-        Path::new("/usr/bin/sandbox-exec").exists()
-    } else if cfg!(target_os = "linux") {
-        static PROBE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-        *PROBE.get_or_init(|| {
-            Path::new("/usr/bin/unshare").exists()
-                && std::process::Command::new("/usr/bin/unshare")
-                    .args(["-r", "-n", "-p", "-f", "--kill-child", "true"])
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .status()
-                    .map(|s| s.success())
-                    .unwrap_or(false)
-        })
-    } else {
-        false
+    Path::new("/usr/bin/sandbox-exec").exists()
+}
+#[cfg(target_os = "linux")]
+pub fn isolation_available() -> bool {
+    static PROBE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *PROBE.get_or_init(linux_probe)
+}
+#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+pub fn isolation_available() -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
+const MOUNT_STAGE: &str = include_str!("linux_mountns.sh");
+#[cfg(target_os = "linux")]
+const ENTER_STAGE: &str = include_str!("linux_enter.sh");
+#[cfg(target_os = "linux")]
+const SECCOMP_STAGE: &str = include_str!("linux_seccomp.py");
+#[cfg(target_os = "linux")]
+const PROBE_SCRIPT: &str = "import os\nopen('probe.txt', 'w').write('ok')\n\ndef denied(f):\n    try:\n        f()\n    except OSError:\n        return True\n    return False\n\nassert denied(lambda: open('/etc/nafs-probe', 'w')), 'filesystem is writable'\nassert denied(lambda: os.fork()), 'fork is allowed'\n";
+
+/// Interpreter prefixes (`<prefix>/bin/python`) of `python`, as given and with symlinks resolved. The shell stage
+/// binds them back in when they live under a directory it hides (a pyenv or venv under /home, say).
+#[cfg(target_os = "linux")]
+fn interpreter_prefixes(python: &str) -> Vec<PathBuf> {
+    let given = Path::new(python);
+    let mut out: Vec<PathBuf> = vec![];
+    for exe in [Some(given.to_path_buf()), std::fs::canonicalize(given).ok()]
+        .into_iter()
+        .flatten()
+    {
+        let prefix = exe
+            .parent()
+            .and_then(Path::parent)
+            .and_then(|p| std::fs::canonicalize(p).ok());
+        if let Some(p) = prefix {
+            let ok = p.is_absolute() && p != Path::new("/") && !p.to_string_lossy().contains('\n');
+            if ok && !out.contains(&p) {
+                out.push(p);
+            }
+        }
     }
+    out
+}
+
+/// `unshare` arguments for the Linux sandbox: everything up to and including the program to run.
+#[cfg(target_os = "linux")]
+fn linux_args(python: &str, dir: &Path, entry: &Path) -> Vec<std::ffi::OsString> {
+    use std::ffi::OsString;
+    let mut a: Vec<OsString> = [
+        "-r",
+        "-n",
+        "-m",
+        "--propagation",
+        "private",
+        "--",
+        "/bin/sh",
+        "-c",
+        MOUNT_STAGE,
+        "nafs-sbx",
+        ENTER_STAGE,
+    ]
+    .iter()
+    .map(OsString::from)
+    .collect();
+    a.push(dir.into());
+    a.extend(interpreter_prefixes(python).into_iter().map(OsString::from));
+    for x in [
+        "--",
+        python,
+        "-I",
+        "-B",
+        "-c",
+        SECCOMP_STAGE,
+        python,
+        "-I",
+        "-B",
+    ] {
+        a.push(x.into());
+    }
+    a.push(entry.into());
+    a
+}
+
+#[cfg(target_os = "linux")]
+fn linux_probe() -> bool {
+    let python = resolve_python("python3");
+    if !python.starts_with('/')
+        || !Path::new("/usr/bin/unshare").exists()
+        || !Path::new("/usr/bin/setpriv").exists()
+    {
+        return false;
+    }
+    let Ok(raw) = std::env::temp_dir()
+        .canonicalize()
+        .map(|t| t.join(format!("nafs-probe-{}", uuid::Uuid::new_v4())))
+    else {
+        return false;
+    };
+    if std::fs::create_dir_all(&raw).is_err() {
+        return false;
+    }
+    let dir = std::fs::canonicalize(&raw).unwrap_or(raw.clone());
+    let entry = dir.join("probe.py");
+    let ok = std::fs::write(&entry, PROBE_SCRIPT).is_ok()
+        && std::process::Command::new("/usr/bin/unshare")
+            .args(linux_args(&python, &dir, &entry))
+            .current_dir(&dir)
+            .env_clear()
+            .env("PATH", "/usr/local/bin:/usr/bin:/bin")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false);
+    let _ = std::fs::remove_dir_all(&dir);
+    ok
 }
 
 fn command_for(
@@ -152,7 +259,7 @@ fn command_for(
     entry: &Path,
 ) -> Result<tokio::process::Command, String> {
     if limits.deny_network && !isolation_available() {
-        return Err("sandbox isolation is not available on this host; refusing to run untrusted code (fail closed). On Linux it needs unprivileged user namespaces: on Ubuntu 24.04 run `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`".into());
+        return Err("sandbox isolation is not available on this host; refusing to run untrusted code (fail closed). On Linux it needs unprivileged user, mount and PID namespaces, `unshare`, `setpriv` and a python3 with ctypes: on Ubuntu 24.04 run `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`; in Docker run with `seccomp=unconfined` and `apparmor=unconfined`".into());
     }
     #[cfg(target_os = "macos")]
     if limits.deny_network {
@@ -174,18 +281,13 @@ fn command_for(
     }
     #[cfg(target_os = "linux")]
     if limits.deny_network {
+        // New user, network and mount namespaces; stage 2 (linux_mountns.sh) hides user data and makes the
+        // filesystem read-only except `dir`, then enters a PID namespace (no other process is addressable by
+        // signal or through /proc, security review ST-19; --kill-child reaps the tree with the namespace) and
+        // stage 3 (linux_enter.sh) replaces /proc and drops capabilities. Stage 4 (linux_seccomp.py) denies
+        // fork/spawn and mount-table changes in the interpreter that runs the code.
         let mut c = tokio::process::Command::new("/usr/bin/unshare");
-        // New user, network and PID namespaces: no network, and no other process is addressable by
-        // signal (security review ST-19); --kill-child reaps the whole tree with the namespace.
-        c.arg("-r")
-            .arg("-n")
-            .arg("-p")
-            .arg("-f")
-            .arg("--kill-child")
-            .arg(python)
-            .arg("-I")
-            .arg("-B")
-            .arg(entry);
+        c.args(linux_args(python, dir, entry));
         return Ok(c);
     }
     let _ = dir;

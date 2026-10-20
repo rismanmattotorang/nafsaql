@@ -219,7 +219,7 @@
       "id": "F-01",
       "severity": "medium",
       "status": "accepted",
-      "title": "Docker deployments run the gateway with seccomp=unconfined so the verifier can create network namespaces",
+      "title": "Docker deployments run the gateway with seccomp=unconfined and apparmor=unconfined so the verifier can create namespaces and mount inside them",
       "mitigation": "Container still runs as an unprivileged user; prefer the systemd profile on hosts that allow unprivileged user namespaces."
     },
     {
@@ -234,14 +234,14 @@
       "severity": "low",
       "status": "accepted",
       "title": "The sandbox on macOS relies on sandbox-exec, which Apple marks deprecated",
-      "mitigation": "Escape tests run in CI and in this review; Linux uses unshare plus rlimits."
+      "mitigation": "Escape tests run in CI and in this review; Linux uses user, network, mount and PID namespaces, a seccomp filter and rlimits, and the same escape tests run there."
     },
     {
       "id": "F-05",
       "severity": "high",
       "status": "fixed",
       "title": "Sandboxed code could signal (kill) the gateway and other processes of the same user",
-      "mitigation": "Found by ST-19 on 2026-10-18 (it killed the gateway). macOS profile now denies signals except to the process itself; Linux adds a PID namespace (unshare -p --fork --kill-child). Regression test in nafs-verify."
+      "mitigation": "Found by ST-19 on 2026-10-18 (it killed the gateway). macOS profile now denies signals except to the process itself; Linux adds a PID namespace and a fresh /proc (unshare -p --fork --kill-child). Regression test in nafs-verify."
     },
     {
       "id": "F-04",
