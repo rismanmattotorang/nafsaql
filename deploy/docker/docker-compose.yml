@@ -34,9 +34,10 @@ services:
       NAFS_BIND: "0.0.0.0:8080"
       NAFS_AUTH_TOKENS_FILE: /run/secrets/nafs_tokens
     secrets: [nafs_tokens]
-    # The verifier sandbox isolates untrusted code with an unprivileged network namespace (unshare -rn),
-    # which Docker's default seccomp profile forbids; without it the verifier fails closed (SR-002).
-    security_opt: ["seccomp=unconfined"]
+    # The verifier sandbox isolates untrusted code with unprivileged user, network, mount and PID namespaces
+    # (unshare -rnm, then -p) and mounts inside them. Docker's default seccomp profile forbids the namespaces and its
+    # default AppArmor profile forbids mount(2); without both relaxations the verifier fails closed (SR-002, A-040).
+    security_opt: ["seccomp=unconfined", "apparmor=unconfined"]
     volumes: ["nafs-data:/app/data/runtime"]
     depends_on:
       system1: {condition: service_healthy}

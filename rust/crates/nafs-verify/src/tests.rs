@@ -143,15 +143,11 @@ async fn code_verifier_pass_fail_and_limits() {
 #[tokio::test]
 async fn sandbox_denies_network_home_reads_and_forks() {
     let h = hub();
-    let mut attempts = vec![
+    let attempts = [
         "import socket\ns=socket.create_connection(('1.1.1.1',80),timeout=3)",
         "import os\nopen(os.path.expanduser('/Users')).read()",
+        "import os\nos.fork()",
     ];
-    // `fork` is denied by the macOS sandbox profile only; on Linux the sandbox is namespaces and resource
-    // limits (no fork ban; see the Linux note in README.md, Security).
-    if cfg!(target_os = "macos") {
-        attempts.push("import os\nos.fork()");
-    }
     for t in attempts {
         assert!(
             !h.verify_code("```python\nx=1\n```", &tests(&[t]))
@@ -260,13 +256,22 @@ async fn long_unicode_test_lines_are_accepted() {
     assert!(r.passed, "{:?}", r.evidence);
 }
 
-/// Sandbox escape tests (SR-002, P5-T01): each attempt must fail closed, and the host must be unchanged.
+/// Sandbox escape tests (SR-002, P5-T01): each attempt must fail closed, and the host must be unchanged. The
+/// same attempts run on macOS (sandbox-exec profile) and Linux (mount namespace plus seccomp).
 #[tokio::test]
 async fn sandbox_escape_attempts_fail_closed() {
     let h = hub();
-    let repo_file = concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml");
+    // A user file in a directory the sandbox must hide: the temp dir (/tmp on Linux, /private/var/folders on macOS).
+    let canary_dir = std::env::temp_dir().join(format!("nafs-canary-{}", std::process::id()));
+    std::fs::create_dir_all(&canary_dir).unwrap();
+    let canary = canary_dir.join("secret.txt");
+    std::fs::write(&canary, "nafs-canary-contents").unwrap();
     let outside = std::env::temp_dir().join(format!("nafs-escape-{}", std::process::id()));
+    let in_cwd = std::env::current_dir()
+        .unwrap()
+        .join(format!("nafs-escape-{}", std::process::id()));
     let _ = std::fs::remove_file(&outside);
+    let _ = std::fs::remove_file(&in_cwd);
     // A process outside the sandbox that sandboxed code must not be able to signal (security review ST-19).
     // macOS denies the signal; on Linux the PID namespace hides the process, so the call raises.
     let mut sentinel = std::process::Command::new("sleep")
@@ -274,24 +279,52 @@ async fn sandbox_escape_attempts_fail_closed() {
         .spawn()
         .expect("start the sentinel process");
     let sentinel_pid = sentinel.id();
-    // Filesystem and process-creation attempts are blocked by the macOS sandbox profile. The Linux sandbox
-    // isolates network, PIDs and signals and applies resource limits, but not the filesystem or fork: those
-    // attempts run on macOS only (documented limitation; the container recipe is the Linux boundary, SR-002).
-    let macos_only = [
+    let mut attempts = vec![
+        (
+            "signal a process outside the sandbox (security review ST-19)",
+            format!("import os, signal\nos.kill({sentinel_pid}, signal.SIGKILL)"),
+        ),
         (
             "read a user file",
-            format!("print(open({repo_file:?}).read()[:50])"),
+            format!("print(open({:?}).read()[:50])", canary.display().to_string()),
         ),
         (
             "write outside the sandbox",
             format!("open({:?}, 'w').write('x')", outside.display().to_string()),
         ),
         (
+            "write into the gateway's working directory",
+            format!("open({:?}, 'w').write('x')", in_cwd.display().to_string()),
+        ),
+        (
+            "write to the filesystem root",
+            "open('/nafs-escape', 'w').write('x')".to_string(),
+        ),
+        (
             "symlink to the user folder",
             format!(
                 "import os\nos.symlink({:?}, 'l')\nprint(open('l').read()[:50])",
-                repo_file
+                canary.display().to_string()
             ),
+        ),
+        (
+            "reach the hidden tree through the working directory",
+            format!(
+                "import os\nprint(open(os.path.join('..', {:?}, 'secret.txt')).read())",
+                canary_dir.file_name().unwrap().to_string_lossy()
+            ),
+        ),
+        (
+            "read another process's environment through /proc",
+            "import os\nme = os.getpid()\nassert any(open('/proc/%s/environ' % p, 'rb').read() for p in os.listdir('/proc') if p.isdigit() and int(p) != me)".to_string(),
+        ),
+        (
+            "unmount the hiding mounts",
+            "import ctypes\nl = ctypes.CDLL(None)\nassert l.umount2(b'/tmp', 0) == 0".to_string(),
+        ),
+        (
+            "unshare a new user namespace",
+            "import ctypes\nl = ctypes.CDLL(None)\nassert l.unshare(0x10000000) == 0".to_string(),
         ),
         (
             "spawn a process",
@@ -300,16 +333,6 @@ async fn sandbox_escape_attempts_fail_closed() {
         (
             "fork bomb",
             "import os\nwhile True:\n    os.fork()".to_string(),
-        ),
-        (
-            "signal the parent (security review ST-19)",
-            "import os, signal\nos.kill(os.getppid(), signal.SIGCONT)".to_string(),
-        ),
-    ];
-    let portable = [
-        (
-            "signal a process outside the sandbox (security review ST-19)",
-            format!("import os, signal\nos.kill({sentinel_pid}, signal.SIGKILL)"),
         ),
         (
             "memory bomb",
@@ -322,18 +345,40 @@ async fn sandbox_escape_attempts_fail_closed() {
                 .to_string(),
         ),
     ];
-    let attempts: Vec<&(&str, String)> = if cfg!(target_os = "macos") {
-        macos_only.iter().chain(portable.iter()).collect()
-    } else {
-        portable.iter().collect()
-    };
-    for (name, code) in attempts {
+    // On Linux the interpreter is PID 1 of its namespace and getppid() is 0, so "the parent" is not addressable
+    // (kill(0) only reaches the sandbox's own group); the sentinel above is the Linux check.
+    if cfg!(target_os = "macos") {
+        attempts.push((
+            "signal the parent (security review ST-19)",
+            "import os, signal\nos.kill(os.getppid(), signal.SIGCONT)".to_string(),
+        ));
+    }
+    for (name, code) in &attempts {
         let r = h
             .verify_code("```python\nx = 1\n```", &tests(&[code.as_str()]))
             .await;
         assert!(!r.passed, "escape attempt succeeded: {name}");
     }
+    // What a failing run prints is returned to the user and the model: the file's contents must not be in it.
+    let leak = h
+        .verify_code(
+            "```python\nx = 1\n```",
+            &tests(&[&format!(
+                "import sys\nsys.stdout.write(open({:?}).read())\nsys.exit(1)",
+                canary.display().to_string()
+            )]),
+        )
+        .await;
+    assert!(
+        !format!("{:?}", leak.evidence).contains("nafs-canary-contents"),
+        "file contents leaked into the verifier evidence"
+    );
+    let _ = std::fs::remove_dir_all(&canary_dir);
     assert!(!outside.exists(), "a file was written outside the sandbox");
+    assert!(
+        !in_cwd.exists(),
+        "a file was written into the working directory"
+    );
     let alive = sentinel.try_wait().expect("poll the sentinel").is_none();
     let _ = sentinel.kill();
     let _ = sentinel.wait();

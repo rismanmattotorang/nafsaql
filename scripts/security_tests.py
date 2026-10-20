@@ -86,14 +86,14 @@ check("ST-26", "sandbox", "Rust escape and injection unit tests are part of the 
 
 failed_high = [r for r in results if not r["pass"] and r["severity_if_failed"] in ("high", "critical")]
 findings = [
-    {"id": "F-01", "severity": "medium", "status": "accepted", "title": "Docker deployments run the gateway with seccomp=unconfined so the verifier can create network namespaces",
+    {"id": "F-01", "severity": "medium", "status": "accepted", "title": "Docker deployments run the gateway with seccomp=unconfined and apparmor=unconfined so the verifier can create namespaces and mount inside them",
      "mitigation": "Container still runs as an unprivileged user; prefer the systemd profile on hosts that allow unprivileged user namespaces."},
     {"id": "F-02", "severity": "medium", "status": "accepted", "title": "Without NAFS_AUTH_TOKENS the API is unauthenticated (loopback only)",
      "mitigation": "The gateway refuses non-loopback binds without tokens (ST-25); same-origin and Host checks block browser-based attacks (ST-01..03)."},
     {"id": "F-03", "severity": "low", "status": "accepted", "title": "The sandbox on macOS relies on sandbox-exec, which Apple marks deprecated",
-     "mitigation": "Escape tests run in CI and in this review; Linux uses unshare plus rlimits."},
+     "mitigation": "Escape tests run in CI and in this review; Linux uses user, network, mount and PID namespaces, a seccomp filter and rlimits, and the same escape tests run there."},
     {"id": "F-05", "severity": "high", "status": "fixed", "title": "Sandboxed code could signal (kill) the gateway and other processes of the same user",
-     "mitigation": "Found by ST-19 on 2026-10-18 (it killed the gateway). macOS profile now denies signals except to the process itself; Linux adds a PID namespace (unshare -p --fork --kill-child). Regression test in nafs-verify."},
+     "mitigation": "Found by ST-19 on 2026-10-18 (it killed the gateway). macOS profile now denies signals except to the process itself; Linux adds a PID namespace and a fresh /proc (unshare -p --fork --kill-child). Regression test in nafs-verify."},
     {"id": "F-04", "severity": "low", "status": "fixed", "title": "The review in docs/research/code_review_phase1.md found 4 high-severity issues", "mitigation": "All fixed with tests (resolution table)."},
 ]
 out = {"reviewed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "base": BASE, "tests": results,
