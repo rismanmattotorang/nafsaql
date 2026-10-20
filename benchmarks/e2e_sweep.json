@@ -1,5 +1,5 @@
 {
- "measured_at": "2026-10-19T15:32:39Z",
+ "measured_at": "2026-10-20T01:18:57Z",
  "base": "http://127.0.0.1:8080",
  "passed": 38,
  "failed": 0,
@@ -12,7 +12,7 @@
   {
    "check": "GET /metrics",
    "pass": true,
-   "detail": "200 text/plain 3824 B"
+   "detail": "200 text/plain 4797 B"
   },
   {
    "check": "GET /openapi.json",
@@ -22,7 +22,7 @@
   {
    "check": "GET /v1/alerts",
    "pass": true,
-   "detail": "200 application/json 1045 B"
+   "detail": "200 application/json 1032 B"
   },
   {
    "check": "GET /v1/audits",
@@ -42,27 +42,27 @@
   {
    "check": "GET /v1/conversations",
    "pass": true,
-   "detail": "200 application/json 3625 B"
+   "detail": "200 application/json 4216 B"
   },
   {
    "check": "GET /v1/drift",
    "pass": true,
-   "detail": "200 application/json 15811 B"
+   "detail": "200 application/json 15843 B"
   },
   {
    "check": "GET /v1/eval/datasets",
    "pass": true,
-   "detail": "200 application/json 1215 B"
+   "detail": "200 application/json 1334 B"
   },
   {
    "check": "GET /v1/eval/runs",
    "pass": true,
-   "detail": "200 application/json 15482 B"
+   "detail": "200 application/json 19370 B"
   },
   {
    "check": "GET /v1/gate",
    "pass": true,
-   "detail": "200 application/json 2162 B"
+   "detail": "200 application/json 2188 B"
   },
   {
    "check": "GET /v1/gate/params",
@@ -82,7 +82,7 @@
   {
    "check": "GET /v1/perf/stages",
    "pass": true,
-   "detail": "200 application/json 1995 B"
+   "detail": "200 application/json 1943 B"
   },
   {
    "check": "GET /v1/preferences",
@@ -97,17 +97,17 @@
   {
    "check": "GET /v1/self-model",
    "pass": true,
-   "detail": "200 application/json 2674 B"
+   "detail": "200 application/json 2701 B"
   },
   {
    "check": "GET /v1/system",
    "pass": true,
-   "detail": "200 application/json 5763 B"
+   "detail": "200 application/json 5957 B"
   },
   {
    "check": "GET /v1/system/activity",
    "pass": true,
-   "detail": "200 application/json 35364 B"
+   "detail": "200 application/json 35347 B"
   },
   {
    "check": "GET /v1/tazkiya",
@@ -132,7 +132,7 @@
   {
    "check": "chat: verified math reply",
    "pass": true,
-   "detail": "fast verified 2.1s"
+   "detail": "fast verified 1.5s"
   },
   {
    "check": "chat: stage timings recorded (NFR-030)",
@@ -152,7 +152,7 @@
   {
    "check": "perf: latency breakdown (P7-T01)",
    "pass": true,
-   "detail": "94 replies"
+   "detail": "96 replies"
   },
   {
    "check": "system: switching to a stopped backend is refused",
