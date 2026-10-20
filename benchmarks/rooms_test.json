@@ -1,0 +1,324 @@
+{
+ "measured_at": "2026-10-20T13:06:38Z",
+ "base": "http://127.0.0.1:8080",
+ "slow": true,
+ "passed": 63,
+ "failed": 0,
+ "results": [
+  {
+   "check": "create: name is trimmed and collapsed, 201",
+   "pass": true,
+   "detail": "201 T-0b07a6 Alpha"
+  },
+  {
+   "check": "create: the room starts empty",
+   "pass": true,
+   "detail": "{'busy': False, 'conversation_id': 'ce365f0f-a2d0-485b-98ee-f293dbdc43b6', 'created_at': '2026-10-20T13:05:45.268469+00:00', 'last_activity': '2026-10-20T13:05:45.268469+00:00', 'members': 0, 'name': 'T-0b07a6 Alpha', 'profile': 'A', 'questions': 0, 'queued': 0, 'room_id': '4337f825-b4b1-4079-97ec-2"
+  },
+  {
+   "check": "create: duplicate 't-0b07a6 alpha' is a 409 conflict",
+   "pass": true,
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-0b07a6 alpha' already exists\"}"
+  },
+  {
+   "check": "create: duplicate 'T-0b07a6    ALPHA' is a 409 conflict",
+   "pass": true,
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-0b07a6 ALPHA' already exists\"}"
+  },
+  {
+   "check": "create: duplicate ' T-0b07a6 Alpha ' is a 409 conflict",
+   "pass": true,
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-0b07a6 Alpha' already exists\"}"
+  },
+  {
+   "check": "create: empty name is a 400",
+   "pass": true,
+   "detail": "400 {'code': 'E_BAD_REQUEST', 'message': 'bad request: room name required'}"
+  },
+  {
+   "check": "create: blank name is a 400",
+   "pass": true,
+   "detail": "400 {'code': 'E_BAD_REQUEST', 'message': 'bad request: room name required'}"
+  },
+  {
+   "check": "create: control characters only name is a 400",
+   "pass": true,
+   "detail": "400 {'code': 'E_BAD_REQUEST', 'message': 'bad request: room name required'}"
+  },
+  {
+   "check": "create: wrong type is refused with the JSON envelope",
+   "pass": true,
+   "detail": "422 {'code': 'E_BAD_REQUEST', 'message': 'bad request: Failed to deserialize the JSON body into the target type: name: invalid type: integer `5`, expected a string at line 1 column 10'}"
+  },
+  {
+   "check": "create: a 300-character name is cut to 80",
+   "pass": true,
+   "detail": "201 80"
+  },
+  {
+   "check": "create: markup is stored as plain text",
+   "pass": true,
+   "detail": "T-0b07a6 <img src=x onerror=alert(1)>"
+  },
+  {
+   "check": "list: every created room is listed, newest activity first",
+   "pass": true,
+   "detail": "10 rooms"
+  },
+  {
+   "check": "get: one room by id",
+   "pass": true,
+   "detail": "200"
+  },
+  {
+   "check": "get: unknown room is a 404",
+   "pass": true,
+   "detail": "404 {'code': 'E_NOT_FOUND', 'message': 'not found: room 00000000-0000-0000-0000-000000000000'}"
+  },
+  {
+   "check": "get: a malformed id is a 400 with the JSON envelope",
+   "pass": true,
+   "detail": "400 {'code': 'E_BAD_REQUEST', 'message': 'bad request: Invalid URL: Cannot parse `id` with value `not-a-uuid`: UUID parsing failed: invalid character: found `n` at 0'}"
+  },
+  {
+   "check": "rename: normalised, 200, listed under the new name",
+   "pass": true,
+   "detail": "200"
+  },
+  {
+   "check": "rename: onto another room's name (any case) is a 409",
+   "pass": true,
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-0b07a6 alpha' already exists\"}"
+  },
+  {
+   "check": "rename: changing only the case of its own name is allowed",
+   "pass": true,
+   "detail": "200"
+  },
+  {
+   "check": "rename: a blank name is a 400",
+   "pass": true,
+   "detail": "400 {'code': 'E_BAD_REQUEST', 'message': 'bad request: room name required'}"
+  },
+  {
+   "check": "rename: unknown room is a 404",
+   "pass": true,
+   "detail": "404"
+  },
+  {
+   "check": "ws: the first frame is the welcome, addressed to the new member",
+   "pass": true,
+   "detail": "['welcome', 'presence']"
+  },
+  {
+   "check": "ws: welcome carries the name, the room, the members and the limits",
+   "pass": true,
+   "detail": "{'assistant': {'busy': False, 'queued': 0, 'working_for': None}, 'cursor': 0, 'limits': {'burst': 4.0, 'message_chars': 8000, 'queue': 3}, 'pending': [], 'room': {'name': 'T-0b07a6 Alpha', 'room_id': '4337f825-b4b1-4079-97ec-2e41ccaad8b1'}, 'users': ['Ann'], 'you': 'Ann'}"
+  },
+  {
+   "check": "ws: the member then sees its own presence frame",
+   "pass": true,
+   "detail": "['welcome', 'presence']"
+  },
+  {
+   "check": "ws: a clashing name gets a number, so every member is unique",
+   "pass": true,
+   "detail": "ann 2"
+  },
+  {
+   "check": "ws: others see the join, with the member list and count",
+   "pass": true,
+   "detail": "{'payload': {'joined': True, 'members': 2, 'users': ['Ann', 'ann 2']}, 'type': 'presence', 'user': 'ann 2'}"
+  },
+  {
+   "check": "rest: the room list reports who is online",
+   "pass": true,
+   "detail": "['Ann', 'ann 2']"
+  },
+  {
+   "check": "ws: nobody can take the name Assistant",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "ws: ping is answered with pong",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "ws: typing reaches the others, throttled to one frame per 2 s",
+   "pass": true,
+   "detail": "1"
+  },
+  {
+   "check": "ws: an over-long message is refused, privately, not truncated",
+   "pass": true,
+   "detail": "{'code': 'E_TOO_LONG', 'message': 'Messages are limited to 8000 characters; yours has 8001.'}"
+  },
+  {
+   "check": "ws: ... and the others never see it",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "ws: blank messages, unknown frames and garbage are ignored",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "ws: the others receive the message with sender, id and timestamp",
+   "pass": true,
+   "detail": "Ann"
+  },
+  {
+   "check": "ws: the queue frame says the assistant is answering for Ann",
+   "pass": true,
+   "detail": "{'busy': True, 'queued': 0, 'working_for': 'Ann'}"
+  },
+  {
+   "check": "ws: the others see the assistant's answer stream to done",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "ws: the queue frame returns to idle (nothing running, nothing queued)",
+   "pass": true,
+   "detail": "{'busy': False, 'queued': 0, 'working_for': None}"
+  },
+  {
+   "check": "rest: the room now counts the question and its activity",
+   "pass": true,
+   "detail": "questions=1"
+  },
+  {
+   "check": "rest: the transcript has the question (with the sender) and the answer",
+   "pass": true,
+   "detail": "200"
+  },
+  {
+   "check": "rest: room conversations are not in the chat history list",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "ws: welcome hands a late joiner the history cursor (2 stored messages) and nothing pending",
+   "pass": true,
+   "detail": "(2, [])"
+  },
+  {
+   "check": "ws: a late joiner's welcome shows the assistant idle",
+   "pass": true,
+   "detail": "['Ann', 'ann 2', 'Cy']"
+  },
+  {
+   "check": "ws: joining mid-answer, the welcome lists the running question as pending, with the cursor before it",
+   "pass": true,
+   "detail": "({'busy': True, 'queued': 0, 'working_for': 'Ann'}, 2, ['Name three primary colours.'])"
+  },
+  {
+   "check": "ws: ... and the same member receives that answer's done frame, closing the pending turn",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "ws: after the answer, a joiner finds the turn in the stored messages (cursor 4) and nothing pending",
+   "pass": true,
+   "detail": "(4, [])"
+  },
+  {
+   "check": "ws: a rename reaches every member",
+   "pass": true,
+   "detail": "{'payload': {'name': 'T-0b07a6 Alpha Renamed'}, 'type': 'room_renamed'}"
+  },
+  {
+   "check": "ws: a departure is announced with the remaining members",
+   "pass": true,
+   "detail": "{'joined': False, 'members': 1, 'users': ['Ann']}"
+  },
+  {
+   "check": "delete: 200 with a report of what was removed",
+   "pass": true,
+   "detail": "{'deleted': True, 'disconnected': 2, 'name': 'T-0b07a6 Alpha Renamed', 'removed': {'memory_entries': 0, 'messages': 4, 'replies': 2}, 'room_id': '4337f825-b4b1-4079-97ec-2e41ccaad8b1'}"
+  },
+  {
+   "check": "delete: members are told first, then disconnected with code 4004",
+   "pass": true,
+   "detail": "(4004, 4004)"
+  },
+  {
+   "check": "delete: the room is gone (404)",
+   "pass": true,
+   "detail": "404"
+  },
+  {
+   "check": "delete: its transcript is gone",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "delete: its decision record is gone",
+   "pass": true,
+   "detail": "399bed09-94ec-4b1a-bc9c-e9f3c2604a0a"
+  },
+  {
+   "check": "delete: deleting again is a 404",
+   "pass": true,
+   "detail": "404"
+  },
+  {
+   "check": "delete: connecting to a deleted room is refused",
+   "pass": true,
+   "detail": "404"
+  },
+  {
+   "check": "delete: the list no longer holds it",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "delete while answering: succeeds promptly (the turn is cancelled)",
+   "pass": true,
+   "detail": "200 in 0.1 s"
+  },
+  {
+   "check": "delete while answering: the member is told and disconnected",
+   "pass": true,
+   "detail": "4004"
+  },
+  {
+   "check": "delete while answering: nothing of the room is left in the database",
+   "pass": true,
+   "detail": "orphan rows: 0"
+  },
+  {
+   "check": "delete while answering: no stray conversation appeared in the chat list",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "slow ws: a heartbeat arrives within 30 s",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "slow ws: 64 members fit",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "slow ws: the 65th member is refused (400)",
+   "pass": true,
+   "detail": "400"
+  },
+  {
+   "check": "slow ws: beyond four quick messages the sender is told the queue or rate limit is full",
+   "pass": true,
+   "detail": "['E_RATE_LIMITED']"
+  },
+  {
+   "check": "cleanup: every room this script created was deleted",
+   "pass": true,
+   "detail": "6 to clean, 0 left"
+  }
+ ]
+}

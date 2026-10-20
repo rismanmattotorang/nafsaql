@@ -557,42 +557,312 @@ routes.chat = { title: 'Chat', async render(view) {
 } };
 
 // ============================== rooms ==============================
-routes.rooms = { title: 'Rooms', async render(view) {
-  const user = store.get('user', '') || `user-${Math.random().toString(36).slice(2, 6)}`; store.set('user', user);
-  view.innerHTML = `<div class="chat noinspect" style="grid-template-columns:260px minmax(0,1fr) 0">
-    <aside class="convs"><div class="head" style="flex-direction:column;align-items:stretch"><div class="row"><input id="roomName" type="text" placeholder="New room name" style="flex:1"><button class="btn sm" id="mkRoom">${icon.plus}</button></div>
-      <label class="f" style="margin-top:8px">Your name<input id="userName" type="text" value="${esc(user)}"></label></div><div class="list" id="roomList"></div></aside>
-    <div class="thread"><div class="topbar" style="height:48px" id="roomBar"><b>Select or create a room</b></div><div class="msgs" id="rmsgs"><div class="inner" id="rinner"><div class="empty">Rooms are shared chats: everyone connected sees every question and the assistant's live answer (WebSocket, IF-004). Open this page in two browser windows to try it.</div></div></div>
-      <div class="composer"><div class="inner"><div class="box"><textarea id="rinput" rows="1" placeholder="Message the room…" disabled></textarea><button class="btn send" id="rsend" disabled>${icon.send}</button></div>
-      <div class="controls"><div class="grp"><span>Path</span><div class="seg" id="rmode"><button data-m="auto" class="on">Auto</button><button data-m="fast">Fast</button><button data-m="slow">Deliberate</button></div></div><span class="hint">One assistant answer at a time per room; questions queue.</span></div></div></div></div><aside></aside></div>`;
-  let ws = null, room = null, rmode = 'auto'; const turnsByMsg = new Map(); const rinner = $('#rinner');
-  $$('#rmode button').forEach(b => b.onclick = () => { rmode = b.dataset.m; $$('#rmode button').forEach(x => x.classList.toggle('on', x === b)); });
-  $('#userName').onchange = (e) => { store.set('user', e.target.value.trim() || user); if (room) join(room); };
-  async function loadRooms() { const rooms = await api.get('/v1/rooms'); $('#roomList').innerHTML = rooms.length ? rooms.map(r => `<div class="conv ${room?.room_id === r.room_id ? 'on' : ''}" data-id="${r.room_id}"><span class="t1">${esc(r.name)}</span><span class="badge b-domain">${icon.users}${r.members}</span></div>`).join('') : '<div class="empty small">No rooms yet.</div>';
-    $$('#roomList .conv').forEach(el => el.onclick = () => join(rooms.find(r => r.room_id === el.dataset.id))); }
-  $('#mkRoom').onclick = async () => { const name = $('#roomName').value.trim(); if (!name) return toast('Enter a room name'); const r = await api.post('/v1/rooms', { name }); $('#roomName').value = ''; await loadRooms(); join(r); };
-  async function join(r) {
-    if (ws) { ws.onclose = null; ws.close(); } room = r; turnsByMsg.forEach(t => t.dispose()); rinner.innerHTML = ''; turnsByMsg.clear();
-    $('#roomBar').innerHTML = `<b>${esc(r.name)}</b><span class="room-users" id="presence"><span class="dot warn"></span><span class="small muted">connecting…</span></span>`;
-    try { const c = await api.get('/v1/conversations/' + r.conversation_id); for (const m of c.messages) { if (m.role === 'user') { const mm = m.content.match(/^\[([^\]]+)\] ([\s\S]*)$/); addUser(mm ? mm[2] : m.content, mm ? mm[1] : ''); } else if (m.reply) Turn.fromStored(rinner, m.reply, {}).dispose(); } } catch {}
-    const proto = location.protocol === 'https:' ? 'wss' : 'ws'; const tok = api.token();
-    ws = new WebSocket(`${proto}://${location.host}/ws/rooms/${r.room_id}?user=${encodeURIComponent(store.get('user', user))}${tok ? '&token=' + encodeURIComponent(tok) : ''}`);
-    ws.onopen = () => { $('#rinput').disabled = false; $('#rsend').disabled = false; };
-    ws.onclose = () => { $('#presence').innerHTML = '<span class="dot bad"></span><span class="small muted">disconnected</span>'; $('#rinput').disabled = true; $('#rsend').disabled = true; };
-    ws.onmessage = (e) => { const f = JSON.parse(e.data);
-      if (f.type === 'presence') { $('#presence').innerHTML = `<span class="dot ok"></span><span class="small muted">${f.payload.members} online · ${esc(f.user)} ${f.payload.joined ? 'joined' : 'left'}</span>`; loadRooms(); }
-      if (f.type === 'user_message') { addUser(f.payload.content, f.user); scroll(); }
-      if (f.type === 'error') toast(f.payload.message, 4000);
-      if (f.type === 'resync') toast(`Connection fell behind; ${f.payload.missed} updates were skipped.`, 4000);
-      if (f.type === 'assistant_event') { const id = f.payload.reply_to; let t = turnsByMsg.get(id); if (!t) { t = new Turn(rinner, {}); turnsByMsg.set(id, t); } t.on(f.payload.event.event, f.payload.event); scroll(); } };
-    loadRooms();
+// Shared chats over WebSocket (IF-004). The page keeps one connection to one room at a time. The server's
+// `welcome` frame carries a snapshot (`cursor`, `pending`) so that, after any join or reconnect, the transcript
+// is: the first `cursor` stored messages, then the pending questions, then live frames, with no overlap.
+const ROOM_COLORS = ['#1B8A8F', '#6A4C9C', '#C97D10', '#B3263E', '#3A8F4B', '#2F6FD0', '#8A5A44', '#5B6770'];
+const roomColor = (n) => { let x = 0; for (const c of String(n).toLowerCase()) x = (x * 31 + c.codePointAt(0)) >>> 0; return ROOM_COLORS[x % ROOM_COLORS.length]; };
+const roomInitials = (n) => { const p = String(n).trim().split(/\s+/); return ((p[0]?.[0] || '?') + (p.length > 1 ? p[1][0] : '')).toUpperCase(); };
+const roomAvatar = (n, me) => `<span class="rav${me ? ' me' : ''}" style="background:${roomColor(n)}" title="${esc(n)}${me ? ' (you)' : ''}">${esc(roomInitials(n))}</span>`;
+const clock = (iso) => { const d = new Date(iso); return Number.isNaN(+d) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); };
+const dayLabel = (iso) => { const d = new Date(iso), t = new Date(), y = new Date(t); y.setDate(t.getDate() - 1);
+  return d.toDateString() === t.toDateString() ? 'Today' : d.toDateString() === y.toDateString() ? 'Yesterday' : d.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short', year: d.getFullYear() === t.getFullYear() ? undefined : 'numeric' }); };
+const cleanRoomName = (s) => String(s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+const cleanUserName = (s) => String(s).replace(/[^\p{L}\p{N}_\- ]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 32) || 'guest';
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const people = (n) => n === 1 ? '1 person' : `${n} people`;
+const downloadText = (name, text, type) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+function confirmDialog({ title, body, ok = 'Delete', danger = true }) {
+  return new Promise((resolve) => {
+    modal(`<h3 style="margin-top:0">${esc(title)}</h3>${body}<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost" id="cdNo" type="button">Cancel</button><button class="btn ${danger ? 'danger' : ''}" id="cdYes" type="button">${esc(ok)}</button></div>`);
+    const dlg = $('#modal'); dlg.classList.add('confirm'); let done = false; const fin = (v) => { if (done) return; done = true; if (dlg.open) dlg.close(); dlg.classList.remove('confirm'); resolve(v); };
+    $('#cdYes').onclick = () => fin(true); $('#cdNo').onclick = () => fin(false); dlg.addEventListener('close', () => fin(false), { once: true }); $('#cdNo').focus();
+  });
+}
+// Stored messages -> display items. A room question is stored as "[Name] text".
+function roomItems(messages) {
+  return messages.map((m) => { if (m.role === 'user') { const mm = m.content.match(/^\[([^\]]+)\] ([\s\S]*)$/); return { kind: 'q', who: mm ? mm[1] : '', text: mm ? mm[2] : m.content, ts: m.created_at }; }
+    return m.reply ? { kind: 'a', reply: m.reply, ts: m.created_at, feedback: m.feedback } : null; }).filter(Boolean);
+}
+function roomMarkdown(room, conv) {
+  const items = roomItems(conv.messages); let out = `# ${room.name}\n\nExported ${new Date().toLocaleString()} · ${plural(items.filter(i => i.kind === 'q').length, 'question')}\n`; let day = '';
+  for (const i of items) { const d = new Date(i.ts).toDateString(); if (d !== day) { day = d; out += `\n---\n\n### ${dayLabel(i.ts)}\n`; }
+    if (i.kind === 'q') out += `\n**${i.who || 'Someone'}** (${clock(i.ts)}):\n\n${i.text}\n`;
+    else { const r = i.reply; out += `\n**Assistant** (${clock(i.ts)} · ${r.reasoning_mode === 'slow' ? 'deliberate, System 2' : 'fast, System 1'} · ${r.assurance}):\n\n${r.message?.content || ''}\n`; } }
+  return out;
+}
+
+routes.rooms = { title: 'Rooms', async render(view, alive) {
+  const stored = store.get('user', '') || `user-${Math.random().toString(36).slice(2, 6)}`; store.set('user', cleanUserName(stored));
+  view.innerHTML = `<div class="rooms" id="rooms">
+    <aside class="rooms-side" id="roomsSide" aria-label="Rooms">
+      <div class="rooms-head">
+        <div class="row"><b style="font-size:15px">Rooms</b><span class="tiny faint" id="roomCount"></span><span class="sp"></span><button class="btn sm" id="newRoomBtn" type="button">${icon.plus}New room</button></div>
+        <form id="newRoomForm" class="rnew" hidden autocomplete="off"><div class="row" style="flex-wrap:nowrap"><input id="roomName" type="text" maxlength="80" placeholder="Room name" aria-label="New room name" style="flex:1"><button class="btn sm" type="submit" id="mkRoom">Create</button><button class="btn sm ghost" type="button" id="cancelNew" aria-label="Cancel">${icon.x}</button></div>
+          <div class="rerr" id="roomNameErr" role="alert"></div></form>
+        <input id="roomSearch" type="search" class="rsearch" placeholder="Search rooms" aria-label="Search rooms">
+      </div>
+      <div class="rooms-list" id="roomList" role="list"><div class="empty small">Loading rooms…</div></div>
+      <div class="rooms-me"><label class="f">Your name<input id="userName" type="text" maxlength="32" value="${esc(store.get('user', ''))}" autocomplete="off"></label><div class="tiny faint" id="userHint">Shown to everyone in a room. Letters, numbers, spaces, - and _.</div></div>
+    </aside>
+    <section class="rooms-main">
+      <header class="rooms-bar" id="roomBar"></header>
+      <div class="rooms-banner" id="roomBanner" hidden></div>
+      <div class="msgs rmsgs" id="rmsgs" role="log" aria-label="Room transcript"><div class="inner" id="rinner"></div><button class="rjump" id="jumpNew" type="button" hidden></button></div>
+      <div class="rtyping tiny faint" id="rtyping" aria-live="polite"></div>
+      <div class="composer"><div class="inner">
+        <div class="box"><textarea id="rinput" rows="1" maxlength="9000" placeholder="Select or create a room to start" aria-label="Message the room" disabled></textarea><button class="btn send" id="rsend" type="button" aria-label="Send" disabled>${icon.send}</button></div>
+        <div class="controls"><div class="grp"><span>Path</span><div class="seg" id="rmode"><button data-m="auto">Auto</button><button data-m="fast">Fast</button><button data-m="slow">Deliberate</button></div></div>
+          <span class="hint" id="rhint">One assistant answer at a time per room; questions queue.</span><span class="sp"></span><span class="tiny" id="rcount"></span></div>
+        <div class="rcnote tiny" id="rcnote" role="alert"></div></div></div>
+      <div class="rsr" id="rsr" aria-live="polite"></div>
+    </section></div>`;
+  const root = $('#rooms'), rinner = $('#rinner'), rmsgs = $('#rmsgs'), input = $('#rinput');
+  // ---------------- state ----------------
+  const S = { rooms: [], listOk: true, filter: '', room: null, me: null, users: [], assistant: { busy: false, working_for: null, queued: 0 }, limits: { message_chars: 8000 },
+    conn: 'idle', attempt: 0, retryAt: 0, retryTimer: null, ws: null, gen: 0, hyd: 0, hydrating: false, buffer: [], hist: [], histStart: 0, turns: new Map(), slots: new Map(),
+    lastDay: null, follow: true, unseen: 0, typers: new Map(), drafts: new Map(), lastSent: '', lastTyping: 0, mode: store.get('roomMode', 'auto'), dead: false };
+  const WINDOW = Math.max(2, +store.get('roomWindow', 60) || 60); // stored messages shown at first; the rest sit behind "Show earlier"
+  const seenMap = () => store.get('roomSeen', {}); const markSeen = (r) => { if (!r) return; const m = seenMap(); if (m[r.room_id] !== r.last_activity) { m[r.room_id] = r.last_activity; store.set('roomSeen', m); } };
+  const say = (t) => { $('#rsr').textContent = t; };
+  const note = (t, ms = 6000) => { const el = $('#rcnote'); el.textContent = t; clearTimeout(note._t); if (t) note._t = setTimeout(() => { el.textContent = ''; }, ms); };
+  const online = () => S.conn === 'open';
+  // ---------------- room list ----------------
+  const unread = (r) => { const s = seenMap()[r.room_id]; return S.room?.room_id !== r.room_id && s !== undefined && r.last_activity > s; };
+  function renderList() {
+    const q = S.filter.trim().toLowerCase(); const shown = S.rooms.filter(r => !q || r.name.toLowerCase().includes(q)); const L = $('#roomList');
+    $('#roomCount').textContent = S.rooms.length ? (q ? `${shown.length} of ${S.rooms.length}` : String(S.rooms.length)) : '';
+    if (!S.listOk && !S.rooms.length) { L.innerHTML = `<div class="empty small">Could not load rooms.<br><button class="btn sm ghost" id="retryList" type="button" style="margin-top:8px">Try again</button></div>`; $('#retryList').onclick = () => refreshList(); return; }
+    if (!S.rooms.length) { L.innerHTML = `<div class="empty small"><b>No rooms yet.</b><br>A room is a shared chat: everyone in it sees each question and the assistant's answer as it is written.<br><button class="btn sm" id="firstRoom" type="button" style="margin-top:10px">${icon.plus}Create the first room</button></div>`; $('#firstRoom').onclick = openNewForm; return; }
+    if (!shown.length) { L.innerHTML = `<div class="empty small">No room matches “${esc(S.filter)}”.<br><button class="btn sm ghost" id="clearSearch" type="button" style="margin-top:8px">Clear search</button></div>`; $('#clearSearch').onclick = () => { $('#roomSearch').value = ''; S.filter = ''; renderList(); }; return; }
+    L.innerHTML = shown.map((r) => `<button class="room${S.room?.room_id === r.room_id ? ' on' : ''}${unread(r) ? ' unread' : ''}" type="button" role="listitem" data-id="${r.room_id}"${S.room?.room_id === r.room_id ? ' aria-current="true"' : ''}>
+      ${roomAvatar(r.name)}<span class="rbody"><span class="rname">${esc(r.name)}</span><span class="rmeta">${r.members ? `<i class="dot ok"></i>${r.members} online · ` : ''}${r.questions ? plural(r.questions, 'question') : 'no questions yet'} · ${ago(r.last_activity)}</span></span>
+      <span class="rflags">${r.busy ? '<i class="dot warn pulse" title="The assistant is answering"></i>' : ''}${unread(r) ? '<i class="rnew-dot" title="New activity"></i>' : ''}</span></button>`).join('');
+    $$('#roomList .room').forEach(el => el.onclick = () => { join(el.dataset.id); root.classList.remove('side-open'); });
   }
-  const scroll = () => { const m = $('#rmsgs'); m.scrollTop = m.scrollHeight; };
-  const addUser = (text, who) => { const el = h(`<div class="msg user"><div class="who">${esc(who || '')}</div></div>`); el.appendChild(document.createTextNode(text)); rinner.appendChild(el); };
-  const sendRoom = () => { const t = $('#rinput').value.trim(); if (!t || !ws || ws.readyState !== 1) return; ws.send(JSON.stringify({ type: 'user_message', payload: { content: t, force_mode: rmode === 'auto' ? null : rmode, show_reasoning: true } })); $('#rinput').value = ''; };
-  $('#rsend').onclick = sendRoom; $('#rinput').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendRoom(); } });
-  await loadRooms();
-  return () => { if (ws) { ws.onclose = null; ws.close(); } turnsByMsg.forEach(t => t.dispose()); };
+  let listBusy = false;
+  async function refreshList() {
+    if (listBusy || S.dead) return; listBusy = true;
+    try { const rooms = await api.get('/v1/rooms'); if (S.dead || !alive()) return; S.rooms = rooms; S.listOk = true; const m = seenMap(); let ch = false;
+      for (const r of rooms) if (!(r.room_id in m)) { m[r.room_id] = r.last_activity; ch = true; } if (ch) store.set('roomSeen', m);
+      if (S.room) { const cur = rooms.find(r => r.room_id === S.room.room_id); if (cur) { S.room = { ...S.room, ...cur }; markSeen(cur); } } }
+    catch { S.listOk = false; } finally { listBusy = false; } if (!S.dead) renderList();
+  }
+  const refreshSoon = (() => { let t; return () => { clearTimeout(t); t = setTimeout(refreshList, 600); }; })();
+  $('#roomSearch').oninput = (e) => { S.filter = e.target.value; renderList(); };
+  // ---------------- creating a room ----------------
+  function openNewForm() { $('#newRoomForm').hidden = false; $('#newRoomBtn').hidden = true; $('#roomNameErr').textContent = ''; $('#roomName').focus(); }
+  function closeNewForm() { $('#newRoomForm').hidden = true; $('#newRoomBtn').hidden = false; $('#roomName').value = ''; $('#roomNameErr').textContent = ''; }
+  $('#newRoomBtn').onclick = openNewForm; $('#cancelNew').onclick = closeNewForm;
+  $('#roomName').addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNewForm(); });
+  $('#newRoomForm').onsubmit = async (e) => { e.preventDefault(); const err = $('#roomNameErr'); const name = cleanRoomName($('#roomName').value);
+    if (!name) { err.textContent = 'Give the room a name.'; return; }
+    const clash = S.rooms.find(r => r.name.toLowerCase() === name.toLowerCase()); if (clash) { err.innerHTML = `A room named “${esc(clash.name)}” exists. <button class="linkbtn" type="button" id="openClash">Open it</button>`; $('#openClash').onclick = () => { closeNewForm(); join(clash.room_id); }; return; }
+    $('#mkRoom').disabled = true;
+    try { const r = await api.post('/v1/rooms', { name }); closeNewForm(); await refreshList(); await join(r.room_id); input.focus(); }
+    catch (x) { err.textContent = x.status === 409 ? 'A room with that name already exists.' : x.message; } finally { $('#mkRoom').disabled = false; } };
+  // ---------------- header ----------------
+  function chips() {
+    const room = S.room; if (!room) return '';
+    const conn = { open: ['ok', 'Connected'], connecting: ['warn', 'Connecting…'], reconnecting: ['warn', `Reconnecting… retry in ${Math.max(0, Math.ceil((S.retryAt - Date.now()) / 1000))} s`], closed: ['bad', 'Disconnected'], idle: ['warn', 'Connecting…'] }[S.conn];
+    const a = S.assistant; const asst = a.busy ? `<span class="rchip"><i class="dot warn pulse"></i>Answering ${esc(a.working_for === S.me ? 'your' : (a.working_for || 'a') + '’s')} question${a.queued ? ` · ${a.queued} waiting` : ''}</span>` : a.queued ? `<span class="rchip"><i class="dot warn pulse"></i>${plural(a.queued, 'question')} waiting</span>` : `<span class="rchip"><i class="dot ok"></i>Assistant ready</span>`;
+    const users = S.users.slice(0, 6).map(u => roomAvatar(u, u === S.me)).join('') + (S.users.length > 6 ? `<span class="rav more" title="${esc(S.users.slice(6).join(', '))}">+${S.users.length - 6}</span>` : '');
+    return `<span class="rpresence" title="${esc(S.users.join(', '))}">${users}<span class="small muted">${online() ? people(S.users.length) + ' here' : ''}</span></span>
+      <span class="rchip" role="status"><i class="dot ${conn[0]}"></i>${conn[1]}${S.conn === 'closed' || S.conn === 'reconnecting' ? ` <button class="linkbtn" type="button" id="reconnectBtn">${S.conn === 'closed' ? 'Reconnect' : 'Retry now'}</button>` : ''}</span>${S.conn === 'open' ? asst : ''}`;
+  }
+  function renderBar() {
+    const room = S.room; const bar = $('#roomBar');
+    if (!room) { bar.innerHTML = `<button class="btn ghost sm rooms-toggle" id="roomsToggle" type="button">${icon.users}Rooms</button><b>Rooms</b>`; $('#roomsToggle').onclick = () => root.classList.toggle('side-open'); return; }
+    if ($('#renameInput')) { const st = $('#rstate'); if (st) st.innerHTML = chips(); bindBar(); return; }
+    bar.innerHTML = `<button class="btn ghost sm rooms-toggle" id="roomsToggle" type="button">${icon.users}Rooms</button>
+      <div class="rtitle"><h2 id="rtitle" title="${esc(room.name)}">${esc(room.name)}</h2><button class="ibtn" id="renameBtn" type="button" title="Rename room" aria-label="Rename room"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button></div>
+      <div class="rstate" id="rstate">${chips()}</div>
+      <div class="ractions"><button class="btn ghost sm" id="linkBtn" type="button" title="Copy a link to this room" aria-label="Copy a link to this room">${icon.copy}<span class="lbl">Link</span></button>
+        <details class="rmenu" id="exportMenu"><summary class="btn ghost sm" aria-label="Export the transcript" title="Export the transcript">${icon.download}<span class="lbl">Export</span></summary><div class="rmenu-pop"><button type="button" data-x="md">Markdown transcript</button><button type="button" data-x="json">JSON (full records)</button></div></details>
+        <button class="btn ghost sm rdel" id="delBtn" type="button" title="Delete this room for everyone" aria-label="Delete this room for everyone">${icon.x}<span class="lbl">Delete</span></button></div>`;
+    bindBar();
+  }
+  function bindBar() {
+    const t = $('#roomsToggle'); if (t) t.onclick = () => root.classList.toggle('side-open');
+    const rc = $('#reconnectBtn'); if (rc) rc.onclick = reconnectNow;
+    const rb = $('#renameBtn'); if (rb) rb.onclick = startRename;
+    const lb = $('#linkBtn'); if (lb) lb.onclick = copyLink; const db = $('#delBtn'); if (db) db.onclick = deleteRoom;
+    $$('#exportMenu [data-x]').forEach(b => b.onclick = () => { $('#exportMenu').open = false; exportRoom(b.dataset.x); });
+  }
+  function startRename() {
+    const room = S.room; const wrap = $('.rtitle'); if (!room || !wrap) return;
+    wrap.innerHTML = `<input id="renameInput" type="text" maxlength="80" value="${esc(room.name)}" aria-label="Room name"><span class="rerr" id="renameErr" role="alert"></span>`;
+    const inp = $('#renameInput'); inp.focus(); inp.select(); let busy = false;
+    const finish = (rebuild = true) => { if (rebuild) { const keep = S.room; S.room = keep; $('#roomBar').innerHTML = ''; renderBar(); } };
+    inp.onkeydown = async (e) => { if (e.key === 'Escape') { finish(); return; } if (e.key !== 'Enter' || busy) return; e.preventDefault();
+      const name = cleanRoomName(inp.value); if (!name || name === room.name) { finish(); return; } busy = true;
+      try { const r = await api.patch(`/v1/rooms/${room.room_id}`, { name }); S.room = { ...S.room, ...r }; finish(); updateComposer(); refreshList(); toast('Room renamed'); }
+      catch (x) { busy = false; $('#renameErr').textContent = x.status === 409 ? 'Another room already has that name.' : x.status === 404 ? 'This room no longer exists.' : x.message; } };
+    inp.onblur = () => setTimeout(() => { if ($('#renameInput') && !busy) finish(); }, 150);
+  }
+  async function copyLink() { const url = `${location.origin}${location.pathname}#/rooms/${S.room.room_id}`; try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { modal(`<h3 style="margin-top:0">Link to this room</h3><input type="text" readonly style="width:100%" value="${esc(url)}" onfocus="this.select()">`); } }
+  async function exportRoom(kind) {
+    const room = S.room; try { const conv = await api.get('/v1/conversations/' + room.conversation_id); const slug = room.name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'room'; const day = new Date().toISOString().slice(0, 10);
+      if (kind === 'json') downloadText(`room-${slug}-${day}.json`, JSON.stringify({ room: { room_id: room.room_id, name: room.name, created_at: room.created_at }, conversation: conv }, null, 2), 'application/json');
+      else downloadText(`room-${slug}-${day}.md`, roomMarkdown(room, conv), 'text/markdown'); toast('Transcript exported'); } catch (e) { toast(`Export failed: ${e.message}`, 4000); }
+  }
+  async function deleteRoom() {
+    const room = S.room; if (!room) return; const others = Math.max(0, S.users.length - 1);
+    const ok = await confirmDialog({ title: `Delete “${room.name}”?`, ok: 'Delete room', body: `<p>This permanently deletes the room and everything said in it: ${plural(room.questions || 0, 'question')} and the assistant's answers, <b>for everyone</b>.${others ? ` ${others === 1 ? '1 other person is' : others + ' other people are'} in the room now and will be disconnected.` : ''}</p><p class="small muted">Its saved decisions, feedback and retrieval-memory entries are deleted too. This cannot be undone. To keep a copy, cancel and use Export first.</p>` });
+    if (!ok) return;
+    try { const rep = await api.del(`/v1/rooms/${room.room_id}`); toast(`Deleted “${rep.name}” (${plural(rep.removed.messages, 'message')})`); leaveRoom(); }
+    catch (e) { if (e.status === 404) { toast('That room was already deleted.'); leaveRoom(); } else toast(`Could not delete the room: ${e.message}`, 4500); }
+  }
+  function leaveRoom() { closeSocket(); clearTranscript(); S.room = null; S.me = null; S.users = []; S.conn = 'idle'; store.set('lastRoom', null); history.replaceState(null, '', '#/rooms'); banner(null); renderBar(); renderMainEmpty(); updateComposer(); refreshList(); $('#roomSearch').focus(); }
+  // ---------------- banner and empty states ----------------
+  function banner(kind, extra) {
+    const b = $('#roomBanner'); if (!kind) { b.hidden = true; b.innerHTML = ''; return; } b.hidden = false;
+    if (kind === 'deleted') b.innerHTML = `<div class="notice bad">${icon.alert}<span><b>This room was deleted.</b> Its messages are gone for everyone.</span><span class="sp"></span><button class="btn sm ghost" id="bnBack" type="button">Back to rooms</button></div>`;
+    if (kind === 'load') b.innerHTML = `<div class="notice">${icon.alert}<span>Earlier messages could not be loaded (${esc(extra)}).</span><span class="sp"></span><button class="btn sm ghost" id="bnRetry" type="button">Retry</button></div>`;
+    if (kind === 'full') b.innerHTML = `<div class="notice bad">${icon.alert}<span>${esc(extra)}</span><span class="sp"></span><button class="btn sm ghost" id="bnBack" type="button">Back to rooms</button></div>`;
+    const back = $('#bnBack'); if (back) back.onclick = leaveRoom; const rt = $('#bnRetry'); if (rt) rt.onclick = () => reconnectNow();
+  }
+  function renderMainEmpty() {
+    rinner.innerHTML = `<div class="rwelcome"><h3>Think together</h3><p>Rooms are shared chats. Everyone connected sees every question and the assistant's answer as it is written, and the transcript is kept until the room is deleted.</p>
+      <ul><li>Pick a room on the left, or create one.</li><li>Share its link (<b>Link</b> in the header) so others can join.</li><li>The assistant answers one question at a time; up to three more wait their turn.</li></ul>
+      <button class="btn" id="welcomeNew" type="button">${icon.plus}New room</button></div>`; $('#welcomeNew').onclick = () => { root.classList.add('side-open'); openNewForm(); };
+  }
+  // ---------------- transcript ----------------
+  function clearTranscript() { S.turns.forEach(t => t.dispose()); S.turns.clear(); S.slots.clear(); rinner.innerHTML = '<div id="rhist"></div><div id="rlive"></div>'; S.hist = []; S.histStart = 0; S.lastDay = null; S.unseen = 0; $('#jumpNew').hidden = true; }
+  const nearBottom = () => rmsgs.scrollHeight - rmsgs.scrollTop - rmsgs.clientHeight < 90;
+  const toBottom = () => { rmsgs.scrollTop = rmsgs.scrollHeight; S.follow = true; S.unseen = 0; $('#jumpNew').hidden = true; };
+  rmsgs.addEventListener('scroll', () => { S.follow = nearBottom(); if (S.follow) { S.unseen = 0; $('#jumpNew').hidden = true; } });
+  $('#jumpNew').onclick = toBottom;
+  const resizer = new ResizeObserver(() => { if (S.follow) rmsgs.scrollTop = rmsgs.scrollHeight; }); resizer.observe(rinner);
+  const retryAsk = (prompt, mode) => { if (!online()) return toast('Not connected; try again in a moment.'); sendRaw(prompt, mode === 'auto' ? null : mode); };
+  function daySep(into, ts) { const k = new Date(ts).toDateString(); if (k === S.lastDay) return; S.lastDay = k; into.appendChild(h(`<div class="rsep"><span>${esc(dayLabel(ts))}</span></div>`)); }
+  function bubble(into, who, text, ts) {
+    const mine = who === S.me; const el = h(`<div class="msg user rmsg ${mine ? 'mine' : 'other'}"><div class="who">${mine ? 'You' : `<span style="color:${roomColor(who)}">${esc(who || 'Someone')}</span>`}<time title="${esc(new Date(ts).toLocaleString())}">${esc(clock(ts))}</time></div><div class="txt"></div></div>`);
+    $('.txt', el).textContent = text; into.appendChild(el); return el;
+  }
+  function renderHistory() {
+    const box = $('#rhist'); box.innerHTML = ''; S.turns.forEach((t, k) => { if (box.contains(t.el)) { t.dispose(); S.turns.delete(k); } }); S.lastDay = null;
+    if (S.histStart > 0) { const more = h(`<button class="btn ghost sm rmore" type="button">Show ${Math.min(WINDOW, S.histStart)} earlier of ${S.histStart} hidden</button>`);
+      more.onclick = () => { const before = rmsgs.scrollHeight; S.histStart = Math.max(0, S.histStart - WINDOW); renderHistory(); rmsgs.scrollTop += rmsgs.scrollHeight - before; }; box.appendChild(more); }
+    let lastQ = '';
+    for (const it of S.hist.slice(S.histStart)) { daySep(box, it.ts);
+      if (it.kind === 'q') { lastQ = it.text; bubble(box, it.who, it.text, it.ts); }
+      else Turn.fromStored(box, it.reply, { prompt: lastQ, onRetry: retryAsk }, it.feedback).dispose(); }
+  }
+  function addQuestion(id, who, text, ts) { const live = $('#rlive'); daySep(live, ts); bubble(live, who, text, ts); const slot = h('<div class="rslot"></div>'); live.appendChild(slot); if (id) S.slots.set(id, { slot, text }); }
+  function liveTurn(id) {
+    let t = S.turns.get(id); if (t) return t; let s = S.slots.get(id);
+    if (!s) { const slot = h('<div class="rslot"></div>'); $('#rlive').appendChild(slot); s = { slot, text: '' }; S.slots.set(id, s); }
+    t = new Turn(s.slot, { prompt: s.text, onRetry: retryAsk }); S.turns.set(id, t); return t;
+  }
+  function empty() { if (!S.hist.length && !$('#rlive').children.length && S.room && !S.hydrating) { if (!$('#rhist .rempty')) $('#rhist').innerHTML = `<div class="rempty empty"><b>Nobody has asked anything yet.</b><br>Ask a question below: everyone in “${esc(S.room.name)}” sees it, and the assistant's answer as it is written.</div>`; } }
+  // ---------------- joining, the socket, reconnecting ----------------
+  function closeSocket() { S.gen++; clearTimeout(S.retryTimer); const ws = S.ws; S.ws = null; if (ws) { ws.onclose = ws.onmessage = ws.onerror = ws.onopen = null; try { ws.close(); } catch {} } }
+  async function join(id) {
+    if (S.dead) return; if (S.room && S.room.room_id !== id) drafts_save();
+    closeSocket(); clearTranscript(); banner(null); S.attempt = 0; S.users = []; S.me = null; S.assistant = { busy: false, working_for: null, queued: 0 }; S.typers.clear(); renderTyping();
+    let r = S.rooms.find(x => x.room_id === id);
+    try { r = await api.get(`/v1/rooms/${id}`); } catch (e) { if (e.status === 404) { toast('That room no longer exists.'); if (store.get('lastRoom') === id) store.set('lastRoom', null); S.room = null; history.replaceState(null, '', '#/rooms'); renderBar(); renderMainEmpty(); refreshList(); return; } if (!r) { toast(`Could not open the room: ${e.message}`, 4000); return; } }
+    if (S.dead || !alive()) return;
+    S.room = r; markSeen(r); store.set('lastRoom', id); history.replaceState(null, '', `#/rooms/${id}`); S.conn = 'connecting'; $('#roomBar').innerHTML = ''; renderBar(); renderList(); updateComposer();
+    input.value = S.drafts.get(id) || ''; autosize(); connect(S.gen);
+  }
+  const drafts_save = () => { if (S.room) S.drafts.set(S.room.room_id, input.value); };
+  function connect(gen) {
+    if (gen !== S.gen || S.dead) return; S.conn = S.attempt ? 'reconnecting' : 'connecting'; renderBar(); updateComposer();
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws'; const tok = api.token(); let ws;
+    try { ws = new WebSocket(`${proto}://${location.host}/ws/rooms/${S.room.room_id}?user=${encodeURIComponent(store.get('user', 'guest'))}${tok ? '&token=' + encodeURIComponent(tok) : ''}`); } catch { return scheduleReconnect(gen); }
+    S.ws = ws; let lastRx = Date.now(); const watchdog = setInterval(() => { if (Date.now() - lastRx > 75000) { try { ws.close(); } catch {} } }, 10000);
+    ws.onmessage = (e) => { if (gen !== S.gen) return; lastRx = Date.now(); let f; try { f = JSON.parse(e.data); } catch { return; } onFrame(f, gen); };
+    ws.onclose = (ev) => { clearInterval(watchdog); if (gen !== S.gen) return; S.ws = null; if (ev.code === 4004) return handleDeleted(); scheduleReconnect(gen); };
+    ws.onerror = () => {};
+  }
+  async function scheduleReconnect(gen) {
+    if (gen !== S.gen || S.dead) return; S.hydrating = false; S.typers.clear(); renderTyping();
+    if (S.attempt >= 10) { S.conn = 'closed'; renderBar(); updateComposer(); return; }
+    const delay = Math.min(15000, 1000 * 2 ** Math.min(S.attempt, 4)) * (0.8 + Math.random() * 0.4); S.attempt++; S.conn = 'reconnecting'; S.retryAt = Date.now() + delay; renderBar(); updateComposer();
+    clearTimeout(S.retryTimer);
+    S.retryTimer = setTimeout(async () => { if (gen !== S.gen) return;
+      try { const r = await api.get(`/v1/rooms/${S.room.room_id}`); if (gen !== S.gen) return; S.room = { ...S.room, ...r }; } catch (e) { if (e.status === 404) return handleDeleted(); }
+      connect(gen); }, delay);
+  }
+  function reconnectNow() { if (!S.room) return; clearTimeout(S.retryTimer); const ws = S.ws; S.gen++; if (ws) { ws.onclose = ws.onmessage = null; try { ws.close(); } catch {} } S.attempt = 0; connect(S.gen); }
+  function handleDeleted() {
+    if (!S.room || S.conn === 'deleted') return; const id = S.room.room_id; closeSocket(); S.conn = 'deleted'; S.hydrating = false; if (store.get('lastRoom') === id) store.set('lastRoom', null);
+    banner('deleted'); input.disabled = true; $('#rsend').disabled = true; input.placeholder = 'This room was deleted'; $('#roomBar').querySelector('#rstate')?.replaceChildren(); refreshList(); say('This room was deleted.');
+  }
+  // ---------------- frames ----------------
+  function onFrame(f, gen) {
+    switch (f.type) {
+      case 'welcome': return onWelcome(f.payload, gen);
+      case 'presence': S.users = f.payload.users || S.users;
+        if (!S.hydrating && f.user && f.user !== S.me) { const live = $('#rlive'); live.appendChild(h(`<div class="rnote">${esc(f.user)} ${f.payload.joined ? 'joined' : 'left'}</div>`)); }
+        renderBar(); refreshSoon(); return;
+      case 'user_message': case 'assistant_event': if (S.hydrating) { S.buffer.push(f); return; } return onContent(f);
+      case 'queue': S.assistant = f.payload; renderBar(); refreshSoon(); return;
+      case 'typing': if (f.user !== S.me) { S.typers.set(f.user, Date.now() + 4500); renderTyping(); } return;
+      case 'room_renamed': S.room = { ...S.room, name: f.payload.name }; $('#roomBar').innerHTML = ''; renderBar(); updateComposer(); refreshSoon(); $('#rlive').appendChild(h(`<div class="rnote">Room renamed to “${esc(f.payload.name)}”</div>`)); return;
+      case 'room_deleted': return handleDeleted();
+      case 'error': { const p = f.payload; note(p.message); toast(p.message, 4500); if (['E_TOO_LONG', 'E_RATE_LIMITED', 'E_QUEUE_FULL'].includes(p.code) && !input.value && S.lastSent) { input.value = S.lastSent; autosize(); updateComposer(); } if (p.code === 'E_ROOM_FULL') banner('full', p.message); return; }
+      case 'resync': toast('Connection fell behind; reloading the transcript.', 3500); return reconnectNow();
+      default: return; // heartbeat, pong
+    }
+  }
+  async function onWelcome(w, gen) {
+    S.me = w.you; S.users = w.users; S.assistant = w.assistant; S.limits = w.limits || S.limits; S.conn = 'open'; S.attempt = 0; S.hydrating = true; S.buffer = []; const my = ++S.hyd;
+    clearTranscript(); banner(null); renderBar(); updateComposer(); const hint = $('#userHint'); const want = store.get('user', ''); hint.textContent = w.you !== want ? `You appear here as “${w.you}” because “${want}” is taken.` : 'Shown to everyone in a room. Letters, numbers, spaces, - and _.';
+    try { const c = await api.get('/v1/conversations/' + S.room.conversation_id); if (my !== S.hyd || gen !== S.gen) return;
+      S.hist = roomItems(c.messages.slice(0, w.cursor)); S.histStart = Math.max(0, S.hist.length - WINDOW); renderHistory(); }
+    catch (e) { if (my !== S.hyd || gen !== S.gen) return; banner('load', e.message); }
+    for (const p of w.pending || []) addQuestion(p.id, p.user, p.content, p.ts);
+    S.hydrating = false; const buf = S.buffer; S.buffer = []; buf.forEach(onContent); toBottom(); empty(); markSeen(S.room); renderBar(); updateComposer();
+  }
+  function onContent(f) {
+    const wasFollowing = S.follow; $('#rhist .rempty')?.remove();
+    if (f.type === 'user_message') { const p = f.payload; addQuestion(p.id, f.user, p.content, p.ts); if (f.user === S.me) toBottom(); else { say(`${f.user}: ${p.content}`); if (!wasFollowing) { S.unseen++; const j = $('#jumpNew'); j.textContent = `${plural(S.unseen, 'new message')} ↓`; j.hidden = false; } } return; }
+    const id = f.payload.reply_to, ev = f.payload.event; const t = liveTurn(id); t.on(ev.event, ev);
+    if (ev.event === 'done') { say('The assistant answered.'); setTimeout(() => t.dispose(), 800); } if (ev.event === 'error') setTimeout(() => t.dispose(), 800);
+  }
+  // ---------------- composer ----------------
+  const autosize = () => { input.style.height = 'auto'; input.style.height = Math.min(220, input.scrollHeight) + 'px'; };
+  function updateComposer() {
+    const len = [...input.value].length, max = S.limits.message_chars, over = len > max, ok = online();
+    input.disabled = !S.room || S.conn === 'deleted'; $('#rsend').disabled = !ok || !input.value.trim() || over;
+    input.placeholder = !S.room ? 'Select or create a room to start' : S.conn === 'deleted' ? 'This room was deleted' : ok ? `Message “${S.room.name}”…` : S.conn === 'closed' ? 'Disconnected. Your draft is kept; press Reconnect.' : 'Connecting… you can type while you wait';
+    const c = $('#rcount'); c.textContent = len > max * 0.8 ? `${len.toLocaleString()} / ${max.toLocaleString()}` : ''; c.style.color = over ? 'var(--bad)' : 'var(--faint)';
+  }
+  function sendRaw(text, mode) { if (!online()) return false; S.lastSent = text; S.ws.send(JSON.stringify({ type: 'user_message', payload: { content: text, force_mode: mode, show_reasoning: true } })); S.follow = true; return true; }
+  function sendRoom() {
+    const t = input.value.trim(); if (!t) return;
+    if (!online()) { toast('Not connected yet. Your message is kept.'); return; }
+    if ([...t].length > S.limits.message_chars) { note(`Messages are limited to ${S.limits.message_chars.toLocaleString()} characters.`); return; }
+    if (sendRaw(t, S.mode === 'auto' ? null : S.mode)) { input.value = ''; S.drafts.delete(S.room.room_id); autosize(); updateComposer(); note(''); }
+  }
+  $('#rsend').onclick = sendRoom;
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendRoom(); } });
+  input.addEventListener('input', () => { autosize(); updateComposer(); if (online() && input.value.trim() && Date.now() - S.lastTyping > 2000) { S.lastTyping = Date.now(); S.ws.send('{"type":"typing"}'); } });
+  $$('#rmode button').forEach(b => { b.classList.toggle('on', b.dataset.m === S.mode); b.onclick = () => { S.mode = b.dataset.m; store.set('roomMode', S.mode); $$('#rmode button').forEach(x => x.classList.toggle('on', x === b)); }; });
+  function renderTyping() {
+    const now = Date.now(); for (const [k, t] of S.typers) if (t < now) S.typers.delete(k); const n = [...S.typers.keys()];
+    $('#rtyping').textContent = !n.length ? '' : n.length === 1 ? `${n[0]} is typing…` : n.length === 2 ? `${n[0]} and ${n[1]} are typing…` : `${n.length} people are typing…`;
+  }
+  // ---------------- your name ----------------
+  $('#userName').onchange = (e) => { const name = cleanUserName(e.target.value); e.target.value = name; if (name === store.get('user', '')) return; store.set('user', name); if (S.room) { drafts_save(); join(S.room.room_id); } };
+  // ---------------- lifecycle ----------------
+  const tick = setInterval(() => { if (S.conn === 'reconnecting') { const st = $('#rstate'); if (st) st.innerHTML = chips(), bindBar(); } renderTyping(); }, 1000);
+  const poll = setInterval(() => { if (!document.hidden) refreshList(); }, 8000);
+  let lastVis = 0;
+  const onVis = () => { if (document.hidden || Date.now() - lastVis < 3000) return; lastVis = Date.now(); refreshList(); if (S.room && (S.conn === 'closed' || S.conn === 'reconnecting')) reconnectNow(); };
+  const onOnline = () => { if (S.room && S.conn !== 'open') reconnectNow(); };
+  document.addEventListener('visibilitychange', onVis); window.addEventListener('online', onOnline);
+  root.addEventListener('click', (e) => { if (e.target === root) root.classList.remove('side-open'); });
+  clearTranscript(); renderBar(); renderMainEmpty(); updateComposer();
+  await refreshList();
+  if (!alive()) return () => { S.dead = true; clearInterval(tick); clearInterval(poll); resizer.disconnect(); };
+  const want = (location.hash.match(/^#\/rooms\/([0-9a-f-]{36})/i) || [])[1] || store.get('lastRoom', null);
+  if (want && (S.rooms.some(r => r.room_id === want) || location.hash.includes(want))) await join(want);
+  else if (want) { store.set('lastRoom', null); }
+  return () => { S.dead = true; drafts_save(); closeSocket(); S.turns.forEach(t => t.dispose()); clearInterval(tick); clearInterval(poll); clearTimeout(S.retryTimer); resizer.disconnect(); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('online', onOnline); };
 } };
 
 // ============================== performance console ==============================

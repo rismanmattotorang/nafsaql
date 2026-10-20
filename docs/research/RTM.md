@@ -106,3 +106,8 @@
 | FR-084 | Posterior exit rule | Prop. N4; Frazier-Yu 2007; Adaptive-Consistency 2023 | nafs-core | UT-121 | P8 |
 | FR-085 | Agreement samples on unverified drafts | Thm plurality; confidence-signal study | nafs-core | UT-122 | P8 |
 | ER-021 | Confidence-signal study | Prop. N1; Fleming and Lau 2014 | scripts, benchmarks | ER-021 | P8 |
+| FR-090 | Room lifecycle | Rooms review (2026-10-20) | nafs-gateway, nafs-memory | UT-130 | P9 |
+| FR-091 | Room join snapshot | Rooms review (2026-10-20) | nafs-gateway | UT-131 | P9 |
+| FR-092 | Room resilience | Rooms review (2026-10-20) | nafs-gateway | UT-132 | P9 |
+| FR-093 | Rooms interface | Rooms review (2026-10-20) | nafs-web | UT-133 | P9 |
+| ER-022 | Rooms verification | Rooms review (2026-10-20) | scripts | ER-022 | P9 |

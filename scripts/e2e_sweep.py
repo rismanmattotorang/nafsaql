@@ -68,6 +68,31 @@ try:
           f"counted {counted} ms of {r['usage']['wall_ms']} ms; {len(after)} sample_after stage(s)")
 except Exception as e:
     check("chat: unverified math stages add up to the wall time", False, e)
+def rooms_call(method, path, body=None):
+    req = urllib.request.Request(BASE + path, data=None if body is None else json.dumps(body).encode(), method=method, headers={"content-type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            return r.status, json.loads(r.read() or b"null")
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read() or b"null")
+try:
+    # Rooms lifecycle (the live WebSocket behaviour is covered by scripts/rooms_test.py).
+    tag = f"sweep-{int(time.time())}"
+    st, rm = rooms_call("POST", "/v1/rooms", {"name": f"  {tag}   room "})
+    check("rooms: create normalises the name (201)", st == 201 and rm["name"] == f"{tag} room" and rm["questions"] == 0, f"{st}")
+    try:
+        st, e = rooms_call("POST", "/v1/rooms", {"name": f"{tag.upper()} ROOM"})
+        check("rooms: a duplicate name (any case) is a 409 conflict", st == 409 and e["code"] == "E_CONFLICT", f"{st}")
+        st, r2 = rooms_call("PATCH", f"/v1/rooms/{rm['room_id']}", {"name": f"{tag} renamed"})
+        check("rooms: rename (200) is visible in the list", st == 200 and any(x["name"] == f"{tag} renamed" for x in rooms_call("GET", "/v1/rooms")[1]), f"{st}")
+    finally:
+        st, rep = rooms_call("DELETE", f"/v1/rooms/{rm['room_id']}")
+    check("rooms: delete (200) reports what was removed", st == 200 and rep["deleted"] and "removed" in rep, f"{st}")
+    check("rooms: a deleted room is a 404, and deleting it again is a 404", rooms_call("GET", f"/v1/rooms/{rm['room_id']}")[0] == 404 and rooms_call("DELETE", f"/v1/rooms/{rm['room_id']}")[0] == 404)
+    st, e = rooms_call("GET", "/v1/rooms/not-a-uuid")
+    check("rooms: a malformed id is a 400 with the JSON envelope", st == 400 and e["code"] == "E_BAD_REQUEST", f"{st}")
+except Exception as e:
+    check("rooms: lifecycle", False, e)
 for name, path, body, raw in [("malformed JSON", "/v1/eval/runs", b"not json", True),
                               ("wrong field type", "/v1/eval/runs", json.dumps({"benchmark": "smoke_mixed", "max_items": -3, "systems": ["fast_only"]}).encode(), True),
                               ("oversized message", "/v1/chat", json.dumps({"messages": [{"role": "user", "content": "word " * 9000}], "ephemeral": True}).encode(), True)]:

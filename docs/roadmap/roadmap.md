@@ -97,6 +97,15 @@ Estimates are person-weeks (PW) and are estimates, not commitments.
 | P8-T05 | E8.1 Evidence | Agreement samples on unverified mathematics drafts (adopted from the study's agreement arm) | 0.25 | P8-T01 | FR-085 | Should |
 | P8-T04 | E8.3 Research | Quantum-consciousness and neuroscience review with first-principles verdicts and the sequential-evidence propositions | 0.5 |  | ER-021, FR-083, FR-084 | Should |
 
+## Phase 9
+
+| Task | Epic | Title | PW | Depends | Requirements | MoSCoW |
+|---|---|---|---|---|---|---|
+| P9-T01 | E9.1 Rooms | Room store and API: unique normalised names, rename, delete with a full ledger purge, activity and presence in the list | 1.0 |  | FR-090 | Must |
+| P9-T02 | E9.1 Rooms | Room hub: welcome snapshot with cursor and pending turns, unique display names, queue and typing frames, heartbeat, race-safe deletion | 1.0 | P9-T01 | FR-091, FR-092 | Must |
+| P9-T03 | E9.2 Rooms UI | Rooms page rebuilt: list with search and unread, deep links, inline rename, confirmed delete, export, reconnecting transcript, drafts, mobile drawer | 1.5 | P9-T02 | FR-093 | Should |
+| P9-T04 | E9.3 Verification | Live rooms test with simulated members; sweep checks; screenshots; API contract and documents | 0.5 | P9-T03 | ER-022 | Should |
+
 ## Requirements by phase
 
 - **Phase 0**: FR-050, NFR-012, NFR-023, MR-001, MR-003, MR-005, OR-001, ER-001, ER-010, ER-011
@@ -108,3 +117,4 @@ Estimates are person-weeks (PW) and are estimates, not commitments.
 - **Phase 6**: SR-005
 - **Phase 7**: NFR-030, NFR-031, FR-080, FR-081, ER-020, FR-082
 - **Phase 8**: FR-083, FR-084, FR-085, ER-021
+- **Phase 9**: FR-090, FR-091, FR-092, FR-093, ER-022

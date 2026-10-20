@@ -2,7 +2,7 @@
 TECTONIC := $(abspath tools/tectonic)
 
 PHONY_EXTRA = acceptance tazkiya-build regression-suite
-.PHONY: help up down up-vllm down-vllm build test $(PHONY_EXTRA) contract docs report slides spec roadmap tables validate models models-vllm datasets vm-setup clean
+.PHONY: help up down up-vllm down-vllm build test $(PHONY_EXTRA) contract rooms-test docs report slides spec roadmap tables validate models models-vllm datasets vm-setup clean
 
 help:
 	@echo "Run the system (Phase 1):"
@@ -35,6 +35,9 @@ regression-suite: ## ER-008: the fixed 500-item regression suite
 
 contract:
 	python3 -I scripts/contract_test.py --live http://127.0.0.1:8080
+
+rooms-test:      ## live test of Rooms against the running stack (add SLOW=1 for the heartbeat, capacity and queue checks)
+	python3 -I scripts/rooms_test.py $(if $(SLOW),--slow,)
 
 up: build
 	scripts/serve_llama.sh start

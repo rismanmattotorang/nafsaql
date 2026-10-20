@@ -230,6 +230,21 @@ Phase 8 asked what quantum theories of consciousness and the neuroscience of dec
 
 What was deliberately **not** changed: the mean-based early escalation (kept at its measured N = 32, margin 0.04 and labelled a heuristic), the probe schedule, and anything suggested by quantum-consciousness theories.
 
+## Phase 9: Rooms completed (2026-10-20)
+
+Rooms existed since Phase 1 but could not be deleted or renamed, showed a bare list, lost history on a dropped connection and left test rooms behind. Phase 9 closes those gaps.
+
+| Task | Status | Evidence |
+|---|---|---|
+| P9-T01 store and API | Done | `nafs-memory`: unique normalised names (409), a cap of 500, rename, `delete_room` (one transaction over the conversation, messages, replies, decisions, audits, feedback, reviews, preference trials, retrieval memory), activity and question counts in the list. 5 unit tests, including one that seeds every dependent table and checks that nothing of a neighbouring room or chat is touched. `GET/PATCH/DELETE /v1/rooms/{id}` |
+| P9-T02 hub | Done | `nafs-gateway/src/rooms.rs` (moved out of `api.rs`): welcome frame with unique display name, members, assistant state, limits, **history cursor and pending questions taken atomically with the subscription**; presence with names; queue-state and typing frames; heartbeat and ping; member cap; refused (not truncated) long messages; deletion that notifies, cancels the running answer, waits up to 10 s, purges, and leaves an expiring tombstone so a racing connection or turn cannot recreate the room. 7 unit tests, including a 300-turn stress test with concurrent joiners (run 25 times: exactly-once delivery held every time) |
+| P9-T03 interface | Done | Rooms page rebuilt: search, unread markers, activity and online counts, deep links and last-room memory, inline rename, delete behind a confirmation that states what is lost, Markdown and JSON export, copy link, connection and assistant chips, automatic reconnection with a countdown and *Retry now*, transcript rebuilt from the snapshot, drafts per room, character counter, date separators, windowed history, typing indicator, phone drawer and compact header, keyboard and screen-reader support. Checked in a real browser with two tabs as two people: join, typing, messages, rename, cancel and confirm delete, a gateway restart under two connected tabs (both reconnected, identical transcripts, no duplicates), a gateway outage, phone width |
+| P9-T04 verification | Done | `scripts/rooms_test.py`: 63 live checks (`--slow` adds the heartbeat, a full room of 64, the queue limit), including a deletion while the assistant is answering (0.1 s, no orphan row left) and a mid-answer join. Sweep: 48 checks. Screenshots `rooms.png` and `rooms_delete.png` |
+
+Found and fixed along the way: `api/openapi.json` (served at `/openapi.json`) had silently drifted from the YAML by two fields I added in Phase 8; it is now generated from the YAML and `validate_artifacts.sh` fails on any difference. A visibility handler refreshed the list on every focus event; it is rate-limited. In the explicit dark theme another person's bubble was drawn in your colour (selector specificity). The sidebar showed stale counts after an answer; it now refreshes when the assistant's state changes. The answer's action row and the header overflowed a phone screen.
+
+Not changed: ordinary chat conversations are still deleted without purging their ledger rows (A-062), rooms still have no access control (A-063), and the six old `acceptance-*` rooms from earlier test runs were left for their owner to delete with the new button. The acceptance script now deletes its own room; that change was not re-run end to end (a full acceptance run restarts System 2).
+
 ## Web UI test pass (2026-10-20)
 
 The UI was driven in a real browser (every page, the chat with streaming, Inspector, search, theme toggle and shortcuts, Rooms over WebSocket, the alert drill, the judge and verifier playgrounds, the Lab presets) with a console and network error collector, plus API probes of every form the UI submits. No JavaScript error and no failed request occurred; the defects below were layout, accounting and error-handling faults. All are fixed and covered by the sweep (now 42 checks) or a unit test.

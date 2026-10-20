@@ -51,6 +51,59 @@ pub struct Room {
     pub profile: String,
     pub conversation_id: Uuid,
     pub created_at: String,
+    /// Questions asked in the room so far (user turns).
+    #[serde(default)]
+    pub questions: i64,
+    /// Time of the latest message, or of creation for an empty room (RFC 3339).
+    #[serde(default)]
+    pub last_activity: String,
+}
+
+/// Most rooms one gateway keeps; a guard against unbounded creation, not a product limit.
+pub const ROOM_CAP: usize = 500;
+/// Longest room name, in characters.
+pub const ROOM_NAME_MAX: usize = 80;
+
+/// What a room deletion removed.
+#[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
+pub struct RoomPurge {
+    pub messages: i64,
+    pub replies: i64,
+    pub memory_entries: i64,
+}
+
+/// Room names as stored and compared: control characters dropped, runs of whitespace collapsed, trimmed,
+/// at most `ROOM_NAME_MAX` characters. Empty means the name was unusable.
+pub fn normalize_room_name(raw: &str) -> String {
+    let cleaned: String = raw
+        .chars()
+        .filter(|c| !c.is_control() || c.is_whitespace())
+        .collect();
+    let joined = cleaned.split_whitespace().collect::<Vec<_>>().join(" ");
+    joined
+        .chars()
+        .take(ROOM_NAME_MAX)
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+fn room_key(name: &str) -> String {
+    name.to_lowercase()
+}
+const ROOM_SELECT: &str = "SELECT r.id, r.name, r.profile, r.conversation_id, r.created_at, \
+    (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = r.conversation_id AND m.role = 'user'), \
+    COALESCE((SELECT MAX(m.created_at) FROM messages m WHERE m.conversation_id = r.conversation_id), r.created_at) \
+    FROM rooms r";
+fn room_from_row(r: &rusqlite::Row) -> rusqlite::Result<Room> {
+    Ok(Room {
+        room_id: Uuid::parse_str(&r.get::<_, String>(0)?).unwrap_or_default(),
+        name: r.get(1)?,
+        profile: r.get(2)?,
+        conversation_id: Uuid::parse_str(&r.get::<_, String>(3)?).unwrap_or_default(),
+        created_at: r.get(4)?,
+        questions: r.get(5)?,
+        last_activity: r.get(6)?,
+    })
 }
 
 /// (mode, wall_ms, escalated, verifier passed, verifier exact) for the alert window.
@@ -330,45 +383,218 @@ impl Store {
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(st)
     }
 
+    /// Create a room. The name is normalised, must be non-empty and, compared without case, unused; the check
+    /// and the insert happen under one lock, so two simultaneous creates cannot both win.
     pub fn create_room(&self, name: &str, profile: &str) -> Result<Room> {
+        let name = normalize_room_name(name);
+        if name.is_empty() {
+            return Err(NafsError::BadRequest("room name required".into()));
+        }
         let id = Uuid::new_v4();
-        let conv = self.ensure_conversation(None, &format!("Room: {name}"), Some(id))?;
+        let conv = Uuid::new_v4();
         let now = Utc::now().to_rfc3339();
-        self.conn.lock().unwrap().execute("INSERT INTO rooms (id,name,profile,conversation_id,created_at) VALUES (?1,?2,?3,?4,?5)",
+        let mut c = self.conn.lock().unwrap();
+        let names: Vec<String> = {
+            let mut s = c.prepare("SELECT name FROM rooms").map_err(st)?;
+            let rows = s.query_map([], |r| r.get::<_, String>(0)).map_err(st)?;
+            rows.collect::<std::result::Result<Vec<_>, _>>()
+                .map_err(st)?
+        };
+        if names.len() >= ROOM_CAP {
+            return Err(NafsError::BadRequest(format!(
+                "room limit reached ({ROOM_CAP}); delete rooms you no longer need"
+            )));
+        }
+        if names.iter().any(|n| room_key(n) == room_key(&name)) {
+            return Err(NafsError::Conflict(format!(
+                "a room named '{name}' already exists"
+            )));
+        }
+        let title: String = format!("Room: {name}").chars().take(60).collect();
+        let tx = c.transaction().map_err(st)?;
+        tx.execute("INSERT INTO conversations (id,title,room_id,created_at,updated_at) VALUES (?1,?2,?3,?4,?4)",
+            params![conv.to_string(), title, id.to_string(), now]).map_err(st)?;
+        tx.execute("INSERT INTO rooms (id,name,profile,conversation_id,created_at) VALUES (?1,?2,?3,?4,?5)",
             params![id.to_string(), name, profile, conv.to_string(), now]).map_err(st)?;
+        tx.commit().map_err(st)?;
         Ok(Room {
             room_id: id,
-            name: name.into(),
+            name,
             profile: profile.into(),
             conversation_id: conv,
-            created_at: now,
+            created_at: now.clone(),
+            questions: 0,
+            last_activity: now,
         })
     }
+    /// Rename a room under the same rules as creation (a name equal to its own, ignoring case, is allowed).
+    pub fn rename_room(&self, id: Uuid, name: &str) -> Result<Room> {
+        let name = normalize_room_name(name);
+        if name.is_empty() {
+            return Err(NafsError::BadRequest("room name required".into()));
+        }
+        let mut c = self.conn.lock().unwrap();
+        let rows: Vec<(String, String)> = {
+            let mut s = c.prepare("SELECT id, name FROM rooms").map_err(st)?;
+            let it = s
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+                .map_err(st)?;
+            it.collect::<std::result::Result<Vec<_>, _>>().map_err(st)?
+        };
+        if !rows.iter().any(|(rid, _)| *rid == id.to_string()) {
+            return Err(NafsError::NotFound(format!("room {id}")));
+        }
+        if rows
+            .iter()
+            .any(|(rid, n)| *rid != id.to_string() && room_key(n) == room_key(&name))
+        {
+            return Err(NafsError::Conflict(format!(
+                "a room named '{name}' already exists"
+            )));
+        }
+        let title: String = format!("Room: {name}").chars().take(60).collect();
+        let tx = c.transaction().map_err(st)?;
+        tx.execute(
+            "UPDATE rooms SET name=?2 WHERE id=?1",
+            params![id.to_string(), name],
+        )
+        .map_err(st)?;
+        tx.execute(
+            "UPDATE conversations SET title=?2 WHERE room_id=?1",
+            params![id.to_string(), title],
+        )
+        .map_err(st)?;
+        tx.commit().map_err(st)?;
+        drop(c);
+        self.get_room(id)
+    }
+    /// Messages stored for a conversation (a room's history cursor).
+    pub fn message_count(&self, conv: Uuid) -> Result<i64> {
+        self.conn
+            .lock()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM messages WHERE conversation_id=?1",
+                params![conv.to_string()],
+                |r| r.get(0),
+            )
+            .map_err(st)
+    }
+    /// All rooms, most recently active first.
     pub fn list_rooms(&self) -> Result<Vec<Room>> {
         let c = self.conn.lock().unwrap();
         let mut s = c
-            .prepare(
-                "SELECT id,name,profile,conversation_id,created_at FROM rooms ORDER BY created_at",
-            )
+            .prepare(&format!("{ROOM_SELECT} ORDER BY 7 DESC, r.created_at DESC"))
             .map_err(st)?;
-        let rows = s
-            .query_map([], |r| {
-                Ok(Room {
-                    room_id: Uuid::parse_str(&r.get::<_, String>(0)?).unwrap_or_default(),
-                    name: r.get(1)?,
-                    profile: r.get(2)?,
-                    conversation_id: Uuid::parse_str(&r.get::<_, String>(3)?).unwrap_or_default(),
-                    created_at: r.get(4)?,
-                })
-            })
-            .map_err(st)?;
+        let rows = s.query_map([], room_from_row).map_err(st)?;
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(st)
     }
     pub fn get_room(&self, id: Uuid) -> Result<Room> {
-        self.list_rooms()?
-            .into_iter()
-            .find(|r| r.room_id == id)
-            .ok_or_else(|| NafsError::NotFound(format!("room {id}")))
+        let c = self.conn.lock().unwrap();
+        c.query_row(
+            &format!("{ROOM_SELECT} WHERE r.id = ?1"),
+            params![id.to_string()],
+            room_from_row,
+        )
+        .optional()
+        .map_err(st)?
+        .ok_or_else(|| NafsError::NotFound(format!("room {id}")))
+    }
+    /// Delete a room for good: the room, its conversation and messages, and every ledger row that holds its
+    /// content (replies, decisions, audits, feedback, reviews, preference trials, retrieval memory), in one
+    /// transaction. The trace file keeps no message content and is append-only, so it is left as it is.
+    pub fn delete_room(&self, id: Uuid) -> Result<RoomPurge> {
+        let room = self.get_room(id)?;
+        let mut c = self.conn.lock().unwrap();
+        let tx = c.transaction().map_err(st)?;
+        let report = Self::purge_tx(&tx, room.conversation_id, true)?;
+        let gone = tx
+            .execute("DELETE FROM rooms WHERE id=?1", params![id.to_string()])
+            .map_err(st)?;
+        if gone == 0 {
+            return Err(NafsError::NotFound(format!("room {id}")));
+        }
+        tx.commit().map_err(st)?;
+        Ok(report)
+    }
+    /// Remove a conversation's ledger rows; with `with_conversation` also the conversation and its messages.
+    /// Safe to call again (a turn that finished after its room was deleted leaves a reply behind).
+    pub fn purge_conversation_data(
+        &self,
+        conv: Uuid,
+        with_conversation: bool,
+    ) -> Result<RoomPurge> {
+        let mut c = self.conn.lock().unwrap();
+        let tx = c.transaction().map_err(st)?;
+        let report = Self::purge_tx(&tx, conv, with_conversation)?;
+        tx.commit().map_err(st)?;
+        Ok(report)
+    }
+    fn purge_tx(
+        tx: &rusqlite::Transaction,
+        conv: Uuid,
+        with_conversation: bool,
+    ) -> Result<RoomPurge> {
+        let conv_s = conv.to_string();
+        let replies: Vec<(String, String)> = {
+            let mut s = tx
+                .prepare("SELECT id, json FROM replies WHERE conversation_id=?1")
+                .map_err(st)?;
+            let it = s
+                .query_map(params![conv_s], |r| Ok((r.get(0)?, r.get(1)?)))
+                .map_err(st)?;
+            it.collect::<std::result::Result<Vec<_>, _>>().map_err(st)?
+        };
+        let mut report = RoomPurge::default();
+        for (rid, json) in &replies {
+            let v: Value = serde_json::from_str(json).unwrap_or(Value::Null);
+            let did = v["decision"]["decision_id"]
+                .as_str()
+                .or_else(|| v["decision_id"].as_str())
+                .map(str::to_string);
+            if let Some(d) = did {
+                tx.execute("DELETE FROM audits WHERE decision_id=?1", params![d])
+                    .map_err(st)?;
+                tx.execute("DELETE FROM decisions WHERE id=?1", params![d])
+                    .map_err(st)?;
+            }
+            tx.execute("DELETE FROM feedback WHERE reply_id=?1", params![rid])
+                .map_err(st)?;
+            tx.execute("DELETE FROM reviews WHERE reply_id=?1", params![rid])
+                .map_err(st)?;
+            tx.execute(
+                "DELETE FROM preferences WHERE fast_reply_id=?1 OR slow_reply_id=?1",
+                params![rid],
+            )
+            .map_err(st)?;
+            report.memory_entries += tx
+                .execute("DELETE FROM memory_index WHERE reply_id=?1", params![rid])
+                .map_err(st)? as i64;
+        }
+        report.memory_entries += tx
+            .execute(
+                "DELETE FROM memory_index WHERE conversation_id=?1",
+                params![conv_s],
+            )
+            .map_err(st)? as i64;
+        report.replies = tx
+            .execute(
+                "DELETE FROM replies WHERE conversation_id=?1",
+                params![conv_s],
+            )
+            .map_err(st)? as i64;
+        if with_conversation {
+            report.messages = tx
+                .query_row(
+                    "SELECT COUNT(*) FROM messages WHERE conversation_id=?1",
+                    params![conv_s],
+                    |r| r.get(0),
+                )
+                .map_err(st)?;
+            tx.execute("DELETE FROM conversations WHERE id=?1", params![conv_s])
+                .map_err(st)?;
+        }
+        Ok(report)
     }
 
     pub fn save_run(&self, kind: &str, id: Uuid, status: &str, json: &Value) -> Result<()> {
@@ -1184,6 +1410,217 @@ mod tests {
         st.append_message(conv, "assistant", "Patience is steadfastness.", Some(id))
             .unwrap();
         id
+    }
+    #[test]
+    fn room_names_are_normalised() {
+        assert_eq!(
+            normalize_room_name("  Study \t group \n 7  "),
+            "Study group 7"
+        );
+        assert_eq!(normalize_room_name("a\u{0}b\u{7}c"), "abc");
+        assert_eq!(normalize_room_name(" \n\t "), "");
+        assert_eq!(
+            normalize_room_name(&"x".repeat(200)).chars().count(),
+            ROOM_NAME_MAX
+        );
+        // Truncation never leaves trailing whitespace behind.
+        let n = normalize_room_name(&format!("{} tail", "y".repeat(79)));
+        assert_eq!(n, "y".repeat(79));
+    }
+    #[test]
+    fn room_names_are_unique_without_case_and_creation_is_capped() {
+        let (st, d) = tmp_store();
+        let a = st.create_room("  Study   Group ", "A").unwrap();
+        assert_eq!(a.name, "Study Group");
+        assert_eq!(a.questions, 0);
+        assert!(!a.last_activity.is_empty());
+        for dup in ["study group", "STUDY  GROUP", " Study Group"] {
+            let e = st.create_room(dup, "A").unwrap_err();
+            assert!(matches!(e, NafsError::Conflict(_)), "{dup}: {e}");
+        }
+        assert!(matches!(
+            st.create_room(" \n ", "A").unwrap_err(),
+            NafsError::BadRequest(_)
+        ));
+        // Rooms do not appear in the chat conversation list, and the room's conversation carries its title.
+        assert!(st.list_conversations(10).unwrap().is_empty());
+        assert_eq!(
+            st.get_conversation(a.conversation_id).unwrap().title,
+            "Room: Study Group"
+        );
+        for i in 1..ROOM_CAP {
+            st.create_room(&format!("room {i}"), "A").unwrap();
+        }
+        let e = st.create_room("one too many", "A").unwrap_err();
+        assert!(
+            matches!(e, NafsError::BadRequest(ref m) if m.contains("limit")),
+            "{e}"
+        );
+        let _ = std::fs::remove_dir_all(d);
+    }
+    #[test]
+    fn rooms_can_be_renamed_under_the_same_rules() {
+        let (st, d) = tmp_store();
+        let a = st.create_room("Alpha", "A").unwrap();
+        let b = st.create_room("Beta", "A").unwrap();
+        assert!(matches!(
+            st.rename_room(b.room_id, "alpha").unwrap_err(),
+            NafsError::Conflict(_)
+        ));
+        assert!(matches!(
+            st.rename_room(Uuid::new_v4(), "Gamma").unwrap_err(),
+            NafsError::NotFound(_)
+        ));
+        assert!(matches!(
+            st.rename_room(a.room_id, "   ").unwrap_err(),
+            NafsError::BadRequest(_)
+        ));
+        // A room may change the case of its own name, and the conversation title follows.
+        let r = st.rename_room(a.room_id, "ALPHA  Prime").unwrap();
+        assert_eq!(r.name, "ALPHA Prime");
+        assert_eq!(
+            st.get_conversation(a.conversation_id).unwrap().title,
+            "Room: ALPHA Prime"
+        );
+        let r2 = st.rename_room(a.room_id, "alpha prime").unwrap();
+        assert_eq!(r2.name, "alpha prime");
+        // The freed name can be taken again.
+        st.rename_room(a.room_id, "Alpha 2").unwrap();
+        st.create_room("Alpha Prime", "A").unwrap();
+        let _ = std::fs::remove_dir_all(d);
+    }
+    #[test]
+    fn rooms_report_activity_and_sort_by_it() {
+        let (st, d) = tmp_store();
+        let a = st.create_room("quiet", "A").unwrap();
+        let b = st.create_room("busy", "A").unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        fake_reply(&st, b.conversation_id, "unverified", "fast");
+        let list = st.list_rooms().unwrap();
+        assert_eq!(
+            list.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(),
+            vec!["busy", "quiet"]
+        );
+        assert_eq!(list[0].questions, 1);
+        assert!(list[0].last_activity > list[1].last_activity);
+        assert_eq!(st.get_room(b.room_id).unwrap().questions, 1);
+        assert_eq!(st.get_room(a.room_id).unwrap().questions, 0);
+        assert!(matches!(
+            st.get_room(Uuid::new_v4()).unwrap_err(),
+            NafsError::NotFound(_)
+        ));
+        let _ = std::fs::remove_dir_all(d);
+    }
+    #[test]
+    fn deleting_a_room_removes_its_content_everywhere_and_nothing_else() {
+        let (st, d) = tmp_store();
+        let room = st.create_room("doomed", "A").unwrap();
+        let keep_room = st.create_room("survivor", "A").unwrap();
+        let chat = st.ensure_conversation(None, "a chat", None).unwrap();
+        // Seed the room with a reply that has every kind of dependent row, and the others with one reply each.
+        let seed = |conv: Uuid, with_deps: bool| -> Uuid {
+            let rid = fake_reply(&st, conv, "verified", "slow");
+            if with_deps {
+                let did = Uuid::new_v4().to_string();
+                let c = st.conn.lock().unwrap();
+                c.execute(
+                    "UPDATE replies SET json=?2 WHERE id=?1",
+                    params![
+                        rid.to_string(),
+                        format!("{{\"decision\":{{\"decision_id\":\"{did}\"}}}}")
+                    ],
+                )
+                .unwrap();
+                c.execute(
+                    "INSERT INTO decisions (id,created_at,json) VALUES (?1,'t','{}')",
+                    params![did],
+                )
+                .unwrap();
+                c.execute("INSERT INTO audits (id,decision_id,created_at,status,domain,request_json,kept_answer) VALUES (?1,?2,'t','done','open','{}','x')", params![Uuid::new_v4().to_string(), did]).unwrap();
+                c.execute(
+                    "INSERT INTO feedback (reply_id,created_at,rating) VALUES (?1,'t',1)",
+                    params![rid.to_string()],
+                )
+                .unwrap();
+                c.execute("INSERT INTO reviews (reply_id,decision,reviewer,created_at) VALUES (?1,'approve','t','t')", params![rid.to_string()]).unwrap();
+                c.execute("INSERT INTO memory_index (reply_id,conversation_id,created_at,question,answer) VALUES (?1,?2,'t','q','a')", params![rid.to_string(), conv.to_string()]).unwrap();
+                c.execute("INSERT INTO preferences (id,created_at,prompt,fast_reply_id,slow_reply_id,preferred) VALUES (?1,'t','p',?2,?3,'slow')", params![Uuid::new_v4().to_string(), rid.to_string(), Uuid::new_v4().to_string()]).unwrap();
+            }
+            rid
+        };
+        let doomed_reply = seed(room.conversation_id, true);
+        seed(room.conversation_id, false);
+        let other_room_reply = seed(keep_room.conversation_id, true);
+        let chat_reply = seed(chat, true);
+        let count = |sql: &str| -> i64 {
+            st.conn
+                .lock()
+                .unwrap()
+                .query_row(sql, [], |r| r.get(0))
+                .unwrap()
+        };
+        let before = (
+            count("SELECT COUNT(*) FROM replies"),
+            count("SELECT COUNT(*) FROM decisions"),
+            count("SELECT COUNT(*) FROM memory_index"),
+        );
+        assert_eq!(before, (4, 3, 3));
+        let rep = st.delete_room(room.room_id).unwrap();
+        assert_eq!(
+            rep,
+            RoomPurge {
+                messages: 4,
+                replies: 2,
+                memory_entries: 1
+            }
+        );
+        // The room, its conversation and every dependent row are gone ...
+        assert!(matches!(
+            st.get_room(room.room_id).unwrap_err(),
+            NafsError::NotFound(_)
+        ));
+        assert!(st.get_conversation(room.conversation_id).is_err());
+        let gone = |table: &str, col: &str, id: Uuid| {
+            count(&format!("SELECT COUNT(*) FROM {table} WHERE {col}='{id}'"))
+        };
+        for (t, c) in [
+            ("replies", "id"),
+            ("feedback", "reply_id"),
+            ("reviews", "reply_id"),
+            ("memory_index", "reply_id"),
+            ("preferences", "fast_reply_id"),
+        ] {
+            assert_eq!(gone(t, c, doomed_reply), 0, "{t}");
+        }
+        // ... and the survivor room and the chat keep all of theirs.
+        for (t, c) in [
+            ("replies", "id"),
+            ("feedback", "reply_id"),
+            ("reviews", "reply_id"),
+            ("memory_index", "reply_id"),
+            ("preferences", "fast_reply_id"),
+        ] {
+            assert_eq!(gone(t, c, other_room_reply), 1, "{t}");
+            assert_eq!(gone(t, c, chat_reply), 1, "{t}");
+        }
+        assert_eq!(count("SELECT COUNT(*) FROM decisions"), 2);
+        assert_eq!(count("SELECT COUNT(*) FROM audits"), 2);
+        assert!(st.get_room(keep_room.room_id).is_ok());
+        assert_eq!(st.get_conversation(chat).unwrap().messages.len(), 2);
+        // A second delete is a clean not-found, and a late reply for the deleted room can still be purged.
+        assert!(matches!(
+            st.delete_room(room.room_id).unwrap_err(),
+            NafsError::NotFound(_)
+        ));
+        st.conn.lock().unwrap().execute(
+            "INSERT INTO replies (id,conversation_id,created_at,domain,mode,assurance,escalated,wall_ms,rule,backend,audit,ephemeral,json) VALUES (?1,?2,'t','open','fast','unverified',0,1,'fixed','llama',0,0,'{}')",
+            params![Uuid::new_v4().to_string(), room.conversation_id.to_string()]).unwrap();
+        let late = st
+            .purge_conversation_data(room.conversation_id, false)
+            .unwrap();
+        assert_eq!(late.replies, 1);
+        assert_eq!(late.messages, 0);
+        let _ = std::fs::remove_dir_all(d);
     }
     #[test]
     fn feedback_review_and_opt_out_shape_the_training_view() {

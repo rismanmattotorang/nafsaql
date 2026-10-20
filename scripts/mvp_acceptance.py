@@ -66,7 +66,14 @@ b.onmessage=(e)=>{{const f=JSON.parse(e.data); if(f.type==='presence') presence=
   if(f.type==='assistant_event'&&f.payload.event.event==='done'){{seenAssistant=true; console.log(JSON.stringify({{seenUser,seenAssistant,presence}})); process.exit(0);}}}};
 let open=0; const go=()=>{{ if(++open===2) setTimeout(()=>a.send(JSON.stringify({{type:'user_message',payload:{{content:'Say hi to everyone.',force_mode:'fast'}}}})),300); }};
 a.onopen=go; b.onopen=go; setTimeout(()=>{{console.log(JSON.stringify({{seenUser,seenAssistant,presence,timeout:true}})); process.exit(1);}}, 300000);"""
-    out = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=320).stdout.strip().splitlines()[-1]
+    try:
+        out = subprocess.run(["node", "-e", js], capture_output=True, text=True, timeout=320).stdout.strip().splitlines()[-1]
+    finally:
+        try:
+            req = urllib.request.Request(f"{BASE}/v1/rooms/{room['room_id']}", method="DELETE")
+            urllib.request.urlopen(req, timeout=30).read()  # the acceptance room does not outlive the test
+        except Exception:
+            pass
     d = json.loads(out); return d["seenUser"] and d["seenAssistant"] and d["presence"] >= 2, f"bob saw alice's message={d['seenUser']}, saw streamed answer={d['seenAssistant']}, members={d['presence']}"
 def a8():
     r = post("/v1/chat", {"messages": [{"role": "user", "content": "Reply with OK."}], "force_mode": "fast", "max_tokens": 8})

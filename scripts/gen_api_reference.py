@@ -2,6 +2,9 @@
 import os, yaml
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 d = yaml.safe_load(open(os.path.join(ROOT, "api/openapi.yaml")))
+# api/openapi.json (served at /openapi.json) is generated from the YAML, which is the single source.
+import json
+open(os.path.join(ROOT, "api/openapi.json"), "w").write(json.dumps(d, indent=2, ensure_ascii=False))
 out = [f"# Nafs-Aql API reference (v{d['info']['version']})", "", "Generated from `api/openapi.yaml` by `scripts/gen_api_reference.py`; do not edit by hand.", "",
        d["info"]["description"].strip(), "",
        "Authentication: send `Authorization: Bearer <token>` when the gateway runs with `NAFS_AUTH_TOKENS`. Browser requests must be same-origin (cross-origin requests get 403).", ""]

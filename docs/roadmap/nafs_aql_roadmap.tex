@@ -12,7 +12,7 @@
 \input{../shared/nafsstyle.tex}
 \input{gen/phase_reqs.tex}\input{gen/tasks.tex}
 \pagestyle{fancy}\fancyhf{}\lhead{\small Nafs-Aql Development Roadmap v2.0}\rhead{\small Dirac R\&D Team}\cfoot{\small\thepage}
-\title{\textbf{Nafs-Aql Development Roadmap}\\[4pt]\large Version 2.1 (20 October 2026): Phases 0--6 implemented, Phases 7--8 added, road ahead}
+\title{\textbf{Nafs-Aql Development Roadmap}\\[4pt]\large Version 2.2 (20 October 2026): Phases 0--6 implemented, Phases 7--9 added, road ahead}
 \author{Dirac R\&D Team}\date{}
 \begin{document}\maketitle
 \begin{abstract}\noindent
@@ -76,6 +76,11 @@ Phases overlap where their work packages are independent (for example, fine-tuni
 \textbf{Objectives.} Decide, from first principles and measurements, what the neuroscience of decision making and the quantum theories of consciousness contribute to the accuracy and speed of \Sys, and implement only what carries a proof and a measurement. \textbf{Scope.} A review with explicit pass/fail tests (\texttt{docs/research/quantum\_neuro\_review.md}, report Section~8); a confidence-signal study of System~1 drafts against exact labels (ROC, AUROC with bootstrap intervals, recall at the operating escalation rate); the lowest-window confidence signal as a gate feature with an exact early-escalation rule (a running minimum, so an early crossing is the full draft's decision); a posterior stopping rule with a collapsing bound for the adaptive exit on non-verifiable tasks, compared in a paired Lab run; Wald's bound on the mean-based early escalation and the optimal probe interval as validations of existing settings. \textbf{Requirements satisfied.} \ReqsPhaseI. \textbf{Out of scope.} Anything from quantum consciousness: no mechanism passed the transferability test (Proposition~Q2 of the report), and the result is recorded as negative rather than deferred.
 
 \textbf{Exit criteria.} The signal study is stored with its sample size and intervals; the window rule's threshold and domains come from it; the posterior rule is on by default only if the paired run shows unchanged answers and no token increase; the review names, for every idea not adopted, the test it failed.
+
+\section{Phase 9: Rooms (added 20 October 2026)}
+\textbf{Objectives.} Make shared rooms a complete, trustworthy feature: a room can be created, renamed and deleted for good, a member always sees a consistent transcript however and whenever it joins, and the page survives a dropped connection. \textbf{Scope.} The room store (unique normalised names, a bound on the number of rooms, rename, and a deletion that purges the room's conversation and every ledger row made from it in one transaction); the room hub (a welcome snapshot carrying a history cursor and the pending questions, taken together with the subscription so that each turn is delivered exactly once; unique display names; presence, queue-state and typing frames; heartbeat; cancellation of a running answer when the room is deleted; tombstones that expire); the rebuilt Rooms page (search, unread markers, deep links, inline rename, confirmed delete, export, automatic reconnection, drafts, windowed history, a phone drawer); a live test with simulated members. \textbf{Requirements satisfied.} \ReqsPhaseJ. \textbf{Out of scope.} Accounts and per-room permissions: the gateway has none, so anyone who can reach it can administer any room, which the user guide and runbook state plainly.
+
+\textbf{Exit criteria.} The live rooms test passes, including a deletion while an answer is being written; a stress test of the join snapshot shows every turn delivered exactly once under concurrent joins; deleting a room leaves no reply, decision, memory or conversation row behind.
 
 \section{Milestones and Decision Gates}
 \begin{longtable}{@{}p{1.0cm}p{1.0cm}p{6.2cm}p{6.4cm}@{}}

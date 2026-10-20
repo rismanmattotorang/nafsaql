@@ -1,5 +1,4 @@
 //! HTTP, SSE and WebSocket handlers.
-use axum::extract::ws::{Message as WsMessage, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, Query, Request, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::{self, Next};
@@ -7,37 +6,24 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use metrics_exporter_prometheus::PrometheusHandle;
 use nafs_core::orchestrator::{Emitter, Orchestrator};
 use nafs_core::Config;
 use nafs_memory::Store;
-use nafs_types::{ChatRequest, Message, NafsError, ReasoningMode, StreamEvent, VerificationInputs};
+use nafs_types::{ChatRequest, NafsError, StreamEvent, VerificationInputs};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use uuid::Uuid;
 
 const OPENAPI_YAML: &str = include_str!("../../../../api/openapi.yaml");
 const OPENAPI_JSON: &str = include_str!("../../../../api/openapi.json");
-/// Assistant turns that may wait behind the current one in a room (review M7).
-const ROOM_QUEUE_CAP: usize = 3;
-/// Per-connection message bucket: burst and refill interval (review M7, NFR-011).
-const WS_BURST: f64 = 4.0;
-const WS_REFILL_S: f64 = 6.0;
-
-pub struct RoomHub {
-    tx: broadcast::Sender<String>,
-    members: AtomicUsize,
-    queued: AtomicUsize,
-    busy: Arc<tokio::sync::Mutex<()>>,
-}
-
 pub struct AppStateInner {
     pub cfg: Arc<Config>,
     pub orch: Arc<Orchestrator>,
@@ -47,7 +33,7 @@ pub struct AppStateInner {
     pub web_dir: Option<String>,
     pub started: Instant,
     pub allowed_hosts: Vec<String>,
-    rooms: Mutex<HashMap<Uuid, Arc<RoomHub>>>,
+    pub(crate) rooms: Mutex<HashMap<Uuid, Arc<crate::rooms::RoomHub>>>,
     rate: Mutex<HashMap<String, (Instant, u32)>>,
     cancels: Mutex<HashMap<Uuid, Arc<AtomicBool>>>,
     /// Recent request outcomes (time, ok) for the error-rate alert (OR-004).
@@ -124,7 +110,7 @@ impl IntoResponse for ApiError {
         r
     }
 }
-type ApiResult<T> = Result<T, ApiError>;
+pub(crate) type ApiResult<T> = Result<T, ApiError>;
 
 pub fn router(state: AppState) -> Router {
     let v1 = Router::new()
@@ -138,8 +124,17 @@ pub fn router(state: AppState) -> Router {
                 .delete(delete_conversation),
         )
         .route("/v1/decisions/{id}", get(get_decision))
-        .route("/v1/rooms", get(list_rooms).post(create_room))
-        .route("/ws/rooms/{id}", get(room_socket))
+        .route(
+            "/v1/rooms",
+            get(crate::rooms::list_rooms).post(crate::rooms::create_room),
+        )
+        .route(
+            "/v1/rooms/{id}",
+            get(crate::rooms::get_room)
+                .patch(crate::rooms::rename_room)
+                .delete(crate::rooms::delete_room),
+        )
+        .route("/ws/rooms/{id}", get(crate::rooms::room_socket))
         .route(
             "/v1/bench/prompt-sets",
             get(|| async { Json(nafs_bench::prompt_sets()) }),
@@ -398,14 +393,15 @@ async fn healthz(State(s): State<AppState>) -> Json<Value> {
     )
 }
 
-async fn run_with_cap(
+pub(crate) async fn run_with_cap(
     s: &AppState,
     req: ChatRequest,
     em: Emitter,
+    cancel: Option<Arc<AtomicBool>>,
 ) -> Result<nafs_types::ChatReply, NafsError> {
     let r = tokio::time::timeout(
         Duration::from_secs(s.cfg.server.request_wall_clock_cap_s + 30),
-        s.orch.handle(req, em),
+        s.orch.handle_with_cancel(req, em, cancel),
     )
     .await
     .map_err(|_| NafsError::BackendTimeout("request wall-clock cap exceeded".into()))
@@ -437,7 +433,7 @@ async fn chat(
     State(s): State<AppState>,
     Json(req): Json<ChatRequest>,
 ) -> ApiResult<Json<nafs_types::ChatReply>> {
-    Ok(Json(run_with_cap(&s, req, Emitter(None)).await?))
+    Ok(Json(run_with_cap(&s, req, Emitter(None), None).await?))
 }
 
 async fn chat_stream(
@@ -449,7 +445,7 @@ async fn chat_stream(
     let (tx, rx) = mpsc::unbounded_channel::<StreamEvent>();
     let s2 = s.clone();
     let tx2 = tx.clone();
-    let inner = tokio::spawn(async move { run_with_cap(&s2, req, Emitter(Some(tx2))).await });
+    let inner = tokio::spawn(async move { run_with_cap(&s2, req, Emitter(Some(tx2)), None).await });
     tokio::spawn(async move {
         // A panic or abort must still end the stream with an error event (review M10).
         let err = match inner.await {
@@ -1003,235 +999,6 @@ async fn lab_insights(
         .await
         .map_err(|e| NafsError::Internal(e.to_string()))?;
     Ok(Json(v))
-}
-
-// ---------------- Rooms (IF-004) ----------------
-async fn list_rooms(State(s): State<AppState>) -> ApiResult<Json<Value>> {
-    let rooms = s.store.list_rooms()?;
-    let hubs = s.rooms.lock().unwrap();
-    Ok(Json(json!(rooms
-        .into_iter()
-        .map(|r| {
-            let m = hubs
-                .get(&r.room_id)
-                .map(|h| h.members.load(Ordering::Relaxed))
-                .unwrap_or(0);
-            let mut v = json!(r);
-            v["members"] = json!(m);
-            v
-        })
-        .collect::<Vec<_>>())))
-}
-#[derive(Deserialize)]
-struct NewRoom {
-    name: String,
-    #[serde(default)]
-    profile: Option<String>,
-}
-async fn create_room(
-    State(s): State<AppState>,
-    Json(b): Json<NewRoom>,
-) -> ApiResult<(StatusCode, Json<Value>)> {
-    let name: String = b.name.trim().chars().take(80).collect();
-    if name.is_empty() {
-        return Err(NafsError::BadRequest("room name required".into()).into());
-    }
-    let profile: String = b
-        .profile
-        .unwrap_or_else(|| s.cfg.assistant.profile.clone())
-        .chars()
-        .filter(|c| c.is_alphanumeric())
-        .take(8)
-        .collect();
-    Ok((
-        StatusCode::CREATED,
-        Json(json!(s.store.create_room(&name, &profile)?)),
-    ))
-}
-fn hub(s: &AppState, id: Uuid) -> Arc<RoomHub> {
-    s.rooms
-        .lock()
-        .unwrap()
-        .entry(id)
-        .or_insert_with(|| {
-            Arc::new(RoomHub {
-                tx: broadcast::channel(4096).0,
-                members: AtomicUsize::new(0),
-                queued: AtomicUsize::new(0),
-                busy: Arc::new(tokio::sync::Mutex::new(())),
-            })
-        })
-        .clone()
-}
-#[derive(Deserialize)]
-struct WsQuery {
-    #[serde(default)]
-    user: Option<String>,
-}
-async fn room_socket(
-    State(s): State<AppState>,
-    Path(id): Path<Uuid>,
-    Query(q): Query<WsQuery>,
-    ws: WebSocketUpgrade,
-) -> ApiResult<Response> {
-    let room = s.store.get_room(id)?;
-    let user: String = q
-        .user
-        .unwrap_or_else(|| "guest".into())
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-' || *c == ' ')
-        .take(32)
-        .collect();
-    let user = if user.trim().is_empty() {
-        "guest".to_string()
-    } else {
-        user
-    };
-    Ok(ws
-        .max_message_size(64 * 1024)
-        .on_upgrade(move |socket| room_session(s, room, user, socket)))
-}
-async fn room_session(s: AppState, room: nafs_memory::Room, user: String, socket: WebSocket) {
-    let h = hub(&s, room.room_id);
-    // Subscribe before announcing, so this client also receives its own and concurrent presence frames.
-    let mut rx = h.tx.subscribe();
-    let n = h.members.fetch_add(1, Ordering::SeqCst) + 1;
-    let _ = h.tx.send(
-        json!({"type": "presence", "user": user, "payload": {"joined": true, "members": n}})
-            .to_string(),
-    );
-    let (mut sink, mut stream) = socket.split();
-    // Frames meant only for this connection (rate-limit and queue errors).
-    let (ptx, mut prx) = mpsc::unbounded_channel::<String>();
-    let fwd = tokio::spawn(async move {
-        loop {
-            let msg = tokio::select! {
-                r = rx.recv() => match r {
-                    Ok(m) => m,
-                    // A slow member skips frames instead of silently stopping (review M6).
-                    Err(broadcast::error::RecvError::Lagged(k)) => json!({"type": "resync", "payload": {"missed": k}}).to_string(),
-                    Err(broadcast::error::RecvError::Closed) => break,
-                },
-                p = prx.recv() => match p { Some(m) => m, None => break },
-            };
-            if sink.send(WsMessage::Text(msg.into())).await.is_err() {
-                break;
-            }
-        }
-    });
-    let alive = Arc::new(AtomicBool::new(true));
-    let (mut tokens, mut last) = (WS_BURST, Instant::now());
-    let private_err = |code: &str, message: &str| {
-        json!({"type": "error", "payload": {"code": code, "message": message}}).to_string()
-    };
-    while let Some(Ok(msg)) = stream.next().await {
-        let WsMessage::Text(text) = msg else { continue };
-        let Ok(frame) = serde_json::from_str::<Value>(text.as_str()) else {
-            continue;
-        };
-        if frame["type"] != "user_message" {
-            continue;
-        }
-        let content: String = frame["payload"]["content"]
-            .as_str()
-            .unwrap_or("")
-            .trim()
-            .chars()
-            .take(8000)
-            .collect();
-        if content.is_empty() {
-            continue;
-        }
-        // Per-connection token bucket (review M7).
-        tokens = (tokens + last.elapsed().as_secs_f64() / WS_REFILL_S).min(WS_BURST);
-        last = Instant::now();
-        if tokens < 1.0 {
-            let _ = ptx.send(private_err(
-                "E_RATE_LIMITED",
-                "You are sending messages too quickly; wait a few seconds.",
-            ));
-            continue;
-        }
-        tokens -= 1.0;
-        if h.queued.load(Ordering::SeqCst) >= ROOM_QUEUE_CAP {
-            let _ = ptx.send(private_err("E_QUEUE_FULL", "The assistant already has several questions queued in this room; try again shortly."));
-            continue;
-        }
-        let msg_id = Uuid::new_v4().to_string();
-        let _ = h.tx.send(json!({"type": "user_message", "user": user, "payload": {"content": content, "id": msg_id}}).to_string());
-        let (s2, h2, user2, conv, alive2) = (
-            s.clone(),
-            h.clone(),
-            user.clone(),
-            room.conversation_id,
-            alive.clone(),
-        );
-        let opts = frame["payload"].clone();
-        h.queued.fetch_add(1, Ordering::SeqCst);
-        tokio::spawn(async move {
-            let _guard = h2.busy.lock().await; // one assistant turn at a time per room
-            h2.queued.fetch_sub(1, Ordering::SeqCst);
-            if !alive2.load(Ordering::SeqCst) {
-                // The sender left before their turn started: drop it.
-                let _ = h2.tx.send(json!({"type": "assistant_event", "payload": {"reply_to": msg_id, "event": {"event": "error", "data": {"code": "E_CANCELLED", "message": "sender disconnected before the turn started"}}}}).to_string());
-                return;
-            }
-            let (tx, mut rx) = mpsc::unbounded_channel::<StreamEvent>();
-            let h3 = h2.clone();
-            let reply_to = msg_id.clone();
-            let fwd = tokio::spawn(async move {
-                while let Some(ev) = rx.recv().await {
-                    let _ = h3.tx.send(json!({"type": "assistant_event", "payload": {"reply_to": reply_to, "event": ev}}).to_string());
-                }
-            });
-            let req = ChatRequest {
-                conversation_id: Some(conv),
-                messages: vec![Message {
-                    role: "user".into(),
-                    content: format!("[{user2}] {content}"),
-                }],
-                lambda: opts["lambda"]
-                    .as_f64()
-                    .map(|x| x as f32)
-                    .filter(|l| (0.0..=1.0).contains(l)),
-                force_mode: opts["force_mode"].as_str().and_then(|m| match m {
-                    "fast" => Some(ReasoningMode::Fast),
-                    "slow" => Some(ReasoningMode::Slow),
-                    _ => None,
-                }),
-                show_reasoning: Some(opts["show_reasoning"].as_bool().unwrap_or(true)),
-                ..Default::default()
-            };
-            let inner = {
-                let (s3, tx3) = (s2.clone(), tx.clone());
-                tokio::spawn(async move { run_with_cap(&s3, req, Emitter(Some(tx3))).await })
-            };
-            match inner.await {
-                Ok(Ok(_)) => {}
-                Ok(Err(e)) => {
-                    let _ = tx.send(StreamEvent::Error {
-                        code: e.code().into(),
-                        message: e.to_string(),
-                    });
-                }
-                Err(_) => {
-                    let _ = tx.send(StreamEvent::Error {
-                        code: "E_INTERNAL".into(),
-                        message: "internal error: the request task stopped unexpectedly".into(),
-                    });
-                }
-            }
-            drop(tx);
-            let _ = fwd.await;
-        });
-    }
-    alive.store(false, Ordering::SeqCst);
-    fwd.abort();
-    let n = h.members.fetch_sub(1, Ordering::SeqCst).saturating_sub(1);
-    let _ = h.tx.send(
-        json!({"type": "presence", "user": user, "payload": {"joined": false, "members": n}})
-            .to_string(),
-    );
 }
 
 // ---------------- Bench, eval and verifier runs (IF-009) ----------------

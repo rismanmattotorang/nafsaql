@@ -30,6 +30,23 @@ Nafs-Aql answers in two ways. A fast model (System 1) drafts an answer at once. 
 - **Compare:** sets the System 1 draft beside the final answer.
 - **👍 / 👎:** records your rating. Ratings are shown in the ledger and help reviewers; they never change the gate directly.
 
+## Rooms
+
+A room is a shared chat. Everyone connected sees each question and the assistant's answer as it is written, and the transcript is kept until the room is deleted. Open **Rooms** in the left bar.
+
+- **Create** a room with *New room*. Names are unique without regard to case; spaces are tidied and the name is cut to 80 characters.
+- **Join** by clicking a room, or from a link: *Link* in the room's header copies an address of the form `…/#/rooms/<id>`. The page reopens the last room you were in.
+- **Your name** (bottom left) is shown to everyone. If someone in the room already uses it, you appear as *Name 2*, and a note tells you so. *Assistant* and *System* are reserved.
+- **Ask** with Enter (Shift+Enter for a new line). *Auto*, *Fast* and *Deliberate* work as in Chat. The assistant answers one question at a time; up to three more wait, and the header says whose question is being answered. A message may hold 8,000 characters; a counter appears near the limit and a longer message is refused, not cut. *Regenerate*, *Think harder* and *Fast only* under an answer ask the same question again as a new question in the room.
+- **See who is here**: avatars in the header, the sidebar's *n online*, a dot for new activity since you last looked, and "… is typing". Date separators and join and leave notes mark the flow. Long histories show the latest 60 messages with *Show earlier*.
+- **Rename** with the pencil beside the title. Everyone in the room sees the new name at once.
+- **Export** downloads a Markdown transcript or the full JSON records.
+- **Delete** removes the room *for everyone* and cannot be undone: the room, its messages, and the saved decisions, feedback and retrieval-memory entries made from it. The dialog says how many questions and people are affected. Others in the room are told and disconnected; an answer being written is stopped.
+- **If the connection drops** (a gateway restart, a laptop that slept) the header shows *Reconnecting…* with a countdown and *Retry now*; your draft stays in the box. When the connection returns the transcript is rebuilt from the server, so nothing is missing or doubled. A room that was deleted meanwhile is reported as such.
+- **On a phone** the room list moves into a drawer behind the *Rooms* button, and the header actions become icons.
+
+Rooms are not removed by the 90-day retention purge: they stay until someone deletes them. There are no accounts, so anyone who can reach the gateway can read, rename or delete any room; run the gateway with tokens (see the operator runbook) when that is not acceptable.
+
 ## Privacy
 
 Conversations may be used, after removing personal data, for evaluation and for training the fast model. Turn off **Use for research** in a conversation's header to exclude it. Conversations are kept for 90 days by default.

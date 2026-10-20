@@ -1,6 +1,7 @@
 //! nafs-gateway: the Rust Gateway (IF-001..IF-004, IF-009, NFR-011, NFR-021, NFR-022).
 mod api;
 mod gates;
+mod rooms;
 mod security;
 use clap::Parser;
 use std::sync::Arc;

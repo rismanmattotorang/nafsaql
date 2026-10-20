@@ -82,6 +82,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | 📈 **Latency attribution** | Every reply records where its time went: queue, prefill, decode and KV-cache reuse per model stage, straight from llama-server's timings. |
 | 🛡 **Operations built in** | Drift monitor (CUSUM with a shuffled negative control), alerts with a drill mode, Prometheus metrics, audit stream, retention purge, secure-by-default bind, token auth, TLS recipes. |
 | 🔁 **Distillation loop (Tazkiya)** | Verified System 2 traces become System 1 training data under a promotion gate with one-command rollback. The GPU training run itself is deferred. |
+| 👥 **Rooms** | Shared chats over WebSocket: everyone sees each question and the assistant's answer as it is written. Create, rename, search, share a link, export, and delete for good (the room, its messages and every ledger row made from it, in one transaction). Presence, typing, a queue of assistant turns, unique display names, automatic reconnection, and a join snapshot that delivers every turn exactly once however late you arrive. |
 | 🧭 **Sequential evidence (Phase 8)** | The rules that read a *stream* of evidence come from sequential analysis and decision neuroscience: a lowest-window confidence signal whose early crossing *is* the full-draft decision (a running minimum), a posterior stopping rule with a collapsing bound for the adaptive exit, Wald's bound on what an early escalation can promise, and the optimal probe interval. A review of quantum theories of consciousness is included as a negative result, with the test each idea failed. |
 | 🔌 **Two serving profiles** | llama.cpp on bare metal (the reference), and vLLM's CPU backend in Docker, behind one OpenAI-compatible gateway. |
 
@@ -93,6 +94,10 @@ Every request moves through a small, bounded automaton and the reply says where 
 <tr>
 <td width="50%"><img src="docs/shared/screenshots/muhasaba_drift_alerts.png" alt="Muhasaba: drift monitor and alerts"><br><sub><b>Muhasaba.</b> Drift per domain, alert rules over live traffic.</sub></td>
 <td width="50%"><img src="docs/shared/screenshots/lab_gates.png" alt="Roadmap gates computed from stored evidence"><br><sub><b>Gates.</b> Go / no-go computed from stored runs, never typed in by hand.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/shared/screenshots/rooms.png" alt="Rooms: three people in a shared chat with the assistant's answers"><br><sub><b>Rooms.</b> Presence, per-person bubbles, live answers, search and unread markers.</sub></td>
+<td width="50%"><img src="docs/shared/screenshots/rooms_delete.png" alt="Rooms: confirmation before deleting a room for everyone"><br><sub><b>Delete.</b> A room can be deleted for good; the dialog says what is lost.</sub></td>
 </tr>
 </table>
 
@@ -138,7 +143,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | A sequential test on the mean-log-prob early escalation | Wald's bound: ≥ 260 tokens to separate the threshold from its 0.04 margin at 5 % error; drafts are 47–291 tokens | kept as a measured heuristic, never made more aggressive |
 | Quantum-consciousness mechanisms (Orch OR and descendants) | decoherence 10⁻¹³ s against 10⁻³ s dynamics; a CPU can follow at most ~30 two-level systems | nothing transfers as an algorithm; negative result, `docs/research/quantum_neuro_review.md` |
 
-**Quality of the build**: 83 Rust tests, 9 Python tests, a 26-probe security suite (one real sandbox-escape found and fixed), a 42-check end-to-end sweep over every endpoint and UI page, `clippy -D warnings` clean.
+**Quality of the build**: 95 Rust tests, 9 Python tests, a 26-probe security suite (one real sandbox-escape found and fixed), a 48-check end-to-end sweep over every endpoint and UI page, a 63-check live test of Rooms with simulated members (`scripts/rooms_test.py`), `clippy -D warnings` clean.
 
 ## Quick start
 
@@ -198,7 +203,7 @@ A Rust workspace of eight crates:
 
 | Crate | Role |
 |---|---|
-| `nafs-gateway` | axum HTTP/SSE/WebSocket API (50 documented endpoints, OpenAPI 3.1), auth, metrics, background workers |
+| `nafs-gateway` | axum HTTP/SSE/WebSocket API (51 documented endpoints, OpenAPI 3.1), auth, metrics, background workers |
 | `nafs-core` | orchestrator and automaton, Aql Gate, calibration, drift, backends (llama.cpp, vLLM) |
 | `nafs-verify` | exact verifiers and the sandbox, rubric judge support, mutation harness |
 | `nafs-memory` | SQLite ledger, traces, retrieval memory (BM25), preferences |

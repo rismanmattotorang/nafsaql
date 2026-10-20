@@ -8,7 +8,7 @@ only navigates, clicks a conversation and the Inspect button, and scrolls.
 Usage: python3 scripts/capture_screenshots.py [--base http://127.0.0.1:8080] [--only chat,lab]
 Needs Google Chrome and the websocket-client package.
 """
-import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.request
+import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
 import websocket
 
@@ -55,6 +55,28 @@ class Tab:
         open(path, "wb").write(base64.b64decode(data))
         print("wrote", os.path.relpath(path, ROOT))
         self.call("Emulation.setDeviceMetricsOverride", width=W, height=H, deviceScaleFactor=SCALE, mobile=False)
+
+
+def api(base, method, path, body=None):
+    req = urllib.request.Request(base + path, data=None if body is None else json.dumps(body).encode(), method=method,
+                                 headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read() or b"null")
+
+
+def ask(ws, text, timeout=240):
+    """Send one question to a room as this member and wait for the assistant's answer to finish."""
+    ws.send(json.dumps({"type": "user_message", "payload": {"content": text, "force_mode": "fast"}}))
+    end = time.time() + timeout
+    ws.settimeout(5)
+    while time.time() < end:
+        try:
+            f = json.loads(ws.recv())
+        except websocket.WebSocketTimeoutException:
+            continue
+        if f.get("type") == "assistant_event" and f["payload"]["event"]["event"] == "done":
+            return True
+    return False
 
 
 def scroll_to_heading(tab, text):
@@ -125,6 +147,38 @@ def main():
         if want("system"):
             go("system")
             tab.shot("system")
+        if want("rooms"):
+            # A throw-away room with three people and two real answers, photographed, then deleted.
+            ws_base = base.replace("http", "ws", 1)
+            room = api(base, "POST", "/v1/rooms", {"name": "Study group"})
+            members = []
+            try:
+                for who in ("Aisha", "Bilal"):
+                    members.append(websocket.create_connection(f"{ws_base}/ws/rooms/{room['room_id']}?user={who}", timeout=10))
+                    members[-1].recv()  # welcome
+                ask(members[0], "Give me two tips for studying in a group.")
+                ask(members[1], "Which of those is easier to start with?")
+                go("rooms")
+                tab.js("localStorage.setItem('nafs.user', JSON.stringify('Maya')); localStorage.setItem('nafs.roomMode', JSON.stringify('fast'))")
+                go(f"rooms/{room['room_id']}")
+                tab.wait_for("document.querySelectorAll('#rinner .msg.bot').length >= 2 && /Connected/.test(document.querySelector('#rstate')?.innerText || '')", 40)
+                time.sleep(1.5)
+                tab.shot("rooms")
+                tab.js("document.getElementById('delBtn').click()")
+                tab.wait_for("document.getElementById('modal').open", 5)
+                time.sleep(0.6)
+                tab.shot("rooms_delete")
+                tab.js("document.getElementById('cdNo').click()")
+            finally:
+                for m in members:
+                    try:
+                        m.close()
+                    except Exception:
+                        pass
+                try:
+                    api(base, "DELETE", f"/v1/rooms/{room['room_id']}")
+                except urllib.error.HTTPError:
+                    pass
     finally:
         chrome.terminate()
         try:

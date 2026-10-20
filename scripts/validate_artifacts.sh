@@ -3,6 +3,12 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 echo "== OpenAPI 3.1";   uvx --python 3.12 --from openapi-spec-validator openapi-spec-validator api/openapi.yaml
+echo "== openapi.json is the YAML (run scripts/gen_api_reference.py after editing api/openapi.yaml)"
+python3 -I - <<'PY'
+import json, yaml
+assert yaml.safe_load(open("api/openapi.yaml")) == json.load(open("api/openapi.json")), "api/openapi.json differs from api/openapi.yaml"
+print("ok api/openapi.json matches api/openapi.yaml")
+PY
 echo "== JSON Schemas (draft 2020-12)"
 python3 -I - <<'PY'
 import glob, json

@@ -312,7 +312,8 @@
           "rooms"
         ],
         "operationId": "listRooms",
-        "summary": "List chat rooms",
+        "summary": "List chat rooms, most recently active first",
+        "description": "Each room carries who is connected now (`members`, `users`), whether the assistant is answering (`busy`) and how many questions wait (`queued`).",
         "responses": {
           "200": {
             "description": "Rooms",
@@ -338,6 +339,7 @@
         ],
         "operationId": "createRoom",
         "summary": "Create a chat room",
+        "description": "The name is trimmed, control characters are dropped, runs of whitespace collapse to one space and it is cut to 80 characters. Names are unique without regard to case. A gateway keeps at most 500 rooms.",
         "requestBody": {
           "required": true,
           "content": {
@@ -371,6 +373,163 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/rooms/{room_id}": {
+      "parameters": [
+        {
+          "name": "room_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "rooms"
+        ],
+        "operationId": "getRoom",
+        "summary": "One room",
+        "responses": {
+          "200": {
+            "description": "The room",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "rooms"
+        ],
+        "operationId": "renameRoom",
+        "summary": "Rename a room",
+        "description": "Same rules as creation. A room may change the case of its own name. Connected members receive a `room_renamed` frame.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The renamed room",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Room"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "rooms"
+        ],
+        "operationId": "deleteRoom",
+        "summary": "Delete a room and everything stored from it",
+        "description": "Permanent. Connected members receive `room_deleted` and are disconnected with WebSocket close code 4004. A running answer is cancelled and given up to 10 seconds to stop. In one transaction the room, its conversation and messages, and the replies, decisions, audits, feedback, reviews, preference trials and retrieval-memory entries made from it are removed. The append-only trace file holds no message content and is left as it is.",
+        "responses": {
+          "200": {
+            "description": "What was removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "deleted",
+                    "room_id",
+                    "name",
+                    "removed"
+                  ],
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    },
+                    "room_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "disconnected": {
+                      "type": "integer",
+                      "description": "Members that were connected when the room was deleted"
+                    },
+                    "removed": {
+                      "type": "object",
+                      "properties": {
+                        "messages": {
+                          "type": "integer"
+                        },
+                        "replies": {
+                          "type": "integer"
+                        },
+                        "memory_entries": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "403": {
             "$ref": "#/components/responses/Forbidden"
           }
@@ -384,6 +543,7 @@
         ],
         "operationId": "roomSocket",
         "summary": "WebSocket upgrade for a chat room (frames are `RoomFrame` JSON objects)",
+        "description": "Query parameters: `user` (display name: letters, digits, space, `-`, `_`; at most 32 characters; made unique in the room by appending a number; `Assistant` and `System` are reserved) and `token` when authentication is on. The first frame is always `welcome`; build the transcript from its `cursor` (stored messages that precede the running turn) and `pending` (questions of the running and queued turns), then apply live frames: every turn appears exactly once, however late you join or reconnect. Client frames: `user_message` (`payload.content` up to 8000 characters; optional `force_mode`, `lambda`, `show_reasoning`), `typing` and `ping`. A room holds 64 members; at most three questions queue behind the running one.",
         "parameters": [
           {
             "name": "room_id",
@@ -393,11 +553,23 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "user",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
           }
         ],
         "responses": {
           "101": {
             "description": "Switching Protocols"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -2467,6 +2639,16 @@
             }
           }
         }
+      },
+      "Conflict": {
+        "description": "The request clashes with existing state, for example a room name that is already taken",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       }
     },
     "schemas": {
@@ -2627,6 +2809,14 @@
           "adaptive_exit": {
             "type": "boolean",
             "description": "FR-082: use (true) or skip (false) the adaptive reasoning exit (probe-and-verify early stop of System 2 reasoning); default from configuration"
+          },
+          "adaptive_exit_rule": {
+            "type": "string",
+            "enum": [
+              "consistency",
+              "posterior"
+            ],
+            "description": "Phase 8: stopping rule of the adaptive exit on non-verifiable tasks: consistency (k consecutive agreeing probes) or posterior (majority posterior over all probes against a collapsing bound); default from configuration"
           }
         }
       },
@@ -2944,6 +3134,13 @@
                   "number",
                   "null"
                 ]
+              },
+              "low_window_logprob": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "description": "Phase 8: lowest mean log-prob over any confidence_window consecutive draft tokens (a running minimum)"
               },
               "k": {
                 "type": "integer"
@@ -3334,15 +3531,40 @@
           "profile": {
             "type": "string"
           },
-          "members": {
-            "type": "integer"
-          },
           "conversation_id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The room's transcript is the conversation with this id (GET /v1/conversations/{id})"
           },
           "created_at": {
             "type": "string"
+          },
+          "questions": {
+            "type": "integer",
+            "description": "Questions asked in the room so far"
+          },
+          "last_activity": {
+            "type": "string",
+            "description": "Time of the latest message, or of creation for an empty room (RFC 3339)"
+          },
+          "members": {
+            "type": "integer",
+            "description": "Members connected now"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Display names of the members connected now"
+          },
+          "busy": {
+            "type": "boolean",
+            "description": "The assistant is answering a question in this room"
+          },
+          "queued": {
+            "type": "integer",
+            "description": "Questions waiting behind the running one"
           }
         }
       },
@@ -3351,18 +3573,23 @@
         "required": [
           "type"
         ],
+        "description": "A WebSocket text frame. `welcome` (to the new member only, always first): `{you, room, users, assistant, limits, cursor, pending}`. `presence`: `{joined, members, users}` with the member in `user`. `user_message`: `{content, id, ts}` with the sender in `user`. `assistant_event`: `{reply_to, event}` where `event` is a stream event (`{event, data}`) for the question with id `reply_to`. `queue`: `{busy, working_for, queued}`. `typing`: the typist in `user`. `room_renamed`: `{name}`. `room_deleted`: the socket closes with code 4004 right after. `heartbeat` every 25 s; `pong` answers a client `ping`. `error`: `{code, message}` to one member (`E_RATE_LIMITED`, `E_QUEUE_FULL`, `E_TOO_LONG`, `E_ROOM_FULL`). `resync`: `{missed}` frames were skipped; reconnect.",
         "properties": {
           "type": {
             "type": "string",
             "enum": [
-              "join",
-              "leave",
-              "user_message",
-              "assistant_token",
-              "assistant_event",
-              "assistant_done",
+              "welcome",
               "presence",
-              "error"
+              "user_message",
+              "assistant_event",
+              "queue",
+              "typing",
+              "room_renamed",
+              "room_deleted",
+              "heartbeat",
+              "pong",
+              "error",
+              "resync"
             ]
           },
           "user": {

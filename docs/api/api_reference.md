@@ -331,7 +331,7 @@ Responses: `200`, `403`.
 
 ### `GET /v1/rooms`
 
-List chat rooms
+List chat rooms, most recently active first
 
 Responses: `200`, `403`.
 
@@ -341,15 +341,35 @@ Create a chat room
 
 Request body: `name`*, `profile` (* = required).
 
-Responses: `201`, `403`.
+Responses: `201`, `400`, `409`, `403`.
+
+### `DELETE /v1/rooms/{room_id}`
+
+Delete a room and everything stored from it
+
+Responses: `200`, `404`, `403`.
+
+### `GET /v1/rooms/{room_id}`
+
+One room
+
+Responses: `200`, `404`, `403`.
+
+### `PATCH /v1/rooms/{room_id}`
+
+Rename a room
+
+Request body: `name`* (* = required).
+
+Responses: `200`, `400`, `404`, `409`, `403`.
 
 ### `GET /ws/rooms/{room_id}`
 
 WebSocket upgrade for a chat room (frames are `RoomFrame` JSON objects)
 
-Parameters: `room_id` (path, required).
+Parameters: `room_id` (path, required), `user` (query).
 
-Responses: `101`, `404`, `403`.
+Responses: `101`, `400`, `404`, `403`.
 
 ## system
 
@@ -493,7 +513,7 @@ Responses: `202`, `404`, `403`.
 - `StreamEvent`: SSE frame payload; the SSE event name equals `event`. Discriminated by `event`.
 - `Conversation`
 - `Room`
-- `RoomFrame`
+- `RoomFrame`: A WebSocket text frame. `welcome` (to the new member only, always first): `{you, room, users, assistant, limits, cursor, pending}`. `presence`: `{joined, members, users}` with the member in `user`. `user_message`: `{content, id, ts}` with the sender in `user`. `assistant_event`: `{reply_to, event}` where `event` is a stream event (`{event, data}`) for the question with id `reply_to`. `queue`: `{busy, working_for, queued}`. `typing`: the typist in `user`. `room_renamed`: `{name}`. `room_deleted`: the socket closes with code 4004 right after. `heartbeat` every 25 s; `pong` answers a client `ping`. `error`: `{code, message}` to one member (`E_RATE_LIMITED`, `E_QUEUE_FULL`, `E_TOO_LONG`, `E_ROOM_FULL`). `resync`: `{missed}` frames were skipped; reconnect.
 - `BenchRunRequest`
 - `BenchRun`
 - `Quantiles`

@@ -468,6 +468,9 @@ pub enum NafsError {
     Cancelled,
     #[error("forbidden: {0}")]
     Forbidden(String),
+    /// The request is well formed but clashes with existing state (for example a duplicate room name).
+    #[error("conflict: {0}")]
+    Conflict(String),
 }
 impl NafsError {
     pub fn code(&self) -> &'static str {
@@ -488,6 +491,7 @@ impl NafsError {
             NafsError::Internal(_) => "E_INTERNAL",
             NafsError::Cancelled => "E_CANCELLED",
             NafsError::Forbidden(_) => "E_FORBIDDEN",
+            NafsError::Conflict(_) => "E_CONFLICT",
         }
     }
     pub fn http_status(&self) -> u16 {
@@ -497,6 +501,7 @@ impl NafsError {
             NafsError::RateLimited | NafsError::QueueTimeout(_) => 429,
             NafsError::NotFound(_) => 404,
             NafsError::Forbidden(_) => 403,
+            NafsError::Conflict(_) => 409,
             NafsError::Cancelled => 499,
             NafsError::BackendUnavailable(_) => 503,
             NafsError::BackendTimeout(_) => 504,

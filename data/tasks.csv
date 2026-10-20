@@ -49,3 +49,7 @@ P8-T02,8,E8.1 Evidence,"Lowest-window confidence as a gate feature and an exact 
 P8-T03,8,E8.2 Deliberation,"Posterior stopping rule with a collapsing bound for the adaptive exit on non-verifiable tasks",0.5,P7-T08,FR-084,Could
 P8-T05,8,E8.1 Evidence,"Agreement samples on unverified mathematics drafts (adopted from the study's agreement arm)",0.25,P8-T01,FR-085,Should
 P8-T04,8,E8.3 Research,"Quantum-consciousness and neuroscience review with first-principles verdicts and the sequential-evidence propositions",0.5,,"ER-021, FR-083, FR-084",Should
+P9-T01,9,E9.1 Rooms,"Room store and API: unique normalised names, rename, delete with a full ledger purge, activity and presence in the list",1.0,,"FR-090",Must
+P9-T02,9,E9.1 Rooms,"Room hub: welcome snapshot with cursor and pending turns, unique display names, queue and typing frames, heartbeat, race-safe deletion",1.0,P9-T01,"FR-091, FR-092",Must
+P9-T03,9,E9.2 Rooms UI,"Rooms page rebuilt: list with search and unread, deep links, inline rename, confirmed delete, export, reconnecting transcript, drafts, mobile drawer",1.5,P9-T02,"FR-093",Should
+P9-T04,9,E9.3 Verification,"Live rooms test with simulated members; sweep checks; screenshots; API contract and documents",0.5,P9-T03,"ER-022",Should
