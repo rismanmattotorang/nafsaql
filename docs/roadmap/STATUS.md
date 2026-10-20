@@ -230,6 +230,19 @@ Phase 8 asked what quantum theories of consciousness and the neuroscience of dec
 
 What was deliberately **not** changed: the mean-based early escalation (kept at its measured N = 32, margin 0.04 and labelled a heuristic), the probe schedule, and anything suggested by quantum-consciousness theories.
 
+## Web UI test pass 2 (2026-10-21)
+
+Driven in a real browser in a separate tab (the pane is shared with the user, who was using it at the same time), with a console and network collector: every page at desktop, tablet (768 px) and phone (375 px) widths; Chat (a verified-math example through to a verified System 2 answer, a plain factual question, the Both trial, the Inspector, the conversation drawer and delete); Rooms (create, duplicate and blank names, a hostile name, join, the full lifecycle); the Lab form (presets, datasets, validation). No JavaScript error and no unexpected failed request occurred, and a controlled test showed a single Enter press sends exactly one request (a duplicate "Think harder" run seen early on was a hand action in the shared pane).
+
+| Defect | Cause | Fix |
+|---|---|---|
+| On a phone the Chat page showed a 540 px conversation list and pushed the conversation off the screen | The rule that hides the list at ≤760 px sat before the base `.convs { display: flex }` rule and lost on equal specificity | The hide rule now wins, and the list is a drawer behind a *Chats* button, with a *New chat* shortcut in a phone-only bar |
+| Lab, Muhasaba, Tazkiya, Performance and System scrolled sideways on a phone (58 to 376 px) | The one-column grid used `1fr`, which grows to the widest table inside; card headers did not wrap | `minmax(0, 1fr)`, wrapping card headers, form controls capped to the width |
+| Tazkiya's pipeline commands pushed the page sideways at tablet width | Unwrapped `<pre>` blocks | They scroll inside their card; inline code wraps |
+| Deleting a chat, and discarding measured gate parameters, used the browser's native `confirm()` | Native dialogs can be blocked in embedded browsers (Delete would silently do nothing) and do not match the Rooms dialog | Both use the app's own confirmation, which names what is lost |
+
+The sweep now has 55 checks, including one per page that it does not scroll sideways at 375 px. Two phone layouts were measured before and after: six of seven pages overflowed; none do. Known and unchanged: the Chat composer's controls take about a third of a phone screen.
+
 ## Phase 9: Rooms completed (2026-10-20)
 
 Rooms existed since Phase 1 but could not be deleted or renamed, showed a bare list, lost history on a dropped connection and left test rooms behind. Phase 9 closes those gaps.

@@ -1,7 +1,7 @@
 {
- "measured_at": "2026-10-20T13:05:06Z",
+ "measured_at": "2026-10-20T23:57:35Z",
  "base": "http://127.0.0.1:8080",
- "passed": 48,
+ "passed": 55,
  "failed": 0,
  "results": [
   {
@@ -22,12 +22,12 @@
   {
    "check": "GET /v1/alerts",
    "pass": true,
-   "detail": "200 application/json 1033 B"
+   "detail": "200 application/json 1032 B"
   },
   {
    "check": "GET /v1/audits",
    "pass": true,
-   "detail": "200 application/json 596 B"
+   "detail": "200 application/json 1124 B"
   },
   {
    "check": "GET /v1/bench/prompt-sets",
@@ -42,12 +42,12 @@
   {
    "check": "GET /v1/conversations",
    "pass": true,
-   "detail": "200 application/json 4216 B"
+   "detail": "200 application/json 4628 B"
   },
   {
    "check": "GET /v1/drift",
    "pass": true,
-   "detail": "200 application/json 15125 B"
+   "detail": "200 application/json 15173 B"
   },
   {
    "check": "GET /v1/eval/datasets",
@@ -82,7 +82,7 @@
   {
    "check": "GET /v1/perf/stages",
    "pass": true,
-   "detail": "200 application/json 1987 B"
+   "detail": "200 application/json 2239 B"
   },
   {
    "check": "GET /v1/preferences",
@@ -92,7 +92,7 @@
   {
    "check": "GET /v1/rooms",
    "pass": true,
-   "detail": "200 application/json 2186 B"
+   "detail": "200 application/json 2175 B"
   },
   {
    "check": "GET /v1/self-model",
@@ -107,7 +107,7 @@
   {
    "check": "GET /v1/system/activity",
    "pass": true,
-   "detail": "200 application/json 35278 B"
+   "detail": "200 application/json 35248 B"
   },
   {
    "check": "GET /v1/tazkiya",
@@ -132,7 +132,7 @@
   {
    "check": "chat: verified math reply",
    "pass": true,
-   "detail": "fast verified 1.1s"
+   "detail": "fast verified 1.0s"
   },
   {
    "check": "chat: stage timings recorded (NFR-030)",
@@ -142,7 +142,7 @@
   {
    "check": "chat: unverified math stages add up to the wall time",
    "pass": true,
-   "detail": "counted 7854 ms of 7857 ms; 1 sample_after stage(s)"
+   "detail": "counted 7835 ms of 7839 ms; 1 sample_after stage(s)"
   },
   {
    "check": "rooms: create normalises the name (201)",
@@ -202,7 +202,7 @@
   {
    "check": "perf: latency breakdown (P7-T01)",
    "pass": true,
-   "detail": "44 replies"
+   "detail": "41 replies"
   },
   {
    "check": "system: switching to a stopped backend is refused",
@@ -243,6 +243,41 @@
    "check": "ui: #system renders without errors",
    "pass": true,
    "detail": "System \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #chat fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #eval fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #gate fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #tazkiya fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #rooms fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #bench fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #system fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
   }
  ]
 }

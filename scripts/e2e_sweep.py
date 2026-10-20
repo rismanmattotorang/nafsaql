@@ -189,6 +189,16 @@ if "--no-ui" not in args:
                 time.sleep(0.3)
             title = call("Runtime.evaluate", expression="document.title", returnByValue=True)["result"].get("value", "")
             check(f"ui: #{route} renders without errors", not errors and "Nafs-Aql" in title, errors[:2] or title)
+        # The same pages on a phone-sized screen: nothing may force the page to scroll sideways.
+        call("Emulation.setDeviceMetricsOverride", width=375, height=812, deviceScaleFactor=2, mobile=True)
+        for route in ["chat", "eval", "gate", "tazkiya", "rooms", "bench", "system"]:
+            call("Page.navigate", url=f"{BASE}/?e2e=m{route}#/{route}")
+            t = time.time()
+            while time.time() - t < 4:
+                call("Runtime.evaluate", expression="1")
+                time.sleep(0.3)
+            over = call("Runtime.evaluate", expression="(() => { const v = document.querySelector('.view'); return v ? v.scrollWidth - v.clientWidth : -1; })()", returnByValue=True)["result"].get("value")
+            check(f"ui: #{route} fits a 375 px screen (no sideways scroll)", over is not None and 0 <= over <= 1, f"{over} px over")
         ws.close()
     finally:
         chrome.terminate()

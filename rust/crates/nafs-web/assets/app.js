@@ -410,7 +410,7 @@ routes.chat = { title: 'Chat', async render(view) {
   view.innerHTML = `<div class="chat noinspect" id="chatGrid">
     <aside class="convs"><div class="head" style="flex-direction:column;align-items:stretch;gap:8px"><button class="btn" id="newConv" style="justify-content:center" title="New chat (Ctrl/Cmd+K)">${icon.plus}New chat</button>
       <input id="convSearch" type="search" placeholder="Search conversations" aria-label="Search conversations"></div><div class="list" id="convList"></div></aside>
-    <div class="thread"><div class="threadbar" id="threadBar" hidden><b id="tbTitle" class="t1"></b><span class="sp"></span>
+    <div class="thread"><div class="mbar"><button class="btn sm ghost" id="convsToggle" type="button" aria-label="Show conversations"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Chats</button><span class="sp"></span><button class="btn sm" id="mbNew" type="button">${icon.plus}New chat</button></div><div class="threadbar" id="threadBar" hidden><b id="tbTitle" class="t1"></b><span class="sp"></span>
         <label class="toggle small" title="SR-004: when on, this conversation may be used for evaluation and, after redaction and review, for training"><input type="checkbox" id="tbResearch"> Use for research</label>
         <button class="btn sm ghost" id="tbExport" title="Download this conversation as JSON">${icon.download}Export</button></div>
       <div class="msgs" id="msgs"><div class="inner" id="inner"></div></div>
@@ -440,6 +440,11 @@ routes.chat = { title: 'Chat', async render(view) {
   showInspector(!narrow() && store.get('inspector', true), false);
   const select = (t, explicit = false) => { selected = t; turns.forEach(x => x.el.classList.toggle('selected', x === t)); insp.innerHTML = inspectorHTML(t); if (explicit && narrow()) showInspector(true, false); };
   $('#inspBtn').onclick = () => showInspector(grid.classList.contains('noinspect'));
+  // Phones: the conversation list is a drawer behind the "Chats" button; picking a conversation closes it.
+  const closeConvs = () => grid.classList.remove('convs-open');
+  $('#convsToggle').onclick = () => grid.classList.toggle('convs-open');
+  $('#mbNew').onclick = () => { closeConvs(); newConv(); };
+  grid.addEventListener('click', (e) => { if (e.target === grid || e.target.closest('#convList .conv, #newConv')) setTimeout(closeConvs, 0); });
   // settings
   const segBtns = $$('#modeSeg button'); const setMode = (m) => { S.mode = m; segBtns.forEach(b => b.classList.toggle('on', b.dataset.m === m)); cfg.save(); };
   segBtns.forEach(b => b.onclick = () => setMode(b.dataset.m)); setMode(S.mode);
@@ -482,7 +487,8 @@ routes.chat = { title: 'Chat', async render(view) {
       L.innerHTML = list.length ? list.map(c => `<div class="conv ${c.conversation_id === convId ? 'on' : ''}" data-id="${c.conversation_id}"><span class="t1" title="${esc(c.title)}">${esc(c.title)}</span><span class="tiny faint">${ago(c.updated_at)}</span><button class="x" title="Export as JSON" data-exp="${c.conversation_id}">⤓</button><button class="x" title="Delete" data-del="${c.conversation_id}">×</button></div>`).join('') : `<div class="empty small">${q ? 'No conversation matches your search.' : 'No conversations yet.'}</div>`;
       $$('.conv', L).forEach(el => el.onclick = async (e) => { if (e.target.dataset.exp) { const c = await api.get('/v1/conversations/' + e.target.dataset.exp);
           const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(c, null, 2)], { type: 'application/json' })); a.download = `nafs-aql-${c.conversation_id.slice(0, 8)}.json`; a.click(); return; }
-        if (e.target.dataset.del) { if (confirm('Delete this conversation?')) { await api.del('/v1/conversations/' + e.target.dataset.del); if (convId === e.target.dataset.del) newConv(); loadConvs(); } return; } openConv(el.dataset.id); });
+        if (e.target.dataset.del) { const id = e.target.dataset.del; const title = el.querySelector('.t1')?.textContent || 'this conversation';
+          if (await confirmDialog({ title: 'Delete this conversation?', ok: 'Delete', body: `<p>“${esc(title)}” and its messages are removed for good. This cannot be undone.</p><p class="small muted">Use the export button first to keep a copy.</p>` })) { await api.del('/v1/conversations/' + id); if (convId === id) newConv(); loadConvs(); } return; } openConv(el.dataset.id); });
     }
   }
   const showBar = (c) => { const bar = $s('#threadBar'); if (!c) { bar.hidden = true; return; } bar.hidden = false; $s('#tbTitle').textContent = c.title; $s('#tbResearch').checked = !c.training_opt_out; };
@@ -1132,7 +1138,7 @@ routes.gate = { title: 'Muhasaba · gate and ledger', async render(view, alive) 
     $('#gParams').innerHTML = `<div class="card-h"><h3>Gate parameters per domain</h3><span class="hint">Placeholders until derived from Phase-0 runs (FR-011, FR-021). ${g.derived?.derived_at ? `Derived ${ago(g.derived.derived_at)} from ${g.derived.source_runs.length} run(s).` : ''}</span><span class="sp"></span>${g.derived?.derived_at ? '<button class="btn sm ghost" id="gReset" type="button">Reset to placeholders</button>' : ''}</div><div class="card-b" style="padding:0;overflow:auto">
       <table class="t"><tr><th>Domain</th><th>ê₂</th><th></th><th>Δc</th><th></th><th>N</th><th>R</th><th>Budget</th><th></th></tr>${doms.map(d => { const x = prov[d]; return `<tr><td>${esc(d)}</td><td>${num(x.e2_hat, 3)}</td><td>${src(x.e2_source)}</td><td>${num(x.delta_c_s, 0)} s</td><td>${src(x.delta_c_source)}</td><td>${x.caps.N}</td><td>${x.caps.R}</td><td>${x.caps.budget}</td><td>${src(x.caps_source)} ${src(x.budget_source)}</td></tr>`; }).join('')}</table>
       <p class="hint" style="padding:0 16px">Select evaluation runs with fast_only and slow_only (and optionally a budget sweep) on the Lab page, then use "Derive parameters from selected".</p></div>`;
-    $('#gReset') && ($('#gReset').onclick = async () => { if (confirm('Discard measured parameters and use the configuration placeholders?')) { await api.del('/v1/gate/params'); load(); } });
+    $('#gReset') && ($('#gReset').onclick = async () => { if (await confirmDialog({ title: 'Discard measured parameters?', ok: 'Discard', danger: false, body: '<p>The gate goes back to the placeholder values in the configuration. Measured values can be derived again from the Lab.</p>' })) { await api.del('/v1/gate/params'); load(); } });
     const R = rates?.rates || {}; const running = (rruns || []).find(x => x.status === 'running');
     $('#gRates').innerHTML = `<div class="card-h"><h3 title="FR-032, ER-003">Verifier quality</h3><span class="sp"></span><select id="gRDs" title="Code test suites for the mutants"><option value="base">MBPP + HumanEval tests</option><option value="plus">EvalPlus tests (MBPP+, HumanEval+)</option><option value="judge">judge only</option></select><label class="toggle small"><input type="checkbox" id="gRJ"> include judge</label><button class="btn sm" id="gRRun" type="button" ${running ? 'disabled' : ''}>${running ? '<span class="spin"></span> measuring' : 'Measure'}</button></div><div class="card-b" style="padding:0">
       ${Object.keys(R).length ? `<table class="t"><tr><th>Verifier</th><th>r (true accept)</th><th>φ (false accept)</th><th>φ 95% upper</th><th>Mutants</th><th>Correct</th></tr>${Object.entries(R).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${num(v.r, 3)}</td><td><b>${num(v.phi, 3)}</b></td><td>${num(v.phi_upper95, 3)}</td><td>${v.n_mutants}</td><td>${v.n_correct}</td></tr>`).join('')}</table>` : '<div class="empty small">Not measured yet.</div>'}
