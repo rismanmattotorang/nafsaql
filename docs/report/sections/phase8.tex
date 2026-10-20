@@ -1,0 +1,259 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 8 -- quantum consciousness, neuroscience and sequential evidence
+% ---------------------------------------------------------------------------
+\section{Phase 8: Quantum Consciousness, Neuroscience and Sequential Evidence}
+\label{sec:phase8}
+
+Phase~8 (20 October 2026) asked whether quantum theories of consciousness and the
+neuroscience of decision making offer improvements to the inference speed or the
+reasoning accuracy of \Sys. Each candidate idea had to pass four tests before any
+code was written: it must be established rather than hypothesised; a classical,
+CPU-only pipeline must inherit something from it beyond its classical description;
+it must yield a result with an engineering consequence in the sense of
+Section~\ref{sec:math}; and the consequence must be measurable on the reference
+machine with the exact verifiers. The full review, with sources, is
+\texttt{docs/research/quantum\_neuro\_review.md}; this section records the results.
+
+\subsection{Quantum consciousness: a negative result}
+
+Orchestrated objective reduction \cite{hameroff2014orchor} places consciousness
+in quantum computations within microtubules. Tegmark's estimate of the
+decoherence times of the relevant superpositions is $10^{-20}$--$10^{-13}$\,s
+against dynamical timescales of $10^{-3}$--$10^{-1}$\,s \cite{tegmark2000decoherence};
+the rebuttal of \cite{hagan2002quantum} lengthens the former by several orders of
+magnitude without reaching the latter. Recent measurements of collective
+ultraviolet emission from tryptophan networks in microtubules
+\cite{babcock2024superradiance} show a modest quantum-yield enhancement and do
+not demonstrate computation. Two results close the question for \Sys.
+
+\begin{proposition}[Decoherence separation] \textnormal{[literature]}
+\label{prop:q1}
+With $\tau_{\mathrm{dec}}\le10^{-4}$\,s on the most favourable published estimate and
+$\tau_{\mathrm{dyn}}\ge10^{-3}$\,s, any superposition of neural states has decohered into a
+mixture over the interval of a decision. The description of cognition at that
+timescale is a classical stochastic process.
+\end{proposition}
+\emph{Consequence.} The object is the one Section~\ref{sec:math} already models:
+stochastic policies $\pi_1,\pi_2$ and a finite automaton over trace states.
+
+\begin{proposition}[No transferable algorithm] \textnormal{[exact]}
+\label{prop:q2}
+A classical machine that follows the state of $n$ two-level systems stores $2^n$
+complex amplitudes; in double precision the reference machine's 32\,GB hold
+$n\le30$. No theorem separates BQP from BPP, so no speed-up is inherited by a
+classical algorithm from the quantum character of a process.
+\end{proposition}
+\begin{proof}
+$\dim\mathbb C^{2^n}=2^n$ and $2^{30}\times16$ bytes $=17$\,GB; the second claim is
+the open status of the separation. \qed
+\end{proof}
+\emph{Consequence.} Even an established Orch~OR would contribute nothing computable to
+a CPU inference loop (A-055). Quantum \emph{cognition}, the use of Hilbert-space
+probability as a descriptive model of judgement
+\cite{busemeyer2012quantum,pothos2013quantum}, has one structural lesson:
+non-commuting measurements produce order effects, confirmed by the parameter-free
+QQ equality on about seventy surveys \cite{wang2013qq,wang2014context} and
+reported in language models \cite{qqllm2026}. Read for \Sys, an order effect is
+anchoring of the deliberate answer on the draft, which the draft-blind slow path
+(FR-023) removes and the coupling test (ER-004) measures
+(Proposition~\ref{prop:collision}). The design needed no change.
+
+\subsection{Neuroscience: the sequential form of the gate}
+
+Three results of decision neuroscience have exact mathematical forms: evidence is
+accumulated to a bound \cite{gold2007neural}, whose optimal form is Wald's
+sequential probability ratio test \cite{wald1945sequential,wald1948optimum}; under
+a cost of time or a deadline the optimal bound collapses
+\cite{frazier2007deadline,drugowitsch2012cost}; and the quality of a confidence
+signal is its accuracy--confidence association measured by ROC statistics
+\cite{fleming2014metacognition}, with the all-or-none ignition of a global
+workspace as the same threshold picture at system level
+\cite{dehaene2011workspace}. Theorem~\ref{thm:gate} is the one-step instance;
+three mechanisms of \Sys\ read a \emph{stream} of evidence and stop on a bound,
+and each had a hand-set rule where a theorem exists. The language-model
+literature reached the same rules independently
+\cite{aggarwal2023adaptive,li2024esc,fu2025deepconf}.
+
+\begin{proposition}[ROC dominance] \textnormal{[exact]}
+\label{prop:n1}
+If the ROC curve of a confidence signal $s'$ for predicting a wrong draft
+dominates that of $s$ at every escalation rate, the best threshold gate on $s'$
+has an objective \eqref{eq:objective} no larger than the best threshold gate on
+$s$, for every $L$, $\lambda$ and $\Delta c$.
+\end{proposition}
+\begin{proof}
+At a fixed escalation rate the compute term is equal and the error term is
+$L$ times the wrong drafts not escalated, which dominance makes no larger;
+minimising over the rate preserves the inequality. \qed
+\end{proof}
+\emph{Consequence.} The gate's signal is chosen by a stored ROC study against
+exact labels (ER-021), not by convention.
+
+\begin{proposition}[Exact early escalation on a running minimum] \textnormal{[exact]}
+\label{prop:n2}
+Let $w(n)$ be the lowest mean log-probability over complete windows of $W$
+consecutive tokens among the first $n$ tokens of a draft. Then $w$ is
+non-increasing in $n$, so for the rule ``escalate iff $w(N)<\theta$'' the
+stopping time $T=\min\{n:w(n)<\theta\}$ gives exactly the full draft's decision,
+and no rule on the same stream escalates such a draft earlier without a
+non-zero disagreement rate.
+\end{proposition}
+\begin{proof}
+A minimum over a growing set; $w(N)\le w(T)<\theta$; before $T$ every window is
+$\ge\theta$. \qed
+\end{proof}
+\emph{Consequence.} Early escalation on the lowest-window signal needs no margin,
+minimum token count or agreement study (FR-083). It is a decision, not a
+prediction.
+
+\begin{proposition}[Wald's bound on the mean rule] \textnormal{[exact under i.i.d.\ Gaussian tokens]}
+\label{prop:n3}
+Any sequential test of $\mu=\tau$ against $\mu=\tau-\delta$ on tokens with
+variance $\sigma^2$ and errors $(\alpha,\beta)$ has
+$\mathbb E_1[N]\ge\big[(1-\beta)\ln\frac{1-\beta}{\alpha}+\beta\ln\frac{\beta}{1-\alpha}\big]\big/\frac{\delta^2}{2\sigma^2}$.
+\end{proposition}
+\emph{Measured.} On the 40 open-ended drafts of the early-escalation study the
+per-token spread is $\sigma\approx0.28$ and the margin is $\delta=0.04$: the bound
+is 260 tokens at $\alpha=\beta=0.05$, against drafts of 47--291 tokens (median
+133), and the first tokens of a draft are systematically more confident than the
+rest. \emph{Consequence.} The mean-based early escalation of P7-T03 is an
+empirical heuristic that cannot be made more aggressive by a sequential test; it
+is kept at its measured setting and labelled as such (A-056).
+
+\begin{proposition}[Posterior stopping with a collapsing bound] \textnormal{[exact for the rule; strong for optimality]}
+\label{prop:n4}
+With $k$ probed answers clustered into categories, counts $v$ and a uniform
+Dirichlet prior, the posterior probability that the plurality answer is the
+majority answer is
+$1-I_{1/2}(v_{\mathrm{top}}+1,\,k-v_{\mathrm{top}}+1)
+=1-2^{-k-1}\sum_{j=v_{\mathrm{top}}+1}^{k+1}\binom{k+1}{j}$.
+Under a per-probe cost and a hard budget the Bayes-optimal rule stops at the
+first $k$ with this probability at or above a bound $\theta(t_k)$ that is
+non-increasing in the budget used \cite{frazier2007deadline}.
+\end{proposition}
+\emph{Values.} One probe 0.75; two agreeing 0.875; $[2,1]$ 0.6875; $[3,1]$ 0.8125.
+With $\theta$ falling linearly from 0.85 to 0.70 the rule reproduces the
+``two consecutive agreeing probes'' rule early in the budget, never stops on one
+probe, votes over all probes (Theorem~\ref{thm:plurality}) rather than the last
+two, and lets a $[3,1]$ split stop once about 45\,\% of the budget is used
+(FR-084). Verifiable tasks are untouched: the exact verifier is the stopping
+signal (Theorem~\ref{thm:precision}).
+
+\begin{proposition}[Optimal probe interval] \textnormal{[exact under an exponential model]}
+\label{prop:n5}
+If the reasoning length at which the answer becomes available is exponential
+with mean $m$ tokens, a probe costs $c_p$ seconds and decoding runs at $v$
+tokens per second, the periodic interval minimising probe cost plus overshoot is
+$\Delta^\star=\sqrt{2c_pvm}$, with $\mathrm{cost}(\Delta)/\mathrm{cost}(\Delta^\star)
+=\tfrac12(\Delta/\Delta^\star+\Delta^\star/\Delta)$.
+\end{proposition}
+\emph{Measured.} Idle: $c_p\approx0.7$\,s, $v\approx8$, $m\approx300$ give
+$\Delta^\star\approx58$ tokens; the configured gap of 64 costs 0.5\,\% more than
+the optimum (1\,\% under the shared load). The schedule is validated and
+unchanged (A-059). This is the quantitative content of the ``quantum Zeno''
+intuition that measuring often is costly; here a probe has no back-action, only
+a price.
+
+\subsection{Measurements}
+\label{sec:phase8meas}
+
+All measurements were taken on the shared reference machine (load average 5--11,
+other sessions compiling); accuracy and log-probabilities do not depend on load,
+wall-clock figures do.
+
+\textbf{Confidence-signal study (ER-021).} 150 GSM8K test items were drafted by
+System~1 under the production prompt and sampling (temperature 0.2, top-$p$ 0.8,
+no thinking) and scored by the exact numeric verifier: 31 drafts are wrong
+(accuracy 0.793). Table~\ref{tab:signals} gives, for each candidate signal, the
+AUROC for predicting a wrong draft (lower signal flags the draft; 400-resample
+bootstrap interval) and the recall and precision when the least confident 10\,\%
+and 20\,\% of drafts are escalated.
+
+\begin{table}[t]
+\caption{Which confidence signal of a System~1 draft predicts a wrong draft (150 GSM8K drafts, 31 wrong)}
+\label{tab:signals}
+\centering\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Signal & AUROC [95\,\% CI] & recall / precision at 10\,\% & at 20\,\% \\
+\midrule
+lowest token log-prob & \textbf{0.646} [0.539, 0.746] & 0.23 / 0.47 & 0.35 / 0.37 \\
+mean top-1/top-2 margin & 0.614 [0.493, 0.729] & 0.23 / 0.47 & 0.39 / 0.40 \\
+lowest 16-token window of the margin & 0.611 [0.510, 0.715] & 0.06 / 0.13 & 0.26 / 0.27 \\
+lowest 16-token window log-prob \cite{fu2025deepconf} & 0.581 [0.488, 0.698] & 0.13 / 0.27 & 0.29 / 0.30 \\
+negative mean top-5 entropy & 0.573 [0.453, 0.679] & 0.16 / 0.33 & 0.26 / 0.27 \\
+mean log-prob (the fixed rule) & 0.564 [0.449, 0.672] & 0.13 / 0.27 & 0.26 / 0.27 \\
+bottom-10\,\% tokens & 0.555 [0.459, 0.675] & 0.10 / 0.20 & 0.23 / 0.23 \\
+tail (last 32 tokens) & 0.492 [0.366, 0.631] & 0.19 / 0.40 & 0.23 / 0.23 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three facts follow. First, \emph{the fixed rule is blind on mathematics}: at the
+production threshold ($-0.175$ at the default $\lambda$) the mean-log-prob rule
+escalates 0 of 150 drafts and catches 0 of 31 wrong ones, because mathematics
+drafts have a mean log-prob of about $-0.03$ whether right or wrong; on the
+unverified mathematics path every wrong draft was kept, and because such drafts
+never enter the uncertainty band the agreement samples were never drawn either.
+Second, \emph{token confidence is a weak metacognitive signal} for this model on
+this task: the best signal is the single lowest token, and the window signal's
+interval includes chance, so no ROC dominates (Proposition~\ref{prop:n1}) and
+the signal that Proposition~\ref{prop:n2} makes exact to act on is not the one
+worth acting on. Third, \emph{Theorem~\ref{thm:gate} forbids escalating on any of
+them at the default price}: escalation pays only if
+$\Pr[\text{wrong}\mid\text{escalated}]>\hat e_2+\lambda\Delta c/(L\cdot\text{cost unit})
+=0.15+0.2\cdot150/60=0.65$, and the highest precision reached at an escalation
+rate of at least 10\,\% is 0.47. By Proposition~\ref{prop:cascade} the expected
+accuracy of a gate escalating the 20\,\% least confident drafts by the lowest
+token is 0.847--0.867 (System~2 accuracy 0.9--1.0) against 0.793, for about 30\,s
+of mean latency per question, which the default price rates as a loss.
+\emph{Decision:} the window signal is recorded on every decision and read by the
+calibrated gate, but its fixed-rule threshold stays off (A-057): the mechanism is
+exact, the measured signal is not strong enough to use it. The repository keeps
+this negative result next to the positive ones.
+
+\textbf{Agreement with cheap samples.} The gate's second signal, agreement between
+the draft and $k=2$ cheap System~1 samples, was never computed on mathematics
+because the samples are drawn only inside the uncertainty band of the mean
+log-prob. For the first 60 drafts the samples were drawn exactly as production
+draws them and compared with the draft's final number (12 of 60 drafts wrong;
+54\,s per item on the loaded machine). Agreement has AUROC 0.759 [0.618, 0.901]
+and, with ties broken by the lowest token, 0.823 [0.690, 0.940], against 0.720
+for the lowest token and 0.611 for the window on the same drafts. The rule
+``any disagreement'' (the configured threshold at the default care) escalates
+25\,\% of drafts, catches 8 of the 12 wrong ones (precision 0.53) and raises the
+expected cascade accuracy from 0.800 to 0.908--0.933. This is what
+Theorem~\ref{thm:plurality} predicts: a wrong low-temperature draft is usually
+one whose answer holds no majority at temperature 0.8. \emph{Decision
+(implemented, FR-085):} unverified mathematics drafts always get their two
+samples (\texttt{gate.samples\_on\_unverified\_domains}), whatever their token
+confidence says (A-060). Its precision is still below the 0.65 bar of
+Theorem~\ref{thm:gate} at the default price, so the calibrated gate, once
+promoted, will price it rather than apply it unconditionally.
+
+\textbf{Exit rules on factual prompts (FR-084).} A paired Lab run on six factual
+prompts (run \texttt{73cd5bba}, 512-token budget, shared machine) compared the
+consistency rule with the posterior rule. Both gave the same factual content on
+every prompt; reasoning tokens were 357 against 382 on average (wall 93\,s
+against 101\,s), two prompts exhausting the budget under both rules. Where they
+diverged most, the probes disagreed first and then agreed: the consistency rule
+stopped at the two consecutive agreeing probes (183 tokens) while the posterior
+rule saw a $[2,1]$ split below its bound and continued to $[3,1]$ (318 tokens),
+as Proposition~\ref{prop:n4} prescribes. That caution costs tokens on this set,
+so by the criterion fixed in advance (A-058) the posterior rule stays an option
+and the consistency rule remains the default; the comparison is indicative
+($n=6$, no exact labels).
+
+
+\subsection{What changed}
+
+The crate \texttt{nafs-core} gains a \texttt{sequential} module (the window signal and
+its streaming tracker, the probe posterior with the exact beta tail, the
+collapsing bound, Wald's bound and the probe interval, each with tests of the
+property its proposition states). Every gate decision now records
+\texttt{low\_window\_logprob}; the calibrated gate reads it as an eighth feature; the
+fixed rule applies it for the measured domains and stops the draft at the
+crossing; the adaptive exit offers the posterior rule per request and in the Lab
+(\texttt{slow\_exit\_posterior} against \texttt{slow\_exit\_consistency}). Nothing was
+added for the quantum-consciousness ideas; Propositions~\ref{prop:q1}--\ref{prop:q2}
+are the record of why.

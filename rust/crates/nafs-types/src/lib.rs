@@ -176,6 +176,10 @@ pub struct ChatRequest {
     /// FR-082: use (true) or skip (false) the adaptive reasoning exit; default from config.
     #[serde(default)]
     pub adaptive_exit: Option<bool>,
+    /// Phase 8: stopping rule of the adaptive exit on non-verifiable tasks, "consistency" (k consecutive
+    /// agreeing probes) or "posterior" (majority posterior above a collapsing bound); default from config.
+    #[serde(default)]
+    pub adaptive_exit_rule: Option<String>,
     /// In-process lab traffic (evaluation and load-test runs). Never read from HTTP; such replies are stored
     /// as ephemeral and kept out of the operational alerts (OR-004), which describe the live service.
     #[serde(skip)]
@@ -265,6 +269,10 @@ pub struct VerifierResult {
 pub struct GateFeatures {
     pub mean_logprob: Option<f32>,
     pub min_logprob: Option<f32>,
+    /// Phase 8: lowest mean log-prob over any `gate.confidence_window` consecutive draft tokens
+    /// ("lowest group confidence"); a running minimum, so an early crossing is the full draft's value.
+    #[serde(default)]
+    pub low_window_logprob: Option<f32>,
     pub k: u8,
     pub agreement: Option<f32>,
     pub domain: Domain,

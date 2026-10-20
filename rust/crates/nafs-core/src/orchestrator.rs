@@ -730,22 +730,35 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             } else {
                 cfg.gate.k_samples
             };
+            // Phase 8: on an unverified draft of these domains the samples are drawn whatever the draft's
+            // confidence says, because for them token confidence does not predict a wrong draft and
+            // agreement does (Theorem 6; confidence_signal_study.json).
+            let samples_always = !verifiable
+                && cfg
+                    .gate
+                    .samples_on_unverified_domains
+                    .iter()
+                    .any(|d| d == dom.as_str());
             // P7-T03 early escalation: under the fixed rule an unverifiable draft without samples is judged
             // on its mean log-prob alone, so a draft whose running mean is already well below the threshold
             // is stopped and handed to System 2 instead of being generated to the end.
+            // Phase 8: the lowest-window rule stops a draft the moment a window collapses, on any
+            // non-verifiable draft under the fixed rule; the decision equals the full draft's (Prop. N2).
             let early_n = cfg.gate.early_escalation_tokens as usize;
-            let early_stop = (early_n > 0
-                && k == 0
-                && !verifiable
+            let early = crate::backend::EarlyStop {
+                min_n: early_n,
+                below_mean: (early_n > 0 && k == 0).then(|| {
+                    gate::fixed_logprob_threshold(&cfg, lambda) - cfg.gate.early_escalation_margin
+                }),
+                window: cfg.gate.confidence_window as usize,
+                below_window: gate::fixed_window_threshold(&cfg, lambda, dom),
+            };
+            let early_stop = (!verifiable
                 && fixed_in_force
                 && req.force_mode.is_none()
-                && req.audit != Some(true))
-            .then(|| {
-                (
-                    early_n,
-                    gate::fixed_logprob_threshold(&cfg, lambda) - cfg.gate.early_escalation_margin,
-                )
-            });
+                && req.audit != Some(true)
+                && (early.below_mean.is_some() || early.below_window.is_some()))
+            .then_some(early);
             let dreq = GenRequest {
                 messages: prompt.clone(),
                 early_stop,
@@ -805,10 +818,10 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             let mut k_drawn = k_now;
             if sequential && d.finish_reason != "early_escalation" {
                 let thr = gate::fixed_logprob_threshold(&cfg, lambda);
-                let uncertain = d
-                    .mean_logprob()
-                    .map(|m| (m - thr).abs() <= cfg.gate.uncertain_band)
-                    .unwrap_or(true);
+                let uncertain = samples_always
+                    || d.mean_logprob()
+                        .map(|m| (m - thr).abs() <= cfg.gate.uncertain_band)
+                        .unwrap_or(true);
                 if uncertain {
                     samples = futures::future::join_all((0..k).map(|i| {
                         let s = GenRequest {
@@ -862,6 +875,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 verifiable,
                 draft_verdict.as_ref().map(|v| v.passed),
                 d.prompt_tokens,
+                cfg.gate.confidence_window as usize,
             );
             draft = Some(d);
         }
@@ -909,8 +923,10 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         {
             if gd.escalate {
                 gd.explanation = format!(
-                    "{} Decided after {} draft tokens: the rest of the draft was not generated (early escalation).",
-                    gd.explanation, d.completion_tokens
+                    "{} Decided after {} draft tokens: the rest of the draft was not generated (early escalation{}).",
+                    gd.explanation,
+                    d.completion_tokens,
+                    d.note.as_deref().map(|n| format!(": {n}")).unwrap_or_default()
                 );
             }
         }
@@ -1066,6 +1082,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                 show_reasoning,
                                 round,
                                 &mut stages,
+                                req.adaptive_exit_rule.as_deref().unwrap_or(&ax.exit_rule),
                             )
                             .await
                         {
@@ -1464,6 +1481,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         show_reasoning: bool,
         round: u32,
         stages: &mut Vec<StageTiming>,
+        exit_rule: &str,
     ) -> Result<GenOutput> {
         const SIGNALS: &[&str] = &[
             "Wait",
@@ -1487,6 +1505,9 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         let (mut rtok, mut since, mut probes, mut chunk) = (0u32, 0u32, 0u32, 0u64);
         let mut last_probe: Option<String> = None;
         let mut agree = 0u32;
+        // Phase 8: posterior over all probe answers (Prop. N4) when the rule is "posterior".
+        let posterior_rule = exit_rule == "posterior";
+        let mut post = crate::sequential::ProbePosterior::default();
         // "budget" unless a break below says otherwise.
         let mut exit = String::from("budget");
         let mut agg = GenOutput::default();
@@ -1616,6 +1637,29 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 stages.push(st);
                 if passed {
                     exit = "verified".into();
+                    break;
+                }
+            } else if posterior_rule {
+                let i = post.observe(&p.text, |a, b| answer_similarity(a, b) >= 0.8);
+                let pm = post.majority_probability();
+                let bound = crate::sequential::collapsing_bound(
+                    rtok,
+                    budget,
+                    ax.posterior_stop,
+                    ax.posterior_stop_end,
+                );
+                st.note = Some(format!(
+                    "{} P(majority) {pm:.2} {} bound {bound:.2}",
+                    if post.counts[i].1 > 1 {
+                        "agrees"
+                    } else {
+                        "new"
+                    },
+                    if pm >= bound { ">=" } else { "<" }
+                ));
+                stages.push(st);
+                if pm >= bound {
+                    exit = "posterior".into();
                     break;
                 }
             } else {

@@ -1731,6 +1731,12 @@ components:
           type: boolean
           description: 'FR-082: use (true) or skip (false) the adaptive reasoning exit (probe-and-verify early stop of System
             2 reasoning); default from configuration'
+        adaptive_exit_rule:
+          type: string
+          enum: [consistency, posterior]
+          description: 'Phase 8: stopping rule of the adaptive exit on non-verifiable tasks: consistency (k consecutive
+            agreeing probes) or posterior (majority posterior over all probes against a collapsing bound); default from
+            configuration'
     Message:
       type: object
       required:
@@ -1954,6 +1960,11 @@ components:
               type:
               - number
               - 'null'
+            low_window_logprob:
+              type:
+              - number
+              - 'null'
+              description: 'Phase 8: lowest mean log-prob over any confidence_window consecutive draft tokens (a running minimum)'
             k:
               type: integer
             agreement:

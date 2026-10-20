@@ -61,13 +61,15 @@ fn d_systems() -> Vec<String> {
     vec!["nafs_aql".into(), "fast_only".into(), "slow_only".into()]
 }
 
-pub const FIXED_SYSTEMS: [&str; 6] = [
+pub const FIXED_SYSTEMS: [&str; 8] = [
     "nafs_aql",
     "nafs_blind",
     "fast_only",
     "slow_only",
     "slow_conditioned",
     "slow_noexit",
+    "slow_exit_consistency",
+    "slow_exit_posterior",
 ];
 
 /// Gated systems: `nafs_aql`, `nafs_blind`, and their lambda variants `nafs_aql_l<NN>` /
@@ -278,7 +280,11 @@ pub async fn run_item(
         domain_hint: if blind { task_domain(t) } else { None },
         force_mode: match sys {
             "fast_only" => Some(ReasoningMode::Fast),
-            "slow_only" | "slow_conditioned" | "slow_noexit" => Some(ReasoningMode::Slow),
+            "slow_only"
+            | "slow_conditioned"
+            | "slow_noexit"
+            | "slow_exit_consistency"
+            | "slow_exit_posterior" => Some(ReasoningMode::Slow),
             _ if sweep.is_some() => Some(ReasoningMode::Slow),
             _ => None,
         },
@@ -295,6 +301,11 @@ pub async fn run_item(
         audit: Some(false),
         ablation_draft_conditioned: conditioned.then_some(true),
         adaptive_exit: (sys == "slow_noexit").then_some(false),
+        adaptive_exit_rule: match sys {
+            "slow_exit_consistency" => Some("consistency".into()),
+            "slow_exit_posterior" => Some("posterior".into()),
+            _ => None,
+        },
         ..Default::default()
     };
     // Same wall-clock cap as the HTTP path (review L5).
@@ -572,6 +583,7 @@ pub fn report(
     pairs.push(("fast_only".into(), "slow_only".into()));
     pairs.push(("slow_conditioned".into(), "slow_only".into()));
     pairs.push(("slow_noexit".into(), "slow_only".into()));
+    pairs.push(("slow_exit_posterior".into(), "slow_exit_consistency".into()));
     for (a, b) in pairs.iter().map(|(a, b)| (a.as_str(), b.as_str())) {
         if !(req.systems.iter().any(|s| s == a) && req.systems.iter().any(|s| s == b)) {
             continue;

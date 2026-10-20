@@ -64,6 +64,13 @@
             "null"
           ]
         },
+        "low_window_logprob": {
+          "description": "Phase 8: lowest mean log-prob over any confidence_window consecutive draft tokens (a running minimum).",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "k": {
           "type": "integer"
         },

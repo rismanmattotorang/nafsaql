@@ -6,6 +6,7 @@ pub mod domain;
 pub mod drift;
 pub mod gate;
 pub mod orchestrator;
+pub mod sequential;
 
 pub use backend::{Backend, BackendHealth, GenOutput, GenRequest};
 pub use config::Config;

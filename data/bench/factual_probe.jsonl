@@ -1,0 +1,13 @@
+{"id": "open-00", "domain": "factual", "prompt": "What is the capital of Indonesia, and on which island is it located?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-01", "domain": "factual", "prompt": "Who wrote 'The Incoherence of the Philosophers'?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-02", "domain": "factual", "prompt": "In what year did the first crewed Moon landing take place?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-08", "domain": "factual", "prompt": "What is the boiling point of water at sea level in Fahrenheit?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "open-11", "domain": "factual", "prompt": "Which planet in our solar system has the most moons as of 2024?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x00", "domain": "factual", "prompt": "Which river flows through Baghdad?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x01", "domain": "factual", "prompt": "Who wrote the Muqaddimah?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x02", "domain": "factual", "prompt": "What is the largest planet in the Solar System?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x03", "domain": "factual", "prompt": "In what year did the Apollo 11 mission land on the Moon?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x04", "domain": "factual", "prompt": "Which element has the chemical symbol Fe?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x05", "domain": "factual", "prompt": "What is the capital of Australia?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x06", "domain": "factual", "prompt": "Who painted the ceiling of the Sistine Chapel?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}
+{"id": "factual-x07", "domain": "factual", "prompt": "Which ocean lies between Africa and Australia?", "verification": {}, "source": "nafs-aql", "license": "Apache-2.0"}

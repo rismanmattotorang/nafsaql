@@ -98,6 +98,8 @@ async fn completion(State(m): State<Mock>, Json(body): Json<Value>) -> impl Into
     let prompt = body["prompt"].as_str().unwrap_or("");
     let (content, stop_type, word, n) = if prompt.ends_with("Answer:") {
         (" 7", "eos", "", 2)
+    } else if prompt.ends_with("The answer is") {
+        (" Jakarta, on Java", "eos", "", 5)
     } else if prompt.ends_with("</think>\n\n") {
         ("The result is 7.\nAnswer: 7", "eos", "", 9)
     } else {
@@ -725,4 +727,143 @@ async fn adaptive_exit_stops_reasoning_once_a_probe_verifies() {
         !calls.iter().any(|c| c["model"] == "system2"),
         "System 2 chat endpoint not used on the adaptive path"
     );
+}
+
+#[tokio::test]
+async fn window_rule_stops_a_collapsing_draft_exactly() {
+    // Phase 8 (Prop. N2): the lowest-window rule stops the draft the moment a window crosses the threshold
+    // (here after 4 tokens, not the 32 of the mean rule) and the gate escalates for that reason.
+    let (o, _mock, _d) = setup_with(true, |c| {
+        c.gate.confidence_window = 4;
+        c.gate.fixed.low_window_logprob_threshold = Some(-1.0);
+        c.gate.fixed.low_window_domains = vec!["open".into()];
+    })
+    .await;
+    let r = ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: "Tell me something; this is an uncertain draft test.".into(),
+        }],
+        ephemeral: Some(true),
+        ..Default::default()
+    };
+    let reply = o.handle(r, Emitter(None)).await.unwrap();
+    assert!(reply.decision.escalate);
+    assert!(
+        reply.decision.explanation.contains("window")
+            && reply.decision.explanation.contains("exact"),
+        "{}",
+        reply.decision.explanation
+    );
+    let draft = reply
+        .usage
+        .stages
+        .iter()
+        .find(|s| s.stage == "draft")
+        .unwrap();
+    assert_eq!(
+        draft.tokens,
+        Some(4),
+        "stopped at the first complete window"
+    );
+    assert_eq!(reply.decision.features.low_window_logprob, Some(-2.0));
+    // A confident draft is not touched by the rule.
+    let r2 = ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: "Tell me something nice.".into(),
+        }],
+        ephemeral: Some(true),
+        ..Default::default()
+    };
+    let reply2 = o.handle(r2, Emitter(None)).await.unwrap();
+    assert!(!reply2.decision.escalate, "{}", reply2.decision.explanation);
+    assert!(reply2.decision.features.low_window_logprob.unwrap() > -0.1);
+}
+
+#[tokio::test]
+async fn posterior_exit_rule_stops_on_a_majority_posterior() {
+    // Phase 8 (Prop. N4): on a non-verifiable task the posterior rule stops once P(majority) of the probed
+    // answers reaches the collapsing bound: one probe (0.75) continues, two agreeing probes (0.875) stop.
+    let (o, _mock, _d) = setup_with(true, |c| {
+        c.deliberation.adaptive_exit.enabled = true;
+        c.deliberation.adaptive_exit.exit_rule = "consistency".into();
+    })
+    .await;
+    let r = ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: "What is the capital of Indonesia?".into(),
+        }],
+        ephemeral: Some(true),
+        force_mode: Some(ReasoningMode::Slow),
+        adaptive_exit_rule: Some("posterior".into()),
+        ..Default::default()
+    };
+    let reply = o.handle(r, Emitter(None)).await.unwrap();
+    assert_eq!(reply.domain, Domain::Factual);
+    let probes: Vec<_> = reply
+        .usage
+        .stages
+        .iter()
+        .filter(|s| s.stage == "probe")
+        .collect();
+    assert_eq!(probes.len(), 2, "{:?}", reply.usage.stages);
+    assert!(probes[0]
+        .note
+        .as_deref()
+        .unwrap()
+        .contains("P(majority) 0.75 <"));
+    assert!(probes[1]
+        .note
+        .as_deref()
+        .unwrap()
+        .contains("P(majority) 0.88 >="));
+    let delib = reply
+        .usage
+        .stages
+        .iter()
+        .find(|s| s.stage == "deliberate")
+        .unwrap();
+    assert!(
+        delib
+            .note
+            .as_deref()
+            .unwrap()
+            .contains("adaptive exit: posterior after 2 probe(s)"),
+        "{:?}",
+        delib.note
+    );
+}
+
+#[tokio::test]
+async fn unverified_math_drafts_always_get_the_agreement_samples() {
+    // Phase 8: a math question without a reference answer is not verifiable; its draft is confident in
+    // token terms (the mock's log-probs are -0.01), so the uncertainty band would skip the samples. The
+    // configured domain list draws them anyway, and the gate records k = 2.
+    let (o, _mock, _d) = setup(true).await;
+    let r = ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: "How many minutes from 3:40 pm to 6:05 pm?".into(),
+        }],
+        ephemeral: Some(true),
+        ..Default::default()
+    };
+    let reply = o.handle(r.clone(), Emitter(None)).await.unwrap();
+    assert_eq!(reply.domain, Domain::Math);
+    assert_eq!(
+        reply.decision.features.k, 2,
+        "{}",
+        reply.decision.explanation
+    );
+    assert_eq!(reply.decision.features.agreement, Some(1.0));
+    assert!(!reply.decision.escalate);
+    // Without the domain in the list, the confident draft skips the samples as before (P7-T02).
+    let (o2, _mock2, _d2) = setup_with(true, |c| {
+        c.gate.samples_on_unverified_domains.clear();
+    })
+    .await;
+    let reply2 = o2.handle(r, Emitter(None)).await.unwrap();
+    assert_eq!(reply2.decision.features.k, 0);
 }

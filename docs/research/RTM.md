@@ -102,3 +102,7 @@
 | FR-081 | Speculative decoding heads | D-07; Phase-5 draft-model result | scripts, serving | PT-011 | P7 |
 | ER-020 | Efficiency frontier | Lab mission | nafs-eval, nafs-web | ER-020 | P7 |
 | FR-082 | Adaptive reasoning exit | Thm 1; DTSR/Dynasor-CoT 2026; D-07 | nafs-core | UT-112 | P7 |
+| FR-083 | Lowest-window confidence | Prop. N2; DeepConf 2025 | nafs-core | UT-120 | P8 |
+| FR-084 | Posterior exit rule | Prop. N4; Frazier-Yu 2007; Adaptive-Consistency 2023 | nafs-core | UT-121 | P8 |
+| FR-085 | Agreement samples on unverified drafts | Thm plurality; confidence-signal study | nafs-core | UT-122 | P8 |
+| ER-021 | Confidence-signal study | Prop. N1; Fleming and Lau 2014 | scripts, benchmarks | ER-021 | P8 |

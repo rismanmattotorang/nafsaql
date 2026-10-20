@@ -16,6 +16,17 @@ pub fn fixed_logprob_threshold(cfg: &Config, lambda: f32) -> f32 {
     cfg.gate.fixed.mean_logprob_threshold + 0.25 * care(cfg, lambda)
 }
 
+/// Phase 8: the fixed rule's threshold on the lowest-window log-prob at this lambda, if the rule is on for
+/// this domain (the signal's scale is domain-specific; see `FixedRuleCfg::low_window_domains`).
+pub fn fixed_window_threshold(cfg: &Config, lambda: f32, domain: Domain) -> Option<f32> {
+    let fx = &cfg.gate.fixed;
+    if !fx.low_window_domains.iter().any(|d| d == domain.as_str()) {
+        return None;
+    }
+    fx.low_window_logprob_threshold
+        .map(|t| t + 0.25 * care(cfg, lambda))
+}
+
 pub fn features(
     draft: &GenOutput,
     samples: &[GenOutput],
@@ -23,6 +34,7 @@ pub fn features(
     verifiable: bool,
     draft_verified: Option<bool>,
     prompt_tokens: u32,
+    window: usize,
 ) -> GateFeatures {
     // Agreement = mean similarity of each cheap sample to the draft (exact for numeric answers, word overlap for text).
     // Truncated samples (finish_reason "length") carry an intermediate number, not an answer (M11).
@@ -44,6 +56,7 @@ pub fn features(
     GateFeatures {
         mean_logprob: draft.mean_logprob(),
         min_logprob: draft.min_logprob(),
+        low_window_logprob: crate::sequential::low_window_mean(&draft.logprobs, window),
         k: valid.len() as u8,
         agreement,
         domain,
@@ -161,6 +174,18 @@ pub fn decide(f: &GateFeatures, ctx: &GateCtx) -> GateDecision {
             reasons.push(format!("mean log-prob {m:.2} < {lp_thr:.2}"));
         }
     }
+    // Phase 8: a local collapse of confidence (lowest window) flags the draft even when its mean is fine.
+    if let (Some(lw), Some(thr)) = (
+        f.low_window_logprob,
+        fixed_window_threshold(cfg, ctx.lambda, f.domain),
+    ) {
+        if lw < thr {
+            reasons.push(format!(
+                "lowest {}-token window log-prob {lw:.2} < {thr:.2}",
+                cfg.gate.confidence_window
+            ));
+        }
+    }
     // Agreement is evidence only where answers are canonical (a number, code, a structure, a short
     // fact). Open-ended replies legitimately differ in wording, so lexical agreement is not used there.
     let canonical = matches!(
@@ -211,6 +236,7 @@ mod tests {
         GateFeatures {
             mean_logprob: Some(mean),
             min_logprob: Some(-2.0),
+            low_window_logprob: Some(mean - 0.1),
             k: 2,
             agreement: Some(agree),
             domain,
@@ -424,11 +450,19 @@ mod tests {
             finish_reason: "stop".into(),
             ..Default::default()
         };
-        let g = features(&draft, &[cut.clone(), ok], Domain::Math, false, None, 10);
+        let g = features(
+            &draft,
+            &[cut.clone(), ok],
+            Domain::Math,
+            false,
+            None,
+            10,
+            16,
+        );
         assert_eq!(g.k, 1);
         assert_eq!(g.agreement, Some(1.0));
         assert_eq!(
-            features(&draft, &[cut], Domain::Math, false, None, 10).agreement,
+            features(&draft, &[cut], Domain::Math, false, None, 10, 16).agreement,
             None
         );
     }

@@ -44,3 +44,8 @@ P7-T07,7,E7.5 Release,"End-to-end sweep, UI screenshots, technical report and sl
 P7-T08,7,E7.3 Cascade,"Adaptive reasoning exit: probe-and-verify on the raw continuation path, with a token-saving study",1.0,P7-T03,FR-082,Should
 P7-T09,7,E7.3 Cascade,"Judge on System 1: measure the small judge's (r, phi) with the rates harness and adopt it if the rates hold",0.5,P7-T01,FR-034,Could
 P7-T10,7,E7.6 Backends,"vLLM CPU backend in Docker (carstenz/vllm-smoke image, BF16, one model in two modes) with an end-to-end check against the gateway",1.0,P5-T02,MR-003,Should
+P8-T01,8,E8.1 Evidence,"Confidence-signal study: which token-level signal of a System 1 draft predicts a wrong draft (ROC against exact labels)",0.5,P7-T03,ER-021,Should
+P8-T02,8,E8.1 Evidence,"Lowest-window confidence as a gate feature and an exact early-escalation rule (running minimum)",0.5,P8-T01,FR-083,Should
+P8-T03,8,E8.2 Deliberation,"Posterior stopping rule with a collapsing bound for the adaptive exit on non-verifiable tasks",0.5,P7-T08,FR-084,Could
+P8-T05,8,E8.1 Evidence,"Agreement samples on unverified mathematics drafts (adopted from the study's agreement arm)",0.25,P8-T01,FR-085,Should
+P8-T04,8,E8.3 Research,"Quantum-consciousness and neuroscience review with first-principles verdicts and the sequential-evidence propositions",0.5,,"ER-021, FR-083, FR-084",Should

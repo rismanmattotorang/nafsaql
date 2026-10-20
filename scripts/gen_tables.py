@@ -31,10 +31,10 @@ with open(os.path.join(DOCS,"spec","gen","traceability.tex"),"w") as f:
 byphase=collections.defaultdict(list)
 for r in reqs: byphase[r["phase"]].append(r["id"])
 with open(os.path.join(DOCS,"roadmap","gen","phase_reqs.tex"),"w") as f:
-    for p in sorted(byphase): f.write("\\newcommand{\\ReqsPhase%s}{%s}\n"%("ABCDEFGH"[int(p)],", ".join(byphase[p])))
+    for p in sorted(byphase): f.write("\\newcommand{\\ReqsPhase%s}{%s}\n"%("ABCDEFGHIJ"[int(p)],", ".join(byphase[p])))
 with open(os.path.join(DOCS,"roadmap","gen","tasks.tex"),"w") as f:
     for p in sorted(set(t["phase"] for t in tasks)):
-        f.write("\\newcommand{\\TasksPhase%s}{\n"%"ABCDEFGH"[int(p)])
+        f.write("\\newcommand{\\TasksPhase%s}{\n"%"ABCDEFGHIJ"[int(p)])
         f.write("\\begin{tabular}{@{}p{1.1cm}p{2.3cm}p{6.0cm}p{0.9cm}p{1.9cm}p{1.7cm}@{}}\n\\toprule ID & Epic & Task & PW & Depends & MoSCoW\\\\\\midrule\n")
         for t in tasks:
             if t["phase"]==p: f.write("%s & %s & %s & %s & %s & %s\\\\\n"%(t["id"],esc(t["epic"]),esc(t["title"]),t["est_pw"],esc(t["depends"]) or "--",t["moscow"]))

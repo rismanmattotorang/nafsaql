@@ -39,7 +39,8 @@ pub struct Calibration {
     pub reliability: Vec<(f32, f32, usize)>,
 }
 
-pub const FEATURE_NAMES: [&str; 7] = [
+pub const NF: usize = 8;
+pub const FEATURE_NAMES: [&str; NF] = [
     "bias",
     "mean_logprob",
     "min_logprob",
@@ -47,11 +48,14 @@ pub const FEATURE_NAMES: [&str; 7] = [
     "log_draft_tokens",
     "domain_hard",
     "no_samples",
+    "low_window_logprob",
 ];
 
-pub fn feature_vector(f: &GateFeatures) -> [f32; 7] {
+pub fn feature_vector(f: &GateFeatures) -> [f32; NF] {
     let mean = f.mean_logprob.unwrap_or(-0.5);
     let min = f.min_logprob.unwrap_or(-5.0).max(-20.0);
+    // Phase 8: the lowest-window signal; a draft without it is treated as uniformly confident at its mean.
+    let low = f.low_window_logprob.unwrap_or(mean).max(-20.0);
     let dis = 1.0 - f.agreement.unwrap_or(1.0);
     let len = ((f.draft_tokens.max(1)) as f32).ln();
     let hard = matches!(
@@ -59,7 +63,7 @@ pub fn feature_vector(f: &GateFeatures) -> [f32; 7] {
         nafs_types::Domain::Math | nafs_types::Domain::Code
     ) as i32 as f32;
     let none = f.agreement.is_none() as i32 as f32;
-    [1.0, mean, min, dis, len, hard, none]
+    [1.0, mean, min, dis, len, hard, none, low]
 }
 
 fn sigmoid(z: f32) -> f32 {
@@ -67,47 +71,47 @@ fn sigmoid(z: f32) -> f32 {
 }
 
 /// L2-regularised logistic regression by full-batch gradient descent on standardised features.
-fn logistic(feats: &[[f32; 7]], ys: &[bool]) -> Vec<f32> {
+fn logistic(feats: &[[f32; NF]], ys: &[bool]) -> Vec<f32> {
     let n = feats.len().max(1) as f32;
     // Standardise columns 1.. for conditioning, then map the weights back to raw scale.
-    let mut mu = [0f32; 7];
-    let mut sd = [1f32; 7];
-    for j in 1..7 {
+    let mut mu = [0f32; NF];
+    let mut sd = [1f32; NF];
+    for j in 1..NF {
         mu[j] = feats.iter().map(|x| x[j]).sum::<f32>() / n;
         let v = feats.iter().map(|x| (x[j] - mu[j]).powi(2)).sum::<f32>() / n;
         sd[j] = v.sqrt().max(1e-3);
     }
-    let z: Vec<[f32; 7]> = feats
+    let z: Vec<[f32; NF]> = feats
         .iter()
         .map(|x| {
-            let mut o = [1f32; 7];
-            for j in 1..7 {
+            let mut o = [1f32; NF];
+            for j in 1..NF {
                 o[j] = (x[j] - mu[j]) / sd[j];
             }
             o
         })
         .collect();
-    let mut w = [0f32; 7];
+    let mut w = [0f32; NF];
     let rate = ys.iter().filter(|&&y| y).count() as f32 / n;
     w[0] = (rate.clamp(0.01, 0.99) / (1.0 - rate.clamp(0.01, 0.99))).ln();
     let (lr, l2) = (0.5f32, 1e-2f32);
     for _ in 0..3000 {
-        let mut g = [0f32; 7];
+        let mut g = [0f32; NF];
         for (x, &y) in z.iter().zip(ys) {
             let p = sigmoid(w.iter().zip(x).map(|(a, b)| a * b).sum());
             let e = p - y as i32 as f32;
-            for j in 0..7 {
+            for j in 0..NF {
                 g[j] += e * x[j];
             }
         }
-        for j in 0..7 {
+        for j in 0..NF {
             let reg = if j == 0 { 0.0 } else { l2 * w[j] };
             w[j] -= lr * (g[j] / n + reg);
         }
     }
-    let mut raw = vec![0f32; 7];
+    let mut raw = vec![0f32; NF];
     raw[0] = w[0];
-    for j in 1..7 {
+    for j in 1..NF {
         raw[j] = w[j] / sd[j];
         raw[0] -= w[j] * mu[j] / sd[j];
     }
@@ -177,7 +181,7 @@ impl Calibration {
             n: 0,
             ece: f32::NAN,
             brier: f32::NAN,
-            weights: vec![-2.2, -3.0, -0.08, 2.5, 0.1, 0.6, 0.3],
+            weights: vec![-2.2, -3.0, -0.08, 2.5, 0.1, 0.6, 0.3, -1.0],
             feature_names: FEATURE_NAMES.iter().map(|s| s.to_string()).collect(),
             source_run: None,
             n_pos: 0,
@@ -191,7 +195,7 @@ impl Calibration {
     }
     fn logit_p(&self, f: &GateFeatures) -> f32 {
         let x = feature_vector(f);
-        // Files written before the 7th feature existed have 6 weights; zip stops at the shorter.
+        // Files written before the 7th or 8th feature existed have fewer weights; zip stops at the shorter.
         sigmoid(self.weights.iter().zip(x.iter()).map(|(w, v)| w * v).sum())
     }
     /// Estimated probability that the fast draft is wrong.
@@ -246,7 +250,7 @@ impl Calibration {
         source_run: Option<String>,
         threshold: &dyn Fn(&GateFeatures, f32) -> f32,
     ) -> Self {
-        let feats: Vec<[f32; 7]> = xs.iter().map(feature_vector).collect();
+        let feats: Vec<[f32; NF]> = xs.iter().map(feature_vector).collect();
         let n = xs.len();
         let folds = if n >= 50 { 5 } else { 2.min(n.max(1)) };
         let mut order: Vec<usize> = (0..n).collect();
@@ -261,7 +265,7 @@ impl Calibration {
         // Out-of-fold logistic scores.
         let mut oof = vec![0f32; n];
         for k in 0..folds.max(1) {
-            let (tr_x, tr_y): (Vec<[f32; 7]>, Vec<bool>) = (0..n)
+            let (tr_x, tr_y): (Vec<[f32; NF]>, Vec<bool>) = (0..n)
                 .filter(|&i| fold_of[i] != k || folds <= 1)
                 .map(|i| (feats[i], ys[i]))
                 .unzip();

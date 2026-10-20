@@ -12,7 +12,7 @@
 \input{../shared/nafsstyle.tex}
 \input{gen/phase_reqs.tex}\input{gen/tasks.tex}
 \pagestyle{fancy}\fancyhf{}\lhead{\small Nafs-Aql Development Roadmap v2.0}\rhead{\small Dirac R\&D Team}\cfoot{\small\thepage}
-\title{\textbf{Nafs-Aql Development Roadmap}\\[4pt]\large Version 2.0 (18 October 2026): Phases 0--6 implemented, Phase 7 added, road ahead}
+\title{\textbf{Nafs-Aql Development Roadmap}\\[4pt]\large Version 2.1 (20 October 2026): Phases 0--6 implemented, Phases 7--8 added, road ahead}
 \author{Dirac R\&D Team}\date{}
 \begin{document}\maketitle
 \begin{abstract}\noindent
@@ -71,6 +71,11 @@ Phases overlap where their work packages are independent (for example, fine-tuni
 \textbf{Objectives.} Make the CPU path as fast as the hardware allows, and know where every second goes. Phase~7 was added on 18 October 2026, after Phases~0--6 had been implemented on the reference machine, in response to the goal of maximum speed on CPU with GPU work deferred. \textbf{Scope.} Per-stage latency attribution with the server's prefill, decode and cache timings; engine tuning under interleaved A/B tests; early escalation in the streaming draft; EAGLE-3 speculative heads; repacked 4-bit weight formats; the efficiency frontier in the Lab; an end-to-end sweep and documentation refresh. \textbf{Requirements satisfied.} \ReqsPhaseH.
 \par\medskip\noindent\TasksPhaseH
 \par\medskip\noindent\textbf{Dependencies.} P4-T02 (load-test protocol), P2-T01 (gate). \textbf{Exit criteria (measurable).} Every reply carries stage timings and the Performance page attributes at least 95\% of wall time to named stages; every adopted serving change has an interleaved A/B record; early escalation agrees with full-draft decisions on at least 95\% of a held-out prompt set or is switched off by default; EAGLE-3 or a repacked format is adopted only with a measured decode speed-up of at least 1.2$\times$ and identical greedy output. \textbf{Status (19 October 2026).} P7-T01--T03, P7-T07 and P7-T08 (adaptive reasoning exit, added) done; P7-T04 measured and not adopted for System~1 (no decode gain at about 50\% acceptance on four cores; opt-in kept); P7-T05 prepared; P7-T06 partly done (policy map; saved tokens reported by the studies).
+
+\section{Phase 8: Sequential Evidence (added 20 October 2026)}
+\textbf{Objectives.} Decide, from first principles and measurements, what the neuroscience of decision making and the quantum theories of consciousness contribute to the accuracy and speed of \Sys, and implement only what carries a proof and a measurement. \textbf{Scope.} A review with explicit pass/fail tests (\texttt{docs/research/quantum\_neuro\_review.md}, report Section~8); a confidence-signal study of System~1 drafts against exact labels (ROC, AUROC with bootstrap intervals, recall at the operating escalation rate); the lowest-window confidence signal as a gate feature with an exact early-escalation rule (a running minimum, so an early crossing is the full draft's decision); a posterior stopping rule with a collapsing bound for the adaptive exit on non-verifiable tasks, compared in a paired Lab run; Wald's bound on the mean-based early escalation and the optimal probe interval as validations of existing settings. \textbf{Requirements satisfied.} \ReqsPhaseI. \textbf{Out of scope.} Anything from quantum consciousness: no mechanism passed the transferability test (Proposition~Q2 of the report), and the result is recorded as negative rather than deferred.
+
+\textbf{Exit criteria.} The signal study is stored with its sample size and intervals; the window rule's threshold and domains come from it; the posterior rule is on by default only if the paired run shows unchanged answers and no token increase; the review names, for every idea not adopted, the test it failed.
 
 \section{Milestones and Decision Gates}
 \begin{longtable}{@{}p{1.0cm}p{1.0cm}p{6.2cm}p{6.4cm}@{}}
@@ -173,6 +178,7 @@ Additional checks scheduled: the self-refinement fixed point of Theorem~4 (measu
 \item \textbf{Phase 5:} no open high-severity findings; clean-host deployment; decisions on GPU and Profile~C recorded.
 \item \textbf{Phase 6:} 1-point non-inferiority; documentation and publication delivered.
 \item \textbf{Phase 7:} stage timings on every reply; interleaved A/B records for every serving change; early-escalation agreement $\ge95\%$; speculative heads adopted only with a measured speed-up.
+\item \textbf{Phase 8:} a stored ROC study decides the gate's confidence signal; the window rule's early decisions equal full-draft decisions by construction (unit test of the running-minimum property); the posterior exit rule is default only after a paired Lab run; quantum-consciousness ideas are recorded with the test they failed.
 \item \textbf{Programme:} a CPU-only dual-process assistant whose answers carry honest assurance levels, whose gate is derived and calibrated, whose precision on verifiable tasks is bounded by measured verifier rates, and whose fast path improves through a gated distillation loop, with every claim traceable to a stored evaluation run.
 \end{itemize}
 \end{document}

@@ -87,6 +87,16 @@ Estimates are person-weeks (PW) and are estimates, not commitments.
 | P7-T09 | E7.3 Cascade | Judge on System 1: measure the small judge's (r, phi) with the rates harness and adopt it if the rates hold | 0.5 | P7-T01 | FR-034 | Could |
 | P7-T10 | E7.6 Backends | vLLM CPU backend in Docker (carstenz/vllm-smoke image, BF16, one model in two modes) with an end-to-end check against the gateway | 1.0 | P5-T02 | MR-003 | Should |
 
+## Phase 8
+
+| Task | Epic | Title | PW | Depends | Requirements | MoSCoW |
+|---|---|---|---|---|---|---|
+| P8-T01 | E8.1 Evidence | Confidence-signal study: which token-level signal of a System 1 draft predicts a wrong draft (ROC against exact labels) | 0.5 | P7-T03 | ER-021 | Should |
+| P8-T02 | E8.1 Evidence | Lowest-window confidence as a gate feature and an exact early-escalation rule (running minimum) | 0.5 | P8-T01 | FR-083 | Should |
+| P8-T03 | E8.2 Deliberation | Posterior stopping rule with a collapsing bound for the adaptive exit on non-verifiable tasks | 0.5 | P7-T08 | FR-084 | Could |
+| P8-T05 | E8.1 Evidence | Agreement samples on unverified mathematics drafts (adopted from the study's agreement arm) | 0.25 | P8-T01 | FR-085 | Should |
+| P8-T04 | E8.3 Research | Quantum-consciousness and neuroscience review with first-principles verdicts and the sequential-evidence propositions | 0.5 |  | ER-021, FR-083, FR-084 | Should |
+
 ## Requirements by phase
 
 - **Phase 0**: FR-050, NFR-012, NFR-023, MR-001, MR-003, MR-005, OR-001, ER-001, ER-010, ER-011
@@ -97,3 +107,4 @@ Estimates are person-weeks (PW) and are estimates, not commitments.
 - **Phase 5**: FR-061, SR-006, OR-002, OR-003, OR-004
 - **Phase 6**: SR-005
 - **Phase 7**: NFR-030, NFR-031, FR-080, FR-081, ER-020, FR-082
+- **Phase 8**: FR-083, FR-084, FR-085, ER-021

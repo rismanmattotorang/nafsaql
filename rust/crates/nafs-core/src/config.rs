@@ -272,6 +272,20 @@ pub struct GateCfg {
     pub early_escalation_tokens: u32,
     #[serde(default = "d_early_margin")]
     pub early_escalation_margin: f32,
+    /// Phase 8: window (tokens) of the lowest-window confidence signal (`low_window_logprob`).
+    #[serde(default = "d_window")]
+    pub confidence_window: u32,
+    /// Phase 8: domains whose unverified drafts always get the k agreement samples (after the draft), whatever
+    /// the draft's own confidence. Measured on mathematics: token confidence does not predict a wrong draft
+    /// (AUROC 0.56-0.65) but disagreement with the cheap samples does (benchmarks/confidence_signal_study.json).
+    #[serde(default = "d_samples_domains")]
+    pub samples_on_unverified_domains: Vec<String>,
+}
+fn d_samples_domains() -> Vec<String> {
+    vec!["math".into()]
+}
+fn d_window() -> u32 {
+    16
 }
 fn d_band() -> f32 {
     0.10
@@ -315,6 +329,20 @@ pub struct FixedRuleCfg {
     pub mean_logprob_threshold: f32,
     pub agreement_threshold: f32,
     pub escalate_open_domains: bool,
+    /// Phase 8: escalate when the lowest `confidence_window`-token window of the draft has a mean log-prob
+    /// below this (a local collapse of confidence). Off when absent. Because the signal is a running
+    /// minimum, the draft is stopped the moment a window crosses it, with the same decision the full
+    /// draft would get (Prop. N2).
+    #[serde(default)]
+    pub low_window_logprob_threshold: Option<f32>,
+    /// Domains the window rule applies to. The signal's scale is domain-specific (open prose has a median
+    /// lowest window of -0.32 against about -0.1 for math drafts), so the rule runs only where its
+    /// threshold was measured.
+    #[serde(default = "d_low_window_domains")]
+    pub low_window_domains: Vec<String>,
+}
+fn d_low_window_domains() -> Vec<String> {
+    vec!["math".into()]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -360,6 +388,16 @@ pub struct AdaptiveExitCfg {
     pub consistency: u32,
     #[serde(default = "d_ax_domains")]
     pub domains: Vec<String>,
+    /// Phase 8: non-verifiable stopping rule, "consistency" (k consecutive agreeing probes, above) or
+    /// "posterior": stop when the probability that the plurality probe answer is the majority answer
+    /// (Dirichlet(1) posterior over all probes so far) is at least a bound that collapses linearly from
+    /// `posterior_stop` to `posterior_stop_end` over the reasoning budget (Frazier-Yu deadline rule).
+    #[serde(default = "d_exit_rule")]
+    pub exit_rule: String,
+    #[serde(default = "d_posterior_stop")]
+    pub posterior_stop: f32,
+    #[serde(default = "d_posterior_stop_end")]
+    pub posterior_stop_end: f32,
 }
 impl Default for AdaptiveExitCfg {
     fn default() -> Self {
@@ -370,8 +408,20 @@ impl Default for AdaptiveExitCfg {
             probe_max_tokens: d_probe_max(),
             consistency: d_consistency(),
             domains: d_ax_domains(),
+            exit_rule: d_exit_rule(),
+            posterior_stop: d_posterior_stop(),
+            posterior_stop_end: d_posterior_stop_end(),
         }
     }
+}
+fn d_exit_rule() -> String {
+    "consistency".into()
+}
+fn d_posterior_stop() -> f32 {
+    0.85
+}
+fn d_posterior_stop_end() -> f32 {
+    0.70
 }
 fn d_probe_every() -> u32 {
     256

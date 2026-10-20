@@ -75,7 +75,16 @@ P7-T08 & E7.3 Cascade & Adaptive reasoning exit: probe-and-verify on the raw con
 P7-T09 & E7.3 Cascade & Judge on System 1: measure the small judge's (r, phi) with the rates harness and adopt it if the rates hold & 0.5 & P7-T01 & Could\\
 P7-T10 & E7.6 Backends & vLLM CPU backend in Docker (carstenz/vllm-smoke image, BF16, one model in two modes) with an end-to-end check against the gateway & 1.0 & P5-T02 & Should\\
 \bottomrule\end{tabular}}
-\newcommand{\PWTotals}{P0: 7.5; P1: 13.0; P2: 10.5; P3: 5.5; P4: 6.5; P5: 6.5; P6: 4.5; P7: 9.5}
-\newcommand{\PWGrand}{63.5}
-\newcommand{\NTasks}{45}
-\newcommand{\NReqs}{100}
+\newcommand{\TasksPhaseI}{
+\begin{tabular}{@{}p{1.1cm}p{2.3cm}p{6.0cm}p{0.9cm}p{1.9cm}p{1.7cm}@{}}
+\toprule ID & Epic & Task & PW & Depends & MoSCoW\\\midrule
+P8-T01 & E8.1 Evidence & Confidence-signal study: which token-level signal of a System 1 draft predicts a wrong draft (ROC against exact labels) & 0.5 & P7-T03 & Should\\
+P8-T02 & E8.1 Evidence & Lowest-window confidence as a gate feature and an exact early-escalation rule (running minimum) & 0.5 & P8-T01 & Should\\
+P8-T03 & E8.2 Deliberation & Posterior stopping rule with a collapsing bound for the adaptive exit on non-verifiable tasks & 0.5 & P7-T08 & Could\\
+P8-T05 & E8.1 Evidence & Agreement samples on unverified mathematics drafts (adopted from the study's agreement arm) & 0.25 & P8-T01 & Should\\
+P8-T04 & E8.3 Research & Quantum-consciousness and neuroscience review with first-principles verdicts and the sequential-evidence propositions & 0.5 & -- & Should\\
+\bottomrule\end{tabular}}
+\newcommand{\PWTotals}{P0: 7.5; P1: 13.0; P2: 10.5; P3: 5.5; P4: 6.5; P5: 6.5; P6: 4.5; P7: 9.5; P8: 2.2}
+\newcommand{\PWGrand}{65.8}
+\newcommand{\NTasks}{50}
+\newcommand{\NReqs}{104}

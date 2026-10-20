@@ -65,11 +65,16 @@ samples_when_uncertain = true        # P7-T02: draw the k samples after the draf
 uncertain_band = 0.10                  # nats around the fixed threshold (benchmarks/samples_ab_factual.json: samples tripled factual draft time)
 early_escalation_tokens = 32           # P7-T03 / FR-080: stop an unconfident open-ended draft after N tokens (0 = off)
 early_escalation_margin = 0.04          # below the fixed threshold by this much; 100% agreement on 40 prompts (benchmarks/early_escalation_study.json)
+confidence_window = 16                 # Phase 8: window of the lowest-window confidence signal (benchmarks/confidence_signal_study.json)
+samples_on_unverified_domains = ["math"]   # Phase 8: unverified math drafts always get the k samples; token confidence misses wrong math drafts, disagreement catches them
 
 [gate.fixed]                           # Phase-1 placeholder rule until a calibration passes NFR-020
 mean_logprob_threshold = -0.30
 agreement_threshold = 0.5
 escalate_open_domains = true
+# Phase 8: a local collapse of confidence (lowest 16-token window) flags the draft; the draft is stopped the moment it
+# happens, with the decision the full draft would get (Prop. N2). Absent = off. Set from benchmarks/confidence_signal_study.json.
+low_window_domains = ["math"]          # the signal's scale is domain-specific; only where its threshold was measured
 
 [deliberation]                         # FR-020..FR-026
 draft_blind = true
@@ -92,6 +97,9 @@ min_gap_tokens = 64                    # never probe sooner than this after the 
 probe_max_tokens = 24                  # the probe asks for the answer alone, in a few tokens
 consistency = 2                        # non-verifiable domains: stop when this many consecutive probes agree (Dynasor-CoT)
 domains = ["math", "factual"]          # exact verifier decides for math; answer consistency for factual
+exit_rule = "consistency"              # Phase 8: "posterior" (majority posterior over all probes vs a collapsing bound, Prop. N4) or "consistency"
+posterior_stop = 0.85                  # bound at the start of the budget: two agreeing probes (0.875) stop, one (0.75) does not
+posterior_stop_end = 0.70              # bound when the budget is exhausted (Frazier-Yu: the optimal bound is non-increasing)
 
 [judge]                                # FR-034 / SR-003 rubric judge on non-verifiable slow-path answers
 enabled = true

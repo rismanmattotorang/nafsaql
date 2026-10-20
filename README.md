@@ -82,6 +82,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | 📈 **Latency attribution** | Every reply records where its time went: queue, prefill, decode and KV-cache reuse per model stage, straight from llama-server's timings. |
 | 🛡 **Operations built in** | Drift monitor (CUSUM with a shuffled negative control), alerts with a drill mode, Prometheus metrics, audit stream, retention purge, secure-by-default bind, token auth, TLS recipes. |
 | 🔁 **Distillation loop (Tazkiya)** | Verified System 2 traces become System 1 training data under a promotion gate with one-command rollback. The GPU training run itself is deferred. |
+| 🧭 **Sequential evidence (Phase 8)** | The rules that read a *stream* of evidence come from sequential analysis and decision neuroscience: a lowest-window confidence signal whose early crossing *is* the full-draft decision (a running minimum), a posterior stopping rule with a collapsing bound for the adaptive exit, Wald's bound on what an early escalation can promise, and the optimal probe interval. A review of quantum theories of consciousness is included as a negative result, with the test each idea failed. |
 | 🔌 **Two serving profiles** | llama.cpp on bare metal (the reference), and vLLM's CPU backend in Docker, behind one OpenAI-compatible gateway. |
 
 <table>
@@ -109,6 +110,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | Skip samples when an exact verifier decides | Draft median **13.4 s → 7.9 s** | `benchmarks/reference-machine/samples_skip_ab_SHARED_MACHINE.txt` |
 | Early escalation of unconfident drafts | 100 % agreement with full-draft decisions on 40 prompts; ~116 tokens saved per early escalation | `benchmarks/early_escalation_study.json` |
 | Prompt-cache and verifier warm-up | First token 9.8 s → ~1 s; first verification 0.45 s → 3 ms | `docs/roadmap/STATUS.md` |
+| Agreement samples on unverified math drafts (Phase 8) | wrong drafts flagged with AUROC **0.76** (token confidence 0.56–0.65); "any disagreement" catches **8 of 12** wrong drafts at 25 % escalation, expected accuracy **0.80 → 0.91–0.93** | `benchmarks/confidence_signal_study.json` (60 drafts with samples) |
 
 **Verifier quality** (true-accept *r*, false-accept φ with 95 % upper bound)
 
@@ -131,8 +133,12 @@ Every request moves through a small, bounded automaton and the reply says where 
 | Q4_0 / IQ4_NL repacked weights | 17–18 vs 18.8 tok/s | Q4_K_M stays |
 | System 1 as the rubric judge | false-accept 0.27 vs 0.045 | a judge that accepts a quarter of wrong answers is not a verifier |
 | Qwen3.5-2B as System 1 | **+17 points** accuracy (95 % CI +7 to +30, n = 30) but **3.7× slower** | adoption rule allows ≤ 1.3×; revisit on a faster host |
+| Token-confidence escalation on unverified math (Phase 8) | best signal (lowest token) AUROC 0.65, lowest-window 0.58 on 150 drafts with exact labels; precision ≤ 0.47 against the 0.65 the gate's theorem needs at the default price | mechanism kept (exact, tested), threshold off; the study also showed the mean-log-prob rule escalates **0 of 31** wrong math drafts |
+| Posterior exit rule for non-verifiable deliberation (Phase 8) | same answers on 6 factual prompts, **382 vs 357** reasoning tokens (more cautious when probes disagree first) | an option, not the default: `benchmarks/exit_rule_run.json` |
+| A sequential test on the mean-log-prob early escalation | Wald's bound: ≥ 260 tokens to separate the threshold from its 0.04 margin at 5 % error; drafts are 47–291 tokens | kept as a measured heuristic, never made more aggressive |
+| Quantum-consciousness mechanisms (Orch OR and descendants) | decoherence 10⁻¹³ s against 10⁻³ s dynamics; a CPU can follow at most ~30 two-level systems | nothing transfers as an algorithm; negative result, `docs/research/quantum_neuro_review.md` |
 
-**Quality of the build**: 72 Rust tests, 9 Python tests, a 26-probe security suite (one real sandbox-escape found and fixed), a 38-check end-to-end sweep over every endpoint and UI page, `clippy -D warnings` clean.
+**Quality of the build**: 82 Rust tests, 9 Python tests, a 26-probe security suite (one real sandbox-escape found and fixed), a 38-check end-to-end sweep over every endpoint and UI page, `clippy -D warnings` clean.
 
 ## Quick start
 
@@ -205,7 +211,7 @@ The mathematics behind the gate (threshold rule, verifier-bounded precision, Bet
 
 ## Where the project stands
 
-Phases 0–7 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
+Phases 0–8 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
 
 | Gate | Status | Why |
 |:--:|:--:|---|
@@ -226,6 +232,7 @@ Phases 0–7 of the roadmap are implemented on the CPU reference machine; GPU tr
 | [Roadmap](docs/roadmap/nafs_aql_roadmap.pdf) · [Status](docs/roadmap/STATUS.md) | phases, gates, what is done and what is not |
 | [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-052) |
 | [Results write-up](docs/publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
+| [Quantum consciousness and neuroscience review](docs/research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
 | [User guide](docs/user_guide.md) · [Runbook](docs/operations/operator_runbook.md) · [API reference](docs/api/api_reference.md) | using, operating and integrating |
 
 ## Contributing

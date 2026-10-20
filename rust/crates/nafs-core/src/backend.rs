@@ -37,9 +37,21 @@ pub struct GenRequest {
     /// OpenAI-style `response_format` (e.g. a JSON schema): grammar-constrained answer text. Both
     /// llama-server and vLLM apply it after the reasoning span.
     pub response_format: Option<Value>,
-    /// P7-T03: stop the stream once at least `.0` tokens have a running mean log-prob below `.1`.
-    /// The partial output is returned with finish_reason "early_escalation".
-    pub early_stop: Option<(usize, f32)>,
+    /// P7-T03 / Phase 8: stop the stream early (finish_reason "early_escalation") when a confidence
+    /// signal crosses its threshold.
+    pub early_stop: Option<EarlyStop>,
+}
+
+/// Early-escalation thresholds on the draft's token log-probs. `below_mean` is the P7-T03 rule (running
+/// mean below the threshold after `min_n` tokens; predictive, error not controlled). `below_window` is the
+/// Phase-8 rule: the lowest `window`-token mean falls below the threshold, which is exactly the decision
+/// the full draft would receive (the signal is a running minimum).
+#[derive(Debug, Clone, Default)]
+pub struct EarlyStop {
+    pub min_n: usize,
+    pub below_mean: Option<f32>,
+    pub window: usize,
+    pub below_window: Option<f32>,
 }
 
 /// A raw continuation request (P7-T08): the rendered chat template plus any assistant prefix.
@@ -396,6 +408,10 @@ impl Backend {
         let mut out = GenOutput::default();
         let idle = Duration::from_millis(self.retry.stream_idle_timeout_ms);
         let mut split = ThinkSplitter::default();
+        let mut window = req
+            .early_stop
+            .as_ref()
+            .map(|e| crate::sequential::WindowTracker::new(e.window.max(1)));
         let mut last = Instant::now();
         let emit = |out: &mut GenOutput,
                     text: &str,
@@ -470,11 +486,15 @@ impl Backend {
                     emit(&mut out, &t, r, sink);
                 }
             }
+            let mut low_window: Option<f32> = None;
             if let Some(lp) = choice["logprobs"]["content"].as_array() {
                 for t in lp {
                     if let Some(x) = t["logprob"].as_f64() {
                         if x.is_finite() {
                             out.logprobs.push(x as f32);
+                            if let Some(w) = window.as_mut() {
+                                low_window = w.push(x as f32);
+                            }
                         }
                     }
                 }
@@ -482,13 +502,34 @@ impl Backend {
             if let Some(f) = choice["finish_reason"].as_str() {
                 out.finish_reason = f.to_string();
             }
-            if let Some((min_n, below)) = req.early_stop {
-                if out.logprobs.len() >= min_n.max(1)
-                    && out.mean_logprob().map(|m| m < below).unwrap_or(false)
-                {
+            if let Some(e) = req.early_stop.as_ref() {
+                let mean_hit = e.below_mean.is_some_and(|below| {
+                    out.logprobs.len() >= e.min_n.max(1)
+                        && out.mean_logprob().map(|m| m < below).unwrap_or(false)
+                });
+                let window_hit = match (e.below_window, low_window) {
+                    (Some(thr), Some(v)) => v < thr,
+                    _ => false,
+                };
+                if mean_hit || window_hit {
                     // Dropping the stream closes the connection, which stops generation on the server.
                     out.finish_reason = "early_escalation".into();
                     out.completion_tokens = out.logprobs.len() as u32;
+                    out.note = Some(if window_hit {
+                        format!(
+                            "lowest {}-token window log-prob {:.2} < {:.2} (exact)",
+                            e.window,
+                            low_window.unwrap_or(f32::NAN),
+                            e.below_window.unwrap_or(f32::NAN)
+                        )
+                    } else {
+                        format!(
+                            "running mean log-prob {:.2} < {:.2} after {} tokens",
+                            out.mean_logprob().unwrap_or(f32::NAN),
+                            e.below_mean.unwrap_or(f32::NAN),
+                            out.logprobs.len()
+                        )
+                    });
                     break;
                 }
             }
