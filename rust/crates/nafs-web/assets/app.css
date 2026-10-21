@@ -482,3 +482,6 @@ table.t{font-size:var(--fs-1)}
 .skip{position:absolute;left:-9999px;top:8px;background:var(--surface);color:var(--text);padding:8px 12px;border-radius:8px;z-index:100;border:1px solid var(--border)}
 .skip:focus{left:90px}
 @media (max-width:760px){.skip:focus{left:12px}}
+/* phones: seven tabs must fit the bottom rail */
+@media (max-width:760px){.rail a{font-size:10.5px;padding:7px 2px;gap:2px;flex:1;min-width:0} .rail a span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%} .rail a svg{width:20px;height:20px}}
+@media (max-width:400px){.rail a{font-size:9.5px} .rail a svg{width:18px;height:18px}}
