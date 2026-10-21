@@ -67,6 +67,12 @@ early_escalation_tokens = 32           # P7-T03 / FR-080: stop an unconfident op
 early_escalation_margin = 0.04          # below the fixed threshold by this much; 100% agreement on 40 prompts (benchmarks/early_escalation_study.json)
 confidence_window = 16                 # Phase 8: window of the lowest-window confidence signal (benchmarks/confidence_signal_study.json)
 samples_on_unverified_domains = ["math"]   # Phase 8: unverified math drafts always get the k samples; token confidence misses wrong math drafts, disagreement catches them
+live_delta_c = false                   # live latency cost (docs/research/deepinfer_assessment.md): delta_c x clamp(ref / rolling median S2 decode tok/s); live requests only, never lab
+live_delta_c_ref_tok_s = 6.9           # System 2 decode speed at which delta_c_s holds (6.9 tok/s in service; 10.3 idle, 2.6-4.3 under load)
+live_delta_c_min_scale = 0.5           # clamp of the multiplier
+live_delta_c_max_scale = 3.0
+live_delta_c_window = 16               # deliberate stages in the rolling median
+live_delta_c_min_samples = 4           # timed deliberations needed before the median is used
 
 [gate.fixed]                           # Phase-1 placeholder rule until a calibration passes NFR-020
 mean_logprob_threshold = -0.30
