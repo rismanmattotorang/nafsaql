@@ -10,7 +10,7 @@ Date 2026-10-21. Status: **implemented and measured at small n; production switc
 
 ## Evidence so far (run `8a0266ee`, MBPP+, paired, SHARED MACHINE with the owner's mistral.rs and Ollama at 170 to 210% CPU)
 
-See `benchmarks/p7_t11_code_exit_study.json` for the per-item table and the final numbers; `docs/status/PROGRESS.md` carries the snapshot at the time of the PR.
+10 paired items, identical verdicts in all three arms (9 of 10 correct; the wrong item is wrong everywhere). Mean wall 428 s (`slow_only`) against 164 s (exit) and 109 s (exit + decay 0.5); mean reasoning tokens 1351 against 428 and 399; median wall ratio 0.19 and 0.20. Per-item table in `benchmarks/p7_t11_code_exit_study.json` and `docs/status/PROGRESS.md`. **Condition 1 below is met; condition 2 is not yet.**
 
 ## The switch
 
