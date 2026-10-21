@@ -36,6 +36,24 @@ Hardware for every number below: Intel Core i3-8100 (4 cores, no SMT, AVX2 only)
 - Evidence added: acceptance 9/9; three quiet-host protocol runs; the slot study (`benchmarks/slots_ab_system1.json`); refreshed security and deployment records.
 - Documents: `docs/status/` (gap analysis, progress, human-needed), decisions 001 and 002, A-066, runbook capacity note, the scholar packet's sections 5 to 8.
 
+## Scaled G2 evidence at the time of writing (run `553a4eff`, 41 of 400 results, SHARED MACHINE)
+
+Run `553a4eff` (core_set, offset 0), status running, 42/400 results, load1 6.4 at 09:04.
+
+| System | n scored | Accuracy (95% CI) | Escalated | Mean wall | p50 wall |
+|---|---|---|---|---|---|
+| `fast_only` | 11 | 73% (39 to 94) | 0% | 11 s | 10 s |
+| `nafs_aql` | 9 | 100% (66 to 100) | 22% | 35 s | 10 s |
+| `nafs_blind` | 10 | 80% (44 to 97) | 30% | 137 s | 22 s |
+| `slow_only` | 10 | 100% (69 to 100) | 100% | 104 s | 91 s |
+
+- **H1 routing (blind gate vs oracle):** 78% on n = 9 (needs 100; target >= 70%); confusion {'escalate_needed': 1, 'escalate_wasted': 1, 'keep_correct': 6, 'keep_missed': 1}; escalation 30%.
+- **ER-004 coupling (blind):** 0/2 wrong drafts adopted, Clopper-Pearson upper bound 84% (needs 200 trials and <= 5%).
+- **ER-002 non-inferiority (nafs_aql vs slow_only):** n = 9 pairs, delta 0.0, CI None, McNemar p 1.0 (needs 700 pairs, lower bound > -3 points).
+- **Raw e1_hat calibration on labelled drafts:** n = 19, ECE 0.164, Brier 0.192, draft error rate 26%.
+
+The run continues in the gateway; `docs/status/PROGRESS.md` holds the latest snapshot and `GET /v1/gates` the pooled counts.
+
 ## Profile decision (G0 / MR-005) and System 2 latency (objective 1)
 
 - **Profile A stays** (Qwen3-1.7B as System 1, Qwen3-4B-Thinking-2507 as System 2): H7 passes (Qwen3.5 decodes at 79 to 80% of dense Qwen3), and the Profile C comparison (`benchmarks/profile_c_decision.json`) found Qwen3.5-2B more accurate (+17 points, 95% CI +7 to +30, n = 30) but 3.7x slower, above the 1.3x the adoption rule allows. The quiet-host numbers above are for Profile A.
