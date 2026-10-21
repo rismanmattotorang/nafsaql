@@ -238,6 +238,24 @@
             "type": "string"
           }
         },
+        "live_delta_c": {
+          "type": "boolean"
+        },
+        "live_delta_c_ref_tok_s": {
+          "type": "number"
+        },
+        "live_delta_c_min_scale": {
+          "type": "number"
+        },
+        "live_delta_c_max_scale": {
+          "type": "number"
+        },
+        "live_delta_c_window": {
+          "type": "integer"
+        },
+        "live_delta_c_min_samples": {
+          "type": "integer"
+        },
         "fixed": {
           "type": "object",
           "properties": {

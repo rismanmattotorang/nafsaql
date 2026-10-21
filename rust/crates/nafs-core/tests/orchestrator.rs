@@ -165,7 +165,15 @@ async fn chat(State(m): State<Mock>, Json(body): Json<Value>) -> impl IntoRespon
         for w in content.split_inclusive(' ') {
             push(json!({"content": w}), Some(lp));
         }
-        sse.push_str(&format!("data: {}\n\n", json!({"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":20,"completion_tokens":8}})));
+        // "timed deliberation": System 2 reports llama-server timings, 400 tokens decoded at 8 tok/s.
+        let timed = body["model"] == "system2"
+            && body["messages"].to_string().contains("timed deliberation");
+        let mut last = json!({"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":20,"completion_tokens":8}});
+        if timed {
+            last["usage"]["completion_tokens"] = json!(400);
+            last["timings"] = json!({"prompt_n": 20, "cache_n": 0, "prompt_ms": 100.0, "predicted_n": 400, "predicted_ms": 50000.0});
+        }
+        sse.push_str(&format!("data: {}\n\n", last));
         sse.push_str("data: [DONE]\n\n");
         ([(header::CONTENT_TYPE, "text/event-stream")], sse).into_response()
     } else {
@@ -926,4 +934,69 @@ async fn an_oversized_message_is_refused_before_it_reaches_the_model() {
         ..Default::default()
     };
     assert!(o.handle(ok, Emitter(None)).await.is_ok());
+}
+
+#[tokio::test]
+async fn live_latency_cost_scales_live_requests_and_never_lab_ones() {
+    let (o, _mock, _d) = setup_with(true, |c| {
+        c.gate.live_delta_c = true;
+        c.gate.live_delta_c_ref_tok_s = 6.0;
+        c.gate.live_delta_c_min_scale = 0.5;
+        c.gate.live_delta_c_max_scale = 3.0;
+        c.gate.live_delta_c_window = 4;
+        c.gate.live_delta_c_min_samples = 2;
+    })
+    .await;
+    let slow = || {
+        let mut q = req("3");
+        q.messages[0].content = "timed deliberation: what is 2 + 2?".into();
+        q.force_mode = Some(ReasoningMode::Slow);
+        q
+    };
+    // Too few timed deliberations yet: delta_c stays static.
+    let r = o.handle(slow(), Emitter(None)).await.unwrap();
+    let static_dc = o.delta_c(r.decision.features.domain);
+    assert_eq!(r.decision.delta_c, static_dc);
+    assert!(!o.live_delta_c_view()["applied"].as_bool().unwrap());
+    // That deliberation was timed (400 tokens in 50 s): one more sample reaches the minimum.
+    let r = o.handle(slow(), Emitter(None)).await.unwrap();
+    assert_eq!(r.decision.delta_c, static_dc);
+    let v = o.live_delta_c_view();
+    assert_eq!(v["samples"], 2);
+    assert_eq!(v["s2_decode_tok_s_median"].as_f64(), Some(8.0));
+    assert!(v["applied"].as_bool().unwrap());
+    // System 2 at 8 tok/s against a 6 tok/s reference: cheaper deliberation, delta_c x 0.75.
+    let r = o.handle(slow(), Emitter(None)).await.unwrap();
+    assert!((r.decision.delta_c - static_dc * 0.75).abs() < 1e-3);
+    assert!(r.decision.explanation.contains("Latency cost"));
+    // A busy host: the median drops to 1.5 tok/s and the multiplier is clamped at 3.
+    for _ in 0..4 {
+        o.active().s2_decode.lock().unwrap().push(1.5);
+    }
+    let r = o.handle(slow(), Emitter(None)).await.unwrap();
+    assert!((r.decision.delta_c - static_dc * 3.0).abs() < 1e-3);
+    // Lab (evaluation) requests always see the static value.
+    let mut lab = slow();
+    lab.lab = true;
+    let r = o.handle(lab, Emitter(None)).await.unwrap();
+    assert_eq!(r.decision.delta_c, static_dc);
+    assert!(!r.decision.explanation.contains("Latency cost"));
+}
+
+#[tokio::test]
+async fn live_latency_cost_is_off_by_default() {
+    let (o, _mock, _d) = setup(true).await;
+    for _ in 0..8 {
+        o.active().s2_decode.lock().unwrap().push(1.0);
+    }
+    let mut q = req("3");
+    q.force_mode = Some(ReasoningMode::Slow);
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(r.decision.delta_c, o.delta_c(r.decision.features.domain));
+    let v = o.live_delta_c_view();
+    assert_eq!(
+        (v["enabled"].as_bool(), v["applied"].as_bool()),
+        (Some(false), Some(false))
+    );
+    assert_eq!(v["scale"].as_f64(), Some(1.0));
 }

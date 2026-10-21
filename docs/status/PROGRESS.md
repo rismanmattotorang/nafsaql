@@ -60,6 +60,19 @@ All four sub-gates stay `pending` (n far below their thresholds); the direction 
 3. When run `553a4eff` has enough items: per-item times, scaled H1 / ER-002 / ER-004 numbers; then start the `calib_set` `nafs_blind` run: `core_set`, systems `fast_only, slow_only, nafs_blind, nafs_aql`, 100 items (H1 routing needs fast and slow in the same run as the blind gate; ER-004's blind arm needs fast and slow; ER-002 needs nafs_aql and slow). Then `calib_set` with `nafs_blind` for calibration labels.
 3. Track G (G5 re-checks) and Track H (release candidate, scholar packet).
 
+## Live latency cost for the gate (built, switched off; paired evaluation pending)
+
+`[gate] live_delta_c` (default `false`) scales the gate's latency cost by reference speed over the rolling median of System 2 decode tok/s (window 16 deliberations, at least 4, clamp 0.5 to 3.0, reference 6.9 tok/s), from the design in `docs/research/deepinfer_assessment.md`. Lab (evaluation) requests always keep the static `delta_c`, so runs and calibration stay reproducible. `GET /v1/gate` → `live_delta_c` shows the live value. **It changes nothing today:** no calibration is promoted, and the fixed rule does not use `delta_c`.
+
+Because eval runs never use the switch, the on/off comparison is a replay: one run under load with `fast_only`, `slow_only` and `nafs_blind` holds both outcomes of every item, and `scripts/live_delta_c_replay.py` scores the calibrated gate with static and with live `delta_c` on the same items (the median replayed causally from the `slow_only` timings). Owner's commands, on a host under its usual load (record `uptime`; check `inflight` in `GET /v1/system` and that no other eval run is going, since runs start immediately):
+
+```bash
+curl -s -X POST http://127.0.0.1:8080/v1/eval/runs -H 'content-type: application/json' -d '{"benchmark": "core_set", "systems": ["fast_only", "slow_only", "nafs_blind"], "offset": 100, "max_items": 100}'
+python3.11 -I scripts/live_delta_c_replay.py <run_id>   # -> benchmarks/live_delta_c_replay_<id8>.json: escalation rate, accuracy, needless escalations, paired CI and McNemar, off vs on
+```
+
+Adopt (`live_delta_c = true` in `config/nafs-aql.toml`, restart with `inflight` 0) only when a calibration is promoted, `paired.non_inferior_3pt` is true and `on.needless_escalations` is below `off`. Indicative replay of run `553a4eff` (n = 23 so far, load1 5 to 7, calibration not promoted so hypothetical): median multiplier 1.37 (System 2 at about 5 tok/s), escalation 13% off vs 4% on, accuracy 70% vs 65% (one discordant item), needless escalations 2 vs 1. Too few items to decide anything.
+
 ## Open questions
 
 - The host is never idle by the prompt's rule (load1 < 1.5 for five minutes): Chrome and the Claude app alone keep load1 at 2 to 4. Results are labelled SHARED MACHINE with the load average; the idle-host command is in `HUMAN-NEEDED.md`.

@@ -4377,6 +4377,56 @@
           },
           "recalibrate_every_h": {
             "type": "integer"
+          },
+          "live_delta_c": {
+            "type": "object",
+            "description": "Live latency cost ([gate] live_delta_c, off by default). delta_c is scaled by ref_tok_s over the rolling median of System 2 decode tok/s, clamped; applied to live requests only, never to lab (evaluation) requests, and it changes routing only where a promoted calibration decides.",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "applied": {
+                "type": "boolean",
+                "description": "Enabled and at least min_samples timed deliberations in the window."
+              },
+              "backend": {
+                "type": "string"
+              },
+              "s2_decode_tok_s_median": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "samples": {
+                "type": "integer"
+              },
+              "window": {
+                "type": "integer"
+              },
+              "min_samples": {
+                "type": "integer"
+              },
+              "ref_tok_s": {
+                "type": "number"
+              },
+              "clamp": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                }
+              },
+              "scale": {
+                "type": "number"
+              },
+              "delta_c_s": {
+                "type": "object",
+                "description": "Per domain, the static delta_c and the value a live request gets now."
+              },
+              "note": {
+                "type": "string"
+              }
+            }
           }
         }
       },
