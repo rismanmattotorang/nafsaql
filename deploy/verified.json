@@ -1,5 +1,5 @@
 {
-  "verified_at": "2026-10-18T13:35:41Z",
+  "verified_at": "2026-10-21T00:47:17Z",
   "checks": [
     {
       "check": "prometheus alert rules",
@@ -44,12 +44,12 @@
     {
       "check": "gateway --check config/nafs-aql.toml",
       "status": "pass",
-      "detail": "{ \"auth_tokens\": 0, \"backend\": \"llama\", \"bind\": \"127.0.0.1:8080\", \"bind_policy\": \"ok\", \"config\": \"config/nafs-aql.toml\", \"config_hash\": \"17e68ed1110865af\", \"retention_days\": 90, \"sandbox_isolation\": t"
+      "detail": "{ \"auth_tokens\": 0, \"backend\": \"llama\", \"bind\": \"127.0.0.1:8080\", \"bind_policy\": \"ok\", \"config\": \"config/nafs-aql.toml\", \"config_hash\": \"ad4cdb8a9011cf5d\", \"retention_days\": 90, \"sandbox_isolation\": t"
     },
     {
       "check": "gateway --check config/nafs-aql.docker.toml",
       "status": "pass",
-      "detail": "{ \"auth_tokens\": 1, \"backend\": \"vllm\", \"bind\": \"0.0.0.0:8080\", \"bind_policy\": \"ok\", \"config\": \"config/nafs-aql.docker.toml\", \"config_hash\": \"533e5fde96a190f0\", \"retention_days\": 90, \"sandbox_isolation"
+      "detail": "{ \"auth_tokens\": 1, \"backend\": \"vllm\", \"bind\": \"0.0.0.0:8080\", \"bind_policy\": \"ok\", \"config\": \"config/nafs-aql.docker.toml\", \"config_hash\": \"340e57ccad0bdf86\", \"retention_days\": 90, \"sandbox_isolation"
     },
     {
       "check": "reference machine stack (make up) healthy",
