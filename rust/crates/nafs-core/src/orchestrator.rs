@@ -134,6 +134,24 @@ pub fn round_budget(budget: u32, round: u32, decay: f32, min: u32) -> u32 {
     shrunk.max(min.min(budget))
 }
 
+/// FR-086: reasoning tokens that fit in `remaining_ms` at the previous attempt's token rate
+/// (`prev_tokens` in `prev_ms`), keeping room for an answer as long as the previous one and a
+/// 20% margin for prefill and verification. `None` when the previous attempt gives no usable rate
+/// (no tokens, or under a millisecond), in which case the attempt is not constrained.
+pub fn fit_budget(
+    remaining_ms: u64,
+    prev_ms: u64,
+    prev_tokens: u32,
+    prev_answer_tokens: u32,
+) -> Option<u32> {
+    if prev_tokens == 0 || prev_ms == 0 {
+        return None;
+    }
+    let rate = prev_tokens as f64 / prev_ms as f64;
+    let fit = (remaining_ms as f64 * 0.8 * rate) as u32;
+    Some(fit.saturating_sub(prev_answer_tokens))
+}
+
 /// FR-085: a probe is a full answer when the task's exact verifier needs the whole answer (code tests,
 /// JSON Schema); a reference-answer task is probed with a short "Answer:" line instead.
 pub fn full_answer_probe(v: &VerificationInputs) -> bool {
@@ -1100,9 +1118,11 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             // FR-086: no attempt starts that the wall-clock cap would cut off; the previous attempt's
             // duration is the estimate. The best candidate so far is returned instead of a timeout.
             let cap_ms = cfg.server.request_wall_clock_cap_s.saturating_mul(1000);
-            let mut last_attempt_ms: Option<u64> = None;
+            // (wall ms, completion tokens, answer tokens) of the previous attempt: its token rate sizes
+            // the next attempt so that it ends before the cap.
+            let mut last_attempt: Option<(u64, u32, u32)> = None;
             'outer: for round in 0..=max_r {
-                let budget = round_budget(budget, round, decay, cfg.deliberation.retry_min_budget);
+                let round_b = round_budget(budget, round, decay, cfg.deliberation.retry_min_budget);
                 for _ in 0..per_round {
                     attempt += 1;
                     let has_next = attempt < total;
@@ -1114,14 +1134,23 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         notice = Some("Wall-clock cap reached (NFR-001).".into());
                         break 'outer;
                     }
-                    if let Some(prev) = last_attempt_ms.filter(|p| elapsed_ms + *p > cap_ms) {
-                        notice = Some(format!(
-                            "Attempt {attempt} was skipped: the previous attempt took {} s and only {} s remained before the wall-clock cap (NFR-001).",
-                            prev / 1000,
-                            cap_ms.saturating_sub(elapsed_ms) / 1000
-                        ));
-                        break 'outer;
-                    }
+                    let floor = cfg.deliberation.retry_min_budget.min(round_b);
+                    let fit = last_attempt.and_then(|(ms, tokens, answer)| {
+                        fit_budget(cap_ms.saturating_sub(elapsed_ms), ms, tokens, answer)
+                    });
+                    let budget = match fit {
+                        None => round_b,
+                        Some(fit) => {
+                            if fit < floor {
+                                notice = Some(format!(
+                                    "Attempt {attempt} was skipped: at the previous attempt's speed only about {fit} reasoning tokens fit in the {} s left before the wall-clock cap (NFR-001).",
+                                    cap_ms.saturating_sub(elapsed_ms) / 1000
+                                ));
+                                break 'outer;
+                            }
+                            round_b.min(fit)
+                        }
+                    };
                     let t_attempt = Instant::now();
                     states.push(TraceState::M);
                     em.send(StreamEvent::Phase { state: TraceState::M, label: format!("System 2 deliberating (attempt {attempt} of {total}, budget {budget} tokens)") });
@@ -1212,7 +1241,11 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         }
                     };
                     usage.model_calls += 1;
-                    last_attempt_ms = Some(t_attempt.elapsed().as_millis() as u64);
+                    last_attempt = Some((
+                        t_attempt.elapsed().as_millis() as u64,
+                        out.completion_tokens,
+                        out.completion_tokens.saturating_sub(out.reasoning_tokens),
+                    ));
                     // The adaptive exit's probes run inside this call and are recorded as their own stages just
                     // before it, so the deliberate stage is shown net of them (stage times then add up to the wall time).
                     let mut dstage = out.stage("deliberate");
@@ -1985,7 +2018,7 @@ fn write_json<T: Serialize>(path: &str, v: &T) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{delimit, full_answer_probe, round_budget};
+    use super::{delimit, fit_budget, full_answer_probe, round_budget};
     use nafs_types::VerificationInputs;
     #[test]
     fn round_budget_decays_geometrically_with_a_floor() {
@@ -2003,6 +2036,18 @@ mod tests {
             1024,
             "decay 1 keeps the budget"
         );
+    }
+    #[test]
+    fn fit_budget_follows_the_measured_token_rate() {
+        // 4 tok/s measured; 300 s left -> 960 tokens with the margin, minus a 200-token answer.
+        assert_eq!(fit_budget(300_000, 100_000, 400, 200), Some(760));
+        assert_eq!(
+            fit_budget(30_000, 100_000, 400, 200),
+            Some(0),
+            "answer alone would not fit"
+        );
+        assert_eq!(fit_budget(300_000, 0, 8, 8), None, "no usable rate");
+        assert_eq!(fit_budget(300_000, 50, 0, 0), None);
     }
     #[test]
     fn full_answer_probe_only_for_whole_answer_verifiers() {
