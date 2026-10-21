@@ -2817,6 +2817,30 @@
               "posterior"
             ],
             "description": "Phase 8: stopping rule of the adaptive exit on non-verifiable tasks: consistency (k consecutive agreeing probes) or posterior (majority posterior over all probes against a collapsing bound); default from configuration"
+          },
+          "adaptive_exit_domains": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "enum": [
+                "all",
+                "code",
+                "math",
+                "structured",
+                "factual",
+                "open",
+                "other"
+              ]
+            },
+            "description": "FR-085: domains the adaptive exit applies to for this request (overrides the configured list); \"all\" means every domain. On code and structured tasks the probe is a whole answer judged by the exact verifier, and a passing probe becomes the final answer."
+          },
+          "retry_budget_decay": {
+            "type": "number",
+            "minimum": 0.25,
+            "maximum": 1,
+            "description": "FR-086: factor applied to the System 2 thinking budget on each verified retry round; default from configuration (1 = the same budget every round)"
           }
         }
       },

@@ -303,6 +303,12 @@
         "non_verifiable_max_rounds": {
           "type": "integer"
         },
+        "retry_budget_decay": {
+          "type": "number"
+        },
+        "retry_min_budget": {
+          "type": "integer"
+        },
         "caps": {
           "type": "object",
           "additionalProperties": {
@@ -368,6 +374,21 @@
             },
             "posterior_stop_end": {
               "type": "number"
+            },
+            "reuse_probe_answer": {
+              "type": "boolean"
+            },
+            "full_probe_every_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "full_probe_min_gap_tokens": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "full_probe_max_tokens": {
+              "type": "integer",
+              "minimum": 0
             }
           },
           "additionalProperties": false

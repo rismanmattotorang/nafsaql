@@ -155,12 +155,17 @@ if "--no-ui" not in args:
     chrome = subprocess.Popen([CHROME, "--headless=new", f"--remote-debugging-port={port}", f"--user-data-dir={prof}",
                                "--no-first-run", "--window-size=1440,900", "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        for _ in range(50):
+        # A loaded host can take more than ten seconds to bring Chrome's debugger up; give it 60 s and
+        # fail with a clear message instead of a NameError when it never appears.
+        page = None
+        for _ in range(300):
             try:
                 page = next(t for t in json.load(urllib.request.urlopen(f"http://127.0.0.1:{port}/json")) if t["type"] == "page")
                 break
             except Exception:
                 time.sleep(0.2)
+        if page is None:
+            raise RuntimeError("headless Chrome did not expose a debugger page within 60 s (host overloaded?)")
         ws = websocket.create_connection(page["webSocketDebuggerUrl"], timeout=60, suppress_origin=True)
         n = [0]
         errors = []

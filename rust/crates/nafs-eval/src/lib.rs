@@ -9,6 +9,9 @@
 //!   calibrated e1_hat; answers are scored afterwards. This is the honest routing / ECE test (review M9).
 //! - `fast_only`, `slow_only`: the baselines.
 //! - `slow_conditioned`: System 2 sees the System 1 draft (coupling ablation, ER-004).
+//! - `slow_exit_all` / `slow_exit_all_decay`: deliberate-only with the adaptive exit on every domain
+//!   (full-answer probes judged by the code or schema verifier, FR-085), the second with the retry
+//!   budget halved per round (FR-086); both pair with `slow_only`.
 //! - `slow_b<N>`: slow-only with thinking budget N (budget curve, P0-T05).
 //! - `slow_noexit`: slow-only without the adaptive reasoning exit (P7-T08 study; pairs with `slow_only`).
 use nafs_core::calibration::{ece, reliability};
@@ -61,7 +64,7 @@ fn d_systems() -> Vec<String> {
     vec!["nafs_aql".into(), "fast_only".into(), "slow_only".into()]
 }
 
-pub const FIXED_SYSTEMS: [&str; 8] = [
+pub const FIXED_SYSTEMS: [&str; 10] = [
     "nafs_aql",
     "nafs_blind",
     "fast_only",
@@ -70,6 +73,8 @@ pub const FIXED_SYSTEMS: [&str; 8] = [
     "slow_noexit",
     "slow_exit_consistency",
     "slow_exit_posterior",
+    "slow_exit_all",
+    "slow_exit_all_decay",
 ];
 
 /// Gated systems: `nafs_aql`, `nafs_blind`, and their lambda variants `nafs_aql_l<NN>` /
@@ -284,7 +289,9 @@ pub async fn run_item(
             | "slow_conditioned"
             | "slow_noexit"
             | "slow_exit_consistency"
-            | "slow_exit_posterior" => Some(ReasoningMode::Slow),
+            | "slow_exit_posterior"
+            | "slow_exit_all"
+            | "slow_exit_all_decay" => Some(ReasoningMode::Slow),
             _ if sweep.is_some() => Some(ReasoningMode::Slow),
             _ => None,
         },
@@ -306,6 +313,11 @@ pub async fn run_item(
             "slow_exit_posterior" => Some("posterior".into()),
             _ => None,
         },
+        // FR-085 / FR-086 study arms: the exit on every domain (full-answer probes on code and schema
+        // tasks), with and without the shrinking retry budget.
+        adaptive_exit_domains: matches!(sys, "slow_exit_all" | "slow_exit_all_decay")
+            .then(|| vec!["all".to_string()]),
+        retry_budget_decay: (sys == "slow_exit_all_decay").then_some(0.5),
         ..Default::default()
     };
     // Same wall-clock cap as the HTTP path (review L5).
