@@ -43,7 +43,7 @@
 | NFR-004 | Slow-path latency | Measured 6.7 tok/s decode | backends | PT-004 | P1 |
 | NFR-005 | Memory budget | Prop roofline | backends, config | PT-005 | P1 |
 | NFR-006 | Context cap | Prop roofline | nafs-memory, backends | UT-033 | P1 |
-| NFR-007 | Concurrency | Prop roofline | nafs-gateway | PT-006 | P4 |
+| NFR-007 | Concurrency | Prop roofline; decision 002 | nafs-gateway | PT-006 | P4 |
 | NFR-010 | Backend resilience | D-04 operations | nafs-gateway | IT-013 | P2 |
 | NFR-011 | Backpressure | IF-008 | nafs-gateway | IT-014 | P1 |
 | NFR-012 | Pinned model identity | Draft risk: version drift | config, nafs-memory | UT-034 | P0 |
