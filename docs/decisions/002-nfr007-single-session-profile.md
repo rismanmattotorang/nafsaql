@@ -1,6 +1,6 @@
 # Decision 002: NFR-007 is not reachable on four cores; the single-session profile is the CPU profile
 
-Date 2026-10-21. Status: **fallback applied (documented); threshold change is a proposal for the owner**.
+Date 2026-10-21. Status: **restatement chosen by the owner on 2026-10-21 ("restate NFR-007 at the 2-session limit")**. Implemented: `nafs_bench::nfr007` judges p95 at the recommended limit (`NFR007_SESSIONS = 2`) and keeps the 4-session ratio in the record; `gates.rs` re-reads every stored protocol run's levels at that limit (runs are re-read, not re-run); `data/requirements.csv` NFR-007 restated; the Performance page shows both ratios.
 
 ## Evidence
 

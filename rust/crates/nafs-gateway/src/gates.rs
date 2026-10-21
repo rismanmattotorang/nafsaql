@@ -278,7 +278,11 @@ pub fn evaluate(e: &Evidence) -> Value {
         .as_ref()
         .and_then(|r| r["history"].as_array().cloned())
         .unwrap_or_default();
-    let promoted = hist.iter().any(|h| h["action"] == "promote");
+    // Decision 001 (owner, 2026-10-21): only an adapter promotion counts; a base-model swap recorded
+    // with adapter_hash "none" (the rollback drill) does not.
+    let promoted = hist.iter().any(|h| {
+        h["action"] == "promote" && h["adapter_hash"].as_str().is_some_and(|a| a != "none")
+    });
     let rolled = hist.iter().any(|h| h["action"] == "rollback");
     let g3 = gate(
         "G3",
@@ -329,13 +333,15 @@ pub fn evaluate(e: &Evidence) -> Value {
     };
     // NFR-007 is judged on the median ratio over the most recent eligible runs, not on the latest run alone:
     // on a shared CPU single runs ranged from 1.8x to 2.5x. A run is eligible when the single-session level
-    // has at least MIN_NFR_N fast-path samples (with fewer, "p95" is just the maximum).
+    // has at least MIN_NFR_N fast-path samples (with fewer, "p95" is just the maximum). The ratio is
+    // recomputed from each run's stored levels at the recommended concurrency limit (decision 002, owner's
+    // decision of 2026-10-21), so runs recorded under the earlier 4-session reading are re-read, not re-run.
     const MIN_NFR_N: u64 = 8;
+    let limit = nafs_bench::NFR007_SESSIONS;
     let eligible: Vec<(f64, &str)> = e
         .bench_runs
         .iter()
         .filter(|r| r["kind"] == "protocol" && r["status"] == "done")
-        .filter(|r| r["nfr007"]["ratio"].is_f64())
         .filter(|r| {
             r["levels"]
                 .as_array()
@@ -344,18 +350,18 @@ pub fn evaluate(e: &Evidence) -> Value {
                 .unwrap_or(0)
                 >= MIN_NFR_N
         })
-        .take(5)
-        .map(|r| {
-            (
-                r["nfr007"]["ratio"].as_f64().unwrap_or(f64::NAN),
-                r["run_id"].as_str().unwrap_or("?"),
-            )
+        .filter_map(|r| {
+            let levels = r["levels"].as_array()?;
+            let a = nafs_bench::p95_at(levels, 1)?;
+            let b = nafs_bench::p95_at(levels, limit)?;
+            Some((b / a.max(1.0), r["run_id"].as_str().unwrap_or("?")))
         })
+        .take(5)
         .collect();
     let nfr = if eligible.is_empty() {
         crit(
             "NFR-007",
-            "p95 at 4 sessions <= 2 x single session",
+            "p95 at the recommended limit (2 sessions) <= 2 x single session (decision 002)",
             "pending",
             match proto {
                 Some(_) => {
@@ -382,14 +388,14 @@ pub fn evaluate(e: &Evidence) -> Value {
         if median <= 2.0 {
             crit(
                 "NFR-007",
-                "p95 at 4 sessions <= 2 x single session",
+                "p95 at the recommended limit (2 sessions) <= 2 x single session (decision 002)",
                 "pass",
                 detail,
             )
         } else {
             crit(
                 "NFR-007",
-                "p95 at 4 sessions <= 2 x single session",
+                "p95 at the recommended limit (2 sessions) <= 2 x single session (decision 002)",
                 "fail",
                 format!("{detail}; fallback: document the single-session profile"),
             )
@@ -653,10 +659,13 @@ mod tests {
             json!({"results": (1..=9).map(|i| json!({"id": format!("MVP-A{i}"), "pass": true,
             "detail": if i == 1 { "ttft=900ms" } else if i == 3 { "wall=161s" } else { "" }})).collect::<Vec<_>>()}),
         );
-        e.registry = Some(json!({"history": [{"action": "promote"}, {"action": "rollback"}]}));
+        e.registry = Some(
+            json!({"history": [{"action": "promote", "adapter_hash": "ab12"}, {"action": "rollback"}]}),
+        );
         e.bench_runs = vec![
             json!({"kind": "protocol", "status": "done", "run_id": "x", "nfr007": {"pass": false, "ratio": 2.6},
-                   "levels": [{"results": {"latency_fast_ms": {"n": 8}}}]}),
+                   "levels": [{"concurrency": 1, "results": {"latency_fast_ms": {"n": 8, "p95": 1000.0}}},
+                              {"concurrency": 2, "results": {"latency_fast_ms": {"n": 16, "p95": 2600.0}}}]}),
         ];
         let v = evaluate(&e);
         assert_eq!(status(&v, "G1"), "pass");
@@ -667,10 +676,42 @@ mod tests {
         assert_eq!(status(&evaluate(&e), "G1"), "fail");
     }
     #[test]
+    fn tr007_counts_adapters_only_and_or005_any_rollback() {
+        let mut e = ev();
+        e.registry = Some(json!({"history": [
+            {"action": "promote", "adapter_hash": "none"}, {"action": "rollback", "adapter_hash": "none"}]}));
+        let v = evaluate(&e);
+        let g3 = v["gates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|g| g["gate"] == "G3")
+            .unwrap();
+        let st = |id: &str| {
+            g3["criteria"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|c| c["id"] == id)
+                .unwrap()["status"]
+                .clone()
+        };
+        assert_eq!(
+            st("TR-007"),
+            "pending",
+            "a base-model drill is not an adapter"
+        );
+        assert_eq!(st("OR-005"), "pass");
+    }
+    #[test]
     fn nfr007_uses_the_median_of_eligible_runs() {
+        // The ratio is re-read from the stored levels at the 2-session limit; the stored 4-session verdict is
+        // ignored (decision 002).
         let run = |ratio: f64, n: u64| {
-            json!({"kind": "protocol", "status": "done", "run_id": "r", "nfr007": {"pass": ratio <= 2.0, "ratio": ratio},
-                   "levels": [{"results": {"latency_fast_ms": {"n": n}}}]})
+            json!({"kind": "protocol", "status": "done", "run_id": "r", "nfr007": {"pass": false, "ratio": 3.5},
+                   "levels": [{"concurrency": 1, "results": {"latency_fast_ms": {"n": n, "p95": 1000.0}}},
+                              {"concurrency": 2, "results": {"latency_fast_ms": {"n": 2 * n, "p95": 1000.0 * ratio}}},
+                              {"concurrency": 4, "results": {"latency_fast_ms": {"n": 4 * n, "p95": 3500.0}}}]})
         };
         let nfr = |e: &Evidence| {
             let v = evaluate(e);

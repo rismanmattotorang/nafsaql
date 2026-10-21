@@ -1,6 +1,6 @@
 # Decision 001: no registry drill with a non-adapter artifact; TR-007 needs an adapter-aware rule
 
-Date 2026-10-21. Status: **proposal, needs the owner's decision**. Conservative option taken meanwhile: no change to the live registry.
+Date 2026-10-21. Status: **option A chosen by the owner on 2026-10-21 ("count only adapter promotions for TR-007 and run the rollback drill for OR-005")**. Implemented: `gates.rs` counts a `promote` entry for TR-007 only when its `adapter_hash` is not `none`; the drill promotes a base-model artifact with `--adapter-hash none`, so it moves OR-005 and not TR-007. Drill record: `benchmarks/rollback_drill.json` (see the section at the end).
 
 ## Context
 

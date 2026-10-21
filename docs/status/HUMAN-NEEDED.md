@@ -26,13 +26,17 @@ Each entry: what, why it matters, the exact command or action, the evidence it p
 
 ## 3. GPU training run (TR-007)
 
+Still open. Decision 001 (option A, chosen 2026-10-21) means the rollback drill does not touch TR-007: only an adapter promotion closes it.
+
+### 3a. (closed) Rollback drill (OR-005)
+
 - **What:** train the first Tazkiya adapter on a rented GPU and evaluate it with the promotion gate.
 - **Why:** G3's TR-007 needs an adapter evaluated by `tazkiya.py promote`; the owner deferred GPU work.
 - **Action:** `training/RUNBOOK.md` (data build, `train_unsloth.py`, `tazkiya.py promote --baseline-run <id> --candidate-run <id> --sign-off NAME`). The ledger holds far fewer verified System 2 traces than the roughly 5,000 the runbook asks for, so `tazkiya.py synthesize` must run first (System 2 on GSM8K and MBPP train splits: about 2 min per item on this CPU).
 - **Evidence:** registry `promote` entry with the paired gain.
 - **Moves:** G3 (TR-007).
 
-## 4. Threshold decision for NFR-007 (gate G4)
+## 4. Threshold decision for NFR-007 (gate G4): **decided 2026-10-21** (restated at the 2-session limit, decision 002)
 
 - **What:** decide whether NFR-007 stays a CPU-profile requirement.
 - **Why:** on four cores the four-session p95 ratio is 3.4 to 3.9 on a quiet host and no slot count reaches 2x (`docs/decisions/002-nfr007-single-session-profile.md`); G4 will stay `fail` on this machine whatever else is done.

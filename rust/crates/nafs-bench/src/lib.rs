@@ -243,8 +243,8 @@ pub async fn run(
 }
 
 /// The recorded load-test protocol (ER-007): the same prompt set at 1, 2 and 4 concurrent sessions,
-/// p50/p95/p99 per level, and the NFR-007 verdict (p95 fast-path latency at 4 sessions at most twice
-/// the single-session value). The load generator is in-process (closed-loop workers driving the full
+/// p50/p95/p99 per level, and the NFR-007 verdict (p95 fast-path latency at the recommended limit of 2
+/// sessions at most twice the single-session value; decision 002). The load generator is in-process (closed-loop workers driving the full
 /// orchestrator) rather than goose over HTTP; see ASSUMPTIONS A-036.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolRequest {
@@ -270,23 +270,36 @@ fn d_rps() -> usize {
     8
 }
 
+/// Recommended concurrency limit of the CPU profile (decision 002): NFR-007 is judged at this level.
+pub const NFR007_SESSIONS: u64 = 2;
+
+/// p95 fast-path latency of the level with `c` concurrent sessions.
+pub fn p95_at(levels: &[Value], c: u64) -> Option<f64> {
+    levels
+        .iter()
+        .find(|l| l["concurrency"].as_u64() == Some(c))
+        .and_then(|l| {
+            l["results"]["latency_fast_ms"]["p95"]
+                .as_f64()
+                .or(l["results"]["latency_ms"]["p95"].as_f64())
+        })
+}
+
+/// NFR-007 verdict: p95 at the recommended concurrency limit (2 sessions, decision 002) at most twice
+/// the single-session value. The 4-session ratio is kept in the record for comparison.
 pub fn nfr007(levels: &[Value]) -> Value {
-    let p95 = |c: u64| {
-        levels
-            .iter()
-            .find(|l| l["concurrency"].as_u64() == Some(c))
-            .and_then(|l| {
-                l["results"]["latency_fast_ms"]["p95"]
-                    .as_f64()
-                    .or(l["results"]["latency_ms"]["p95"].as_f64())
-            })
-    };
-    match (p95(1), p95(4)) {
+    match (p95_at(levels, 1), p95_at(levels, NFR007_SESSIONS)) {
         (Some(a), Some(b)) => {
-            json!({"p95_single_ms": a, "p95_at_4_ms": b, "ratio": b / a.max(1.0), "pass": b <= 2.0 * a,
-            "target": "p95 fast-path latency at 4 sessions <= 2 x single session (NFR-007)"})
+            let mut v = json!({"p95_single_ms": a, "p95_at_limit_ms": b, "limit_sessions": NFR007_SESSIONS,
+                "ratio": b / a.max(1.0), "pass": b <= 2.0 * a,
+                "target": format!("p95 fast-path latency at {NFR007_SESSIONS} sessions (the recommended limit) <= 2 x single session (NFR-007, decision 002)")});
+            if let Some(four) = p95_at(levels, 4) {
+                v["p95_at_4_ms"] = json!(four);
+                v["ratio_at_4"] = json!(four / a.max(1.0));
+            }
+            v
         }
-        _ => json!({"pass": null, "note": "needs levels 1 and 4"}),
+        _ => json!({"pass": null, "note": format!("needs levels 1 and {NFR007_SESSIONS}")}),
     }
 }
 
@@ -448,11 +461,14 @@ mod tests {
     #[test]
     fn nfr007_verdict() {
         let l = |c: u64, p95: f64| json!({"concurrency": c, "results": {"latency_fast_ms": {"p95": p95}, "latency_ms": {"p95": p95}}});
-        assert_eq!(
-            nfr007(&[l(1, 1000.0), l(2, 1500.0), l(4, 1900.0)])["pass"],
-            true
+        let v = nfr007(&[l(1, 1000.0), l(2, 1500.0), l(4, 3900.0)]);
+        assert_eq!(v["pass"], true, "judged at 2 sessions, not 4");
+        assert_eq!(v["ratio_at_4"], 3.9);
+        assert_eq!(nfr007(&[l(1, 1000.0), l(2, 2500.0)])["pass"], false);
+        assert!(
+            nfr007(&[l(1, 1000.0), l(4, 1900.0)])["pass"].is_null(),
+            "needs level 2"
         );
-        assert_eq!(nfr007(&[l(1, 1000.0), l(4, 2500.0)])["pass"], false);
         assert!(nfr007(&[l(2, 1.0)])["pass"].is_null());
     }
 
