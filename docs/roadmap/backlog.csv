@@ -53,3 +53,4 @@ P9-T01,P9,E9.1 Rooms,"Room store and API: unique normalised names, rename, delet
 P9-T02,P9,E9.1 Rooms,"Room hub: welcome snapshot with cursor and pending turns, unique display names, queue and typing frames, heartbeat, race-safe deletion",1.0,P9-T01,"FR-091, FR-092",Must
 P9-T03,P9,E9.2 Rooms UI,"Rooms page rebuilt: list with search and unread, deep links, inline rename, confirmed delete, export, reconnecting transcript, drafts, mobile drawer",1.5,P9-T02,FR-093,Should
 P9-T04,P9,E9.3 Verification,Live rooms test with simulated members; sweep checks; screenshots; API contract and documents,0.5,P9-T03,ER-022,Should
+P7-T11,P7,E7.3 Cascade,"Exact-verifier exit on code and schema tasks with probe reuse, shrinking retry budgets and a wall-clock time guard; paired Lab systems slow_exit_all / slow_exit_all_decay",1.0,P7-T08,"FR-085, FR-086",Should

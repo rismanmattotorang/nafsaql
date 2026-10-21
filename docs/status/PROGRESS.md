@@ -19,6 +19,7 @@ Branch `feat/complete-nafs-aql`, started 2026-10-21 07:20 (+07) from `246c063`. 
 
 ## Running
 
+- P7-T11 paired study (`mbpp_plus` offset 0, 10 items, `slow_only` vs `slow_exit_all` vs `slow_exit_all_decay`), started 13:27 (+07) on the new gateway binary; log: scratchpad `study_code_exit.log`. Eval run `553a4eff` was auto-resumed by the gateway after the restart (it resumes interrupted eval runs at startup) and then cancelled at 112 stored results so the study runs alone; it is resumed after the study (`POST /v1/eval/runs/553a4eff-620b-4150-86de-c13fe1bc0977/resume`).
 - Track C run 1: eval run `553a4eff` on `core_set` (offset 0, 100 items) with `fast_only, slow_only, nafs_blind, nafs_aql`, started 07:46. Feeds H1, ER-002, ER-004 (blind arm), P0-T04. Resume after a gateway restart: `POST /v1/eval/runs/553a4eff-620b-4150-86de-c13fe1bc0977/resume`.
 
 ## Per-item times measured in this run (first items of `553a4eff`, quiet shared host, load1 5 to 6)

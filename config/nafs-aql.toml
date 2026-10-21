@@ -83,6 +83,8 @@ draft_temperature = 0.2
 slow_temperature = 0.6
 answer_max_tokens = 768
 non_verifiable_max_rounds = 1          # FR-022
+retry_budget_decay = 1.0               # FR-086: thinking budget of retry round r = budget * decay^r (1.0 = same budget every round; the paired study sets 0.5)
+retry_min_budget = 96                  # FR-086: floor for a shrunken retry budget
 caps = { code = { N = 1, R = 2, budget = 1024 }, math = { N = 1, R = 2, budget = 1024 }, structured = { N = 1, R = 2, budget = 512 }, factual = { N = 1, R = 0, budget = 512 }, open = { N = 1, R = 0, budget = 512 }, other = { N = 1, R = 0, budget = 512 } }
 caps_provenance = "Phase-1 defaults sized for the reference CPU; replace with the Prop. 3 cap from the Phase-0 Beta fit"
 cost_ratio = 0.15                      # c_p / L_a for the Prop. 3 cap M* = ceil(alpha/cost_ratio - alpha - beta)
@@ -100,6 +102,9 @@ domains = ["math", "factual"]          # exact verifier decides for math; answer
 exit_rule = "consistency"              # Phase 8: "posterior" (majority posterior over all probes vs a collapsing bound, Prop. N4) or "consistency"
 posterior_stop = 0.85                  # bound at the start of the budget: two agreeing probes (0.875) stop, one (0.75) does not
 posterior_stop_end = 0.70              # bound when the budget is exhausted (Frazier-Yu: the optimal bound is non-increasing)
+reuse_probe_answer = true              # FR-085: a full-answer probe (code tests, JSON Schema) that passes is the final answer; the answer stage is skipped
+full_probe_every_tokens = 512          # FR-085: full-answer probes cost an answer each, so they are rarer than short ones
+full_probe_min_gap_tokens = 192
 
 [judge]                                # FR-034 / SR-003 rubric judge on non-verifiable slow-path answers
 enabled = true

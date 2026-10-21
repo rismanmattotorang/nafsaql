@@ -111,3 +111,5 @@
 | FR-092 | Room resilience | Rooms review (2026-10-20) | nafs-gateway | UT-132 | P9 |
 | FR-093 | Rooms interface | Rooms review (2026-10-20) | nafs-web | UT-133 | P9 |
 | ER-022 | Rooms verification | Rooms review (2026-10-20) | scripts | ER-022 | P9 |
+| FR-085 | Exact-verifier exit on whole-answer tasks | Thm 1; DEER (ICLR 2026); S* (EMNLP 2025 Findings); run 553a4eff | nafs-core | UT-130 | P7 |
+| FR-086 | Retry budget decay and time guard | NFR-001; S* (EMNLP 2025 Findings); run 553a4eff | nafs-core | UT-131 | P7 |
