@@ -38,3 +38,7 @@ Decode at batch 1 is memory-bandwidth bound (about 25 GB/s of weight reads at 22
 Either keep NFR-007 as a GPU-profile requirement (mark it not applicable to the CPU profile in `data/requirements.csv`, so G4 reads `pending` or `n/a` on CPU hosts), or restate it as "p95 at the recommended concurrency limit <= 2x single session", which the data above meets at 2 sessions. Both are gate-logic changes and the owner's call; listed in `docs/status/HUMAN-NEEDED.md`.
 
 Note on the stored runs: the six slot-study runs are in the gateway store and count among the five most recent eligible runs for G4; three of them used `-np 2`. The verdict is the same under either slot count, and the production value was restored and verified at the end of the study.
+
+## Result under the restated criterion (2026-10-21, 18:31)
+
+Three more protocol runs at the production slots (`e9a5981e`, `17a96b1c`, `848f60b8`, owner's workloads active, load1 3.5 to 6.6) gave 2-session ratios of 1.63, 1.87 and 2.25. Re-read at 2 sessions, the five most recent eligible runs give a median of **1.87**, so NFR-007 and G4 pass. The ratio is close to the threshold on every run (1.5 to 2.4 across the day), so this is a pass by the median rule, not by a margin; the 4-session ratios on the same runs were 1.9 to 2.8.

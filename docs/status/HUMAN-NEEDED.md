@@ -28,7 +28,9 @@ Each entry: what, why it matters, the exact command or action, the evidence it p
 
 Still open. Decision 001 (option A, chosen 2026-10-21) means the rollback drill does not touch TR-007: only an adapter promotion closes it.
 
-### 3a. (closed) Rollback drill (OR-005)
+### 3a. Rollback drill (OR-005): attempted 2026-10-21, promotion refused
+
+Qwen3.5-2B, the only artefact that had ever beaten System 1 here, was offered to the promotion gate on 40 and then 120 regression items; the gate refused both (−3.3 points at n = 120). No promotion, so no rollback: OR-005 waits for the first adapter or any candidate the owner names (decision 001).
 
 - **What:** train the first Tazkiya adapter on a rented GPU and evaluate it with the promotion gate.
 - **Why:** G3's TR-007 needs an adapter evaluated by `tazkiya.py promote`; the owner deferred GPU work.
