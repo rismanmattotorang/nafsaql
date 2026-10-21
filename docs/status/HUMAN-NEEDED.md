@@ -31,3 +31,11 @@ Each entry: what, why it matters, the exact command or action, the evidence it p
 - **Action:** `training/RUNBOOK.md` (data build, `train_unsloth.py`, `tazkiya.py promote --baseline-run <id> --candidate-run <id> --sign-off NAME`). The ledger holds far fewer verified System 2 traces than the roughly 5,000 the runbook asks for, so `tazkiya.py synthesize` must run first (System 2 on GSM8K and MBPP train splits: about 2 min per item on this CPU).
 - **Evidence:** registry `promote` entry with the paired gain.
 - **Moves:** G3 (TR-007).
+
+## 4. Threshold decision for NFR-007 (gate G4)
+
+- **What:** decide whether NFR-007 stays a CPU-profile requirement.
+- **Why:** on four cores the four-session p95 ratio is 3.4 to 3.9 on a quiet host and no slot count reaches 2x (`docs/decisions/002-nfr007-single-session-profile.md`); G4 will stay `fail` on this machine whatever else is done.
+- **Action:** choose one of the options in decision 002 (mark NFR-007 as GPU-profile only, or restate it at the recommended concurrency limit of 2 sessions). Either needs an edit to `data/requirements.csv` and `rust/crates/nafs-gateway/src/gates.rs`, which this run does not make.
+- **Evidence:** the stored protocol runs already show the 2-session ratio (1.7 to 2.0x).
+- **Moves:** G4 (NFR-007).
