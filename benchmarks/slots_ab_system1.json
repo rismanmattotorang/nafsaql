@@ -1,0 +1,189 @@
+{
+ "study": "System 1 slot count (-np) under the NFR-007 load protocol (Track D)",
+ "date": "2026-10-21",
+ "commit": "4c373e7",
+ "hardware": "Intel Core i3-8100, 4 cores, AVX2, 32 GB DDR4-2400, macOS 15.4.1, llama.cpp 797de63, -t 4",
+ "model": "models/Qwen3-1.7B-Q4_K_M.gguf (config/models.manifest.json)",
+ "protocol": "chat-short, fast mode, levels 1/2/4 sessions, 8 requests per session, one uncounted warm-up per level",
+ "design": "interleaved A/B (np=2, np=4) x 3 rounds; System 1 restarted between arms with inflight 0; production value -np 4 restored",
+ "host_label": "SHARED MACHINE (load1 3.8 to 5.4; no foreign ML workloads; Chrome and the Claude app running)",
+ "runs": [
+  {
+   "round": 1,
+   "slots": 2,
+   "at": "2026-10-21T00:40:02Z",
+   "load_avg": [
+    3.78,
+    4.63,
+    4.56
+   ],
+   "run_id_prefix": "df855a98",
+   "nfr007_ratio": 2.57,
+   "p95_ms": {
+    "1": 1389.0,
+    "2": 2594.0,
+    "4": 3574.0
+   },
+   "p50_ms": {
+    "1": 679.0,
+    "2": 1142.0,
+    "4": 2539.0
+   },
+   "throughput_rps": {
+    "1": 1.27,
+    "2": 1.51,
+    "4": 1.48
+   }
+  },
+  {
+   "round": 1,
+   "slots": 4,
+   "at": "2026-10-21T00:40:54Z",
+   "load_avg": [
+    4.61,
+    4.72,
+    4.6
+   ],
+   "run_id_prefix": "38e921a3",
+   "nfr007_ratio": 2.65,
+   "p95_ms": {
+    "1": 1736.0,
+    "2": 2581.0,
+    "4": 4601.0
+   },
+   "p50_ms": {
+    "1": 909.0,
+    "2": 1075.0,
+    "4": 1578.0
+   },
+   "throughput_rps": {
+    "1": 1.05,
+    "2": 1.43,
+    "4": 1.99
+   }
+  },
+  {
+   "round": 2,
+   "slots": 2,
+   "at": "2026-10-21T00:41:45Z",
+   "load_avg": [
+    4.63,
+    4.74,
+    4.61
+   ],
+   "run_id_prefix": "75bd9cb9",
+   "nfr007_ratio": 2.75,
+   "p95_ms": {
+    "1": 1228.0,
+    "2": 2495.0,
+    "4": 3377.0
+   },
+   "p50_ms": {
+    "1": 632.0,
+    "2": 1079.0,
+    "4": 2288.0
+   },
+   "throughput_rps": {
+    "1": 1.33,
+    "2": 1.6,
+    "4": 1.68
+   }
+  },
+  {
+   "round": 2,
+   "slots": 4,
+   "at": "2026-10-21T00:42:35Z",
+   "load_avg": [
+    5.38,
+    4.98,
+    4.71
+   ],
+   "run_id_prefix": "18172884",
+   "nfr007_ratio": 3.16,
+   "p95_ms": {
+    "1": 1306.0,
+    "2": 2649.0,
+    "4": 4133.0
+   },
+   "p50_ms": {
+    "1": 623.0,
+    "2": 1040.0,
+    "4": 1498.0
+   },
+   "throughput_rps": {
+    "1": 1.35,
+    "2": 1.44,
+    "4": 2.07
+   }
+  },
+  {
+   "round": 3,
+   "slots": 2,
+   "at": "2026-10-21T00:43:25Z",
+   "load_avg": [
+    5.16,
+    5.03,
+    4.74
+   ],
+   "run_id_prefix": "1dfbb1d8",
+   "nfr007_ratio": 3.23,
+   "p95_ms": {
+    "1": 1079.0,
+    "2": 2562.0,
+    "4": 3480.0
+   },
+   "p50_ms": {
+    "1": 619.0,
+    "2": 1090.0,
+    "4": 2464.0
+   },
+   "throughput_rps": {
+    "1": 1.38,
+    "2": 1.54,
+    "4": 1.68
+   }
+  },
+  {
+   "round": 3,
+   "slots": 4,
+   "at": "2026-10-21T00:44:16Z",
+   "load_avg": [
+    4.86,
+    4.98,
+    4.74
+   ],
+   "run_id_prefix": "88ba4eff",
+   "nfr007_ratio": 3.19,
+   "p95_ms": {
+    "1": 1317.0,
+    "2": 2468.0,
+    "4": 4203.0
+   },
+   "p50_ms": {
+    "1": 662.0,
+    "2": 1031.0,
+    "4": 1648.0
+   },
+   "throughput_rps": {
+    "1": 1.31,
+    "2": 1.54,
+    "4": 2.01
+   }
+  }
+ ],
+ "summary": {
+  "2": {
+   "median_ratio": 2.75,
+   "median_p95_at_4_ms": 3480.0,
+   "median_p50_at_4_ms": 2464.0,
+   "median_rps_at_4": 1.68
+  },
+  "4": {
+   "median_ratio": 3.16,
+   "median_p95_at_4_ms": 4203.0,
+   "median_p50_at_4_ms": 1578.0,
+   "median_rps_at_4": 2.01
+  }
+ },
+ "conclusion": "Neither slot count reaches the 2x target. Two slots lower the 4-session p95 by about 20% but raise its p50 by about 50% and cut throughput; four slots stay. On four cores the four-session cost is intrinsic (the decode batch is compute-bound), so the roadmap fallback applies: the single-session profile is documented and the recommended concurrency limit is 2 sessions (docs/decisions/002-nfr007-single-session-profile.md)."
+}

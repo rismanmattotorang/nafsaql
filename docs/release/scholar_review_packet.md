@@ -79,3 +79,41 @@ Until that file exists with `"decision": "approved"`, gate G6 shows SR-005 as pe
 1. Edit the strings above; they are display-only.
 2. Update `docs/user_guide.md` and the report.
 3. Ask for a re-review.
+
+## 5. Methodology, for the reviewer's context
+
+Nafs-Aql is a dual-process assistant. **System 1** (Qwen3-1.7B) answers at once; the **Aql Gate** decides whether the expected error saved by deliberation outweighs its latency; **System 2** (Qwen3-4B-Thinking-2507) reasons within a token budget when it does. Exact verifiers (a numeric and symbolic checker for arithmetic, unit tests for code, JSON Schema for structured output) decide correctness where they exist; a rubric judge on System 2 scores the rest. The vocabulary in section 2 names the **states of an answer's journey**; nothing in the engineering depends on the names. The analogy is the only thing under review here.
+
+## 6. Evaluation design (what the numbers in the release candidate mean)
+
+- **Benchmarks:** GSM8K (arithmetic word problems), HumanEval+ and MBPP+ (Python functions with hidden tests), twelve JSON Schema tasks, and open or factual prompts. Item sets are fixed and seeded (`scripts/build_item_set.py`); `regression_500` is a held-out fixed suite.
+- **Systems compared on the same items:** `fast_only` (System 1 alone), `slow_only` (System 2 alone), `nafs_aql` (the gated system with verifiers), `nafs_blind` (the gate routing without seeing a verifier, which measures the gate itself), `slow_conditioned` (System 2 shown the draft, a coupling ablation).
+- **Statistics:** paired comparisons on identical items; exact McNemar tests with Bonferroni correction; bootstrap confidence intervals; Clopper-Pearson bounds on rates. A gate passes only when its stored evidence meets the roadmap's threshold at the required sample size; smaller runs are reported as *scaled*, with n and an interval.
+- **Hardware:** one 4-core CPU with no GPU, shared with other work; every timing is labelled with the load average.
+
+## 7. Sample outputs by category, including failures
+
+From stored run `5e87f534` (smoke_mixed, 2026-10-18, shared machine). Answers are shortened. "Correct" is the exact verifier's verdict where one exists.
+
+| Category | Question | System 1 draft | Outcome |
+|---|---|---|---|
+| Arithmetic | A robe takes 2 bolts of blue fiber and half that much white fiber. How many bolts in total? | "1 bolt of blue ... Total = 1.5 bolts. Answer: 1.5" | **Wrong draft** (verifier: 3). The gated system escalated; System 2 answered 3, verified. State sequence A, L, M, T. |
+| Arithmetic | James runs 3 sprints 3 times a week, 60 m each. Total meters per week? | "He runs 3 sprints each week ... 180 meters" | **Wrong draft** (verifier: 540). Escalated; System 2 answered 540, verified. |
+| Arithmetic | Janet's ducks lay 16 eggs per day ... how much does she make daily? | step-by-step, answer 18 | Correct, verified on the draft; no deliberation (state A, T). |
+| Code | Remove the first and last occurrence of a character from a string. | a function using `index` and `rindex` | Correct on the hidden tests; no deliberation. |
+| Structured | A JSON object for a library book (title, author, year 1450-2026, available). | `{"title": "The Great Gatsby", "author": "F. Scott Fitzgerald", "year": 1925, "available": true}` | Valid against the schema; verified. |
+| Factual | What is the capital of Indonesia, and on which island? | "Jakarta ... on the island of Java." | No exact verifier; two cheap samples agreed, so the answer is shown as *consensus* (not *verified*). |
+| Factual | Who wrote *The Incoherence of the Philosophers*? | "... was written by Michel de Montaigne." | **Wrong draft, no verifier.** The gated system escalated on low confidence; System 2 answered al-Ghazālī (correct) but invented an Arabic title. Shown as *unverified*. This is the kind of error the abstention state (X, *tawaqquf*) exists for and did not catch here. |
+
+The last row is the honest case for the reviewer: a confident-sounding wrong draft about an Islamic source, corrected in substance by deliberation but still carrying a fabricated detail. The interface marks such answers *unverified*; it never marks them *verified*.
+
+## 8. Review checklist
+
+- [ ] Each term in 2.1 and 2.2 is accurate as a description of the classical usage and is marked as an analogy.
+- [ ] No wording implies religious authority, a ruling, or a claim about the soul.
+- [ ] The mapping of a machine's first draft to *al-nafs al-ammāra* and of abstention to *tawaqquf* is acceptable, or a replacement is named.
+- [ ] Qur'an citations (12:53, 75:2, 89:27, 91:9) and the al-Ghazālī reference (*Iḥyāʾ*, Book 21) are correctly attributed and rendered.
+- [ ] The failure example in section 7 (a fabricated Arabic title shown as *unverified*) is presented acceptably.
+- [ ] Decision recorded in `docs/release/scholar_review.json` (section 4).
+
+Sign-off status on 2026-10-21: **pending; no reviewer assigned.** The team does not sign for the reviewer.

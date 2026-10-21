@@ -37,3 +37,7 @@ tools/tectonic
 *.bak-nafs
 .env
 .env.*
+
+# Derived item sets: regenerate with `python3 -I scripts/build_item_set.py --no-fetch` (seeded; sha256 recorded in docs/status/PROGRESS.md)
+data/bench/calib_set.jsonl
+data/bench/core_set.jsonl
