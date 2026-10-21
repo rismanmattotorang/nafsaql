@@ -1,6 +1,6 @@
 # Decision 001: no registry drill with a non-adapter artifact; TR-007 needs an adapter-aware rule
 
-Date 2026-10-21. Status: **proposal, needs the owner's decision**. Conservative option taken meanwhile: no change to the live registry.
+Date 2026-10-21. Status: **option A chosen by the owner on 2026-10-21 ("count only adapter promotions for TR-007 and run the rollback drill for OR-005")**. Implemented: `gates.rs` counts a `promote` entry for TR-007 only when its `adapter_hash` is not `none`; the drill promotes a base-model artifact with `--adapter-hash none`, so it moves OR-005 and not TR-007. Drill record: `benchmarks/rollback_drill/` (see the section at the end).
 
 ## Context
 
@@ -29,3 +29,18 @@ B. **Keep the rules** and close OR-005 only after the first real adapter is prom
 C. **Accept a drill under the current rule**, knowing TR-007 would show `pass` with a non-adapter. Not recommended.
 
 Recommendation: A. The one-line change is `let promoted = hist.iter().any(|h| h["action"] == "promote" && h["adapter_hash"] != "none");` with a unit test; the drill command is in `docs/status/HUMAN-NEEDED.md`.
+
+## The drill, run on 2026-10-21 (owner's instruction)
+
+The only artefact on this machine that had ever beaten the production System 1 on a paired test was Qwen3.5-2B (+17 points on 30 mixed tasks, `benchmarks/profile_c_decision.json`). It was served as System 1 and run on the fixed regression suite with `fast_only`, then offered to `tazkiya.py promote` with `--adapter-hash none` against the stored baseline run `880cdb33`:
+
+| Candidate run | Items (all math: the suite's first 300 items are GSM8K) | Candidate accuracy | Paired gain | 95% CI | Gate |
+|---|---|---|---|---|---|
+| `a9309c34` | 40 | 85.0% | +12.5 points | −2.5 to +27.5 | **refused**: lower bound not above 0 |
+| `3cca7cad` | 120 | 70.8% | −3.3 points | −13.3 to +5.8 | **refused**: gain below +2, lower bound below 0 |
+
+So no artefact available here passes the promotion gate, and without a promotion there is nothing to roll back: **OR-005 stays `pending`**, honestly. The gate did its job twice. The two candidate runs are kept in `benchmarks/rollback_drill/` (full items) and the refusal record in `refusal_n120.json`; they were removed from the gateway's run store because they were produced with a non-production System 1 and would otherwise have counted as production evidence for P0-T04 and ER-008 (the store was backed up first).
+
+A by-product for MR-005: on 120 GSM8K items Qwen3.5-2B is **not** more accurate than Qwen3-1.7B as System 1 (−3.3 points, interval includes 0); the earlier +17 came from 30 mixed items. Profile A stays, now with a stronger reason.
+
+What closes OR-005: the first adapter that passes the gate (a GPU training run, HUMAN-NEEDED item 3), or any other candidate artefact the owner wants tested on the suite.

@@ -1,0 +1,9 @@
+{
+ "drill": "OR-005 rollback drill (decision 001 option A)",
+ "at": "2026-10-21T11:23:03Z",
+ "candidate_run": "3cca7cad-e306-4441-94b1-b24bede1f814",
+ "baseline_run": "880cdb33-afa5-4cbe-8847-1a64258c1a1d",
+ "outcome": "promotion refused by the gate; no rollback possible",
+ "promote_exit": 1,
+ "log": "== promote (gate decides) 2026-10-21T11:23:03Z load { 6.82 6.70 6.77 }\n{\n  \"pass\": false,\n  \"reasons\": [\n    \"lower 95% bound of the gain -0.133 is not above 0\",\n    \"gain -0.033 < +0.02\",\n    \"domain math: lower bound -0.125 < -0.01\"\n  ],\n  \"n\": 120,\n  \"gain\": -0.03333333333333333,\n  \"ci95\": [\n    -0.13333333333333333,\n    0.058333333333333334\n  ],\n  \"domains\": {\n    \"math\": {\n      \"n\": 120,\n      \"gain\": -0.03333333333333333,\n      \"ci95\": [\n        -0.125,\n        0.058333333333333334\n      ]\n    }\n  }\n}\nNOT PROMOTED\npromote exit 1\n"
+}

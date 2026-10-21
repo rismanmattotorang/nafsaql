@@ -65,7 +65,7 @@
 \textbf{NFR-004} & Slow-path latency & Target: a slow-path reply with a 1024-token thinking budget on the 4B model SHOULD complete within 240 s at p95 on the reference machine. & Should & P1\\
 \textbf{NFR-005} & Memory budget & Resident memory of both model servers, KV cache and the gateway MUST stay below 8 GB in Profile A on the CPU baseline. & Must & P1\\
 \textbf{NFR-006} & Context cap & The CPU baseline MUST cap prompts at 4096 tokens and MUST enable prompt caching on the model servers. & Must & P1\\
-\textbf{NFR-007} & Concurrency & Target: the reference machine SHOULD serve 4 concurrent chat sessions with p95 fast-path latency at most twice the single-session value. & Could & P4\\
+\textbf{NFR-007} & Concurrency & Target: the reference CPU machine SHOULD serve its recommended concurrency limit of 2 chat sessions with p95 fast-path latency at most twice the single-session value; 4 concurrent sessions are a GPU-profile target (restated by the owner on 2026-10-21, decision 002: on four cores the four-session p95 is 3.4 to 3.9x and no slot count reaches 2x). & Could & P4\\
 \textbf{NFR-010} & Backend resilience & The gateway MUST survive model-server restarts, reconnect automatically and lose no decision records or traces. & Must & P2\\
 \textbf{NFR-011} & Backpressure & In-flight requests per backend MUST be bounded by configuration and excess requests MUST receive HTTP 429 with a retry hint. & Must & P1\\
 \textbf{NFR-012} & Pinned model identity & Model identifiers, revisions, quantisation, chat-template hash and configuration hash MUST be recorded in every trace. & Must & P0\\

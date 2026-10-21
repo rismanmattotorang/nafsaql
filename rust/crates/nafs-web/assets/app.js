@@ -46,6 +46,36 @@ const STATIONS = {
   T: { en: 'Accepted', ar: 'muṭmaʾinna', tip: 'At rest (Q 89:27): the answer is accepted with a stated assurance.' },
   X: { en: 'Abstain', ar: 'tawaqquf', tip: 'Judgement withheld: no candidate earned acceptance within the budget.' },
 };
+// The answer's journey as steps (OpenUI Steps): visited steps are ticked, the live step pulses with its stage label.
+function journeyHTML(seq, visited, cur, label, elapsedMs) {
+  const steps = seq.map((k, i) => { const st = STATIONS[k]; const done = visited.includes(k) && k !== cur; const isCur = k === cur;
+    const n = done ? icon.check : isCur ? `<span class="spin" style="width:10px;height:10px;border-width:1.5px;border-color:rgba(255,255,255,.5);border-top-color:#fff"></span>` : k;
+    return `${i ? `<span class="jlink ${done || isCur ? 'done' : ''}"></span>` : ''}<span class="jstep ${done ? 'done' : ''} ${isCur ? 'cur' : ''} ${k === 'X' ? 'x' : ''}" title="${esc(st.tip)}"><span class="n">${n}</span>${st.en}<i class="ar">${st.ar}</i></span>`; }).join('');
+  const live = cur ? `<span class="jlive"><span>${esc(label || '')}</span><span class="el">${fmtMs(elapsedMs || 0)}</span></span>` : '';
+  return steps + live;
+}
+// Tool cards (OpenUI ToolCall / ToolResult): the gate's decision and every verifier verdict, one line each, evidence on expand.
+function toolcardsHTML(t, live) {
+  const cards = [];
+  const d = t.decision;
+  if (d && !live && d.rule !== 'forced_override') {
+    const esc1 = d.escalate; cards.push(`<details class="toolcard ${esc1 ? 'info' : 'fast'}"><summary><span class="tc-ico">${esc1 ? icon.brain : icon.bolt}</span><span class="tc-name">aql_gate</span><span class="tc-st">${esc1 ? 'escalated to <b>System 2</b>' : 'kept the <b>System 1</b> draft'} · ${esc(d.rule)}</span><span class="tc-dur">ê₁ ${num(d.e1_hat, 2)} · ê₂ ${num(d.e2_hat, 2)}</span><span class="tc-chev">▶</span></summary>
+      <div class="tc-body">${esc(d.explanation)}<div class="tiny faint" style="margin-top:4px">Theorem 2: escalate iff L·(ê₁−ê₂) &gt; λ·Δc with λ ${num(d.lambda, 2)} and Δc ${r4(d.delta_c)} s.</div></div></details>`);
+  }
+  for (const v of t.verifs) { const r = v.result; const ok = r.passed;
+    cards.push(`<details class="toolcard ${ok ? 'pass' : 'fail'}"><summary><span class="tc-ico">${ok ? icon.check : icon.x}</span><span class="tc-name">${esc(r.verifier)}</span><span class="tc-st"><b>${ok ? 'passed' : 'failed'}</b> · ${esc(v.kind || 'final')}${r.verifier === 'judge' && r.score != null ? ` · V ${num(r.score, 2)}` : ''}</span><span class="tc-dur">${r.duration_ms != null ? fmtMs(r.duration_ms) : ''}</span><span class="tc-chev">▶</span></summary>
+      <div class="tc-body">${r.evidence ? `<div class="codebox">${esc(r.evidence)}</div>` : ok ? 'The answer satisfied the verifier.' : 'No evidence recorded.'}${r.verifier === 'judge' && r.details ? judgeBars(r.details) : ''}</div></details>`); }
+  return cards.length ? `<div class="toolcards">${cards.join('')}</div>` : '';
+}
+// Follow-ups (OpenUI FollowUpBlock): what to ask next, from the state of this answer.
+function followupsHTML(t) {
+  const r = t.reply; if (!r) return ''; const f = [];
+  if (r.reasoning_mode === 'fast') f.push(['slow', icon.brain, 'Think harder', 'Ask again with System 2 deliberating']); else f.push(['fast', icon.bolt, 'Quick answer', 'Ask again with System 1 only']);
+  f.push(['steps', icon.book, 'Explain step by step', 'Ask for the reasoning in steps']);
+  if (r.assurance === 'unverified' && ['math', 'code', 'structured'].includes(r.domain) && t.onVerify) f.push(['verify', icon.shield, 'Check with a reference or tests', 'Attach a reference answer, tests or a schema and ask again']);
+  if (r.draft) f.push(['compare', icon.compare, 'Compare draft and answer', 'See what System 2 changed']);
+  return `<span class="fu-l">Next:</span>` + f.map(([k, i, l, tip]) => `<button type="button" data-f="${k}" title="${esc(tip)}">${i}${esc(l)}</button>`).join('');
+}
 function designNotes() {
   modal(`<h3 style="margin-top:0">${icon.book} Design notes: nafs and \u02bfaql</h3>
     <p class="small">Nafs-Aql borrows the classical vocabulary of the self as a <b>design analogy</b>, not as a theological claim. The engineering names are primary; scholar review is a release gate (SR-005).</p>
@@ -151,6 +181,10 @@ document.addEventListener('click', (e) => {
   navigator.clipboard?.writeText(b.parentElement.querySelector('code').textContent).then(() => { b.textContent = 'copied'; setTimeout(() => (b.textContent = 'copy'), 1200); });
 });
 
+// Page intro (what the page is for, how to use it, the primary action): the same shape on every non-chat page.
+const pageIntro = ({ ico, title, lead, steps = [], actions = '' }) => `<div class="pageintro"><div class="pi-ico">${icon[ico] || icon.book}</div><div class="pi-body"><h2>${esc(title)}</h2><p>${lead}</p>${steps.length ? `<div class="pi-steps">${steps.map((s, i) => `<span><b>${i + 1}</b>${esc(s)}</span>`).join('')}</div>` : ''}</div>${actions ? `<div class="pi-actions">${actions}</div>` : ''}</div>`;
+document.addEventListener('click', (e) => { const b = e.target.closest('[data-scroll]'); if (!b) return; e.preventDefault(); const t = document.getElementById(b.dataset.scroll); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'center' }); t.focus?.(); } });
+
 // ============================== charts (inline SVG) ==============================
 const chart = {
   scatter(points, { w = 640, hgt = 220, xLabel = '', yLabel = '', lines = [] } = {}) {
@@ -255,10 +289,10 @@ const assureBadge = (a) => { const [c, i, l, t] = ASSURE[a] || ASSURE.unverified
 const AVATAR = '<div class="avatar" aria-hidden="true"><svg viewBox="0 0 64 64"><circle cx="24" cy="32" r="9"/><circle cx="40" cy="32" r="9"/></svg></div>';
 
 class Turn {
-  constructor(container, { onSelect, onRetry, prompt, request } = {}) {
+  constructor(container, opts = {}) { const { onSelect, onRetry, prompt, request } = opts;
     this.t0 = performance.now(); this.events = []; this.fast = ''; this.slow = ''; this.reason = ''; this.states = ['A']; this.cur = 'A'; this.label = 'System 1 drafting';
     this.verifs = []; this.decision = null; this.reply = null; this.escalated = false; this.domain = null; this.error = null; this.prompt = prompt; this.request = request; this.onSelect = onSelect; this.onRetry = onRetry;
-    this.el = h(`<div class="msg bot">${AVATAR}<div class="body"><div class="meta"></div><div class="automaton"></div><div class="why"></div><div class="folds"></div><div class="verifs"></div><div class="answer"></div><div class="notes"></div>
+    this.el = h(`<div class="msg bot">${AVATAR}<div class="body"><div class="meta"></div><div class="journey" aria-label="How this answer is being made"></div><div class="why"></div><div class="folds"></div><div class="tools"></div><div class="answer"></div><div class="notes"></div><div class="followups"></div>
       <div class="actions"><button data-a="up" class="fb" title="Good answer">${icon.up}</button><button data-a="down" class="fb" title="Poor answer">${icon.down}</button><span class="sep"></span>
       <button data-a="inspect" title="Show the gate decision and trace">${icon.search}Inspect</button><button data-a="compare" title="Compare the System 1 draft with the final answer" hidden>${icon.compare}Compare</button><button data-a="copy">${icon.copy}Copy</button>
       <button data-a="regen" title="Ask the same question again">${icon.retry}Regenerate</button><button data-a="slow" title="Ask again with deliberation forced">${icon.brain}Think harder</button><button data-a="fast" title="Ask again with the fast path only">${icon.bolt}Fast only</button></div></div></div>`);
@@ -269,6 +303,11 @@ class Turn {
       if (a === 'compare') compareModal(this);
       if (a === 'up' || a === 'down') this.rate(a === 'up' ? 1 : -1); };
     this.el.querySelector('.body').addEventListener('dblclick', () => this.onSelect?.(this, true));
+    this.onVerify = opts.onVerify || null;
+    this.el.querySelector('.followups').onclick = (e) => { const f = e.target.closest('button')?.dataset.f; if (!f) return;
+      if (f === 'slow' || f === 'fast') this.onRetry?.(this.prompt, f, this.request);
+      if (f === 'steps') this.onRetry?.(`${this.prompt}\n\nExplain your reasoning step by step.`, this.request?.force_mode || 'auto', this.request);
+      if (f === 'compare') compareModal(this); if (f === 'verify') this.onVerify?.(this); };
     container.appendChild(this.el); this.scheduled = false; this.render();
     this.ticker = setInterval(() => { if (this.reply || this.error || !this.el.isConnected) clearInterval(this.ticker); else this.schedule(); }, 500);
   }
@@ -305,8 +344,7 @@ class Turn {
       `<span class="time">${r ? `${fmtMs(r.usage.ttft_ms)} to first token · ${fmtMs(r.usage.wall_ms)} total` : live ? `<span class="spin"></span> ${fmtMs(performance.now() - this.t0)}` : ''}</span>`].join('');
     const order = ['A', 'L', 'M', 'T']; const final = r ? r.trace_state : null;
     const seq = (final === 'X' ? ['A', 'L', 'M', 'X'] : this.escalated || this.states.includes('L') ? order : ['A', 'T']);
-    el.querySelector('.automaton').innerHTML = seq.map((s, i) => { const visited = this.states.includes(s); const cls = live && s === this.cur ? 'cur' : visited ? 'done' : ''; const st = STATIONS[s];
-      return `${i ? '<span class="arrow">→</span>' : ''}<span class="s ${cls}" title="${esc(st.tip)}"><b>${s}</b>${st.en}<i class="ar">${st.ar}</i></span>`; }).join('') + (live ? `<span class="lbl">${esc(this.label)}</span>` : '');
+    el.querySelector('.journey').innerHTML = journeyHTML(seq, this.states, live ? this.cur : null, live ? this.label : null, live ? performance.now() - this.t0 : null);
     const d0 = this.decision; el.querySelector('.why').innerHTML = d0 && !live ? `<span title="${esc(d0.explanation)}">${d0.escalate ? icon.brain : icon.bolt} ${esc(d0.rule === 'forced_override' ? 'You chose the path.' : d0.explanation.length > 150 ? d0.explanation.slice(0, 150) + '…' : d0.explanation)}</span>` : '';
     const folds = el.querySelector('.folds'); let html = '';
     const draft = r ? r.draft : (this.escalated ? this.fast : null);
@@ -315,7 +353,7 @@ class Turn {
     if (reasoning) { const ntok = r ? r.usage.reasoning_tokens : reasoning.length / 4 | 0; const wasOpen = folds.querySelector('.reason')?.open;
       html += `<details class="fold reason" ${wasOpen ?? (live) ? 'open' : ''}><summary>${icon.brain} Reasoning · ${r ? ntok + ' tokens' : '~' + ntok + ' tokens so far'}${r?.usage?.thinking_budget ? ` (budget ${r.usage.thinking_budget})` : ''}</summary><div class="fb">${esc(reasoning)}</div></details>`; }
     if (folds.innerHTML !== html) { const fb = folds.querySelector('.reason .fb'); const atBottom = fb && fb.scrollTop + fb.clientHeight >= fb.scrollHeight - 20; folds.innerHTML = html; const nfb = folds.querySelector('.reason .fb'); if (nfb && (atBottom || live)) nfb.scrollTop = nfb.scrollHeight; }
-    el.querySelector('.verifs').innerHTML = this.verifs.map(v => `<span class="verif ${v.result.passed ? 'pass' : 'fail'}" title="${esc(v.result.evidence || 'passed')}">${v.result.passed ? icon.check : icon.x} ${esc(v.result.verifier)}${v.result.verifier === 'judge' && v.result.score != null ? ' V ' + num(v.result.score, 2) : ''} · ${v.kind || 'final'}</span>`).join('');
+    { const tools = el.querySelector('.tools'); const open = new Set($$('.toolcard[open]', tools).map((x, i) => i)); const html = toolcardsHTML(this, live); if (tools.dataset.h !== html) { tools.dataset.h = html; tools.innerHTML = html; $$('.toolcard', tools).forEach((x, i) => { if (open.has(i)) x.open = true; }); } }
     const text = r ? r.message.content : this.answerText();
     const ans = el.querySelector('.answer');
     if (!text && live) ans.innerHTML = this.escalated ? `<span class="muted small"><span class="spin"></span> System 2 is deliberating…${this.reason ? '' : ' (reasoning hidden; enable "Show reasoning" to watch)'}</span>` : '<span class="caret"></span>';
@@ -325,6 +363,7 @@ class Turn {
     if (r?.uncertainty_notice) notes += `<div class="notice ${r.assurance === 'abstained' ? 'bad' : ''}">${icon.alert}<span>${esc(r.uncertainty_notice)}</span></div>`;
     if (this.error) notes += `<div class="notice bad">${icon.alert}<span>${esc(this.error)}</span></div>`;
     el.querySelector('.notes').innerHTML = notes;
+    { const fu = el.querySelector('.followups'); const html = r && !this.error ? followupsHTML(this) : ''; if (fu.dataset.h !== html) { fu.dataset.h = html; fu.innerHTML = html; } }
     el.querySelector('.actions').style.display = live ? 'none' : '';
     const acts = el.querySelector('.actions'); acts.querySelector('[data-a=compare]').hidden = !(r && r.draft);
     acts.querySelector('[data-a=up]').classList.toggle('on', this.feedback === 1); acts.querySelector('[data-a=down]').classList.toggle('on', this.feedback === -1);
@@ -392,12 +431,12 @@ function inspectorHTML(t) {
 
 // ============================== chat page ==============================
 const EXAMPLES = [
-  { t: 'Verified math', d: 'Word problem with a numeric reference: watch System 1 get checked.', prompt: 'A train leaves at 3:40 pm and arrives at 6:05 pm the same day. How many minutes is the trip?', v: { reference_answer: '145' } },
-  { t: 'Code with tests', d: 'Python with unit tests run in the sandbox.', prompt: 'Write a Python function `run_length_encode(s)` that compresses consecutive repeats, e.g. "aaabcc" -> "a3b1c2".', v: { tests: ['assert run_length_encode("aaabcc") == "a3b1c2"', 'assert run_length_encode("") == ""', 'assert run_length_encode("x") == "x1"'] } },
-  { t: 'JSON with a schema', d: 'Structured output validated against JSON Schema.', prompt: 'Create a JSON object for a library book with title, author, year (integer 1450-2026) and available (boolean).', v: { json_schema: { type: 'object', required: ['title', 'author', 'year', 'available'], properties: { title: { type: 'string' }, author: { type: 'string' }, year: { type: 'integer', minimum: 1450, maximum: 2026 }, available: { type: 'boolean' } }, additionalProperties: false } } },
-  { t: 'Quick fact', d: 'Easy question: the gate should keep the fast draft.', prompt: 'What is the capital of Indonesia?' },
-  { t: 'Trick question', d: 'Classic intuition trap with a reference answer.', prompt: 'A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost in dollars?', v: { reference_answer: '0.05' } },
-  { t: 'Open question', d: 'No exact verifier applies; the answer stays unverified.', prompt: 'Give three practical tips for writing clear technical documentation.' },
+  { i: 'check', t: 'Verified math', d: 'Word problem with a numeric reference: watch System 1 get checked.', prompt: 'A train leaves at 3:40 pm and arrives at 6:05 pm the same day. How many minutes is the trip?', v: { reference_answer: '145' } },
+  { i: 'shield', t: 'Code with tests', d: 'Python with unit tests run in the sandbox.', prompt: 'Write a Python function `run_length_encode(s)` that compresses consecutive repeats, e.g. "aaabcc" -> "a3b1c2".', v: { tests: ['assert run_length_encode("aaabcc") == "a3b1c2"', 'assert run_length_encode("") == ""', 'assert run_length_encode("x") == "x1"'] } },
+  { i: 'book', t: 'JSON with a schema', d: 'Structured output validated against JSON Schema.', prompt: 'Create a JSON object for a library book with title, author, year (integer 1450-2026) and available (boolean).', v: { json_schema: { type: 'object', required: ['title', 'author', 'year', 'available'], properties: { title: { type: 'string' }, author: { type: 'string' }, year: { type: 'integer', minimum: 1450, maximum: 2026 }, available: { type: 'boolean' } }, additionalProperties: false } } },
+  { i: 'bolt', t: 'Quick fact', d: 'Easy question: the gate should keep the fast draft.', prompt: 'What is the capital of Indonesia?' },
+  { i: 'brain', t: 'Trick question', d: 'Classic intuition trap with a reference answer.', prompt: 'A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost in dollars?', v: { reference_answer: '0.05' } },
+  { i: 'users', t: 'Open question', d: 'No exact verifier applies; the answer stays unverified.', prompt: 'Give three practical tips for writing clear technical documentation.' },
 ];
 
 function settingsBar() {
@@ -423,8 +462,8 @@ routes.chat = { title: 'Chat', async render(view) {
         <div class="box"><textarea id="input" rows="1" placeholder="Ask anything… (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea>
           <button class="btn send" id="sendBtn" title="Send">${icon.send}</button></div>
         <div class="controls">
-          <div class="grp"><span>Path</span><div class="seg" id="modeSeg"><button data-m="auto" title="The Aql Gate decides">Auto</button><button data-m="fast" title="System 1 only">Fast</button><button data-m="slow" title="Always deliberate">Deliberate</button><button data-m="both" title="Lab trial: System 1 and System 2 answer the same question side by side, and you choose the better answer">Both</button></div></div>
-          <div class="grp slider" title="λ: price of extra latency. Lower = more care (escalate more), higher = more speed."><span>Care</span><input type="range" id="lam" min="0" max="0.8" step="0.05"><span>Speed</span><span class="mono" id="lamV"></span></div>
+          <div class="grp"><span>Path</span><div class="seg" id="modeSeg"><button data-m="auto" title="Auto: System 1 drafts, the Aql Gate decides whether System 2 should deliberate">${icon.shield}Auto</button><button data-m="fast" title="Fast: System 1 only, no deliberation">${icon.bolt}Fast</button><button data-m="slow" title="Deliberate: System 2 always reasons within its budget">${icon.brain}Deliberate</button><button data-m="both" title="Both: System 1 and System 2 answer side by side; you choose the better answer (a lab trial)">${icon.compare}Both</button></div></div>
+          <div class="grp slider" title="λ: the price of extra latency. Lower = more care (System 2 more often), higher = more speed."><span>Trade-off</span><span class="end">care</span><input type="range" id="lam" min="0" max="0.8" step="0.05" aria-label="Care against speed"><span class="end">speed</span><span class="mono" id="lamV"></span></div>
           <div class="grp opts"><button class="btn ghost sm" id="optBtn" type="button" aria-haspopup="true" aria-expanded="false" title="Thinking budget and reasoning display">Options ▾</button>
             <div class="pop" id="optPop" hidden><label class="f">Thinking budget<select id="budget" title="Thinking budget for System 2. 'Per domain' uses the configured or measured budget for the question's domain."><option value="0">per domain</option><option value="256">256</option><option value="512">512</option><option value="1024">1024</option><option value="2048">2048</option></select></label>
               <label class="toggle"><input type="checkbox" id="showReason"> Show System 2 reasoning</label>
@@ -473,8 +512,8 @@ routes.chat = { title: 'Chat', async render(view) {
   const setBusy = (ctrl) => { busy = ctrl; const b = $s('#sendBtn'); b.innerHTML = ctrl ? icon.stop : icon.send; b.title = ctrl ? 'Stop' : 'Send'; b.classList.toggle('danger', !!ctrl); };
   const scrollDown = () => { msgs.scrollTop = msgs.scrollHeight; };
   const welcome = () => { inner.innerHTML = `<div class="welcome"><h2>Fast when it can, careful when it must.</h2><p>System 1 drafts instantly. The Aql Gate decides whether System 2 should deliberate. Exact verifiers decide what counts as verified.</p>
-      <div class="examples">${EXAMPLES.map((x, i) => `<div class="ex" data-i="${i}" tabindex="0"><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div>`).join('')}</div>
-      <div class="how">${['A', 'L', 'M', 'T'].map(k => `<span class="st" title="${esc(STATIONS[k].tip)}"><b>${k}</b> ${STATIONS[k].en.toLowerCase()} <i>${STATIONS[k].ar}</i></span>`).join('→')}<span class="faint">or</span><span class="st" title="${esc(STATIONS.X.tip)}"><b>X</b> abstain <i>${STATIONS.X.ar}</i></span></div>
+      <div class="starters">${EXAMPLES.map((x, i) => `<div class="starter ex" data-i="${i}" tabindex="0" role="button"><span class="st-ico">${icon[x.i] || icon.bolt}</span><div><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div></div>`).join('')}</div>
+      <div class="journey" aria-label="How an answer is made">${journeyHTML(['A', 'L', 'M', 'T'], ['A', 'L', 'M', 'T'], null, null, null)}<span class="jlive"><span class="faint">or</span></span><span class="jstep x" title="${esc(STATIONS.X.tip)}"><span class="n">X</span>${STATIONS.X.en}<i class="ar">${STATIONS.X.ar}</i></span></div>
       <p class="tiny faint" style="margin-top:10px"><button class="linkbtn" id="dnBtn">Design notes</button> · the vocabulary of the self is used as an analogy</p></div>`;
     $('#dnBtn') && ($('#dnBtn').onclick = designNotes);
     $$('.ex', inner).forEach(el => { const go = () => { const x = EXAMPLES[+el.dataset.i]; input.value = x.prompt; autosize(); fillVerification(x.v || null); input.focus(); }; el.onclick = go; el.onkeydown = (e) => e.key === 'Enter' && go(); }); };
@@ -484,7 +523,9 @@ routes.chat = { title: 'Chat', async render(view) {
   async function loadConvs() { try { convCache = await api.get('/v1/conversations'); renderConvs(); } catch {} }
   function renderConvs() {
     { const q = ($('#convSearch')?.value || '').toLowerCase(); const list = convCache.filter(c => !q || c.title.toLowerCase().includes(q)); const L = $('#convList');
-      L.innerHTML = list.length ? list.map(c => `<div class="conv ${c.conversation_id === convId ? 'on' : ''}" data-id="${c.conversation_id}"><span class="t1" title="${esc(c.title)}">${esc(c.title)}</span><span class="tiny faint">${ago(c.updated_at)}</span><button class="x" title="Export as JSON" data-exp="${c.conversation_id}">⤓</button><button class="x" title="Delete" data-del="${c.conversation_id}">×</button></div>`).join('') : `<div class="empty small">${q ? 'No conversation matches your search.' : 'No conversations yet.'}</div>`;
+      const row = (c) => `<div class="conv ${c.conversation_id === convId ? 'on' : ''}" data-id="${c.conversation_id}"><span class="t1" title="${esc(c.title)}">${esc(c.title)}</span><span class="tiny faint">${ago(c.updated_at)}</span><button class="x" title="Export as JSON" data-exp="${c.conversation_id}">⤓</button><button class="x" title="Delete" data-del="${c.conversation_id}">×</button></div>`;
+      const groups = []; for (const c of list) { const g = dayLabel(c.updated_at) || 'Earlier'; if (!groups.length || groups[groups.length - 1].g !== g) groups.push({ g, items: [] }); groups[groups.length - 1].items.push(c); }
+      L.innerHTML = list.length ? groups.map(gr => `<div class="convgroup">${esc(gr.g)}</div>${gr.items.map(row).join('')}`).join('') : `<div class="empty small">${q ? '<b>No conversation matches.</b><br>Try another word, or start a new chat.' : '<b>No conversations yet.</b><br>Ask something below; it is saved here.'}</div>`;
       $$('.conv', L).forEach(el => el.onclick = async (e) => { if (e.target.dataset.exp) { const c = await api.get('/v1/conversations/' + e.target.dataset.exp);
           const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(c, null, 2)], { type: 'application/json' })); a.download = `nafs-aql-${c.conversation_id.slice(0, 8)}.json`; a.click(); return; }
         if (e.target.dataset.del) { const id = e.target.dataset.del; const title = el.querySelector('.t1')?.textContent || 'this conversation';
@@ -498,7 +539,7 @@ routes.chat = { title: 'Chat', async render(view) {
   async function openConv(id) {
     try { const c = await api.get('/v1/conversations/' + id); convId = id; store.set('conv', id); inner.innerHTML = ''; turns = [];
       let lastUser = null;
-      for (const m of c.messages) { if (m.role === 'user') { addUser(m.content); lastUser = m.content; } else if (m.reply) { const t = Turn.fromStored(inner, m.reply, { onSelect: select, onRetry: retry, prompt: lastUser, request: { verification: null } }, m.feedback); turns.push(t); } }
+      for (const m of c.messages) { if (m.role === 'user') { addUser(m.content); lastUser = m.content; } else if (m.reply) { const t = Turn.fromStored(inner, m.reply, { onSelect: select, onRetry: retry, prompt: lastUser, request: { verification: null }, onVerify }, m.feedback); turns.push(t); } }
       if (!c.messages.length) welcome(); select(turns[turns.length - 1] || null); showBar(c); scrollDown(); loadConvs();
     } catch (e) { toast('Could not open conversation: ' + e.message); newConv(); }
   }
@@ -512,7 +553,7 @@ routes.chat = { title: 'Chat', async render(view) {
     if (mode === 'both') return trial(text, v);
     const body = { conversation_id: convId, messages: [{ role: 'user', content: text }], lambda: S.lambda, thinking_budget: S.budget > 0 ? S.budget : undefined, show_reasoning: S.reason,
       force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined };
-    const turn = new Turn(inner, { onSelect: select, onRetry: retry, prompt: text, request: body }); turns.push(turn); select(turn);
+    const turn = new Turn(inner, { onSelect: select, onRetry: retry, prompt: text, request: body, onVerify }); turns.push(turn); select(turn);
     turn.onUpdate = (t) => { if (selected === t) insp.innerHTML = inspectorHTML(t); const near = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 160; if (near) scrollDown(); };
     scrollDown(); const ctrl = new AbortController(); setBusy(ctrl);
     try { await api.stream('/v1/chat/stream', body, (ev, data) => { if (ev === 'start' && data.data.conversation_id && !convId) { convId = data.data.conversation_id; store.set('conv', convId); showBar({ title: text.slice(0, 60), training_opt_out: false }); } turn.on(ev, data); }, ctrl.signal);
@@ -547,6 +588,8 @@ routes.chat = { title: 'Chat', async render(view) {
         vote.innerHTML = `<span class="small">${icon.check} Recorded: ${esc(b.textContent)}. See the value of deliberation per domain on the Muhasaba page.</span>`; } catch (e) { toast(e.message); } });
   }
   function retry(prompt, mode, req) { if (!prompt) return toast('Original prompt not available'); send(prompt, mode, req || { verification: null }); }
+  // Follow-up "check with a reference or tests": open the verification panel with the question ready to resend.
+  function onVerify(t) { vp.hidden = false; input.value = t.prompt || ''; autosize(); setTab(t.reply?.domain === 'code' ? 'tests' : t.reply?.domain === 'structured' ? 'schema' : 'ref'); (t.reply?.domain === 'code' ? $('#vTests') : t.reply?.domain === 'structured' ? $('#vSchema') : $('#vRef')).focus(); toast('Add what the answer must satisfy, then press Enter'); }
   const keys = (e) => {
     const mod = e.metaKey || e.ctrlKey; const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
     if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); newConv(); }
@@ -743,7 +786,8 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
   const retryAsk = (prompt, mode) => { if (!online()) return toast('Not connected; try again in a moment.'); sendRaw(prompt, mode === 'auto' ? null : mode); };
   function daySep(into, ts) { const k = new Date(ts).toDateString(); if (k === S.lastDay) return; S.lastDay = k; into.appendChild(h(`<div class="rsep"><span>${esc(dayLabel(ts))}</span></div>`)); }
   function bubble(into, who, text, ts) {
-    const mine = who === S.me; const el = h(`<div class="msg user rmsg ${mine ? 'mine' : 'other'}"><div class="who">${mine ? 'You' : `<span style="color:${roomColor(who)}">${esc(who || 'Someone')}</span>`}<time title="${esc(new Date(ts).toLocaleString())}">${esc(clock(ts))}</time></div><div class="txt"></div></div>`);
+    const mine = who === S.me; const prev = into.lastElementChild; const cont = !!(prev && prev.classList.contains('rmsg') && prev.dataset.who === who && Math.abs(new Date(ts) - new Date(prev.dataset.ts)) < 120000);
+    const el = h(`<div class="msg user rmsg ${mine ? 'mine' : 'other'}${cont ? ' cont' : ''}" data-who="${esc(who)}" data-ts="${esc(ts)}"><div class="who">${mine ? 'You' : `<span style="color:${roomColor(who)}">${esc(who || 'Someone')}</span>`}<time title="${esc(new Date(ts).toLocaleString())}">${esc(clock(ts))}</time></div><div class="txt"></div></div>`);
     $('.txt', el).textContent = text; into.appendChild(el); return el;
   }
   function renderHistory() {
@@ -876,6 +920,7 @@ const REF_BENCH = [['Qwen3-1.7B Q4_K_M (System 1)', 131.0, 22.9], ['Qwen3.5-2B Q
 routes.bench = { title: 'Performance', async render(view, alive) {
   const sets = await api.get('/v1/bench/prompt-sets').catch(() => ({}));
   view.innerHTML = `<div class="page grid" style="gap:16px">
+    ${pageIntro({ ico: 'bolt', title: 'Performance: where the time goes on this CPU', lead: 'Stage timings of recent replies, load tests through the full pipeline, and the recorded 1, 2 and 4-session protocol behind NFR-007. Timings on a shared machine are upper bounds.', steps: ['Read the stage breakdown', 'Run a load test', 'Run the protocol', 'Compare with the raw model speed'], actions: `<button class="btn" data-scroll="pStart" type="button">${icon.play}Run protocol</button>` })}
     <div class="card"><div class="card-h"><h2>Load test</h2><span class="hint">Closed-loop workers send requests through the full pipeline (gate, verifiers, both models). FR-052, ER-007.</span></div>
       <div class="card-b"><div class="row" style="align-items:flex-end;gap:14px">
         <label class="f">Prompt set<select id="bSet">${Object.entries(sets).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('')}</select></label>
@@ -885,7 +930,7 @@ routes.bench = { title: 'Performance', async render(view, alive) {
         <label class="f">Max tokens<input id="bMax" type="number" value="128" min="16" max="2048" style="width:90px"></label>
         <span class="sp"></span><button class="btn" id="bStart">${icon.play}Start</button><button class="btn ghost" id="bCancel" hidden>Cancel</button></div>
         <div id="bProg" style="margin-top:14px" hidden><div class="progress"><i id="bBar" style="width:0"></i></div><div class="small muted" id="bProgTxt" style="margin-top:6px"></div></div></div></div>
-    <div class="card"><div class="card-h"><h2>Load-test protocol (ER-007)</h2><span class="hint">The recorded protocol: the same prompt set at 1, 2 and 4 concurrent sessions, p50/p95/p99, and the NFR-007 verdict (p95 at 4 sessions at most twice the single-session value).</span><span class="sp"></span><button class="btn" id="pStart">${icon.play}Run protocol</button></div><div class="card-b" id="pOut"><div class="empty small">No protocol run yet.</div></div></div>
+    <div class="card"><div class="card-h"><h2>Load-test protocol (ER-007)</h2><span class="hint">The recorded protocol: the same prompt set at 1, 2 and 4 concurrent sessions, p50/p95/p99, and the NFR-007 verdict (p95 at the recommended limit of 2 sessions at most twice the single-session value; decision 002).</span><span class="sp"></span><button class="btn" id="pStart">${icon.play}Run protocol</button></div><div class="card-b" id="pOut"><div class="empty small">No protocol run yet.</div></div></div>
     <div class="card" id="bStages"></div>
     <div class="grid g4" id="bTiles"></div>
     <div class="grid g2"><div class="card"><div class="card-h"><h3>Latency per request</h3><div class="legend"><span><i style="background:var(--fast)"></i>fast path</span><span><i style="background:var(--slow)"></i>deliberate</span><span><i style="background:var(--bad)"></i>error</span></div></div><div class="card-b" id="bScatter"><div class="empty small">Start a run to see results.</div></div></div>
@@ -928,7 +973,7 @@ routes.bench = { title: 'Performance', async render(view, alive) {
   const showProto = (r) => { const T = r.table || []; const v = r.nfr007 || {};
     $('#pOut').innerHTML = `${r.status === 'running' ? `<p class="small"><span class="spin"></span> Running level ${(r.level_index ?? 0) + 1} of ${r.request?.levels?.length ?? 3}…</p>` : ''}${T.length ? `<table class="t"><tr><th>Sessions</th><th>Requests</th><th>OK</th><th>p50</th><th>p95</th><th>p99</th><th>TTFT p95</th><th>Throughput</th><th>Escalated</th><th>Cost / request</th></tr>
       ${T.map(x => `<tr><td><b>${x.concurrency}</b></td><td>${x.requests}</td><td>${x.ok}</td><td>${fmtMs(x.p50_ms)}</td><td>${fmtMs(x.p95_ms)}</td><td>${fmtMs(x.p99_ms)}</td><td>${fmtMs(x.ttft_p95_ms)}</td><td>${num(x.throughput_rps, 3)} req/s</td><td>${pct(x.escalation_rate, 0)}</td><td>${num(x.cost_per_request_s, 1)} s</td></tr>`).join('')}</table>
-      <p class="small">${v.pass == null ? 'NFR-007: needs levels 1 and 4.' : `NFR-007 ${v.pass ? '<span class="badge b-verified">pass</span>' : '<span class="badge b-abstained">fail</span>'} p95 at 4 sessions is ${num(v.ratio, 2)}× the single-session value (target ≤ 2×)${(T[0]?.requests ?? 0) < 8 ? ` · <span class="badge" title="with fewer than 8 requests the p95 is just the maximum">indicative, n ${T[0]?.requests ?? 0}</span>` : ''}${v.pass ? '' : '. Roadmap fallback: document the single-session profile and treat concurrency as a GPU-profile feature.'} The gates dashboard judges the median over recent runs with at least 8 requests per session.`}</p>` : ''}`; };
+      <p class="small">${v.pass == null ? 'NFR-007: needs levels 1 and 2.' : `NFR-007 ${v.pass ? '<span class="badge b-verified">pass</span>' : '<span class="badge b-abstained">fail</span>'} p95 at ${v.limit_sessions || 2} sessions (the recommended limit) is ${num(v.ratio, 2)}× the single-session value (target ≤ 2×)${v.ratio_at_4 != null ? `; at 4 sessions ${num(v.ratio_at_4, 2)}×` : ''}${(T[0]?.requests ?? 0) < 8 ? ` · <span class="badge" title="with fewer than 8 requests the p95 is just the maximum">indicative, n ${T[0]?.requests ?? 0}</span>` : ''}${v.pass ? '' : '. Roadmap fallback: document the single-session profile and treat concurrency as a GPU-profile feature.'} The gates dashboard judges the median over recent runs with at least 8 requests per session.`}</p>` : ''}`; };
   const watchProto = (id) => { const tick = async () => { const r = await api.get('/v1/bench/runs/' + id).catch(() => null); if (!r) return; showProto(r); if (r.status !== 'running') clearInterval(pPoll); }; clearInterval(pPoll); tick(); pPoll = setInterval(tick, 3000); };
   let pPoll = null;
   $('#pStart').onclick = async () => { try { const r = await api.post('/v1/bench/protocol', { prompt_set: $('#bSet').value, mode: 'fast', levels: [1, 2, 4], requests_per_session: 8, max_tokens: +$('#bMax').value }); toast('Protocol started: 1, 2, then 4 sessions'); watchProto(r.run_id); } catch (e) { toast(e.message); } };
@@ -972,6 +1017,7 @@ routes.eval = { title: 'Lab', async render(view, alive) {
   const datasets = await api.get('/v1/eval/datasets').catch(() => []);
   if (!alive()) return;
   view.innerHTML = `<div class="page grid" style="gap:16px">
+    ${pageIntro({ ico: 'compare', title: 'Lab: when is System 2 worth its cost?', lead: 'Run the same tasks through several policies and compare them pair by pair, with confidence intervals. Everything is scored by exact verifiers; the roadmap gates below are computed from the stored runs.', steps: ['Pick an experiment', 'Start the run', 'Read the paired table and the frontier', 'Derive gate parameters from good runs'], actions: `<button class="btn" data-scroll="eStart" type="button">${icon.play}New run</button>` })}
     <div class="card" id="gatesCard"><div class="card-b"><span class="spin"></span> Evaluating roadmap gates…</div></div>
     <div class="card" id="insCard"><div class="card-b"><span class="spin"></span> Pooling every run for insights…</div></div>
     <div class="card"><div class="card-h"><h2>Datasets</h2><span class="hint">Scored by exact verifiers only. Licences: GSM8K MIT, HumanEval MIT, MBPP CC-BY-4.0, task sets Apache-2.0.</span></div>
@@ -1108,6 +1154,7 @@ async function deriveDialog(ids) {
 // ============================== gate and ledger ==============================
 routes.gate = { title: 'Muhasaba · gate and ledger', async render(view, alive) {
   view.innerHTML = `<div class="page grid" style="gap:16px">
+    ${pageIntro({ ico: 'shield', title: 'Muhasaba: how the gate decides, and how well it knows itself', lead: 'The Aql Gate\'s rule and calibration, measured verifier quality, the capability ledger per domain, the drift monitor and the alerts. Numbers come from live traffic and audits; lab runs are kept apart.', steps: ['Gate mode and calibration', 'Verifier quality', 'Ledger per domain', 'Drift and alerts'] })}
     <div class="grid g2"><div class="card" id="gMode"><div class="card-b"><span class="spin"></span></div></div><div class="card" id="gCal"></div></div>
     <div class="card" id="gParams"></div>
     <div class="grid g2"><div class="card" id="gRates"></div><div class="card" id="gJudge"></div></div>
@@ -1182,7 +1229,8 @@ routes.gate = { title: 'Muhasaba · gate and ledger', async render(view, alive) 
 // ============================== tazkiya (Phase 3: distillation) ==============================
 routes.tazkiya = { title: 'Tazkiya', async render(view, alive) {
   view.innerHTML = `<div class="page grid" style="gap:16px">
-    <div class="card"><div class="card-h"><h2>${icon.leaf} Tazkiya: verified reflection teaches the first impulse</h2></div><div class="card-b small">
+    ${pageIntro({ ico: 'leaf', title: 'Tazkiya: verified reflection teaches the first impulse', lead: 'Verified System 2 answers become training data for System 1. Review consensus answers, watch the dataset grow, and promote or roll back a model only through the gate.', steps: ['Build the dataset', 'Train on a GPU host', 'Gate the candidate', 'Roll back in one command'] })}
+    <div class="card"><div class="card-h"><h2>${icon.leaf} What enters the training set</h2></div><div class="card-b small">
       <p style="margin-top:0">Distillation turns System 2 answers that an exact verifier accepted into training data for System 1, so the fast path improves over time. Only verified traces enter the set, plus consensus answers a person has approved (TR-002, FR-033). Personal data is redacted and opted-out conversations are excluded (SR-004). Training runs on a GPU host, never on this machine (TR-005), and a new model is promoted only through the gate below (TR-007) with one-command rollback (OR-005).</p>
       <div class="row" id="tzRules"></div></div></div>
     <div class="grid g2"><div class="card" id="tzData"><div class="card-b"><span class="spin"></span></div></div><div class="card" id="tzReg"></div></div>
@@ -1214,7 +1262,9 @@ routes.tazkiya = { title: 'Tazkiya', async render(view, alive) {
 
 // ============================== system ==============================
 routes.system = { title: 'System', async render(view, alive) {
-  view.innerHTML = `<div class="page grid" style="gap:16px"><div id="sysTop" class="grid g2"><div class="card"><div class="card-b"><span class="spin"></span> Loading…</div></div></div>
+  view.innerHTML = `<div class="page grid" style="gap:16px">
+    ${pageIntro({ ico: 'book', title: 'System: backends, the gate\'s configuration and a verifier playground', lead: 'Which model servers are active and healthy, how the Aql Gate is configured right now, the self-model summary, and a playground to run the exact verifiers on any answer.', steps: ['Check both systems are ready', 'Read the gate configuration', 'Try a verifier'] })}
+    <div id="sysTop" class="grid g2"><div class="card"><div class="card-b"><span class="spin"></span> Loading…</div></div></div>
     <div class="grid g2"><div class="card" id="sysGate"></div><div class="card" id="sysSelf"></div></div>
     <div class="card"><div class="card-h"><h3>Verifier playground</h3><span class="hint">Run the exact verifiers on any answer (POST /v1/verify). Code runs in the network-denied sandbox.</span></div>
       <div class="card-b grid g2"><label class="f">Answer<textarea id="vpAns" rows="8" style="font-family:var(--mono);font-size:12px">\`\`\`python\ndef add(a, b):\n    return a + b\n\`\`\`</textarea></label>
