@@ -180,6 +180,15 @@ pub struct ChatRequest {
     /// agreeing probes) or "posterior" (majority posterior above a collapsing bound); default from config.
     #[serde(default)]
     pub adaptive_exit_rule: Option<String>,
+    /// FR-085: domains the adaptive exit applies to for this request (overrides the configured list);
+    /// `["all"]` means every domain. On code and structured tasks the probe is a full answer that the
+    /// exact verifier judges, and a passing probe becomes the final answer.
+    #[serde(default)]
+    pub adaptive_exit_domains: Option<Vec<String>>,
+    /// FR-086: factor applied to the thinking budget on each verified retry round (0.25..=1.0);
+    /// default from configuration (1.0 = the same budget every round).
+    #[serde(default)]
+    pub retry_budget_decay: Option<f32>,
     /// In-process lab traffic (evaluation and load-test runs). Never read from HTTP; such replies are stored
     /// as ephemeral and kept out of the operational alerts (OR-004), which describe the live service.
     #[serde(skip)]

@@ -78,6 +78,8 @@ draft_temperature = 0.2
 slow_temperature = 0.6
 answer_max_tokens = 768
 non_verifiable_max_rounds = 1          # FR-022
+retry_budget_decay = 1.0               # FR-086: thinking budget of retry round r = budget * decay^r (1.0 = same budget every round)
+retry_min_budget = 96                  # FR-086: floor for a shrunken retry budget
 caps = { code = { N = 1, R = 2, budget = 1024 }, math = { N = 1, R = 2, budget = 1024 }, structured = { N = 1, R = 2, budget = 512 }, factual = { N = 1, R = 0, budget = 512 }, open = { N = 1, R = 0, budget = 512 }, other = { N = 1, R = 0, budget = 512 } }
 caps_provenance = "Phase-1 defaults sized for the reference CPU; replace with the Prop. 3 cap from the Phase-0 Beta fit"
 cost_ratio = 0.15                      # c_p / L_a for the Prop. 3 cap M* = ceil(alpha/cost_ratio - alpha - beta)
@@ -92,6 +94,10 @@ min_gap_tokens = 64                    # never probe sooner than this after the 
 probe_max_tokens = 24                  # the probe asks for the answer alone, in a few tokens
 consistency = 2                        # non-verifiable domains: stop when this many consecutive probes agree (Dynasor-CoT)
 domains = ["math", "factual"]          # exact verifier decides for math; answer consistency for factual
+reuse_probe_answer = true              # FR-085: a full-answer probe (code tests, JSON Schema) that passes is the final answer
+full_probe_every_tokens = 512          # FR-085: full-answer probes cost an answer each, so they are rarer than short ones
+full_probe_min_gap_tokens = 192
+full_probe_max_tokens = 384            # FR-085: longest full-answer probe; bounds the probe overhead on items that never pass (the final answer keeps answer_max_tokens)
 
 [judge]                                # FR-034 / SR-003 rubric judge on non-verifiable slow-path answers
 enabled = true

@@ -86,6 +86,7 @@ Estimates are person-weeks (PW) and are estimates, not commitments.
 | P7-T08 | E7.3 Cascade | Adaptive reasoning exit: probe-and-verify on the raw continuation path, with a token-saving study | 1.0 | P7-T03 | FR-082 | Should |
 | P7-T09 | E7.3 Cascade | Judge on System 1: measure the small judge's (r, phi) with the rates harness and adopt it if the rates hold | 0.5 | P7-T01 | FR-034 | Could |
 | P7-T10 | E7.6 Backends | vLLM CPU backend in Docker (carstenz/vllm-smoke image, BF16, one model in two modes) with an end-to-end check against the gateway | 1.0 | P5-T02 | MR-003 | Should |
+| P7-T11 | E7.3 Cascade | Exact-verifier exit on code and schema tasks with probe reuse, shrinking retry budgets and a wall-clock time guard; paired Lab systems slow_exit_all / slow_exit_all_decay | 1.0 | P7-T08 | FR-085, FR-086 | Should |
 
 ## Phase 8
 
@@ -115,6 +116,6 @@ Estimates are person-weeks (PW) and are estimates, not commitments.
 - **Phase 4**: FR-042, FR-051, FR-052, FR-053, NFR-007, IF-009, ER-007
 - **Phase 5**: FR-061, SR-006, OR-002, OR-003, OR-004
 - **Phase 6**: SR-005
-- **Phase 7**: NFR-030, NFR-031, FR-080, FR-081, ER-020, FR-082
+- **Phase 7**: NFR-030, NFR-031, FR-080, FR-081, ER-020, FR-082, FR-085, FR-086
 - **Phase 8**: FR-083, FR-084, FR-085, ER-021
 - **Phase 9**: FR-090, FR-091, FR-092, FR-093, ER-022

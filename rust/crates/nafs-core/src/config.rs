@@ -368,6 +368,19 @@ pub struct DeliberationCfg {
     /// P7-T08: probe-and-verify early exit from System 2 reasoning.
     #[serde(default)]
     pub adaptive_exit: AdaptiveExitCfg,
+    /// FR-086: the thinking budget of verified retry round r is `budget * decay^r`, never below
+    /// `retry_min_budget`. The verifier's evidence makes a retry a repair, not a fresh search, so it
+    /// needs less reasoning; 1.0 keeps the same budget on every round.
+    #[serde(default = "d_retry_decay")]
+    pub retry_budget_decay: f32,
+    #[serde(default = "d_retry_min_budget")]
+    pub retry_min_budget: u32,
+}
+fn d_retry_decay() -> f32 {
+    1.0
+}
+fn d_retry_min_budget() -> u32 {
+    96
 }
 /// Adaptive reasoning exit (P7-T08, FR-082). System 2 reasons in chunks; at reflection signals ("Wait",
 /// "Alternatively", ...) and at the latest every `probe_every_tokens`, the reasoning is closed provisionally
@@ -398,6 +411,21 @@ pub struct AdaptiveExitCfg {
     pub posterior_stop: f32,
     #[serde(default = "d_posterior_stop_end")]
     pub posterior_stop_end: f32,
+    /// FR-085: on tasks whose exact verifier needs the whole answer (code tests, JSON Schema) the probe
+    /// is a full answer; when it passes, it is the final answer and the answer stage is skipped.
+    #[serde(default = "d_true")]
+    pub reuse_probe_answer: bool,
+    /// Full-answer probes cost an answer each, so they are rarer than short ones: at the latest every
+    /// `full_probe_every_tokens` and never sooner than `full_probe_min_gap_tokens` after the previous one.
+    #[serde(default = "d_full_probe_every")]
+    pub full_probe_every_tokens: u32,
+    #[serde(default = "d_full_probe_min_gap")]
+    pub full_probe_min_gap_tokens: u32,
+    /// Longest full-answer probe. A longer answer cannot pass a probe (it is only truncated), but the
+    /// final answer stage still has `answer_max_tokens`; this bounds the probe overhead on items that
+    /// never pass.
+    #[serde(default = "d_full_probe_max")]
+    pub full_probe_max_tokens: u32,
 }
 impl Default for AdaptiveExitCfg {
     fn default() -> Self {
@@ -411,8 +439,21 @@ impl Default for AdaptiveExitCfg {
             exit_rule: d_exit_rule(),
             posterior_stop: d_posterior_stop(),
             posterior_stop_end: d_posterior_stop_end(),
+            reuse_probe_answer: true,
+            full_probe_every_tokens: d_full_probe_every(),
+            full_probe_min_gap_tokens: d_full_probe_min_gap(),
+            full_probe_max_tokens: d_full_probe_max(),
         }
     }
+}
+fn d_full_probe_every() -> u32 {
+    512
+}
+fn d_full_probe_min_gap() -> u32 {
+    192
+}
+fn d_full_probe_max() -> u32 {
+    384
 }
 fn d_exit_rule() -> String {
     "consistency".into()
