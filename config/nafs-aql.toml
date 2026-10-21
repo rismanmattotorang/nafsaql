@@ -105,6 +105,7 @@ posterior_stop_end = 0.70              # bound when the budget is exhausted (Fra
 reuse_probe_answer = true              # FR-085: a full-answer probe (code tests, JSON Schema) that passes is the final answer; the answer stage is skipped
 full_probe_every_tokens = 512          # FR-085: full-answer probes cost an answer each, so they are rarer than short ones
 full_probe_min_gap_tokens = 192
+full_probe_max_tokens = 384            # FR-085: longest full-answer probe; bounds the probe overhead on items that never pass (the final answer keeps answer_max_tokens)
 
 [judge]                                # FR-034 / SR-003 rubric judge on non-verifiable slow-path answers
 enabled = true

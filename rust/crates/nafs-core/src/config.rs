@@ -421,6 +421,11 @@ pub struct AdaptiveExitCfg {
     pub full_probe_every_tokens: u32,
     #[serde(default = "d_full_probe_min_gap")]
     pub full_probe_min_gap_tokens: u32,
+    /// Longest full-answer probe. A longer answer cannot pass a probe (it is only truncated), but the
+    /// final answer stage still has `answer_max_tokens`; this bounds the probe overhead on items that
+    /// never pass.
+    #[serde(default = "d_full_probe_max")]
+    pub full_probe_max_tokens: u32,
 }
 impl Default for AdaptiveExitCfg {
     fn default() -> Self {
@@ -437,6 +442,7 @@ impl Default for AdaptiveExitCfg {
             reuse_probe_answer: true,
             full_probe_every_tokens: d_full_probe_every(),
             full_probe_min_gap_tokens: d_full_probe_min_gap(),
+            full_probe_max_tokens: d_full_probe_max(),
         }
     }
 }
@@ -445,6 +451,9 @@ fn d_full_probe_every() -> u32 {
 }
 fn d_full_probe_min_gap() -> u32 {
     192
+}
+fn d_full_probe_max() -> u32 {
+    384
 }
 fn d_exit_rule() -> String {
     "consistency".into()

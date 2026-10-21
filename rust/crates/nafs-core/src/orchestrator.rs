@@ -14,7 +14,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
@@ -150,6 +150,12 @@ pub fn fit_budget(
     let rate = prev_tokens as f64 / prev_ms as f64;
     let fit = (remaining_ms as f64 * 0.8 * rate) as u32;
     Some(fit.saturating_sub(prev_answer_tokens))
+}
+
+/// FR-086: tokens that can be generated in `left_ms` after reserving `reserve_ms`, at `rate` tokens per
+/// millisecond, with a 20% margin.
+pub fn tokens_that_fit(left_ms: u64, reserve_ms: u64, rate: f64) -> u32 {
+    (left_ms.saturating_sub(reserve_ms) as f64 * 0.8 * rate.max(0.0)) as u32
 }
 
 /// FR-085: a probe is a full answer when the task's exact verifier needs the whole answer (code tests,
@@ -1200,6 +1206,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                 round,
                                 &mut stages,
                                 req.adaptive_exit_rule.as_deref().unwrap_or(&ax.exit_rule),
+                                Some(t0 + Duration::from_secs(cfg.server.request_wall_clock_cap_s)),
                             )
                             .await
                         {
@@ -1608,6 +1615,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         round: u32,
         stages: &mut Vec<StageTiming>,
         exit_rule: &str,
+        deadline: Option<Instant>,
     ) -> Result<GenOutput> {
         const SIGNALS: &[&str] = &[
             "Wait",
@@ -1667,12 +1675,45 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         };
         let mut stop: Vec<String> = vec!["</think>".into()];
         stop.extend(SIGNALS.iter().map(|s| s.to_string()));
+        // FR-086: the request cap is a deadline for this path too. Once a chunk has been generated the
+        // observed token rate sizes every further chunk, probe and the answer so that they end before it;
+        // `reserve` is the time the answer needs. The standard (non-adaptive) path cannot do this.
+        let answer_est = if full {
+            ax.full_probe_max_tokens
+        } else {
+            d.answer_max_tokens / 2
+        };
+        let rate = |agg: &GenOutput| -> Option<f64> {
+            (agg.wall_ms > 0 && agg.completion_tokens > 0)
+                .then(|| agg.completion_tokens as f64 / agg.wall_ms as f64)
+        };
+        let left_ms = || -> Option<u64> {
+            deadline.map(|dl| dl.saturating_duration_since(Instant::now()).as_millis() as u64)
+        };
+        let probe_tokens = if full {
+            ax.full_probe_max_tokens
+        } else {
+            ax.probe_max_tokens.max(4)
+        };
         loop {
             if cancel.is_set() {
                 return Err(NafsError::Cancelled);
             }
             let remaining = budget.saturating_sub(rtok);
             if remaining == 0 {
+                break;
+            }
+            // Tokens of reasoning that still fit before the answer must start.
+            let fit_now = match (left_ms(), rate(&agg)) {
+                (Some(left), Some(r)) => Some(tokens_that_fit(
+                    left,
+                    (answer_est as f64 / r * 1.25) as u64,
+                    r,
+                )),
+                _ => None,
+            };
+            if fit_now.is_some_and(|f| f < 16) {
+                exit = "deadline".into();
                 break;
             }
             chunk += 1;
@@ -1691,7 +1732,9 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 .complete_raw(
                     &RawRequest {
                         prompt: format!("{base}{reasoning}"),
-                        n_predict: remaining.min(probe_every.max(16)),
+                        n_predict: remaining
+                            .min(probe_every.max(16))
+                            .min(fit_now.unwrap_or(u32::MAX).max(16)),
                         temperature: d.slow_temperature,
                         top_p: 0.95,
                         seed: Some(seed * 1000 + chunk),
@@ -1730,6 +1773,13 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             }
             // Probe: close the reasoning provisionally and ask for the answer. Short tasks get a few
             // tokens after "Answer:"; code and schema tasks get a whole answer (FR-085).
+            // No probe that the deadline would cut off: the time left goes to the answer instead.
+            if let (Some(left), Some(r)) = (left_ms(), rate(&agg)) {
+                if tokens_that_fit(left, (answer_est as f64 / r * 1.25) as u64, r) < probe_tokens {
+                    exit = "deadline".into();
+                    break;
+                }
+            }
             probes += 1;
             since = 0;
             let (hint, label) = if full {
@@ -1743,11 +1793,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 .complete_raw(
                     &RawRequest {
                         prompt: format!("{base}{reasoning}{hint}"),
-                        n_predict: if full {
-                            d.answer_max_tokens
-                        } else {
-                            ax.probe_max_tokens.max(4)
-                        },
+                        n_predict: probe_tokens,
                         temperature: 0.0,
                         top_p: 1.0,
                         seed: Some(seed),
@@ -1846,11 +1892,17 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 p
             }
             None => {
+                let n_answer = match (left_ms(), rate(&agg)) {
+                    (Some(left), Some(r)) => {
+                        d.answer_max_tokens.min(tokens_that_fit(left, 0, r).max(16))
+                    }
+                    _ => d.answer_max_tokens,
+                };
                 let f = s2
                     .complete_raw(
                         &RawRequest {
                             prompt: format!("{base}{reasoning}\n</think>\n\n"),
-                            n_predict: d.answer_max_tokens,
+                            n_predict: n_answer,
                             temperature: d.slow_temperature,
                             top_p: 0.95,
                             seed: Some(seed),
@@ -2018,7 +2070,7 @@ fn write_json<T: Serialize>(path: &str, v: &T) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{delimit, fit_budget, full_answer_probe, round_budget};
+    use super::{delimit, fit_budget, full_answer_probe, round_budget, tokens_that_fit};
     use nafs_types::VerificationInputs;
     #[test]
     fn round_budget_decays_geometrically_with_a_floor() {
@@ -2048,6 +2100,16 @@ mod tests {
         );
         assert_eq!(fit_budget(300_000, 0, 8, 8), None, "no usable rate");
         assert_eq!(fit_budget(300_000, 50, 0, 0), None);
+    }
+    #[test]
+    fn tokens_that_fit_reserves_the_answer_time() {
+        // 3 tok/s: 100 s left, 40 s reserved -> 60 s * 0.8 * 3 = 144 tokens.
+        assert_eq!(tokens_that_fit(100_000, 40_000, 0.003), 144);
+        assert_eq!(
+            tokens_that_fit(30_000, 40_000, 0.003),
+            0,
+            "reserve exceeds the time left"
+        );
     }
     #[test]
     fn full_answer_probe_only_for_whole_answer_verifiers() {
