@@ -36,6 +36,11 @@ Hardware for every number below: Intel Core i3-8100 (4 cores, no SMT, AVX2 only)
 - Evidence added: acceptance 9/9; three quiet-host protocol runs; the slot study (`benchmarks/slots_ab_system1.json`); refreshed security and deployment records.
 - Documents: `docs/status/` (gap analysis, progress, human-needed), decisions 001 and 002, A-066, runbook capacity note, the scholar packet's sections 5 to 8.
 
+## Profile decision (G0 / MR-005) and System 2 latency (objective 1)
+
+- **Profile A stays** (Qwen3-1.7B as System 1, Qwen3-4B-Thinking-2507 as System 2): H7 passes (Qwen3.5 decodes at 79 to 80% of dense Qwen3), and the Profile C comparison (`benchmarks/profile_c_decision.json`) found Qwen3.5-2B more accurate (+17 points, 95% CI +7 to +30, n = 30) but 3.7x slower, above the 1.3x the adoption rule allows. The quiet-host numbers above are for Profile A.
+- **System 2 latency is measurably better, with the paired A/B stored:** the adaptive reasoning exit (run `e7607cbb`, 12 GSM8K items, paired `slow_only` vs `slow_noexit`): mean wall 220 s to 123 s (-44%), reasoning tokens 723 to 348 (-52%), 11/11 correct in both arms. Today's A3 (53 s, 274 tokens) is that gain on a quiet host. **Measured negatives, stored:** EAGLE-3 heads 1.04x and 0.99x (`benchmarks/eagle3_ab_system{1,2}.json`), Q4_0 and IQ4_NL repacks 0.90 to 0.96x (`logs/quant_ab.log`), a 0.6B draft model and n-gram speculation, flash attention, q8_0 KV cache, 3 threads, vLLM on CPU. Decode is at about 70% of the bandwidth ceiling at batch 1; the remaining levers are fewer tokens and fewer calls. The next experiment in that direction, not run here because the host was busy with the G2 run, is the adaptive exit on code (the test verifier as the stop signal): add `"code"` to `deliberation.adaptive_exit.domains`, restart with `inflight` 0, and run `core_set` offset 0 with `slow_only, slow_noexit` on 40 code items (`POST /v1/eval/runs`), paired.
+
 ## Limitations, stated plainly
 
 1. **Concurrency.** Four concurrent sessions cost 3.4 to 3.9x the single-session p95 on four cores; the CPU profile is a one-to-two-user profile. NFR-007 fails and will keep failing on this hardware.

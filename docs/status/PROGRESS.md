@@ -19,6 +19,17 @@ Branch `feat/complete-nafs-aql`, started 2026-10-21 07:20 (+07) from `246c063`. 
 
 - Track C run 1: eval run `553a4eff` on `core_set` (offset 0, 100 items) with `fast_only, slow_only, nafs_blind, nafs_aql`, started 07:46. Feeds H1, ER-002, ER-004 (blind arm), P0-T04. Resume after a gateway restart: `POST /v1/eval/runs/553a4eff-620b-4150-86de-c13fe1bc0977/resume`.
 
+## Per-item times measured in this run (first items of `553a4eff`, quiet shared host, load1 5 to 6)
+
+| System | Wall per item | Note |
+|---|---|---|
+| `fast_only` | 5 to 15 s | GSM8K |
+| `slow_only` | 57 s | adaptive exit on |
+| `nafs_blind` | 140 s | escalated a right draft (wasted); draft + 2 samples + System 2 |
+| `nafs_aql` | 11 s | verifier accepted the draft |
+
+About 220 s per item for the four systems together: 100 items in about 6 h. Revised estimates (to be refined as n grows): P0-T04 fast 4,071 x 10 s = 11 h, slow 4,573 x 57 s = 72 h; H1 100 blind items = 4 h; ER-002 700 pairs x 70 s = 14 h; ER-004 about 950 items x 72 s (fast + slow) = 19 h; ECE 2,900 `nafs_blind` items x 60 to 140 s = 48 to 110 h.
+
 ## Next three actions
 
 1. Track G: security tests, deployment and artifact checks (G5 must stay pass after the changes).
