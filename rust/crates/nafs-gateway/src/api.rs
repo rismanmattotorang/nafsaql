@@ -11,7 +11,9 @@ use metrics_exporter_prometheus::PrometheusHandle;
 use nafs_core::orchestrator::{Emitter, Orchestrator};
 use nafs_core::Config;
 use nafs_memory::Store;
-use nafs_types::{ChatRequest, NafsError, StreamEvent, VerificationInputs};
+use nafs_types::{
+    ChatRequest, CodeAgentReply, CodeAgentRequest, NafsError, StreamEvent, VerificationInputs,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
@@ -150,6 +152,8 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/eval/runs/{id}/calibrate", post(calibrate))
         .route("/v1/eval/runs/{id}/resume", post(resume_eval))
         .route("/v1/verify", post(verify_adhoc))
+        .route("/v1/harness", get(harness_info))
+        .route("/v1/harness/code", post(code_agent))
         .route("/v1/judge", post(judge_adhoc))
         .route("/v1/verifiers", get(get_rates))
         .route("/v1/verifiers/runs", get(list_rate_runs).post(start_rates))
@@ -1313,6 +1317,47 @@ async fn verify_adhoc(
         None => Err(NafsError::BadRequest("no verification inputs (tests, test_code with entry_point, reference_answer or json_schema)".into()).into()),
     }
 }
+// ---------------- Math and code harness (FR-090..FR-093) ----------------
+/// What the integrated harness offers on this server, and where each part came from.
+async fn harness_info(State(s): State<AppState>) -> Json<Value> {
+    let c = &s.cfg;
+    Json(json!({
+        "lean": {
+            "available": s.orch.hub.lean.is_some(),
+            "executable": s.orch.hub.lean.as_ref().map(|l| l.exe.display().to_string()),
+            "mathlib": !c.verifiers.lean_path.is_empty(),
+            "protocol": "Open Math Harness verify: frozen statement and preamble, forbidden tokens, marker-fenced #print axioms and pp.all type check",
+        },
+        "repair": {
+            "policy": c.deliberation.repair_policy,
+            "fanout": c.deliberation.repair_fanout,
+            "patch_repair": c.deliberation.patch_repair,
+        },
+        "code_agent": {
+            "enabled": c.harness.code_agent_enabled,
+            "model": c.harness.model,
+            "max_steps": c.harness.max_steps,
+            "wall_clock_s": c.harness.wall_clock_s,
+        },
+        "sources": [
+            {"name": "Open Math Harness", "revision": "687f2a2", "license": "Apache-2.0", "parts": ["lean rules and verify protocol", "discovery scoring", "best-first candidate tree", "prover stop rule"]},
+            {"name": "OpenAI Codex (codex-rs)", "revision": "970111f6", "license": "Apache-2.0", "parts": ["apply_patch parser and fuzzy matcher", "middle truncation", "exec output format", "seatbelt -D parameters", "turn loop"]},
+        ],
+    }))
+}
+
+/// FR-093: run the code agent to completion and return its files, verdict and steps.
+async fn code_agent(
+    State(s): State<AppState>,
+    Json(b): Json<CodeAgentRequest>,
+) -> ApiResult<Json<CodeAgentReply>> {
+    s.orch
+        .run_code_agent(b)
+        .await
+        .map(Json)
+        .map_err(|e| NafsError::BadRequest(e).into())
+}
+
 #[derive(Deserialize)]
 struct JudgeReq {
     question: String,

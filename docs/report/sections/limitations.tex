@@ -8,6 +8,13 @@ which (conditional independence of verifiers, a Beta prior on acceptance,
 homogeneous refinement dynamics, concave budget returns) are modelling
 choices to be checked.
 
+\textbf{Harness integration.} The Lean verifier was exercised through the real
+sandbox with a stand-in for the \texttt{lean} executable, not with Lean itself,
+which is not installed on the reference machine; core-Lean statements need only the
+toolchain, Mathlib statements a Mathlib build. Patch repair is off until the
+failure rate $f$ of Eq.~(\ref{eq:patch}) is measured, and the code agent's live
+runs are a handful of tasks on a shared host.
+
 \textbf{Shared weights.} Fast and slow paths from one model family make
 correlated errors; the collision term is measured rather than assumed small,
 and the judge shares the same bias, which is why exact verifiers carry the

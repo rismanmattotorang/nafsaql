@@ -1,0 +1,17 @@
+[package]
+name = "nafs-harness"
+description = "Math and code harness for Nafs-Aql: Lean proof checking and best-first repair (after Open Math Harness), apply_patch and a bounded code agent (after OpenAI Codex)"
+version.workspace = true
+# Edition 2024, as upstream: the derived Open Math Harness and Codex files keep their structure (rustfmt applies the workspace style).
+edition = "2024"
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

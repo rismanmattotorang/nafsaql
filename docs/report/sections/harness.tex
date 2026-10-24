@@ -1,0 +1,176 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 10 -- math and code harness (Open Math Harness and Codex integration)
+% ---------------------------------------------------------------------------
+\section{Phase 10: A Math and Code Harness from Open Math Harness and Codex}
+\label{sec:harness}
+
+Two open agent harnesses were assessed for what \Sys{} could take from them
+(24 October 2026): Open Math Harness \cite{openmathharness2026}, the runtime of
+Open Math OS for mathematics research, and the Rust core of OpenAI's Codex CLI
+\cite{openaicodex2026}, a coding agent. Both are Apache-2.0 and both are large
+(about $1.1\times10^5$ and, for Codex's core crate alone, $2.6\times10^5$ lines
+of Rust), so the question was not whether to embed them but which mechanisms carry
+over to a single-process gateway that serves a 1.7B and a 4B model on four CPU
+cores. The assessment, the integration plan and the research behind it are in
+\texttt{docs/research/harness\_integration.md}; this section records the design
+and its measurements.
+
+\subsection{What the two harnesses are}
+
+Open Math Harness is a capability microkernel (an in-memory kernel with
+capabilities, IPC and lifetimes) under which every service and agent is a
+confined Linux process. Its mathematics lives in three services. The
+\emph{Lean service} decides proofs with Lean~4 \cite{moura2021lean4} under a
+protocol in which the statement is frozen on the service side, the candidate is
+refused on text alone for forbidden tokens (\texttt{sorry}, \texttt{axiom},
+\texttt{native\_decide}, and every command that runs code during elaboration) or
+for not reproducing the statement byte for byte, and Lean then checks a file
+assembled from the \emph{frozen} preamble, the candidate's body, an unguessable
+marker, \texttt{\#print axioms} and the fully elaborated (\texttt{pp.all}) type,
+which must equal the pristine statement's character for character. The
+\emph{discovery} service keeps candidate proofs in a tree, scores each node from
+Lean's verdict alone (1 solved, 0.9 complete but rejected,
+$0.5+0.4\,C/(C+L)$ for a partial proof with $C$ credited and $L$ open steps,
+0.05 for errors, 0 for invalid), and continues the best nodes with a reserved
+slot for the best repair prospect. \emph{Ultramath} runs eight members at
+maximum reasoning effort on distinct registered directions with a shared board.
+
+Codex is a submission/event-queue agent whose turn loop samples the model,
+executes the tool calls of the stream, records their outputs and samples again
+until a reply carries no call. The parts that travel are its leaves: the
+\texttt{apply\_patch} language with a lenient parser and a four-pass fuzzy
+matcher (exact, trailing whitespace, surrounding whitespace, Unicode punctuation
+folded to ASCII); execution results reported as exit code, wall time and
+\emph{middle-truncated} output; and a macOS Seatbelt profile whose paths are
+passed as \texttt{-D} parameters instead of being written into the policy text.
+Codex speaks only the Responses API and has no fallback for models without
+native tool calls.
+
+\subsection{What was integrated}
+
+Table~\ref{tab:harness} maps each gap in \Sys{} to its source. The new crate
+\texttt{nafs-harness} holds the derived code as pure logic: it starts no
+process and touches no file; Lean, Python and the models are reached through
+closures and a trait that the gateway supplies, so every rule is unit-tested
+without either. Derived files carry their upstream path and revision and say
+how they were modified; the crate's \texttt{NOTICE} carries both projects'
+notices.
+
+\begin{table}[t]
+\centering
+\caption{Integrated mechanisms (FR-090 to FR-093).}
+\label{tab:harness}
+\scriptsize
+\begin{tabular}{@{}p{2.55cm}p{2.0cm}p{3.0cm}@{}}
+\toprule
+Gap in \Sys{} & Source & What was taken \\
+\midrule
+Maths checkable only against a reference answer & OMH Lean service & Lean verifier (FR-090): textual rules, frozen preamble, marker-fenced axioms and \texttt{pp.all} type, run in the OS sandbox \\
+A retry always repairs the \emph{last} candidate & OMH discovery & Candidate tree, scoring protocol, best-first repair with ``already tried'' siblings (FR-091) \\
+All-or-nothing code verdicts & OMH partial-proof credit & Per-assert credit from the sandbox runner, protected by the run's nonce \\
+Full-budget retries regenerate whole programs (A-067) & Codex \texttt{apply\_patch} & Patch repair: a retry may answer with a patch to \texttt{solution.py} (FR-092) \\
+Evidence keeps only the tail of the output & Codex truncation & Head and tail with an explicit marker \\
+No agent that runs its own code & Codex turn loop, OMH prover agent & Code agent, \texttt{POST /v1/harness/code} (FR-093) \\
+Path written into the sandbox policy & Codex Seatbelt & \texttt{-D} policy parameters \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three things were deliberately left out. The kernel, platform and launcher of
+Open Math Harness need Linux and bubblewrap, and \Sys{} is one process with an
+OS sandbox per untrusted run. Ultramath's eight members at maximum effort would
+take tens of minutes per question at 6--8 tokens/s; its cheapest idea, telling a
+repair what was already tried, is kept. Codex's Responses-API client, tool
+router, approvals and compaction assume a frontier model with native tool calls
+and a context window as the binding limit; here the model is small and the
+binding limit is the wall-clock cap, so the code agent speaks fenced text and
+resets its context every step.
+
+\subsection{Lean as an exact verifier}
+
+A request may carry \texttt{verification.lean}: a frozen statement whose proof is
+\texttt{sorry}. The verifier takes the answer's last \texttt{lean} block, applies
+Open Math Harness's rules, and runs Lean inside the same sandbox as model-written
+Python (no network, no fork, no writes outside the scratch directory, no reads of
+user data except the toolchain). A partial proof that elaborates is graded
+\emph{sorries} (score 0.5) and a proof is \emph{verified} only when the strict
+protocol accepts it. The pristine type is computed once per statement and cached.
+By Theorem~1 the precision of an accepted proof is bounded by the verifier's
+false-accept rate; for Lean that rate is the kernel's soundness plus the
+textual rules, and the protocol's marker makes the candidate's own printed
+output unreadable as a report. Requests are refused (400) when no toolchain is
+configured, so a Lean task can never be labelled \emph{verified} by a
+fallback.
+
+\subsection{Best-first repair}
+
+Every verified attempt becomes a node; the next attempt repairs the node a policy
+chooses and sees that node's own evidence and, as data, what earlier repairs of
+it did. Nafs-Aql explores one candidate at a time, so Open Math Harness's policy
+needs two changes: with a single slot its reserved repair slot would always beat
+the score ordering, so the repair prospect (fewest failures) breaks ties instead;
+and equal scores go to the latest node (the prover's own \texttt{pick\_best}
+rule) rather than the shallowest. A node stays continuable until it has $F$
+children (default 2), which lets the search return to a parent when a repair
+made things worse.
+
+\begin{proposition}[Conservative extension] \textnormal{[exact]}
+\label{prop:h1}
+If every verdict is all-or-nothing (every failed candidate scores 0.05 and has
+one failure), the best-first policy repairs the latest candidate at every round,
+exactly as the previous loop did, for any fanout $F\ge1$ along a chain of
+repairs.
+\end{proposition}
+\begin{proof}
+Along a chain each new node is a child of the previous one and has no children
+of its own, so it is eligible. All failed nodes tie on score and failures; the
+tie goes to the largest id, which is the latest node. The root scores 0 and is
+chosen only when no eligible node scores more, which a valid failed candidate
+(0.05) prevents. \qed
+\end{proof}
+\emph{Consequence.} The policy is on by default (\texttt{repair\_policy = "best"}):
+it changes behaviour only when per-assert credit, Lean's graded verdicts or an
+invalid patch distinguish candidates, and the existing orchestrator tests pass
+unchanged.
+
+\subsection{Patch repair and when it pays}
+
+Let a whole program cost $W$ answer tokens, a patch $P$, and let a patch fail to
+apply with probability $f$, after which the next round regenerates (cost $W$).
+To first order the expected answer tokens of a repair are $P+fW$, so a patch
+pays when
+\begin{equation}
+f<1-P/W .
+\label{eq:patch}
+\end{equation}
+For a one-line fix in a 15-line function $P/W\approx0.3$, so patches help as long
+as fewer than about 70\,\% fail to apply. The literature does not settle $f$ for
+4B models: diffs save tokens, but weaker models fail diff formats more often than
+whole files \cite{diffxyz2025}. Patch repair therefore accepts whole code as well,
+applies patches with Codex's fuzzy matcher, never runs a patch that does not apply
+(its error is the evidence of an \emph{invalid} node, so the tree returns to the
+candidate it tried to repair), and is \emph{off} by default until an interleaved
+A/B on the reference machine measures $f$ (rule~3).
+
+\subsection{The code agent}
+
+\texttt{POST /v1/harness/code} runs a bounded loop on a workspace of flat files.
+Each reply holds one action: a Codex patch, a whole \texttt{solution.py}, a
+\texttt{run} block naming a Python file of the workspace (executed in the
+sandbox, reported in Codex's format), or \texttt{SUBMIT}. The exact verifier runs
+after every change and a passing workspace ends the run at once; \texttt{SUBMIT}
+alone never does (Open Math Harness's prover rule). Each step's prompt is the
+task, the current files, the last verdict and the last three exchanges, so the
+context is bounded by construction; the best-scoring workspace is returned when
+nothing passes. Model calls are bounded by \texttt{max\_steps} (default 6, at most
+12) and the run by a wall-clock cap, as Lemma~1 requires of every loop in \Sys.
+This follows the self-debugging and agent-interface results that concise,
+bounded execution feedback is what lets models repair code
+\cite{chen2024selfdebug,yang2024sweagent}, and the verifier-guided
+self-correction of formal provers \cite{lin2025goedelv2}; best-first search over
+verified candidates is competitive with heavier tree search when the verifier is
+exact \cite{xin2025bfsprover}.
+
+\subsection{Verification}
+
+\input{sections/harness_results.tex}

@@ -10,3 +10,8 @@ Third-party components keep their own licences:
 - Evaluation datasets under data/bench keep their original licences (GSM8K MIT, HumanEval MIT,
   MBPP CC-BY-4.0, EvalPlus Apache-2.0); each task file records its source and licence.
 - EAGLE-3 speculative heads (AngelSlim): Apache-2.0. Not part of this repository.
+- OpenAI Codex (codex-rs, Copyright 2025 OpenAI): Apache-2.0. The apply_patch parser and matcher, output
+  truncation and the exec output format are derived from it in rust/crates/nafs-harness (see its NOTICE).
+- Open Math Harness (openmathmodel/open-math-harness): Apache-2.0. The Lean textual rules and verify protocol,
+  the discovery scoring protocol and the candidate-tree policy are derived from it in rust/crates/nafs-harness
+  (see its NOTICE).

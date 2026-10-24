@@ -291,6 +291,15 @@
         "retry_min_budget": {
           "type": "integer"
         },
+        "repair_policy": {
+          "type": "string"
+        },
+        "repair_fanout": {
+          "type": "integer"
+        },
+        "patch_repair": {
+          "type": "boolean"
+        },
         "caps": {
           "type": "object",
           "additionalProperties": {
@@ -493,6 +502,19 @@
         },
         "rates_file": {
           "type": "string"
+        },
+        "lean": {
+          "type": "string"
+        },
+        "lean_path": {
+          "type": "string"
+        },
+        "lean_timeout_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lean_memory_mb": {
+          "type": "integer"
         }
       },
       "additionalProperties": false
@@ -511,6 +533,35 @@
         },
         "registry_file": {
           "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "harness": {
+      "type": "object",
+      "properties": {
+        "code_agent_enabled": {
+          "type": "boolean"
+        },
+        "model": {
+          "type": "string"
+        },
+        "max_steps": {
+          "type": "integer"
+        },
+        "thinking_budget": {
+          "type": "integer"
+        },
+        "step_max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "wall_clock_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "keep_exchanges": {
+          "type": "integer"
         }
       },
       "additionalProperties": false

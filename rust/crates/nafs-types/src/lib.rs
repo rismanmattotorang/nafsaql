@@ -95,6 +95,20 @@ pub struct VerificationInputs {
     /// JSON Schema the answer must satisfy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub json_schema: Option<Value>,
+    /// A Lean 4 theorem whose proof Lean must accept (Open Math Harness protocol, FR-090).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lean: Option<LeanTask>,
+}
+
+/// A frozen Lean statement: a whole `.lean` file whose theorem is proved by `sorry`. The answer must
+/// reproduce the statement byte for byte and prove it; Lean decides, after textual rules that refuse
+/// `sorry`, `axiom`, `native_decide` and commands that run code (FR-090).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LeanTask {
+    pub statement: String,
+    /// The theorem's name; read from the statement when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theorem: Option<String>,
 }
 impl VerificationInputs {
     /// Code tests that can actually run: plain asserts, or HumanEval `test_code` together with the
@@ -119,6 +133,7 @@ impl VerificationInputs {
                 .map(|r| !r.trim().is_empty())
                 .unwrap_or(false)
             || self.json_schema.is_some()
+            || self.lean.is_some()
     }
     /// Reason the inputs are malformed, if they are (used to reject requests with 400).
     pub fn validation_error(&self) -> Option<String> {
@@ -189,6 +204,13 @@ pub struct ChatRequest {
     /// default from configuration (1.0 = the same budget every round).
     #[serde(default)]
     pub retry_budget_decay: Option<f32>,
+    /// FR-091: "best" (repair the best-scoring candidate, Open Math Harness search) or "last"; default
+    /// from configuration.
+    #[serde(default)]
+    pub repair_policy: Option<String>,
+    /// FR-092: allow a code retry to answer with a Codex patch to the candidate; default from configuration.
+    #[serde(default)]
+    pub patch_repair: Option<bool>,
     /// In-process lab traffic (evaluation and load-test runs). Never read from HTTP; such replies are stored
     /// as ephemeral and kept out of the operational alerts (OR-004), which describe the live service.
     #[serde(skip)]
@@ -520,3 +542,56 @@ impl NafsError {
 }
 
 pub type Result<T> = std::result::Result<T, NafsError>;
+
+/// `POST /v1/harness/code` (FR-093): a bounded code agent over a small workspace.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CodeAgentRequest {
+    /// What to build or fix.
+    pub task: String,
+    /// Starting files (flat names, e.g. `solution.py`); empty starts from nothing.
+    #[serde(default)]
+    pub files: std::collections::BTreeMap<String, String>,
+    /// The hidden tests that end the run (`tests` asserts, or HumanEval `test_code` + `entry_point`); they
+    /// run against `solution.py`.
+    pub verification: VerificationInputs,
+    /// Model calls (1..=12); default from configuration.
+    #[serde(default)]
+    pub max_steps: Option<u32>,
+    /// "system2" or "system1"; default from configuration.
+    #[serde(default)]
+    pub model: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeAgentStep {
+    pub step: u32,
+    /// patch, write, run, submit, none or model_error.
+    pub action: String,
+    /// What the model was shown after the action.
+    pub observation: String,
+    /// The verifier's verdict after a change to the workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub passed: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
+    pub ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CodeAgentReply {
+    pub run_id: Uuid,
+    /// verified, exhausted, deadline or model_error.
+    pub status: String,
+    /// `verified` only when the exact verifier accepted the returned files; otherwise `unverified`.
+    pub assurance: Assurance,
+    /// The verified files, or the best-scoring files seen.
+    pub files: std::collections::BTreeMap<String, String>,
+    pub passed: bool,
+    pub score: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<String>,
+    pub steps: Vec<CodeAgentStep>,
+    pub model_calls: u32,
+    pub model: String,
+    pub wall_ms: u64,
+}

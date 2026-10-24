@@ -11,6 +11,7 @@ repository.workspace = true
 [dependencies]
 nafs-types = { path = "../nafs-types" }
 nafs-verify = { path = "../nafs-verify" }
+nafs-harness = { path = "../nafs-harness" }
 nafs-memory = { path = "../nafs-memory" }
 tokio = { workspace = true }
 reqwest = { workspace = true }

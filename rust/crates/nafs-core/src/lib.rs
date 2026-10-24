@@ -5,6 +5,7 @@ pub mod config;
 pub mod domain;
 pub mod drift;
 pub mod gate;
+pub mod harness;
 pub mod orchestrator;
 pub mod sequential;
 

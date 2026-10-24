@@ -57,6 +57,42 @@ fn reply_for(body: &Value) -> (String, String) {
             ("t".into(), "VAGUE reply".into())
         };
     }
+    // FR-093: the code agent first runs the file, then patches it once it has seen the output.
+    if all.contains("AGENTTASK") {
+        return if msgs.len() <= 2 {
+            (
+                "t".into(),
+                "Let me see what it prints.\n```run\npython solution.py\n```".into(),
+            )
+        } else {
+            ("t".into(), "*** Begin Patch\n*** Update File: solution.py\n@@ def sq(x):\n-    return x + x\n+    return x * x\n*** End Patch".into())
+        };
+    }
+    // FR-091: a code task whose first attempt passes 2 of 3 asserts and whose repair makes things worse; only
+    // a repair of the better first candidate (which carries the "earlier attempts" note) passes.
+    if all.contains("CODETASK") {
+        let code = if last.contains("earlier_attempts") && last.contains("0 of 3") {
+            "def sq(x):\n    return x * x"
+        } else if last.contains("verifier rejected") {
+            "def sq(x):\n    return 0"
+        } else {
+            "def sq(x):\n    return x * x if x < 3 else 0"
+        };
+        return ("t".into(), format!("```python\n{code}\n```"));
+    }
+    // FR-092: a code task repaired with a Codex patch (a broken one first when the task asks for it).
+    if all.contains("PATCHTASK") {
+        if last.contains("*** Begin Patch") {
+            if all.contains("BADPATCH") && !last.contains("was not applied") {
+                return ("t".into(), "*** Begin Patch\n*** Update File: solution.py\n@@\n-    return nothing_like_this\n+    return x * x\n*** End Patch".into());
+            }
+            return ("t".into(), "Fixing the branch.\n*** Begin Patch\n*** Update File: solution.py\n@@ def sq(x):\n-    return x * x if x < 3 else 0\n+    return x * x\n*** End Patch".into());
+        }
+        return (
+            "t".into(),
+            "```python\ndef sq(x):\n    return x * x if x < 3 else 0\n```".into(),
+        );
+    }
     // system2: the first attempt is wrong; once the verifier's evidence is in the prompt it answers 5.
     if last.contains("verifier rejected") {
         (
@@ -926,4 +962,229 @@ async fn an_oversized_message_is_refused_before_it_reaches_the_model() {
         ..Default::default()
     };
     assert!(o.handle(ok, Emitter(None)).await.is_ok());
+}
+
+fn code_req(marker: &str) -> ChatRequest {
+    ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: format!("{marker}: write sq(x) returning x squared."),
+        }],
+        verification: Some(VerificationInputs {
+            tests: Some(vec![
+                "assert sq(1) == 1".into(),
+                "assert sq(2) == 4".into(),
+                "assert sq(3) == 9".into(),
+            ]),
+            ..Default::default()
+        }),
+        ephemeral: Some(true),
+        ..Default::default()
+    }
+}
+
+fn s2_messages(mock: &Mock) -> Vec<Vec<Value>> {
+    mock.calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|b| b["model"] == "system2")
+        .map(|b| b["messages"].as_array().cloned().unwrap_or_default())
+        .collect()
+}
+
+#[tokio::test]
+async fn best_first_repair_backtracks_to_the_candidate_with_more_credit() {
+    let (o, mock, _d) = setup(true).await;
+    let r = o.handle(code_req("CODETASK"), Emitter(None)).await.unwrap();
+    assert_eq!(
+        r.assurance,
+        Assurance::Verified,
+        "{:?}",
+        r.uncertainty_notice
+    );
+    assert!(r.message.content.contains("return x * x\n"));
+    let s2 = s2_messages(&mock);
+    assert_eq!(s2.len(), 3);
+    // The third attempt repairs candidate 1 (2 of 3 passed), not candidate 2 (0 of 3), and is told what the
+    // failed repair did (Open Math Harness's "already tried" siblings).
+    let third = &s2[2];
+    let assistant = third
+        .iter()
+        .rev()
+        .find(|m| m["role"] == "assistant")
+        .unwrap();
+    assert!(assistant["content"]
+        .as_str()
+        .unwrap()
+        .contains("if x < 3 else 0"));
+    let user = third.last().unwrap()["content"].as_str().unwrap();
+    assert!(
+        user.contains("2 of 3 tests passed") && user.contains("earlier_attempts"),
+        "{user}"
+    );
+    let notes: Vec<String> = r
+        .usage
+        .stages
+        .iter()
+        .filter_map(|s| s.note.clone())
+        .filter(|n| n.starts_with("candidate"))
+        .collect();
+    assert_eq!(notes.len(), 3, "{notes:?}");
+    assert!(
+        notes[2].starts_with("candidate 3 (whole) repairs candidate 1"),
+        "{notes:?}"
+    );
+}
+
+#[tokio::test]
+async fn repair_policy_last_keeps_the_old_behaviour() {
+    let (o, _mock, _d) = setup(true).await;
+    let mut q = code_req("CODETASK");
+    q.repair_policy = Some("last".into());
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(
+        r.assurance,
+        Assurance::Abstained,
+        "repairing the worse candidate never passes in this script"
+    );
+    let mut bad = code_req("CODETASK");
+    bad.repair_policy = Some("random".into());
+    assert!(o.handle(bad, Emitter(None)).await.is_err());
+}
+
+#[tokio::test]
+async fn patch_repair_edits_the_candidate_and_survives_a_broken_patch() {
+    let (o, mock, _d) = setup_with(true, |c| c.deliberation.patch_repair = true).await;
+    let r = o
+        .handle(code_req("PATCHTASK"), Emitter(None))
+        .await
+        .unwrap();
+    assert_eq!(r.assurance, Assurance::Verified);
+    assert_eq!(
+        r.message.content,
+        "```python\ndef sq(x):\n    return x * x\n```"
+    );
+    let second = &s2_messages(&mock)[1];
+    assert!(second.last().unwrap()["content"]
+        .as_str()
+        .unwrap()
+        .contains("*** Begin Patch"));
+    assert!(r.usage.stages.iter().any(|s| s
+        .note
+        .as_deref()
+        .is_some_and(|n| n.contains("(patch) repairs candidate 1"))));
+
+    // A patch that does not apply is not run; its error is the evidence, and the search returns to the
+    // candidate it tried to repair.
+    let (o, mock, _d) = setup_with(true, |c| c.deliberation.patch_repair = true).await;
+    let r = o
+        .handle(code_req("PATCHTASK BADPATCH"), Emitter(None))
+        .await
+        .unwrap();
+    assert_eq!(r.assurance, Assurance::Verified);
+    let notes: Vec<String> = r
+        .usage
+        .stages
+        .iter()
+        .filter_map(|s| s.note.clone())
+        .filter(|n| n.starts_with("candidate"))
+        .collect();
+    assert!(
+        notes[1].contains("(patch_failed)") && notes[2].contains("(patch) repairs candidate 1"),
+        "{notes:?}"
+    );
+    let third = &s2_messages(&mock)[2];
+    assert!(third.last().unwrap()["content"]
+        .as_str()
+        .unwrap()
+        .contains("was not applied"));
+}
+
+#[tokio::test]
+async fn lean_tasks_need_a_configured_toolchain() {
+    let (o, _mock, _d) = setup(true).await;
+    let mut q = req("1");
+    q.verification = Some(VerificationInputs {
+        lean: Some(LeanTask {
+            statement: "theorem t (n : Nat) : n + 0 = n :=\nsorry\n".into(),
+            theorem: None,
+        }),
+        ..Default::default()
+    });
+    let e = o.handle(q, Emitter(None)).await.unwrap_err();
+    assert!(e.to_string().contains("Lean toolchain"), "{e}");
+}
+
+#[tokio::test]
+async fn code_agent_runs_patches_and_stops_on_the_verifier() {
+    let (o, mock, _d) = setup(true).await;
+    let req = CodeAgentRequest {
+        task: "AGENTTASK: fix sq(x) so that it returns x squared.".into(),
+        files: [(
+            "solution.py".to_string(),
+            "def sq(x):\n    return x + x\n\nprint(sq(3))\n".to_string(),
+        )]
+        .into_iter()
+        .collect(),
+        verification: VerificationInputs {
+            tests: Some(vec!["assert sq(3) == 9".into(), "assert sq(2) == 4".into()]),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let r = o.run_code_agent(req).await.unwrap();
+    assert_eq!(
+        (r.status.as_str(), r.passed, r.assurance),
+        ("verified", true, Assurance::Verified),
+        "{r:?}"
+    );
+    assert_eq!(r.model_calls, 2);
+    assert_eq!(r.steps[0].action, "run");
+    assert!(
+        r.steps[0]
+            .observation
+            .starts_with("Exit code: 0\nWall time:")
+            && r.steps[0].observation.contains("6"),
+        "{}",
+        r.steps[0].observation
+    );
+    assert_eq!(
+        (r.steps[1].action.as_str(), r.steps[1].passed),
+        ("patch", Some(true))
+    );
+    assert!(r.files["solution.py"].contains("return x * x"));
+    // System 2 saw the starting verdict (1 of 2 asserts pass: sq(2) == 4 holds for x + x).
+    let first = &s2_messages(&mock)[0];
+    assert!(first[1]["content"]
+        .as_str()
+        .unwrap()
+        .contains("1 of 2 tests passed"));
+
+    let bad = CodeAgentRequest {
+        task: "x".into(),
+        verification: VerificationInputs::default(),
+        ..Default::default()
+    };
+    assert!(o
+        .run_code_agent(bad)
+        .await
+        .unwrap_err()
+        .contains("code tests"));
+    let nested = CodeAgentRequest {
+        task: "x".into(),
+        files: [("../a.py".to_string(), String::new())]
+            .into_iter()
+            .collect(),
+        verification: VerificationInputs {
+            tests: Some(vec!["assert True".into()]),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    assert!(o
+        .run_code_agent(nested)
+        .await
+        .unwrap_err()
+        .contains("flat file name"));
 }

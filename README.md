@@ -84,6 +84,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | 🔁 **Distillation loop (Tazkiya)** | Verified System 2 traces become System 1 training data under a promotion gate with one-command rollback. The GPU training run itself is deferred. |
 | 👥 **Rooms** | Shared chats over WebSocket: everyone sees each question and the assistant's answer as it is written. Create, rename, search, share a link, export, and delete for good (the room, its messages and every ledger row made from it, in one transaction). Presence, typing, a queue of assistant turns, unique display names, automatic reconnection, and a join snapshot that delivers every turn exactly once however late you arrive. |
 | 🧭 **Sequential evidence (Phase 8)** | The rules that read a *stream* of evidence come from sequential analysis and decision neuroscience: a lowest-window confidence signal whose early crossing *is* the full-draft decision (a running minimum), a posterior stopping rule with a collapsing bound for the adaptive exit, Wald's bound on what an early escalation can promise, and the optimal probe interval. A review of quantum theories of consciousness is included as a negative result, with the test each idea failed. |
+| 🧮 **Math and code harness (Phase 10)** | Mechanisms taken from two open agent harnesses, as pure Rust in `nafs-harness`. From [Open Math Harness](https://github.com/openmathmodel/open-math-harness): **Lean 4 as an exact verifier** under its frozen-statement protocol (no `sorry`, no axioms, the elaborated type must match), and **best-first repair** over a tree of candidates scored by the verifier, with per-assert credit on code. From [OpenAI Codex](https://github.com/openai/codex): **`apply_patch` repairs** with its fuzzy matcher, head-and-tail evidence, and a **code agent** (`POST /v1/harness/code`) that patches and runs its workspace in the sandbox and stops only when the hidden tests pass. |
 | 🔌 **Two serving profiles** | llama.cpp on bare metal (the reference), and vLLM's CPU backend in Docker, behind one OpenAI-compatible gateway. |
 
 <table>
@@ -199,13 +200,14 @@ Switch with *Use this backend* on the System page. The recipe was built and debu
 
 ## Architecture
 
-A Rust workspace of eight crates:
+A Rust workspace of nine crates:
 
 | Crate | Role |
 |---|---|
-| `nafs-gateway` | axum HTTP/SSE/WebSocket API (51 documented endpoints, OpenAPI 3.1), auth, metrics, background workers |
+| `nafs-gateway` | axum HTTP/SSE/WebSocket API (53 documented endpoints, OpenAPI 3.1), auth, metrics, background workers |
 | `nafs-core` | orchestrator and automaton, Aql Gate, calibration, drift, backends (llama.cpp, vLLM) |
-| `nafs-verify` | exact verifiers and the sandbox, rubric judge support, mutation harness |
+| `nafs-verify` | exact verifiers (numeric, SymPy, code tests, JSON Schema, Lean) and the sandbox, rubric judge support, mutation harness |
+| `nafs-harness` | derived from Open Math Harness and Codex: Lean protocol, scoring and candidate tree, `apply_patch`, truncation, the code agent loop |
 | `nafs-memory` | SQLite ledger, traces, retrieval memory (BM25), preferences |
 | `nafs-eval` | datasets, paired statistics, policy map, resumable evaluation runs |
 | `nafs-bench` | load-test protocol, latency breakdown |
@@ -216,7 +218,7 @@ The mathematics behind the gate (threshold rule, verifier-bounded precision, Bet
 
 ## Where the project stands
 
-Phases 0–8 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
+Phases 0–10 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
 
 | Gate | Status | Why |
 |:--:|:--:|---|
@@ -235,9 +237,10 @@ Phases 0–8 of the roadmap are implemented on the CPU reference machine; GPU tr
 | [Slides](docs/slides/nafs_aql_slides.pdf) | the same story in 40 slides |
 | [Specification](docs/spec/nafs_aql_spec.pdf) | 100 requirements with identifiers, interfaces and a traceability matrix |
 | [Roadmap](docs/roadmap/nafs_aql_roadmap.pdf) · [Status](docs/roadmap/STATUS.md) | phases, gates, what is done and what is not |
-| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-052) |
+| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-074) |
 | [Results write-up](docs/publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
 | [Quantum consciousness and neuroscience review](docs/research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
+| [Math and code harness](docs/research/harness_integration.md) · [Decision 005](docs/decisions/005-harness-integration.md) | Phase 10: what was taken from Open Math Harness and Codex, what was not, and why |
 | [User guide](docs/user_guide.md) · [Runbook](docs/operations/operator_runbook.md) · [API reference](docs/api/api_reference.md) | using, operating and integrating |
 
 ## Contributing

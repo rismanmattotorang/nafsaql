@@ -7,6 +7,7 @@ use std::sync::{Arc, OnceLock, RwLock};
 use std::time::Instant;
 
 pub mod extract;
+pub mod lean;
 pub mod mutation;
 pub mod sandbox;
 pub use extract::{
@@ -21,6 +22,8 @@ pub struct VerifierHub {
     pub numeric_tolerance: f64,
     /// Published (r, phi) per verifier from mutation testing (FR-032), attached to every verdict.
     pub rates: Arc<RwLock<HashMap<String, Rates>>>,
+    /// Lean proof checking (FR-090); None when no Lean toolchain is configured.
+    pub lean: Option<Arc<lean::LeanVerifier>>,
 }
 
 fn result(verifier: &str, passed: bool, evidence: Option<String>, t: Instant) -> VerifierResult {
@@ -44,6 +47,7 @@ impl VerifierHub {
             limits,
             numeric_tolerance,
             rates: Arc::new(RwLock::new(HashMap::new())),
+            lean: None,
         }
     }
 
@@ -83,6 +87,18 @@ impl VerifierHub {
         }
         if let Some(schema) = inputs.json_schema.as_ref() {
             results.push(self.with_rates(verify_json_schema(answer, schema)));
+        }
+        if let Some(task) = inputs.lean.as_ref() {
+            results.push(self.with_rates(match &self.lean {
+                Some(l) => l.verify(answer, task).await,
+                // Fail closed: requests are refused earlier (validate); this is the last line.
+                None => result(
+                    "lean_proof",
+                    false,
+                    Some("No Lean toolchain is configured on this server.".into()),
+                    Instant::now(),
+                ),
+            }));
         }
         if results.len() <= 1 {
             return results.pop();
@@ -185,26 +201,27 @@ impl VerifierHub {
         let nonce = format!("NAFS-OK-{}", uuid::Uuid::new_v4().simple());
         // The tests live in their own file and are compiled from bytes: Python 3.10's file tokenizer can
         // split a multi-byte character on very long lines (EvalPlus inputs) and report "Non-UTF-8 code".
-        let runner = String::from("# -*- coding: utf-8 -*-\nimport sys, os\n_nafs_nonce = sys.stdin.readline().strip()\nsys.stdin.close()\n_d = os.path.dirname(os.path.abspath(__file__))\nsys.path.insert(0, _d)\nfrom solution import *\nimport solution as _nafs_solution\nglobals().update({k: v for k, v in vars(_nafs_solution).items() if not k.startswith('__')})\nwith open(os.path.join(_d, 'tests.py'), 'rb') as _f:\n    _src = _f.read()\nexec(compile(_src, 'tests.py', 'exec'), globals())\nsys.stdout.write('\\n' + _nafs_nonce + '\\n')\nsys.stdout.flush()\n");
-        let mut tests_py = String::new();
+        // Plain asserts (`tests`) run one by one, each compiled from its own string, so the verdict carries
+        // per-assert credit for the repair search (Open Math Harness scores partial proofs the same way). The
+        // credit line and the final line carry the run's nonce, which the candidate never sees on stdin.
+        let runner = String::from("# -*- coding: utf-8 -*-\nimport sys, os, json\n_nafs_nonce = sys.stdin.readline().strip()\nsys.stdin.close()\n_d = os.path.dirname(os.path.abspath(__file__))\nsys.path.insert(0, _d)\nfrom solution import *\nimport solution as _nafs_solution\nglobals().update({k: v for k, v in vars(_nafs_solution).items() if not k.startswith('__')})\n_items = json.load(open(os.path.join(_d, 'tests.json'), encoding='utf-8'))\n_passed, _fails = 0, []\nfor _i, _src in enumerate(_items):\n    try:\n        exec(compile(_src, 'test_%d' % (_i + 1), 'exec'), globals())\n        _passed += 1\n    except Exception as _e:\n        _fails.append('test %d: %s -> %s: %s' % (_i + 1, _src.strip()[:160], type(_e).__name__, str(_e)[:160]))\nsys.stdout.write('\\n%s credit %d/%d\\n' % (_nafs_nonce, _passed, len(_items)))\nsys.stdout.flush()\nif _fails:\n    sys.stderr.write('\\n'.join(_fails[:6]) + '\\n')\n    sys.exit(1)\nsys.stdout.write('\\n' + _nafs_nonce + '\\n')\nsys.stdout.flush()\n");
+        let mut items: Vec<String> = vec![];
         if let Some(tc) = inputs.test_code.as_deref() {
-            tests_py.push_str(tc);
-            tests_py.push('\n');
+            let mut t = format!("{tc}\n");
             if let Some(ep) = inputs.entry_point.as_deref() {
-                tests_py.push_str(&format!("\ncheck({ep})\n"));
+                t.push_str(&format!("\ncheck({ep})\n"));
             }
+            items.push(t);
         }
         if let Some(tests) = inputs.tests.as_ref() {
-            for s in tests {
-                tests_py.push_str(s);
-                tests_py.push('\n');
-            }
+            items.extend(tests.iter().filter(|s| !s.trim().is_empty()).cloned());
         }
+        let tests_json = serde_json::to_string(&items).unwrap_or_else(|_| "[]".into());
         let out = sandbox::run(
             &[
                 ("solution.py", &code),
                 ("runner.py", &runner),
-                ("tests.py", &tests_py),
+                ("tests.json", &tests_json),
             ],
             "runner.py",
             Some(&format!("{nonce}\n")),
@@ -212,6 +229,7 @@ impl VerifierHub {
             &self.limits,
         )
         .await;
+        let mut credit: Option<(u64, u64)> = None;
         let (passed, evidence) = match out {
             Ok(o) => {
                 let ok = o.exit_ok
@@ -221,7 +239,23 @@ impl VerifierHub {
                         .last()
                         .map(|l| l.trim() == nonce)
                         .unwrap_or(false);
-                let ev = o.tail(self.limits.max_output_bytes).replace(&nonce, "");
+                let tag = format!("{nonce} credit ");
+                credit = o
+                    .stdout
+                    .lines()
+                    .find_map(|l| l.trim().strip_prefix(tag.as_str()))
+                    .and_then(|c| c.split_once('/'))
+                    .and_then(|(p, t)| Some((p.trim().parse().ok()?, t.trim().parse().ok()?)));
+                let mut ev = o
+                    .excerpt(self.limits.max_output_bytes)
+                    .lines()
+                    .filter(|l| !l.trim().starts_with(tag.as_str()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+                    .replace(&nonce, "");
+                if let (false, Some((p, t))) = (ok, credit) {
+                    ev = format!("{p} of {t} tests passed.\n{}", ev.trim());
+                }
                 (
                     ok,
                     (!ok).then(|| {
@@ -238,7 +272,11 @@ impl VerifierHub {
             }
             Err(e) => (false, Some(format!("Tests could not run: {e}"))),
         };
-        result("code_tests", passed, evidence, t)
+        let mut r = result("code_tests", passed, evidence, t);
+        if let Some((p, total)) = credit {
+            r.details = Some(serde_json::json!({"tests_passed": p, "tests_total": total}));
+        }
+        r
     }
 }
 

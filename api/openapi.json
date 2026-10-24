@@ -61,6 +61,10 @@
     {
       "name": "phase7",
       "description": "CPU inference performance and latency attribution (Phase 7)"
+    },
+    {
+      "name": "harness",
+      "description": "Lean proof checking, best-first repair and the code agent (Open Math Harness and Codex integration)"
     }
   ],
   "paths": {
@@ -1178,6 +1182,67 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VerifierResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/harness": {
+      "get": {
+        "tags": [
+          "harness"
+        ],
+        "operationId": "getHarness",
+        "summary": "The integrated math and code harness on this server (Lean, repair search, code agent) and its sources",
+        "responses": {
+          "200": {
+            "description": "Harness capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HarnessInfo"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/harness/code": {
+      "post": {
+        "tags": [
+          "harness"
+        ],
+        "operationId": "runCodeAgent",
+        "summary": "Run the code agent (FR-093): the model patches and runs a small workspace in the sandbox until the hidden tests pass or the step budget is spent",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The run, with the verified files or the best-scoring files seen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeAgentReply"
                 }
               }
             }
@@ -2759,6 +2824,9 @@
                 "type": "object",
                 "description": "Schema the answer must satisfy"
               },
+              "lean": {
+                "$ref": "#/components/schemas/LeanTask"
+              },
               "test_code": {
                 "type": "string",
                 "description": "HumanEval-style test program defining check(candidate)"
@@ -2841,6 +2909,18 @@
             "minimum": 0.25,
             "maximum": 1,
             "description": "FR-086: factor applied to the System 2 thinking budget on each verified retry round; default from configuration (1 = the same budget every round)"
+          },
+          "repair_policy": {
+            "type": "string",
+            "enum": [
+              "best",
+              "last"
+            ],
+            "description": "FR-091: which candidate a verified retry repairs. \"best\" keeps a candidate tree scored by the exact verifier (Open Math Harness scoring, per-assert credit on code) and repairs the best one; \"last\" repairs the latest. Default from configuration."
+          },
+          "patch_repair": {
+            "type": "boolean",
+            "description": "FR-092: on code tasks a retry may answer with a Codex apply_patch to the candidate instead of the whole program. Default from configuration."
           }
         }
       },
@@ -4214,6 +4294,205 @@
           }
         }
       },
+      "LeanTask": {
+        "type": "object",
+        "description": "FR-090: a frozen Lean 4 statement (a whole file whose theorem is proved by `sorry`). The answer must keep the statement byte for byte and prove it; textual rules refuse `sorry`, `axiom`, `native_decide` and commands that run code, and Lean decides (Open Math Harness verify protocol). Needs `verifiers.lean` on the server.",
+        "required": [
+          "statement"
+        ],
+        "properties": {
+          "statement": {
+            "type": "string",
+            "maxLength": 65536
+          },
+          "theorem": {
+            "type": "string",
+            "description": "The theorem's name; read from the statement when absent"
+          }
+        }
+      },
+      "CodeAgentRequest": {
+        "type": "object",
+        "required": [
+          "task",
+          "verification"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "maxLength": 20000
+          },
+          "files": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Starting files by flat name (at most 16); `solution.py` is what the hidden tests import"
+          },
+          "verification": {
+            "type": "object",
+            "description": "Hidden tests (`tests` asserts, or `test_code` with `entry_point`)",
+            "properties": {
+              "tests": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "test_code": {
+                "type": "string"
+              },
+              "entry_point": {
+                "type": "string"
+              },
+              "code_prefix": {
+                "type": "string"
+              }
+            }
+          },
+          "max_steps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12
+          },
+          "model": {
+            "type": "string",
+            "enum": [
+              "system1",
+              "system2"
+            ]
+          }
+        }
+      },
+      "CodeAgentStep": {
+        "type": "object",
+        "required": [
+          "step",
+          "action",
+          "observation",
+          "ms"
+        ],
+        "properties": {
+          "step": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "patch",
+              "write",
+              "run",
+              "submit",
+              "none",
+              "model_error"
+            ]
+          },
+          "observation": {
+            "type": "string"
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number"
+          },
+          "ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "CodeAgentReply": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "assurance",
+          "files",
+          "passed",
+          "score",
+          "steps",
+          "model_calls",
+          "model",
+          "wall_ms"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "exhausted",
+              "deadline",
+              "model_error"
+            ]
+          },
+          "assurance": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "unverified"
+            ]
+          },
+          "files": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "score": {
+            "type": "number",
+            "description": "Open Math Harness scoring of the returned files (1 = all tests pass; 0.5-0.9 = some pass)"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeAgentStep"
+            }
+          },
+          "model_calls": {
+            "type": "integer"
+          },
+          "model": {
+            "type": "string"
+          },
+          "wall_ms": {
+            "type": "integer"
+          }
+        }
+      },
+      "HarnessInfo": {
+        "type": "object",
+        "properties": {
+          "lean": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "repair": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "code_agent": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
       "VerifyRequest": {
         "type": "object",
         "required": [
@@ -4242,6 +4521,9 @@
               "json_schema": {
                 "type": "object",
                 "description": "Schema the answer must satisfy"
+              },
+              "lean": {
+                "$ref": "#/components/schemas/LeanTask"
               },
               "test_code": {
                 "type": "string",

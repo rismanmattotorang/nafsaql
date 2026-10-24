@@ -1,6 +1,6 @@
 # Nafs-Aql delivery status
 
-Updated 2026-10-18 (night). Tracks roadmap Phases 0–7 (task IDs from `data/tasks.csv`) on the reference machine: Intel Core i3-8100, 4 cores, AVX2, 32 GB, macOS 15.4.1. Numbers are measurements unless marked otherwise.
+Updated 2026-10-24 (Phase 10 added; earlier sections as of 2026-10-18 night). Tracks roadmap Phases 0–7 (task IDs from `data/tasks.csv`) on the reference machine: Intel Core i3-8100, 4 cores, AVX2, 32 GB, macOS 15.4.1. Numbers are measurements unless marked otherwise.
 
 All measurements after 14:00 are marked "shared machine" (ASSUMPTIONS A-027). They ran while the owner's other workloads were busy: an Ollama server, mistral.rs, and a second llama-server from another project at about 210% CPU, with load averages of 10–15 on 4 cores. Absolute speeds from that period are lower bounds.
 
@@ -27,6 +27,12 @@ All measurements after 14:00 are marked "shared machine" (ASSUMPTIONS A-027). Th
   - Documentation: operator runbook, user guide, and an API reference generated from OpenAPI 1.5 (50 paths).
   - Publication: a results write-up compiled to PDF, with every number generated from stored runs (`docs/publication/`).
 - **Phase 7 (added, CPU inference performance):** P7-T01–T03 and P7-T07 done; P7-T04/T05 prepared; P7-T06 partly done. See "Phase 7" below.
+- **Phase 10 (added 2026-10-24, math and code harness):** mechanisms from Open Math Harness and OpenAI Codex integrated as the `nafs-harness` crate (decision 005, `docs/research/harness_integration.md`, report section "Phase 10"):
+  - FR-090 Lean 4 verifier under Open Math Harness's frozen-statement protocol, run in the OS sandbox; refused (400) when no toolchain is configured. Lean is **not installed** on the reference machine: tested with a stand-in executable through the real sandbox.
+  - FR-091 best-first repair over a verifier-scored candidate tree, per-assert credit on code tests; on by default (equals the old loop under all-or-nothing verdicts).
+  - FR-092 patch repair with Codex `apply_patch`; **off** until an interleaved A/B measures the patch failure rate.
+  - FR-093 code agent `POST /v1/harness/code`; also head-and-tail verifier evidence and Seatbelt `-D` parameters.
+  - Tests: 57 in `nafs-harness`, 165 in the workspace, clippy clean (macOS and Linux target). Live run (shared machine, partial): agent task 1 verified after 2 calls (the first patch used a unified-diff header, now tolerated); task 2 hit the 900 s cap inside one 1,041 s model call. Records: `benchmarks/harness_live_check.json`.
 - **UX:** the app is a research lab for System 1 / System 2 interaction (see "Lab and UX" below), including "Both" trials that collect human preferences between the two paths.
 
 ## Phase 0 and Phase 1
