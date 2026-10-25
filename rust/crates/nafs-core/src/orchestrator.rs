@@ -7,6 +7,9 @@ use crate::config::{Caps, Config};
 use crate::live_cost::{self, RollingMedian};
 use crate::{domain, gate};
 use chrono::Utc;
+use nafs_harness::patch;
+use nafs_harness::scoring::Verdict;
+use nafs_harness::search::{siblings_note, CandidateTree, Outcome};
 use nafs_memory::{assemble_prompt, Store};
 use nafs_types::*;
 use nafs_verify::{answer_similarity, extract_json, SandboxLimits, VerifierHub};
@@ -98,6 +101,58 @@ fn domain_instruction(d: Domain) -> &'static str {
         Domain::Structured => "Reply with a single valid JSON value only, in a ```json code block, with no extra commentary.",
         Domain::Factual => "Answer concisely and say clearly if you are not sure.",
         _ => "Answer helpfully and concisely.",
+    }
+}
+
+/// FR-090: what a prover is told (Open Math Harness `putnam.j2`, shortened for a small model).
+fn lean_instruction(statement: &str) -> String {
+    format!(
+        "Prove the theorem below in Lean 4. Keep the theorem statement exactly as given, byte for byte; you may add helper lemmas before it. `sorry`, `axiom`, `native_decide` and commands that run code are not allowed. Return the complete file in one ```lean code block.\n```lean\n{}\n```",
+        statement.trim()
+    )
+}
+
+/// FR-092: how a code retry may answer with a patch (Codex's apply_patch format).
+const PATCH_REPAIR_HINT: &str = "Your code above is the file solution.py. Instead of the whole program you may reply with a patch to it, in exactly this format:\n*** Begin Patch\n*** Update File: solution.py\n@@ <a line just above the change, e.g. the def line>\n-<old line>\n+<new line>\n*** End Patch\nKeep unchanged lines out of the patch, or prefix them with one space.";
+
+/// The scoring-protocol outcome of a verdict (FR-091): per-assert credit on code tests, Lean's graded
+/// verdict on proofs, all-or-nothing otherwise.
+pub fn outcome_of(v: &VerifierResult) -> Outcome {
+    let ev = v.evidence.clone();
+    if v.passed {
+        return Outcome::binary(true, None);
+    }
+    let d = v.details.as_ref();
+    let num = |k: &str| d.and_then(|d| d[k].as_u64());
+    match v.verifier.as_str() {
+        "code_tests" => match (num("tests_passed"), num("tests_total")) {
+            (Some(p), Some(t)) => Outcome::tests(false, p, t, ev),
+            _ => Outcome::binary(false, ev),
+        },
+        "lean_proof" => match d.and_then(|d| d["verdict"].as_str()) {
+            Some("invalid") => Outcome::invalid(ev),
+            Some("sorries") => Outcome {
+                verdict: Verdict::Sorries,
+                verified: false,
+                credit: None,
+                failures: 1,
+                evidence: ev,
+            },
+            Some("complete") => Outcome {
+                verdict: Verdict::Complete,
+                verified: false,
+                credit: None,
+                failures: 1,
+                evidence: ev,
+            },
+            _ => Outcome {
+                failures: d
+                    .and_then(|d| d["error_classes"].as_array())
+                    .map_or(1, |a| a.len().max(1) as u64),
+                ..Outcome::binary(false, ev)
+            },
+        },
+        _ => Outcome::binary(false, ev),
     }
 }
 
@@ -223,7 +278,7 @@ impl Orchestrator {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         let v = &cfg.verifiers;
-        let hub = VerifierHub::new(
+        let mut hub = VerifierHub::new(
             SandboxLimits {
                 cpu_time_s: v.cpu_time_s,
                 wall_clock_s: v.wall_clock_s,
@@ -238,6 +293,22 @@ impl Orchestrator {
             v.numeric_tolerance,
         );
         hub.load_rates(&v.rates_file);
+        // FR-090: Lean proof checking, when a toolchain is configured and present.
+        if !v.lean.is_empty() {
+            match nafs_verify::lean::LeanVerifier::new(
+                &v.lean,
+                &v.lean_path,
+                v.lean_timeout_s,
+                v.lean_memory_mb,
+                v.deny_network,
+            ) {
+                Some(l) => hub.lean = Some(Arc::new(l)),
+                None => tracing::warn!(
+                    "verifiers.lean = {:?} is not an executable; Lean proof checking is off",
+                    v.lean
+                ),
+            }
+        }
         // P7-T01: compile the answer-extraction patterns now, so the first verified request does not
         // pay for it (measured at about 0.45 s on the reference machine).
         let _ = hub.verify_math("The result is 1/2.\nAnswer: \\boxed{1/2}", "0.5");
@@ -562,6 +633,19 @@ impl Orchestrator {
             if let Some(e) = v.validation_error() {
                 return Err(NafsError::BadRequest(e));
             }
+            if let Some(l) = &v.lean {
+                if self.hub.lean.is_none() {
+                    return bad("verification.lean needs a Lean toolchain; none is configured on this server (verifiers.lean)");
+                }
+                if let Some(e) = nafs_harness::lean::frozen_objection(&l.statement) {
+                    return Err(NafsError::BadRequest(format!("verification.lean: {e}")));
+                }
+            }
+        }
+        if let Some(p) = &req.repair_policy {
+            if p != "best" && p != "last" {
+                return bad("repair_policy must be \"best\" or \"last\"");
+            }
         }
         if req.ablation_draft_conditioned == Some(true)
             && !self.cfg.deliberation.allow_draft_conditioned_ablation
@@ -749,7 +833,11 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         let mut system = format!(
             "{}\n\n{}",
             cfg.assistant.system_prompt,
-            domain_instruction(dom)
+            match &verification.lean {
+                // FR-090: the Open Math Harness prover's rules, and the frozen statement to keep.
+                Some(l) => lean_instruction(&l.statement),
+                None => domain_instruction(dom).to_string(),
+            }
         );
         // FR-061: earlier verified answers, delimited as data with provenance (SR-001).
         let mut retrieved: Vec<Value> = vec![];
@@ -1177,6 +1265,19 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             }
             let mut messages = base.clone();
             let mut best: Option<String> = None;
+            // FR-091: every verified attempt is a node of a candidate tree scored by the exact verifier
+            // (Open Math Harness); the next attempt repairs the node the policy chooses. `parent` is the node
+            // the current attempt repairs (0: a fresh, draft-blind attempt).
+            let mut tree = CandidateTree::new(cfg.deliberation.repair_fanout as usize);
+            let tree_repair = req
+                .repair_policy
+                .as_deref()
+                .unwrap_or(&cfg.deliberation.repair_policy)
+                == "best";
+            // FR-092: Codex patches as repairs of code (whole code is always accepted too).
+            let patch_repair = verification.has_code_tests()
+                && req.patch_repair.unwrap_or(cfg.deliberation.patch_repair);
+            let mut parent = 0usize;
             let mut best_judge: Option<VerifierResult> = None;
             let mut harmful = false;
             let mut attempt = 0u32;
@@ -1363,10 +1464,51 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         }
                         continue;
                     }
-                    best = Some(out.content.clone());
+                    let mut content = out.content.clone();
+                    // FR-092: a patch in the reply edits the code of the candidate it repairs.
+                    let mut edit = "whole";
+                    let mut patch_error: Option<String> = None;
+                    if patch_repair && parent != 0 {
+                        if let Some(p) = patch::find_patch(&out.content) {
+                            let base_code = nafs_verify::extract_code(
+                                &tree.nodes[parent].candidate,
+                                verification.entry_point.as_deref(),
+                            )
+                            .unwrap_or_else(|| tree.nodes[parent].candidate.clone());
+                            let mut ws: patch::Workspace = [("solution.py".to_string(), base_code)]
+                                .into_iter()
+                                .collect();
+                            match patch::apply_patch(&mut ws, &p) {
+                                Ok(_) => {
+                                    content = format!("```python\n{}```", ws["solution.py"]);
+                                    edit = "patch";
+                                    metrics::counter!("nafs_patch_repairs_total", "result" => "applied").increment(1);
+                                }
+                                Err(e) => {
+                                    edit = "patch_failed";
+                                    patch_error = Some(format!("The patch was not applied: {e}\nReply with a corrected patch or the whole program."));
+                                    metrics::counter!("nafs_patch_repairs_total", "result" => "failed").increment(1);
+                                }
+                            }
+                        }
+                    }
+                    if !(verifiable && tree_repair) {
+                        best = Some(content.clone());
+                    }
                     if verifiable {
                         let tv = Instant::now();
-                        let v = self.hub.verify(&out.content, &verification).await;
+                        let v = match &patch_error {
+                            // A patch that does not apply is not run: its error is the evidence.
+                            Some(e) => Some(VerifierResult {
+                                verifier: "code_tests".into(),
+                                passed: false,
+                                score: Some(0.0),
+                                evidence: Some(e.clone()),
+                                exact: true,
+                                ..Default::default()
+                            }),
+                            None => self.hub.verify(&content, &verification).await,
+                        };
                         stages.push(StageTiming {
                             stage: "verify".into(),
                             ms: tv.elapsed().as_millis() as u64,
@@ -1374,6 +1516,27 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         });
                         usage.verifier_calls += 1;
                         let v = v.expect("verifiable inputs produce a verdict");
+                        let outcome = if patch_error.is_some() {
+                            Outcome::invalid(v.evidence.clone())
+                        } else {
+                            outcome_of(&v)
+                        };
+                        let score = outcome.score();
+                        let node = tree.add(parent, content.clone(), outcome);
+                        if tree_repair {
+                            best = tree.best().map(|n| n.candidate.clone());
+                        }
+                        if let Some(st) = stages.last_mut().filter(|s| s.stage == "verify") {
+                            st.note = Some(format!(
+                                "candidate {node} ({edit}) {} {}; score {score:.2}",
+                                if parent == 0 { "fresh from" } else { "repairs" },
+                                if parent == 0 {
+                                    "the task".to_string()
+                                } else {
+                                    format!("candidate {parent}")
+                                }
+                            ));
+                        }
                         record_verdict(&v);
                         em.send(StreamEvent::Verification {
                             round,
@@ -1390,7 +1553,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         let evidence = v.evidence.clone();
                         verdict = Some(v);
                         if passed {
-                            final_text = out.content;
+                            final_text = content;
                             assurance = Assurance::Verified;
                             break 'outer;
                         }
@@ -1401,15 +1564,36 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                 of: max_r,
                                 evidence: evidence.clone(),
                             });
+                            // FR-091: the policy picks the candidate to repair; its own evidence goes with it,
+                            // and earlier repairs of it are shown as "already tried" (OMH).
+                            parent = if tree_repair { tree.choose() } else { node };
                             messages = base.clone();
-                            messages.push(Message {
-                                role: "assistant".into(),
-                                content: out.content,
-                            });
-                            messages.push(Message {
-                                role: "user".into(),
-                                content: evidence_prompt(&evidence.unwrap_or_default()),
-                            });
+                            if parent != 0 {
+                                let pn = &tree.nodes[parent];
+                                let ev = pn
+                                    .outcome
+                                    .as_ref()
+                                    .and_then(|o| o.evidence.clone())
+                                    .unwrap_or_default();
+                                let mut follow = evidence_prompt(&ev);
+                                if let Some(note) = siblings_note(&tree.siblings(parent, 3), 200) {
+                                    follow.push('\n');
+                                    follow.push_str(&delimit("earlier_attempts", &note, 900));
+                                }
+                                if patch_repair {
+                                    follow.push('\n');
+                                    follow.push_str(PATCH_REPAIR_HINT);
+                                }
+                                messages.push(Message {
+                                    role: "assistant".into(),
+                                    content: pn.candidate.clone(),
+                                });
+                                messages.push(Message {
+                                    role: "user".into(),
+                                    content: follow,
+                                });
+                            }
+                            let _ = evidence;
                         }
                     } else if use_judge {
                         // FR-034: soft verifier with hard floors; a pass is at most "consensus" (Thm 1).

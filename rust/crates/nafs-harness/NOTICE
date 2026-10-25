@@ -1,0 +1,31 @@
+nafs-harness: third-party notices
+
+This crate contains code derived from the two projects below, both licensed under the Apache License,
+Version 2.0 (the same licence as Nafs-Aql; see LICENSE at the repository root). Each derived file states
+its source path and revision in a header comment and says how it was modified.
+
+OpenAI Codex
+  https://github.com/openai/codex, codex-rs at revision 970111f6 (2026-10-23)
+  License: Apache License 2.0
+  The notice of the original:
+
+      OpenAI Codex
+      Copyright 2025 OpenAI
+
+  Derived files: src/patch/streaming_parser.rs, src/patch/seek_sequence.rs, src/patch/text_file.rs,
+  src/patch/parser.rs, and compute_replacements in src/patch/mod.rs (from apply-patch/src); src/truncate.rs
+  (from utils/string/src/truncate.rs and core/src/tools/mod.rs). src/agent.rs follows the shape of
+  core/src/session/turn.rs without copying it. The seatbelt parameter pattern in
+  nafs-verify/src/sandbox.rs follows sandboxing/src/seatbelt.rs. These files were modified.
+
+Open Math Harness
+  https://github.com/openmathmodel/open-math-harness at revision 687f2a2 (2026-10-23), release 0.41.0
+  License: Apache License 2.0
+  Open Math Harness itself adapts prompts from OpenAI Codex (notice above); nafs-harness takes none of those
+  prompts.
+
+  Derived files: src/lean/rules.rs (from interfaces/lean/src/rules.rs), src/lean/verify.rs (from
+  program-files/lean/src/verify.rs, without its runners), src/scoring.rs (from
+  interfaces/discovery/src/scoring.rs), last_fenced_block and the repair feedback in src/lean/mod.rs (from
+  program-files/prover/src/lib.rs). src/search.rs adapts ProblemTree and InitialPolicy from
+  program-files/discovery/src/lib.rs to one candidate at a time. These files were modified.

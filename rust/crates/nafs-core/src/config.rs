@@ -28,8 +28,68 @@ pub struct Config {
     pub alerts: AlertsCfg,
     #[serde(default)]
     pub retrieval: RetrievalCfg,
+    /// Math and code harness (FR-090..FR-093): the code agent endpoint.
+    #[serde(default)]
+    pub harness: HarnessCfg,
     #[serde(skip)]
     pub hash: String,
+}
+
+/// The code agent (FR-093, `POST /v1/harness/code`): Codex's turn loop with Open Math Harness's stop rule,
+/// on System 2 by default, in the verifier sandbox.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HarnessCfg {
+    #[serde(default = "d_true")]
+    pub code_agent_enabled: bool,
+    /// Model calls per run.
+    #[serde(default = "d_agent_steps")]
+    pub max_steps: u32,
+    /// "system2" (reasoning) or "system1" (fast).
+    #[serde(default = "d_agent_model")]
+    pub model: String,
+    /// Reasoning tokens per step on System 2.
+    #[serde(default = "d_agent_think")]
+    pub thinking_budget: u32,
+    /// Answer tokens per step (a patch or a whole file).
+    #[serde(default = "d_agent_tokens")]
+    pub step_max_tokens: u32,
+    /// Wall-clock cap of one run.
+    #[serde(default = "d_agent_wall")]
+    pub wall_clock_s: u64,
+    /// Exchanges kept after each context reset (OMH keeps 4).
+    #[serde(default = "d_agent_keep")]
+    pub keep_exchanges: usize,
+}
+fn d_agent_steps() -> u32 {
+    6
+}
+fn d_agent_model() -> String {
+    "system2".into()
+}
+fn d_agent_think() -> u32 {
+    512
+}
+fn d_agent_tokens() -> u32 {
+    768
+}
+fn d_agent_wall() -> u64 {
+    900
+}
+fn d_agent_keep() -> usize {
+    3
+}
+impl Default for HarnessCfg {
+    fn default() -> Self {
+        Self {
+            code_agent_enabled: true,
+            max_steps: d_agent_steps(),
+            model: d_agent_model(),
+            thinking_budget: d_agent_think(),
+            step_max_tokens: d_agent_tokens(),
+            wall_clock_s: d_agent_wall(),
+            keep_exchanges: d_agent_keep(),
+        }
+    }
 }
 
 /// Rubric judge (FR-034, SR-003): System 2 scores honesty h, harm-avoidance a, helpfulness u, grounding m.
@@ -407,6 +467,24 @@ pub struct DeliberationCfg {
     pub retry_budget_decay: f32,
     #[serde(default = "d_retry_min_budget")]
     pub retry_min_budget: u32,
+    /// FR-091: which candidate a verified retry repairs. "best" keeps a candidate tree scored by the
+    /// verifier (Open Math Harness's scoring protocol, per-assert credit on code) and repairs the best one;
+    /// with all-or-nothing verdicts that is the latest, so "best" equals "last" unless credit differs.
+    #[serde(default = "d_repair_policy")]
+    pub repair_policy: String,
+    /// FR-091: repairs of one candidate before the search moves on.
+    #[serde(default = "d_repair_fanout")]
+    pub repair_fanout: u32,
+    /// FR-092: on code tasks a retry may answer with a Codex patch to the candidate instead of the whole
+    /// program (fewer decode tokens). Whole code is always accepted. Off until measured (rule 3).
+    #[serde(default)]
+    pub patch_repair: bool,
+}
+fn d_repair_policy() -> String {
+    "best".into()
+}
+fn d_repair_fanout() -> u32 {
+    2
 }
 fn d_retry_decay() -> f32 {
     1.0
@@ -545,6 +623,23 @@ pub struct VerifierCfg {
     /// Mutation-measured (r, phi) per verifier (FR-035); loaded at startup when present.
     #[serde(default = "d_rates")]
     pub rates_file: String,
+    /// FR-090: the `lean` executable (absolute path, e.g. ~/.elan/toolchains/<v>/bin/lean); empty disables
+    /// Lean proof checking and requests with `verification.lean` are refused.
+    #[serde(default)]
+    pub lean: String,
+    /// `LEAN_PATH` for a Mathlib build (empty: core Lean only).
+    #[serde(default)]
+    pub lean_path: String,
+    #[serde(default = "d_lean_timeout")]
+    pub lean_timeout_s: u64,
+    #[serde(default = "d_lean_mem")]
+    pub lean_memory_mb: u64,
+}
+fn d_lean_timeout() -> u64 {
+    120
+}
+fn d_lean_mem() -> u64 {
+    4096
 }
 fn d_mem() -> u64 {
     512
@@ -563,6 +658,10 @@ impl Default for VerifierCfg {
             memory_mb: d_mem(),
             sympy_python: String::new(),
             rates_file: d_rates(),
+            lean: String::new(),
+            lean_path: String::new(),
+            lean_timeout_s: d_lean_timeout(),
+            lean_memory_mb: d_lean_mem(),
         }
     }
 }

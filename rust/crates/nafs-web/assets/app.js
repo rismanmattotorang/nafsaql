@@ -94,14 +94,23 @@ function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.c
 // A page loader that loses the gateway mid-request (restart, network) must not leave an uncaught error:
 // show one notice instead; the status pill and the next navigation recover on their own.
 window.addEventListener('unhandledrejection', (e) => { const m = String(e.reason?.message || e.reason || '');
-  if (/Failed to fetch|NetworkError|Load failed/i.test(m)) { e.preventDefault(); if (!toast._net || Date.now() - toast._net > 10000) { toast._net = Date.now(); toast('Gateway unreachable; retrying when it is back', 4000); } } });
+  if (/Failed to fetch|NetworkError|Load failed|Gateway unreachable/i.test(m)) { e.preventDefault(); if (!toast._net || Date.now() - toast._net > 10000) { toast._net = Date.now(); toast('Gateway unreachable; retrying when it is back', 4000); } } });
+// Copy text, with a fallback for the cases where the async clipboard API is missing or refuses (plain-HTTP hosts,
+// an unfocused page, denied permission): a hidden textarea and execCommand. Resolves true when the text was copied.
+async function copyText(text) {
+  try { if (navigator.clipboard?.writeText && window.isSecureContext !== false) { await navigator.clipboard.writeText(text); return true; } } catch {}
+  const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+  document.body.appendChild(ta); const prev = document.activeElement; ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch {} ta.remove(); prev?.focus?.(); return ok;
+}
 function modal(html) { $('#modalContent').innerHTML = html; $('#modal').showModal(); }
 
 const api = {
   token: () => store.get('token', ''),
   headers() { const h = { 'Content-Type': 'application/json' }; const t = this.token(); if (t) h.Authorization = `Bearer ${t}`; return h; },
   async req(method, path, body) {
-    const r = await fetch(path, { method, headers: this.headers(), body: body === undefined ? undefined : JSON.stringify(body) });
+    let r;
+    try { r = await fetch(path, { method, headers: this.headers(), body: body === undefined ? undefined : JSON.stringify(body) }); }
+    catch (e) { const err = new Error('Gateway unreachable: it may be restarting or stopped. Check the status pill, then try again.'); err.network = true; throw err; }
     if (r.status === 204) return null;
     const text = await r.text(); let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
     if (!r.ok) { const e = new Error((data && data.message) || `HTTP ${r.status}`); e.status = r.status; e.data = data; if (r.status === 401) toast('Unauthorized: set an API token (key icon, bottom left).', 4000); throw e; }
@@ -176,9 +185,10 @@ function md(src) {
   flushPara(); flushList();
   return out.join('');
 }
-document.addEventListener('click', (e) => {
+document.addEventListener('click', async (e) => {
   const b = e.target.closest('pre .copy'); if (!b) return;
-  navigator.clipboard?.writeText(b.parentElement.querySelector('code').textContent).then(() => { b.textContent = 'copied'; setTimeout(() => (b.textContent = 'copy'), 1200); });
+  const ok = await copyText(b.parentElement.querySelector('code').textContent);
+  b.textContent = ok ? 'copied' : 'press Ctrl/Cmd+C'; setTimeout(() => (b.textContent = 'copy'), 1500);
 });
 
 // Page intro (what the page is for, how to use it, the primary action): the same shape on every non-chat page.
@@ -297,7 +307,7 @@ class Turn {
       <button data-a="inspect" title="Show the gate decision and trace">${icon.search}Inspect</button><button data-a="compare" title="Compare the System 1 draft with the final answer" hidden>${icon.compare}Compare</button><button data-a="copy">${icon.copy}Copy</button>
       <button data-a="regen" title="Ask the same question again">${icon.retry}Regenerate</button><button data-a="slow" title="Ask again with deliberation forced">${icon.brain}Think harder</button><button data-a="fast" title="Ask again with the fast path only">${icon.bolt}Fast only</button></div></div></div>`);
     this.el.querySelector('.actions').onclick = (e) => { const a = e.target.closest('button')?.dataset.a; if (!a) return;
-      if (a === 'inspect') this.onSelect?.(this, true); if (a === 'copy') navigator.clipboard?.writeText(this.reply?.message?.content || this.answerText()).then(() => toast('Copied'));
+      if (a === 'inspect') this.onSelect?.(this, true); if (a === 'copy') copyText(this.reply?.message?.content || this.answerText()).then((ok) => toast(ok ? 'Copied' : 'Could not copy: select the text and press Ctrl/Cmd+C'));
       if (a === 'slow' || a === 'fast') this.onRetry?.(this.prompt, a, this.request);
       if (a === 'regen') this.onRetry?.(this.prompt, this.request?.force_mode || 'auto', this.request);
       if (a === 'compare') compareModal(this);
@@ -749,7 +759,7 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
       catch (x) { busy = false; $('#renameErr').textContent = x.status === 409 ? 'Another room already has that name.' : x.status === 404 ? 'This room no longer exists.' : x.message; } };
     inp.onblur = () => setTimeout(() => { if ($('#renameInput') && !busy) finish(); }, 150);
   }
-  async function copyLink() { const url = `${location.origin}${location.pathname}#/rooms/${S.room.room_id}`; try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { modal(`<h3 style="margin-top:0">Link to this room</h3><input type="text" readonly style="width:100%" value="${esc(url)}" onfocus="this.select()">`); } }
+  async function copyLink() { const url = `${location.origin}${location.pathname}#/rooms/${S.room.room_id}`; if (await copyText(url)) toast('Link copied'); else { modal(`<h3 style="margin-top:0">Link to this room</h3><input type="text" readonly style="width:100%" value="${esc(url)}">`); const i = $('#modalContent input'); i?.focus(); i?.select(); } }
   async function exportRoom(kind) {
     const room = S.room; try { const conv = await api.get('/v1/conversations/' + room.conversation_id); const slug = room.name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'room'; const day = new Date().toISOString().slice(0, 10);
       if (kind === 'json') downloadText(`room-${slug}-${day}.json`, JSON.stringify({ room: { room_id: room.room_id, name: room.name, created_at: room.created_at }, conversation: conv }, null, 2), 'application/json');
@@ -973,7 +983,7 @@ routes.bench = { title: 'Performance', async render(view, alive) {
   const showProto = (r) => { const T = r.table || []; const v = r.nfr007 || {};
     $('#pOut').innerHTML = `${r.status === 'running' ? `<p class="small"><span class="spin"></span> Running level ${(r.level_index ?? 0) + 1} of ${r.request?.levels?.length ?? 3}…</p>` : ''}${T.length ? `<table class="t"><tr><th>Sessions</th><th>Requests</th><th>OK</th><th>p50</th><th>p95</th><th>p99</th><th>TTFT p95</th><th>Throughput</th><th>Escalated</th><th>Cost / request</th></tr>
       ${T.map(x => `<tr><td><b>${x.concurrency}</b></td><td>${x.requests}</td><td>${x.ok}</td><td>${fmtMs(x.p50_ms)}</td><td>${fmtMs(x.p95_ms)}</td><td>${fmtMs(x.p99_ms)}</td><td>${fmtMs(x.ttft_p95_ms)}</td><td>${num(x.throughput_rps, 3)} req/s</td><td>${pct(x.escalation_rate, 0)}</td><td>${num(x.cost_per_request_s, 1)} s</td></tr>`).join('')}</table>
-      <p class="small">${v.pass == null ? 'NFR-007: needs levels 1 and 2.' : `NFR-007 ${v.pass ? '<span class="badge b-verified">pass</span>' : '<span class="badge b-abstained">fail</span>'} p95 at ${v.limit_sessions || 2} sessions (the recommended limit) is ${num(v.ratio, 2)}× the single-session value (target ≤ 2×)${v.ratio_at_4 != null ? `; at 4 sessions ${num(v.ratio_at_4, 2)}×` : ''}${(T[0]?.requests ?? 0) < 8 ? ` · <span class="badge" title="with fewer than 8 requests the p95 is just the maximum">indicative, n ${T[0]?.requests ?? 0}</span>` : ''}${v.pass ? '' : '. Roadmap fallback: document the single-session profile and treat concurrency as a GPU-profile feature.'} The gates dashboard judges the median over recent runs with at least 8 requests per session.`}</p>` : ''}`; };
+      <p class="small">${v.pass == null ? 'NFR-007: needs levels 1 and 2.' : `NFR-007 ${v.pass ? '<span class="badge b-verified">pass</span>' : '<span class="badge b-abstained">fail</span>'} p95 at ${v.limit_sessions || 2} sessions (the recommended limit) is ${num(v.ratio, 2)}× the single-session value (target ≤ 2×)${v.ratio_at_4 != null ? `; at 4 sessions ${num(v.ratio_at_4, 2)}×` : ''}${(T[0]?.requests ?? 0) < 8 ? ` · <span class="badge" title="with fewer than 8 requests the p95 is just the maximum">indicative, n ${T[0]?.requests ?? 0}</span>` : ''}${v.pass ? '' : '. One run can miss on a shared CPU; the verdict that counts is the median of the five most recent runs with at least 8 requests per session (decision 002), shown in the Lab gates.'}${v.pass ? ' The gates dashboard judges the median over recent runs with at least 8 requests per session.' : ''}`}</p>` : ''}`; };
   const watchProto = (id) => { const tick = async () => { const r = await api.get('/v1/bench/runs/' + id).catch(() => null); if (!r) return; showProto(r); if (r.status !== 'running') clearInterval(pPoll); }; clearInterval(pPoll); tick(); pPoll = setInterval(tick, 3000); };
   let pPoll = null;
   $('#pStart').onclick = async () => { try { const r = await api.post('/v1/bench/protocol', { prompt_set: $('#bSet').value, mode: 'fast', levels: [1, 2, 4], requests_per_session: 8, max_tokens: +$('#bMax').value }); toast('Protocol started: 1, 2, then 4 sessions'); watchProto(r.run_id); } catch (e) { toast(e.message); } };

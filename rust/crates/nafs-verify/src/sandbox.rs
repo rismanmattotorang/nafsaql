@@ -53,6 +53,21 @@ pub struct SandboxOutput {
     pub killed: Option<String>,
 }
 impl SandboxOutput {
+    /// Combined output with head and tail kept (Codex's middle truncation), for verifier evidence: the first
+    /// failing assertion is near the head, the exception near the tail.
+    pub fn excerpt(&self, max: usize) -> String {
+        let mut t = self.stdout.clone();
+        if !self.stderr.trim().is_empty() {
+            if !t.is_empty() {
+                t.push('\n');
+            }
+            t.push_str(&self.stderr);
+        }
+        if let Some(k) = &self.killed {
+            t.push_str(&format!("\n[sandbox] {k}"));
+        }
+        nafs_harness::truncate::truncate_middle(t.trim(), max)
+    }
     /// Combined, human-readable tail for verifier evidence.
     pub fn tail(&self, max: usize) -> String {
         let mut t = self.stdout.clone();
@@ -252,31 +267,70 @@ fn linux_probe() -> bool {
     ok
 }
 
+/// What the sandbox runs: model-written Python, or a trusted native checker (Lean) on untrusted input.
+#[derive(Debug, Clone)]
+pub enum Program {
+    Python {
+        python: String,
+        entry: PathBuf,
+    },
+    /// `exe args...`. `read_roots` are directories the program must read besides the sandbox directory (its
+    /// toolchain); everything else under /Users, /Volumes and the temp directories stays unreadable.
+    Native {
+        exe: PathBuf,
+        args: Vec<String>,
+        read_roots: Vec<PathBuf>,
+        env: Vec<(String, String)>,
+    },
+}
+
+/// The macOS profile. Paths are policy parameters (`-D`), never interpolated into the policy text: the
+/// pattern OpenAI Codex's seatbelt module uses, so a path with a quote cannot change the policy.
+#[cfg(target_os = "macos")]
+fn seatbelt_profile(read_roots: usize) -> String {
+    let mut p = String::from(
+        "(version 1)(allow default)(deny network*)(deny process-fork)(deny signal)(allow signal (target self))\
+         (deny file-write* (require-not (subpath (param \"SANDBOX_DIR\"))))\
+         (deny file-read* (subpath \"/Users\") (subpath \"/Volumes\") (subpath \"/private/var/folders\") (subpath \"/private/tmp\"))\
+         (allow file-read* (subpath (param \"SANDBOX_DIR\")))",
+    );
+    for i in 0..read_roots {
+        p.push_str(&format!(
+            "(allow file-read* (subpath (param \"READ_ROOT_{i}\")))"
+        ));
+    }
+    p
+}
+
 fn command_for(
     limits: &SandboxLimits,
-    python: &str,
+    program: &Program,
     dir: &Path,
-    entry: &Path,
 ) -> Result<tokio::process::Command, String> {
     if limits.deny_network && !isolation_available() {
         return Err("sandbox isolation is not available on this host; refusing to run untrusted code (fail closed). On Linux it needs unprivileged user, mount and PID namespaces, `unshare`, `setpriv` and a python3 with ctypes: on Ubuntu 24.04 run `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`; in Docker run with `seccomp=unconfined` and `apparmor=unconfined`".into());
     }
     #[cfg(target_os = "macos")]
     if limits.deny_network {
-        let d = dir.display();
-        let profile = format!(
-            "(version 1)(allow default)(deny network*)(deny process-fork)(deny signal)(allow signal (target self))\
-             (deny file-write* (require-not (subpath \"{d}\")))\
-             (deny file-read* (subpath \"/Users\") (subpath \"/Volumes\") (subpath \"/private/var/folders\") (subpath \"/private/tmp\"))\
-             (allow file-read* (subpath \"{d}\"))"
-        );
+        let roots: &[PathBuf] = match program {
+            Program::Native { read_roots, .. } => read_roots,
+            Program::Python { .. } => &[],
+        };
         let mut c = tokio::process::Command::new("/usr/bin/sandbox-exec");
-        c.arg("-p")
-            .arg(profile)
-            .arg(python)
-            .arg("-I")
-            .arg("-B")
-            .arg(entry);
+        c.arg("-p").arg(seatbelt_profile(roots.len()));
+        c.arg(format!("-DSANDBOX_DIR={}", dir.display()));
+        for (i, r) in roots.iter().enumerate() {
+            c.arg(format!("-DREAD_ROOT_{i}={}", r.display()));
+        }
+        c.arg("--");
+        match program {
+            Program::Python { python, entry } => {
+                c.arg(python).arg("-I").arg("-B").arg(entry);
+            }
+            Program::Native { exe, args, .. } => {
+                c.arg(exe).args(args);
+            }
+        }
         return Ok(c);
     }
     #[cfg(target_os = "linux")]
@@ -287,13 +341,32 @@ fn command_for(
         // stage 3 (linux_enter.sh) replaces /proc and drops capabilities. Stage 4 (linux_seccomp.py) denies
         // fork/spawn and mount-table changes in the interpreter that runs the code.
         let mut c = tokio::process::Command::new("/usr/bin/unshare");
-        c.args(linux_args(python, dir, entry));
+        match program {
+            Program::Python { python, entry } => {
+                c.args(linux_args(python, dir, entry));
+            }
+            // A native checker gets the user and network namespaces only (A-070): Lean reads its toolchain
+            // from the user's home, which the mount stage hides, and the candidate cannot run code under the
+            // textual rules (no #eval, IO, macros or elaborators).
+            Program::Native { exe, args, .. } => {
+                c.args(["-r", "-n", "--"]).arg(exe).args(args);
+            }
+        }
         return Ok(c);
     }
     let _ = dir;
-    let mut c = tokio::process::Command::new(python);
-    c.arg("-I").arg("-B").arg(entry);
-    Ok(c)
+    Ok(match program {
+        Program::Python { python, entry } => {
+            let mut c = tokio::process::Command::new(python);
+            c.arg("-I").arg("-B").arg(entry);
+            c
+        }
+        Program::Native { exe, args, .. } => {
+            let mut c = tokio::process::Command::new(exe);
+            c.args(args);
+            c
+        }
+    })
 }
 
 #[cfg(target_os = "macos")]
@@ -345,7 +418,42 @@ pub async fn run(
     std::fs::create_dir_all(&raw).map_err(|e| format!("sandbox setup failed: {e}"))?;
     // Seatbelt matches resolved paths: /var/folders is a symlink to /private/var/folders.
     let dir: PathBuf = std::fs::canonicalize(&raw).unwrap_or(raw.clone());
-    let result = run_in(&dir, files, entry, stdin, python, limits).await;
+    let program = Program::Python {
+        python: python.to_string(),
+        entry: dir.join(entry),
+    };
+    let result = run_in(&dir, files, &program, stdin, limits).await;
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+/// Run a native program over `files` inside the sandbox; `{dir}` in `args` is replaced by the sandbox
+/// directory. Used for Lean, which is trusted but reads untrusted input.
+pub async fn run_program(
+    files: &[(&str, &str)],
+    exe: &Path,
+    args: &[String],
+    read_roots: &[PathBuf],
+    env: &[(String, String)],
+    stdin: Option<&str>,
+    limits: &SandboxLimits,
+) -> Result<SandboxOutput, String> {
+    let raw = std::env::temp_dir().join(format!("nafs-sbx-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(&raw).map_err(|e| format!("sandbox setup failed: {e}"))?;
+    let dir: PathBuf = std::fs::canonicalize(&raw).unwrap_or(raw.clone());
+    let program = Program::Native {
+        exe: exe.to_path_buf(),
+        args: args
+            .iter()
+            .map(|a| a.replace("{dir}", &dir.display().to_string()))
+            .collect(),
+        read_roots: read_roots
+            .iter()
+            .map(|r| std::fs::canonicalize(r).unwrap_or_else(|_| r.clone()))
+            .collect(),
+        env: env.to_vec(),
+    };
+    let result = run_in(&dir, files, &program, stdin, limits).await;
     let _ = std::fs::remove_dir_all(&dir);
     result
 }
@@ -353,9 +461,8 @@ pub async fn run(
 async fn run_in(
     dir: &Path,
     files: &[(&str, &str)],
-    entry: &str,
+    program: &Program,
     stdin: Option<&str>,
-    python: &str,
     limits: &SandboxLimits,
 ) -> Result<SandboxOutput, String> {
     for (name, content) in files {
@@ -365,7 +472,7 @@ async fn run_in(
         std::fs::write(dir.join(name), content)
             .map_err(|e| format!("sandbox setup failed: {e}"))?;
     }
-    let mut cmd = command_for(limits, python, dir, &dir.join(entry))?;
+    let mut cmd = command_for(limits, program, dir)?;
     cmd.current_dir(dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -377,6 +484,11 @@ async fn run_in(
         .env("HOME", dir)
         .env("TMPDIR", dir)
         .env("LANG", "C.UTF-8");
+    if let Program::Native { env, .. } = program {
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
+    }
     let (cpu, mem) = (limits.cpu_time_s, limits.memory_mb);
     unsafe {
         cmd.pre_exec(move || {
@@ -404,9 +516,10 @@ async fn run_in(
             Ok(())
         });
     }
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("could not start python: {e}"))?;
+    let mut child = cmd.spawn().map_err(|e| match program {
+        Program::Python { .. } => format!("could not start python: {e}"),
+        Program::Native { exe, .. } => format!("could not start {}: {e}", exe.display()),
+    })?;
     let pid = child.id().map(|p| p as i32).unwrap_or(0);
     if let Some(mut si) = child.stdin.take() {
         if let Some(text) = stdin {

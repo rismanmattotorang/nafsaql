@@ -1175,6 +1175,7 @@ dependencies = [
  "fastrand",
  "futures",
  "metrics",
+ "nafs-harness",
  "nafs-memory",
  "nafs-types",
  "nafs-verify",
@@ -1239,6 +1240,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nafs-harness"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "nafs-memory"
 version = "0.1.0"
 dependencies = [
@@ -1269,6 +1279,7 @@ dependencies = [
  "futures",
  "jsonschema",
  "libc",
+ "nafs-harness",
  "nafs-types",
  "regex",
  "serde",

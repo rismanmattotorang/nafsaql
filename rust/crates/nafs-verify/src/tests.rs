@@ -391,3 +391,140 @@ async fn sandbox_environment_carries_no_secrets() {
     let r = h.verify_code("```python\nx = 1\n```", &tests(&["import os\nassert 'NAFS_AUTH_TOKENS' not in os.environ and not any('secret' in v for v in os.environ.values())"])).await;
     assert!(r.passed, "{:?}", r.evidence);
 }
+
+#[tokio::test]
+async fn code_tests_report_per_assert_credit_and_keep_the_head_of_the_output() {
+    let h = hub();
+    let r = h
+        .verify_code(
+            "```python\ndef sq(x):\n    return x * x if x < 3 else 0\n```",
+            &tests(&[
+                "assert sq(1) == 1",
+                "assert sq(2) == 4",
+                "assert sq(3) == 9",
+            ]),
+        )
+        .await;
+    assert!(!r.passed);
+    let d = r.details.clone().unwrap();
+    assert_eq!(
+        (d["tests_passed"].as_u64(), d["tests_total"].as_u64()),
+        (Some(2), Some(3))
+    );
+    let ev = r.evidence.unwrap();
+    assert!(
+        ev.starts_with("Tests failed:\n2 of 3 tests passed.\ntest 3:"),
+        "{ev}"
+    );
+    assert!(
+        ev.contains("test 3: assert sq(3) == 9 -> AssertionError"),
+        "{ev}"
+    );
+    assert!(
+        !ev.contains("NAFS-OK"),
+        "the nonce never reaches the evidence"
+    );
+    let ok = h
+        .verify_code(
+            "```python\ndef sq(x):\n    return x * x\n```",
+            &tests(&["assert sq(1) == 1", "assert sq(3) == 9"]),
+        )
+        .await;
+    assert!(ok.passed);
+    assert_eq!(ok.details.unwrap()["tests_passed"].as_u64(), Some(2));
+}
+
+/// A stand-in for `lean` (Lean is not installed on the reference machine): a Python script that answers a
+/// probe as Lean would, run through the real sandbox. It reports an error for `bad_tactic`, and after the
+/// harness's marker prints the axioms line and the theorem's type.
+fn fake_lean(axioms: &str) -> (std::path::PathBuf, String) {
+    let root = std::env::temp_dir().join(format!("nafs-fake-lean-{}", uuid::Uuid::new_v4()));
+    std::fs::create_dir_all(root.join("bin")).unwrap();
+    let py = crate::sandbox::resolve_python("python3");
+    let script = format!(
+        r##"#!{py} -I
+import re, sys
+src = open(sys.argv[1], encoding="utf-8").read()
+if "bad_tactic" in src:
+    print("Probe.lean:3:3: error: unknown tactic")
+    sys.exit(1)
+m = re.findall(r'#print "(nafs-report-[0-9a-f]+)"', src)
+if not m:
+    sys.exit(0)
+thm = re.search(r"#print axioms (\S+)", src).group(1)
+print(m[-1])
+print("'" + thm + "' {axioms}")
+print(thm + " : forall (a b : Nat), @Eq.{{1}} Nat (a + b) (b + a)")
+"##
+    );
+    let exe = root.join("bin/lean");
+    std::fs::write(&exe, script).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+    (root, exe.to_string_lossy().into_owned())
+}
+
+#[tokio::test]
+async fn lean_verifier_runs_the_protocol_in_the_sandbox() {
+    let (root, exe) = fake_lean("does not depend on any axioms");
+    let mut h = hub();
+    h.lean = Some(Arc::new(
+        lean::LeanVerifier::new(&exe, "", 30, 512, true).expect("fake lean"),
+    ));
+    let task = nafs_types::LeanTask {
+        statement: "theorem add_comm' (a b : Nat) : a + b = b + a :=\nsorry\n".into(),
+        theorem: None,
+    };
+    let inputs = VerificationInputs {
+        lean: Some(task.clone()),
+        ..Default::default()
+    };
+    let proof = "Here is the proof.\n```lean\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nby omega\n```";
+    let r = h.verify(proof, &inputs).await.unwrap();
+    assert!(r.passed, "{r:?}");
+    assert_eq!(r.verifier, "lean_proof");
+
+    let partial = "```lean\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nby sorry\n```";
+    let r = h.verify(partial, &inputs).await.unwrap();
+    assert!(!r.passed && r.score == Some(0.5), "{r:?}");
+    assert!(r.evidence.unwrap().contains("remaining `sorry`"));
+
+    let broken = "```lean\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nby bad_tactic\n```";
+    let r = h.verify(broken, &inputs).await.unwrap();
+    assert!(!r.passed);
+    assert_eq!(r.details.unwrap()["kind"], "elaboration");
+
+    let cheat = "```lean\naxiom cheat : False\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\ncheat.elim\n```";
+    let r = h.verify(cheat, &inputs).await.unwrap();
+    assert!(!r.passed && r.evidence.unwrap().contains("axiom"));
+
+    // Without a Lean toolchain the verifier fails closed.
+    let r = hub().verify(proof, &inputs).await.unwrap();
+    assert!(!r.passed && r.evidence.unwrap().contains("No Lean toolchain"));
+    let _ = std::fs::remove_dir_all(root);
+}
+
+#[tokio::test]
+async fn lean_verifier_rejects_untrusted_axioms_reported_by_lean() {
+    let (root, exe) = fake_lean("depends on axioms: [propext, sorryAx]");
+    let mut h = hub();
+    h.lean = Some(Arc::new(
+        lean::LeanVerifier::new(&exe, "", 30, 512, true).unwrap(),
+    ));
+    let inputs = VerificationInputs {
+        lean: Some(nafs_types::LeanTask {
+            statement: "theorem add_comm' (a b : Nat) : a + b = b + a :=\nsorry\n".into(),
+            theorem: None,
+        }),
+        ..Default::default()
+    };
+    let r = h
+        .verify(
+            "```lean\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nby omega\n```",
+            &inputs,
+        )
+        .await
+        .unwrap();
+    assert!(!r.passed, "a proof that depends on sorryAx is not a proof");
+    let _ = std::fs::remove_dir_all(root);
+}

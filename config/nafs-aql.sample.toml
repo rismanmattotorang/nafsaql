@@ -91,6 +91,9 @@ answer_max_tokens = 768
 non_verifiable_max_rounds = 1          # FR-022
 retry_budget_decay = 1.0               # FR-086: thinking budget of retry round r = budget * decay^r (1.0 = same budget every round; the paired study sets 0.5)
 retry_min_budget = 96                  # FR-086: floor for a shrunken retry budget
+repair_policy = "best"                 # FR-091: repair the best-scoring candidate (Open Math Harness tree; equals "last" when verdicts are all-or-nothing)
+repair_fanout = 2                      # FR-091: repairs of one candidate before the search moves on
+patch_repair = false                   # FR-092: code retries may answer with a Codex apply_patch; off until measured (rule 3)
 caps = { code = { N = 1, R = 2, budget = 1024 }, math = { N = 1, R = 2, budget = 1024 }, structured = { N = 1, R = 2, budget = 512 }, factual = { N = 1, R = 0, budget = 512 }, open = { N = 1, R = 0, budget = 512 }, other = { N = 1, R = 0, budget = 512 } }
 caps_provenance = "Phase-1 defaults sized for the reference CPU; replace with the Prop. 3 cap from the Phase-0 Beta fit"
 cost_ratio = 0.15                      # c_p / L_a for the Prop. 3 cap M* = ceil(alpha/cost_ratio - alpha - beta)
@@ -150,9 +153,22 @@ numeric_tolerance = 1e-6
 memory_mb = 1024                       # RSS cap per verifier subprocess (FR-033); some MBPP+ tests need > 512 MB
 sympy_python = "python3.10"            # interpreter with SymPy; "" disables symbolic math checks
 rates_file = "data/runtime/verifier_rates.json"   # mutation-measured (r, phi), FR-035
+lean = ""                              # FR-090: absolute path of the `lean` executable (e.g. ~/.elan/toolchains/<v>/bin/lean); "" refuses Lean tasks
+lean_path = ""                         # LEAN_PATH of a Mathlib build ("" = core Lean only)
+lean_timeout_s = 120
+lean_memory_mb = 4096
 
 [storage]
 sqlite_path = "data/runtime/nafs.sqlite"
 trace_path = "data/runtime/traces/trace.jsonl"
 retention_days = 90                    # SR-004 bounded retention (spec default 90 days; 0 = keep forever)
 registry_file = "config/models.registry.json"   # active and previous model artefacts (OR-005, Tazkiya promotion)
+
+[harness]                              # FR-093 code agent, POST /v1/harness/code (Codex turn loop, Open Math Harness stop rule)
+code_agent_enabled = true
+model = "system2"                      # "system2" (reasoning) or "system1" (fast)
+max_steps = 6                          # model calls per run
+thinking_budget = 512                  # reasoning tokens per step on System 2
+step_max_tokens = 768                  # answer tokens per step (a patch or a whole file)
+wall_clock_s = 900
+keep_exchanges = 3                     # exchanges kept after each context reset

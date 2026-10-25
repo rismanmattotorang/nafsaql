@@ -1,7 +1,7 @@
 # Nafs-Aql Rust workspace (Phase 0-1). Versions verified on crates.io 2026-10-18.
 [workspace]
 resolver = "2"
-members = ["crates/nafs-types", "crates/nafs-core", "crates/nafs-verify", "crates/nafs-memory", "crates/nafs-gateway", "crates/nafs-web", "crates/nafs-eval", "crates/nafs-bench"]
+members = ["crates/nafs-types", "crates/nafs-harness", "crates/nafs-core", "crates/nafs-verify", "crates/nafs-memory", "crates/nafs-gateway", "crates/nafs-web", "crates/nafs-eval", "crates/nafs-bench"]
 
 [workspace.package]
 version = "0.1.0"

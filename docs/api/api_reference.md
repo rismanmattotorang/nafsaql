@@ -245,6 +245,22 @@ Request body: `run_ids`, `min_n`, `apply` (* = required).
 
 Responses: `200`, `400`, `403`.
 
+## harness
+
+### `GET /v1/harness`
+
+The integrated math and code harness on this server (Lean, repair search, code agent) and its sources
+
+Responses: `200`, `403`.
+
+### `POST /v1/harness/code`
+
+Run the code agent (FR-093): the model patches and runs a small workspace in the sandbox until the hidden tests pass or the step budget is spent
+
+Request body: `CodeAgentRequest` (* = required).
+
+Responses: `200`, `400`, `403`.
+
 ## lab
 
 ### `GET /v1/lab/insights`
@@ -524,6 +540,11 @@ Responses: `202`, `404`, `403`.
 - `ConversationSummary`
 - `Dataset`
 - `Calibration`
+- `LeanTask`: FR-090: a frozen Lean 4 statement (a whole file whose theorem is proved by `sorry`). The answer must keep the statement byte for byte and prove it; textual rules refuse `sorry`, `axiom`, `native_decide` and commands that run code, and Lean decides (Open Math Harness verify protocol). Needs `verifiers.lean` on the server.
+- `CodeAgentRequest`
+- `CodeAgentStep`
+- `CodeAgentReply`
+- `HarnessInfo`
 - `VerifyRequest`
 - `SystemInfo`: Backends with live health, gate and deliberation configuration, calibration, host facts
 - `Rates`: Mutation-measured verifier quality (FR-032)

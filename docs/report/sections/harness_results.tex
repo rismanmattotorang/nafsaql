@@ -1,0 +1,35 @@
+\textbf{Tests.} \texttt{nafs-harness} has 57 unit tests, including the ported
+upstream suites (Codex's streaming patch parser and fuzzy matcher, Open Math
+Harness's Lean textual rules, verify protocol and scoring). \texttt{nafs-verify}
+adds per-assert credit and two Lean tests that run the whole protocol through the
+real macOS sandbox with a stand-in \texttt{lean} executable (a pass, a partial
+proof graded 0.5, an elaboration error, a user axiom, \texttt{sorryAx} in the
+report, and fail-closed without a toolchain); the existing isolation tests
+(network, home reads, fork, escape attempts) pass with the parameterised
+Seatbelt profile. Four new orchestrator tests on the mock backends show the tree
+returning to the candidate with more credit, \texttt{repair\_policy = "last"}
+reproducing the old loop, patch repair surviving a patch that does not apply, and
+the code agent running, patching and stopping on the verifier. All 22 earlier
+orchestrator tests pass unchanged, as Proposition~\ref{prop:h1} predicts; the
+workspace has 165 tests, clean under \texttt{clippy -D warnings} on macOS and,
+cross-checked, on the Linux target.
+
+\textbf{Live run (partial; shared machine).} \texttt{scripts/harness\_live\_check.py}
+drives the running gateway with Qwen3-4B-Thinking as System~2 while the owner's
+other llama-server used about 270\,\% CPU (load average 10--30), so times are
+lower bounds of nothing and are not speed claims. On the first agent task (make a
+palindrome test ignore case and punctuation) the model's first patch used a
+unified-diff hunk header (\texttt{@@ -1,4 +1,12 @@}) that Codex's grammar reads as
+a context line, so it did not apply and the model was told why; its second patch
+applied and the hidden tests passed: \emph{verified} after two model calls
+(about 500\,s each). On the second task a single model call took 1{,}041\,s,
+longer than the 900\,s run cap, and ended inside the reasoning budget with no
+action, so the run stopped at the deadline with the original file returned
+\emph{unverified}. Two changes follow. The patch parser now drops unified-diff line
+ranges from a hunk header (a leniency in the spirit of Codex's own heredoc
+stripping), with a test built from the live reply. And the run cap is checked
+between steps, so one step can overrun it by its own length; on this host a step
+budget of 512 reasoning and 768 answer tokens is too large for a 900\,s cap. The
+remaining tasks of the run (one agent task and three patch-repair chats) were
+still running when this version was written; \texttt{benchmarks/harness\_live\_check.json}
+holds the records.

@@ -90,6 +90,22 @@
         "code_prefix": {
           "type": "string",
           "description": "Prepended when the answer is only a function body"
+        },
+        "lean": {
+          "type": "object",
+          "description": "FR-090: frozen Lean 4 statement (theorem proved by sorry) that the answer must prove; Lean decides",
+          "required": [
+            "statement"
+          ],
+          "properties": {
+            "statement": {
+              "type": "string",
+              "maxLength": 65536
+            },
+            "theorem": {
+              "type": "string"
+            }
+          }
         }
       }
     },
@@ -126,6 +142,18 @@
     "retrieve": {
       "type": "boolean",
       "description": "FR-061: use (true) or skip (false) retrieval of earlier verified answers, quoted as delimited data with provenance; default from configuration"
+    },
+    "repair_policy": {
+      "type": "string",
+      "enum": [
+        "best",
+        "last"
+      ],
+      "description": "FR-091: repair the best-scoring candidate (Open Math Harness search) or the latest"
+    },
+    "patch_repair": {
+      "type": "boolean",
+      "description": "FR-092: a code retry may answer with a Codex apply_patch to the candidate"
     }
   }
 }
