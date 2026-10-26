@@ -64,6 +64,10 @@ step). The warm-up made the first call of the round find the agent prompt cached
 The escalation was exercised in the end-to-end check of the final build (System 2, `fix_merge_intervals` with
 defaults): the 256-token first step failed with `got [[5, 6]]` in the evidence, the 512-token second step verified.
 
+Checked and left alone (no headroom in the data): `compact_at_tokens` (compaction fired 13 times in 67 Phase 11 runs,
+mostly from `unstick`; System 2 runs end in one or two calls) and slot affinity (`id_slot`): round 3 served 93–100 % of
+prompt tokens from the cache.
+
 ## Re-open / flip conditions
 
 - `edit_format = "any"`: only with a model that applies patches reliably (an A/B where the patch arm verifies at least
