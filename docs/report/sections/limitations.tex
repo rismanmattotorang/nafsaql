@@ -8,12 +8,18 @@ which (conditional independence of verifiers, a Beta prior on acceptance,
 homogeneous refinement dynamics, concave budget returns) are modelling
 choices to be checked.
 
-\textbf{Harness integration.} The Lean verifier was exercised through the real
-sandbox with a stand-in for the \texttt{lean} executable, not with Lean itself,
-which is not installed on the reference machine; core-Lean statements need only the
-toolchain, Mathlib statements a Mathlib build. Patch repair is off until the
+\textbf{Harness integration.} The Lean verifier runs against core Lean~4.35.0;
+statements that import Mathlib need a Mathlib build and \texttt{lean\_path}, which
+were not installed. On Linux, Lean runs with user and network namespaces only
+(A-070). Patch repair is off until the
 failure rate $f$ of Eq.~(\ref{eq:patch}) is measured, and the code agent's live
 runs are a handful of tasks on a shared host.
+The Phase~11 A/B (Section~\ref{sec:harness2}) has ten System~1 tasks and three
+System~2 tasks per arm on a shared host: its verified counts are indicative,
+not significant, and its tasks are small single-file functions. Grammar
+constraints fix the syntax of an action, not its sense (a patch that applies can
+still break the file), and they need llama-server; on vLLM the harness relies on
+the stream cut alone.
 
 \textbf{Shared weights.} Fast and slow paths from one model family make
 correlated errors; the collision term is measured rather than assumed small,

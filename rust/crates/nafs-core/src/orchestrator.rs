@@ -934,6 +934,8 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             let hard = matches!(dom, Domain::Math | Domain::Code);
             let sreq = GenRequest {
                 early_stop: None,
+                grammar: None,
+                stop_after: None,
                 max_tokens: if hard {
                     cfg.gate.sample_max_tokens_hard
                 } else {
@@ -1273,6 +1275,8 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         cancel: Some(cancel.clone()),
                         response_format: None,
                         early_stop: None,
+                        grammar: None,
+                        stop_after: None,
                     };
                     let em2 = em.clone();
                     let mut sink = move |t: &str, r: bool| {
@@ -2149,6 +2153,36 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 if b.complete(&req).await.is_ok() {
                     warmed += 1;
                 }
+            }
+        }
+        // Phase 11: the code agent's system prompt is the constant start of every agent request (Codex keeps
+        // its base instructions byte-identical for the same reason), so it is primed on the agent's model too.
+        if self.cfg.harness.code_agent_enabled && self.inflight.load(Ordering::SeqCst) == 0 {
+            let (b, thinking) = if self.cfg.harness.model == "system1" {
+                (&pair.s1, pair.s1.cfg.thinking)
+            } else {
+                (&pair.s2, true)
+            };
+            let req = GenRequest {
+                messages: vec![
+                    Message {
+                        role: "system".into(),
+                        content: nafs_harness::agent::SYSTEM_PROMPT.into(),
+                    },
+                    Message {
+                        role: "user".into(),
+                        content: "Task:\n".into(),
+                    },
+                ],
+                max_tokens: 1,
+                temperature: 0.0,
+                top_p: 1.0,
+                thinking: Some(thinking),
+                thinking_budget: thinking.then_some(16),
+                ..Default::default()
+            };
+            if b.complete(&req).await.is_ok() {
+                warmed += 1;
             }
         }
         warmed

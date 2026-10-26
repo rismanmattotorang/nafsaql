@@ -56,9 +56,51 @@ pub struct HarnessCfg {
     /// Wall-clock cap of one run.
     #[serde(default = "d_agent_wall")]
     pub wall_clock_s: u64,
-    /// Exchanges kept after each context reset (OMH keeps 4).
+    /// Exchanges kept after each context reset (OMH keeps 4). Reset mode only.
     #[serde(default = "d_agent_keep")]
     pub keep_exchanges: usize,
+    /// Phase 11: "append" keeps the transcript append-only so the server's prompt cache is reused (Codex);
+    /// "reset" rebuilds it every step (Phase 10).
+    #[serde(default)]
+    pub context: nafs_harness::agent::ContextMode,
+    /// Append mode: estimated transcript tokens above which it is compacted before the next call. Must leave
+    /// room for the reply in the model's slot (System 1 slots hold 4,096 tokens on the reference setup).
+    #[serde(default = "d_agent_compact")]
+    pub compact_at_tokens: usize,
+    /// Sample each action under the step's GBNF grammar (llama-server only; ignored elsewhere).
+    #[serde(default = "d_true")]
+    pub constrain: bool,
+    /// End the model's stream as soon as its action is complete.
+    #[serde(default = "d_true")]
+    pub stream_cut: bool,
+    /// Prose lines System 1 may write before its action under the grammar (System 2 plans while reasoning).
+    #[serde(default = "d_agent_notes")]
+    pub notes: usize,
+    /// "auto" (whole file while solution.py is missing or short, patch or whole file above), "any" or "whole".
+    #[serde(default)]
+    pub edit_format: nafs_harness::agent::EditFormat,
+    /// "auto": solution.py's length (lines) above which a patch is offered.
+    #[serde(default = "d_agent_whole_lines")]
+    pub whole_max_lines: usize,
+    /// After a step that reproduced already-judged files: compact the transcript and sample more diversely.
+    #[serde(default = "d_true")]
+    pub unstick: bool,
+    /// System 2 reasoning tokens on the first step only (0 = `thinking_budget` on every step): a cheap first
+    /// attempt, the full budget after a failure (decision 006, round 3: same tasks verified in half the time).
+    #[serde(default = "d_agent_first_think")]
+    pub first_step_thinking_budget: u32,
+}
+fn d_agent_first_think() -> u32 {
+    256
+}
+fn d_agent_whole_lines() -> usize {
+    80
+}
+fn d_agent_compact() -> usize {
+    2600
+}
+fn d_agent_notes() -> usize {
+    2
 }
 fn d_agent_steps() -> u32 {
     6
@@ -88,6 +130,15 @@ impl Default for HarnessCfg {
             step_max_tokens: d_agent_tokens(),
             wall_clock_s: d_agent_wall(),
             keep_exchanges: d_agent_keep(),
+            context: Default::default(),
+            compact_at_tokens: d_agent_compact(),
+            constrain: true,
+            stream_cut: true,
+            notes: d_agent_notes(),
+            edit_format: Default::default(),
+            whole_max_lines: d_agent_whole_lines(),
+            unstick: true,
+            first_step_thinking_budget: d_agent_first_think(),
         }
     }
 }

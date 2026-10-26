@@ -166,3 +166,12 @@ thinking_budget = 512                  # reasoning tokens per step on System 2
 step_max_tokens = 768                  # answer tokens per step (a patch or a whole file)
 wall_clock_s = 900
 keep_exchanges = 3                     # exchanges kept after each context reset
+context = "append"                     # Phase 11: "append" = Codex transcript (prompt cache reused, compacted when long); "reset" = Phase 10 loop
+compact_at_tokens = 2600               # append mode: compact before a call when the transcript estimate exceeds this (System 1 slots hold 4,096 tokens)
+constrain = true                       # sample each action under the step's GBNF grammar (Codex's apply_patch grammar; llama-server only)
+stream_cut = true                      # end the model's stream as soon as its action is complete
+notes = 2                              # prose lines System 1 may write before an action under the grammar
+edit_format = "auto"                   # "auto": whole solution.py while it is missing or short, a patch or the whole file above; "any"; "whole"
+whole_max_lines = 80                   # "auto": solution.py lines above which a patch is offered
+unstick = true                         # after a step that reproduced judged files: compact the transcript, sample more diversely
+first_step_thinking_budget = 256       # System 2 reasoning tokens on the first step; thinking_budget after a failure (0 = thinking_budget always)

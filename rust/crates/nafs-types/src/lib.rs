@@ -560,6 +560,27 @@ pub struct CodeAgentRequest {
     /// "system2" or "system1"; default from configuration.
     #[serde(default)]
     pub model: Option<String>,
+    /// Phase 11 A/B override of `harness.context`: "append" (Codex transcript) or "reset" (Phase 10 loop).
+    #[serde(default)]
+    pub context: Option<String>,
+    /// Phase 11 A/B override of `harness.constrain`: sample actions under the action grammar.
+    #[serde(default)]
+    pub constrain: Option<bool>,
+    /// Phase 11 A/B override of `harness.stream_cut`: end the stream when the action is complete.
+    #[serde(default)]
+    pub stream_cut: Option<bool>,
+    /// Phase 11 A/B override of `harness.edit_format`: "auto", "any" or "whole".
+    #[serde(default)]
+    pub edit_format: Option<String>,
+    /// Phase 11 A/B override of `harness.unstick`: break a repetition loop (compact, sample more diversely).
+    #[serde(default)]
+    pub unstick: Option<bool>,
+    /// Override of `harness.thinking_budget` (System 2 reasoning tokens per step, 64..=4096).
+    #[serde(default)]
+    pub thinking_budget: Option<u32>,
+    /// Override of `harness.first_step_thinking_budget` (0 = off, else 64..=4096).
+    #[serde(default)]
+    pub first_step_thinking_budget: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -575,6 +596,33 @@ pub struct CodeAgentStep {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub score: Option<f64>,
     pub ms: u64,
+    /// What the step's model call cost (absent when the call failed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<CodeAgentUsage>,
+    /// The transcript was compacted before this step's call.
+    #[serde(default)]
+    pub compacted: bool,
+}
+
+/// One model call of the code agent, as the server reported it (Phase 11).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CodeAgentUsage {
+    /// Prompt tokens prefilled (not served from the server's cache).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_tokens: Option<u32>,
+    /// Prompt tokens served from the cache.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefill_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decode_ms: Option<f64>,
+    pub completion_tokens: u32,
+    pub reasoning_tokens: u32,
+    /// stop, length, or action_complete (the stream was cut after the action).
+    pub finish_reason: String,
+    /// Sampled under the action grammar.
+    pub constrained: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -594,4 +642,29 @@ pub struct CodeAgentReply {
     pub model_calls: u32,
     pub model: String,
     pub wall_ms: u64,
+    /// "append" or "reset".
+    #[serde(default)]
+    pub context: String,
+    /// Whether actions were sampled under the action grammar.
+    #[serde(default)]
+    pub constrained: bool,
+    /// "auto", "any" or "whole".
+    #[serde(default)]
+    pub edit_format: String,
+    /// Sandbox runs of the verifier (a workspace already judged is not judged again).
+    #[serde(default)]
+    pub verifier_calls: u32,
+    #[serde(default)]
+    pub compactions: u32,
+    /// Prompt tokens prefilled over the run, and those served from the server's cache.
+    #[serde(default)]
+    pub prefill_tokens: u64,
+    #[serde(default)]
+    pub cached_tokens: u64,
+    /// Tokens decoded over the run (reasoning included).
+    #[serde(default)]
+    pub decoded_tokens: u64,
+    /// The run's net change as a unified diff (returned files against the starting ones).
+    #[serde(default)]
+    pub diff: String,
 }

@@ -33,7 +33,12 @@ impl LeanVerifier {
         memory_mb: u64,
         deny_network: bool,
     ) -> Option<Self> {
-        let exe = std::fs::canonicalize(exe).ok()?;
+        // `~/` is the gateway user's home, so a configuration can name an elan toolchain without a user name.
+        let expanded = match (exe.strip_prefix("~/"), std::env::var("HOME")) {
+            (Some(rest), Ok(home)) => format!("{home}/{rest}"),
+            _ => exe.to_string(),
+        };
+        let exe = std::fs::canonicalize(expanded).ok()?;
         if !exe.is_file() {
             return None;
         }
@@ -84,7 +89,16 @@ impl LeanVerifier {
                 &self.limits,
             ))
             .map_err(RunError::NoVerdict)?;
-        let combined = format!("{}{}", out.stdout, out.stderr);
+        // Lean names the probe by its sandbox path; the model only needs `Probe.lean:line:col`.
+        let combined: String = format!("{}{}", out.stdout, out.stderr)
+            .lines()
+            .map(|l| match l.find("/Probe.lean:") {
+                Some(i) if l[..i].starts_with('/') => &l[i + 1..],
+                _ => l,
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            + "\n";
         match (&out.killed, out.exit_ok) {
             (Some(k), _) => Err(RunError::NoVerdict(format!("{k}\n{combined}"))),
             (None, true) => Ok(combined),

@@ -1,0 +1,17 @@
+% Phase 11 results, round 3. Numbers from harness_ab_macros.tex.
+\textbf{Round 3: a cheap first attempt.} With patches kept out of code blocks,
+round~3 compared the 512-token budget on every step with 256 tokens on the
+first step and 512 after a failure, on the same six System~2 tasks
+(Table~\ref{tab:harnessab3}). Both arms verified all six, each in one call per
+task, so the escalation was never needed; the cheap first attempt took
+\HABRRTwoAdaptWall\,s in all against \HABRRTwoFixedWall\,s, half the time, and
+decoded \HABRRTwoAdaptDecoded{} tokens against \HABRRTwoFixedDecoded. It is the
+default (\texttt{first\_step\_thinking\_budget = 256}). The same build primes
+llama-server's cache with the agent's system prompt at startup: the first call
+of round~3 found it cached (207 tokens) where round~1's first call found 5, and
+over the round \HABRRTwoAdaptHit\,\% of the prompt tokens of the faster arm came
+from the cache (partly because both arms send the same task message, so the
+second arm of a task finds it cached); prefill was \HABRRTwoAdaptPrefillS\,s of its
+\HABRRTwoAdaptWall\,s. On this machine a verified System~2 fix of a small
+function now takes 33--59\,s, against single calls of 500--1{,}041\,s and no
+verified task in the Phase~10 live run; the hardware and the models are the same.

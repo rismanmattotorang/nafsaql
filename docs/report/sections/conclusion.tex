@@ -24,3 +24,10 @@ the cascade runs end to end on a shared four-core CPU, the verifiers are
 measured, Profile~C was evaluated and not adopted, and latency is
 attributed by stage, which points the next work at decode speed (EAGLE-3 and
 repacked weights) and at release-scale evaluation on a faster host.
+
+Phase~11 adds one lesson about agent harnesses for small models. What made
+Codex's loop work here was not its tools but its discipline: an action language
+the server can enforce, a history that is never rewritten, and a hard budget.
+With the action constrained and the edit format chosen by file length, the 1.7B
+and 4B models stopped losing steps to malformed replies; that, more than any
+saving in prefill, is where the speed of a verified answer came from.

@@ -1,0 +1,24 @@
+% Phase 11 results, System 2 (round 1). Numbers from harness_ab_gen.tex.
+\textbf{System~2.} System~2 is the code agent's default model, and three tasks
+were run per arm (a System~2 step takes minutes on this host). The Phase~11 arm
+verified all \HABTwoNewVerified{} in \HABTwoNewCalls{} model calls, one per task,
+in \HABTwoNewWall\,s in all; the Phase~10 loop verified
+\HABTwoOldVerified{} of \HABTwoOldN{} in \HABTwoOldCalls{} calls and
+\HABTwoOldWall\,s. Two of its runs ended at the 900\,s cap, which now holds
+inside a model call (both ended at 900.0\,s; in Phase~10 one call had run to
+1{,}041\,s), and the third spent its six steps. \HABTwoOldMalformed{} of its
+\HABTwoOldActions{} steps were malformed: update hunks whose lines lacked the
+\texttt{+}/\texttt{-}/space prefix or the \texttt{@@} marker, and replies with no
+action at all, two of them cut off by the token limit. Under the grammar no step
+was malformed. Two of the three Phase~11 steps are worth a note: the files were
+short, so \texttt{"auto"} offered only a whole file, and the model wrote a Codex
+patch \emph{inside} the \verb|```python| block, which the grammar allows (a code
+line may start with \texttt{***}); the parser applies a patch envelope wherever it
+appears, both applied, and both runs verified. Every Phase~11 call spent its full
+reasoning budget (511 tokens): decoding took \HABTwoNewDecodeS\,s of the
+\HABTwoNewWall\,s and prefill \HABTwoNewPrefillS\,s, which is why round~2
+measures the budget. With three tasks this is a demonstration rather than an
+estimate, but the direction agrees with System~1 and the mechanism is visible in
+every step.
+
+\input{sections/harness2_results_r2.tex}

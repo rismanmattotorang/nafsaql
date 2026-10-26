@@ -417,7 +417,7 @@ async fn code_tests_report_per_assert_credit_and_keep_the_head_of_the_output() {
         "{ev}"
     );
     assert!(
-        ev.contains("test 3: assert sq(3) == 9 -> AssertionError"),
+        ev.contains("test 3: assert sq(3) == 9 -> AssertionError: got 0"),
         "{ev}"
     );
     assert!(
@@ -527,4 +527,115 @@ async fn lean_verifier_rejects_untrusted_axioms_reported_by_lean() {
         .unwrap();
     assert!(!r.passed, "a proof that depends on sorryAx is not a proof");
     let _ = std::fs::remove_dir_all(root);
+}
+
+/// The protocol against the real Lean binary (FR-090). Runs only when `NAFS_LEAN` names a `lean` executable,
+/// e.g. `NAFS_LEAN=~/.elan/toolchains/leanprover--lean4---v4.35.0/bin/lean cargo test -p nafs-verify real_lean`;
+/// CI has no Lean and skips it.
+#[tokio::test]
+async fn real_lean_accepts_proofs_and_rejects_the_known_attacks() {
+    let Ok(exe) = std::env::var("NAFS_LEAN") else {
+        eprintln!("NAFS_LEAN not set; skipping the real-Lean test");
+        return;
+    };
+    let mut h = hub();
+    h.lean = Some(Arc::new(
+        lean::LeanVerifier::new(&exe, "", 120, 2048, true).expect("NAFS_LEAN is not an executable"),
+    ));
+    let statement = "theorem add_comm' (a b : Nat) : a + b = b + a :=\nsorry\n";
+    let inputs = VerificationInputs {
+        lean: Some(nafs_types::LeanTask {
+            statement: statement.into(),
+            theorem: None,
+        }),
+        ..Default::default()
+    };
+    let check = |body: &str| format!("```lean\n{body}\n```");
+    let mut rows: Vec<(&str, String, bool, Option<&str>)> = vec![
+        ("omega", check("theorem add_comm' (a b : Nat) : a + b = b + a :=\nby omega"), true, None),
+        ("term proof", check("theorem add_comm' (a b : Nat) : a + b = b + a :=\nNat.add_comm a b"), true, None),
+        (
+            "helper lemma first",
+            check("theorem helper (x y : Nat) : x + y = y + x := Nat.add_comm x y\n\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nhelper a b"),
+            true,
+            None,
+        ),
+        ("partial proof", check("theorem add_comm' (a b : Nat) : a + b = b + a :=\nby sorry"), false, Some("sorry_ax")),
+        ("wrong tactic", check("theorem add_comm' (a b : Nat) : a + b = b + a :=\nby rfl"), false, Some("elaboration")),
+        // Attacks: only Lean's own report after the marker can catch these.
+        ("hidden sorryAx", check("theorem add_comm' (a b : Nat) : a + b = b + a :=\nsorryAx _ false"), false, None),
+        ("user axiom", check("axiom cheat : False\n\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\ncheat.elim"), false, Some("forbidden")),
+        (
+            "shadowed instance",
+            check("instance (priority := high) cheatAdd : HAdd Nat Nat Nat := ⟨fun _ _ => 0⟩\n\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nrfl"),
+            false,
+            None,
+        ),
+    ];
+    let mut report = vec![];
+    for (name, answer, want_pass, want_kind) in rows.drain(..) {
+        let r = h.verify(&answer, &inputs).await.unwrap();
+        let kind = r
+            .details
+            .as_ref()
+            .and_then(|d| d["kind"].as_str().map(String::from));
+        report.push(format!(
+            "{name}: passed={} kind={kind:?} {} ms",
+            r.passed, r.duration_ms
+        ));
+        assert_eq!(r.passed, want_pass, "{name}: {r:?}");
+        if let Some(k) = want_kind {
+            assert_eq!(kind.as_deref(), Some(k), "{name}: {r:?}");
+        }
+    }
+    eprintln!("{}", report.join("\n"));
+}
+
+/// Tracebacks name the file, not the run's random scratch directory (Phase 11: the path cost the model
+/// tokens and told it nothing).
+#[tokio::test]
+async fn sandbox_output_names_files_relative_to_the_run() {
+    let o = sandbox::run(
+        &[("boom.py", "raise ValueError('x')\n")],
+        "boom.py",
+        None,
+        "python3",
+        &sandbox::SandboxLimits::default(),
+    )
+    .await
+    .unwrap();
+    assert!(!o.exit_ok);
+    assert!(
+        o.stderr.contains("File \"boom.py\", line 1"),
+        "{}",
+        o.stderr
+    );
+    assert!(!o.stderr.contains("nafs-sbx"), "{}", o.stderr);
+}
+
+/// A bare failing assert reports what its left side produced; an assert with its own message keeps it; other
+/// errors are unchanged (Phase 11 evidence).
+#[tokio::test]
+async fn failing_asserts_report_the_value_they_got() {
+    let h = hub();
+    let r = h
+        .verify_code(
+            "```python\ndef f(x):\n    return [x, x]\n```",
+            &tests(&[
+                "assert f(1) == [1]",
+                "assert not f(2)",
+                "assert f(3) == 1, 'custom message'",
+                "assert g(1) == 1",
+            ]),
+        )
+        .await;
+    let ev = r.evidence.unwrap();
+    for want in [
+        "test 1: assert f(1) == [1] -> AssertionError: got [1, 1]",
+        "test 2: assert not f(2) -> AssertionError: got [2, 2]",
+        "test 3: assert f(3) == 1, 'custom message' -> AssertionError: custom message",
+        "test 4: assert g(1) == 1 -> NameError: name 'g' is not defined",
+    ] {
+        assert!(ev.contains(want), "{want}\n{ev}");
+    }
 }

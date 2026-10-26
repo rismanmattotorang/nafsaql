@@ -85,6 +85,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | 👥 **Rooms** | Shared chats over WebSocket: everyone sees each question and the assistant's answer as it is written. Create, rename, search, share a link, export, and delete for good (the room, its messages and every ledger row made from it, in one transaction). Presence, typing, a queue of assistant turns, unique display names, automatic reconnection, and a join snapshot that delivers every turn exactly once however late you arrive. |
 | 🧭 **Sequential evidence (Phase 8)** | The rules that read a *stream* of evidence come from sequential analysis and decision neuroscience: a lowest-window confidence signal whose early crossing *is* the full-draft decision (a running minimum), a posterior stopping rule with a collapsing bound for the adaptive exit, Wald's bound on what an early escalation can promise, and the optimal probe interval. A review of quantum theories of consciousness is included as a negative result, with the test each idea failed. |
 | 🧮 **Math and code harness (Phase 10)** | Mechanisms taken from two open agent harnesses, as pure Rust in `nafs-harness`. From [Open Math Harness](https://github.com/openmathmodel/open-math-harness): **Lean 4 as an exact verifier** under its frozen-statement protocol (no `sorry`, no axioms, the elaborated type must match), and **best-first repair** over a tree of candidates scored by the verifier, with per-assert credit on code. From [OpenAI Codex](https://github.com/openai/codex): **`apply_patch` repairs** with its fuzzy matcher, head-and-tail evidence, and a **code agent** (`POST /v1/harness/code`) that patches and runs its workspace in the sandbox and stops only when the hidden tests pass. |
+| 🤖 **Codex-style agent harness (Phase 11)** | The code agent's loop rebuilt on the mechanisms of Codex's agent core, adapted to a 1.7B/4B model on four CPU cores: an **append-only transcript** so llama-server's prompt cache reuses every earlier exchange (a cold 1,969-token prompt prefilled in 64 s, the same prompt plus one exchange in 3 s), harness-written **compaction**, Codex's `apply_patch` grammar as a **per-step GBNF grammar** that keeps the reasoning span free and stops decoding at the end of the action, a **whole-file edit policy** for short files, budget reminders, the run's cap enforced inside a model call, and the run's net diff. |
 | 🔌 **Two serving profiles** | llama.cpp on bare metal (the reference), and vLLM's CPU backend in Docker, behind one OpenAI-compatible gateway. |
 
 <table>
@@ -207,7 +208,7 @@ A Rust workspace of nine crates:
 | `nafs-gateway` | axum HTTP/SSE/WebSocket API (53 documented endpoints, OpenAPI 3.1), auth, metrics, background workers |
 | `nafs-core` | orchestrator and automaton, Aql Gate, calibration, drift, backends (llama.cpp, vLLM) |
 | `nafs-verify` | exact verifiers (numeric, SymPy, code tests, JSON Schema, Lean) and the sandbox, rubric judge support, mutation harness |
-| `nafs-harness` | derived from Open Math Harness and Codex: Lean protocol, scoring and candidate tree, `apply_patch`, truncation, the code agent loop |
+| `nafs-harness` | derived from Open Math Harness and Codex: Lean protocol, scoring and candidate tree, `apply_patch` and its grammar (GBNF), truncation, the append-only transcript and compaction, the code agent loop |
 | `nafs-memory` | SQLite ledger, traces, retrieval memory (BM25), preferences |
 | `nafs-eval` | datasets, paired statistics, policy map, resumable evaluation runs |
 | `nafs-bench` | load-test protocol, latency breakdown |
@@ -241,6 +242,7 @@ Phases 0–10 of the roadmap are implemented on the CPU reference machine; GPU t
 | [Results write-up](docs/publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
 | [Quantum consciousness and neuroscience review](docs/research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
 | [Math and code harness](docs/research/harness_integration.md) · [Decision 005](docs/decisions/005-harness-integration.md) | Phase 10: what was taken from Open Math Harness and Codex, what was not, and why |
+| [Codex-style harness](docs/research/harness_integration.md#5-phase-11-the-codex-agent-harness-adapted-to-small-models-on-a-cpu) · [Decision 006](docs/decisions/006-codex-harness.md) | Phase 11: the Codex agent-core mechanisms ported, the measured A/B against the Phase 10 loop, and the defaults it set |
 | [User guide](docs/user_guide.md) · [Runbook](docs/operations/operator_runbook.md) · [API reference](docs/api/api_reference.md) | using, operating and integrating |
 
 ## Contributing

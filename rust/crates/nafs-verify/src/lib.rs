@@ -26,6 +26,49 @@ pub struct VerifierHub {
     pub lean: Option<Arc<lean::LeanVerifier>>,
 }
 
+/// The sandboxed test runner. When an assert fails without a message (a bare `assert f(x) == y`), the
+/// evidence adds the value the left side produced (`got 5`): concise execution feedback with the actual
+/// value is what lets small models repair code (Self-Debugging, Chen et al. 2024). The verdict is unchanged.
+const CODE_RUNNER: &str = r#"# -*- coding: utf-8 -*-
+import sys, os, json, ast
+_nafs_nonce = sys.stdin.readline().strip()
+sys.stdin.close()
+_d = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _d)
+from solution import *
+import solution as _nafs_solution
+globals().update({k: v for k, v in vars(_nafs_solution).items() if not k.startswith('__')})
+_items = json.load(open(os.path.join(_d, 'tests.json'), encoding='utf-8'))
+def _nafs_got(src):
+    try:
+        t = ast.parse(src)
+        if len(t.body) != 1 or not isinstance(t.body[0], ast.Assert):
+            return ''
+        e = t.body[0].test
+        if isinstance(e, ast.Compare) and len(e.ops) == 1:
+            e = e.left
+        elif isinstance(e, ast.UnaryOp) and isinstance(e.op, ast.Not):
+            e = e.operand
+        return 'got %s' % repr(eval(compile(ast.Expression(e), 'got', 'eval'), globals()))[:160]
+    except Exception:
+        return ''
+_passed, _fails = 0, []
+for _i, _src in enumerate(_items):
+    try:
+        exec(compile(_src, 'test_%d' % (_i + 1), 'exec'), globals())
+        _passed += 1
+    except Exception as _e:
+        _msg = str(_e)[:160] or (_nafs_got(_src) if isinstance(_e, AssertionError) else '')
+        _fails.append('test %d: %s -> %s: %s' % (_i + 1, _src.strip()[:160], type(_e).__name__, _msg))
+sys.stdout.write('\n%s credit %d/%d\n' % (_nafs_nonce, _passed, len(_items)))
+sys.stdout.flush()
+if _fails:
+    sys.stderr.write('\n'.join(_fails[:6]) + '\n')
+    sys.exit(1)
+sys.stdout.write('\n' + _nafs_nonce + '\n')
+sys.stdout.flush()
+"#;
+
 fn result(verifier: &str, passed: bool, evidence: Option<String>, t: Instant) -> VerifierResult {
     VerifierResult {
         verifier: verifier.into(),
@@ -204,7 +247,7 @@ impl VerifierHub {
         // Plain asserts (`tests`) run one by one, each compiled from its own string, so the verdict carries
         // per-assert credit for the repair search (Open Math Harness scores partial proofs the same way). The
         // credit line and the final line carry the run's nonce, which the candidate never sees on stdin.
-        let runner = String::from("# -*- coding: utf-8 -*-\nimport sys, os, json\n_nafs_nonce = sys.stdin.readline().strip()\nsys.stdin.close()\n_d = os.path.dirname(os.path.abspath(__file__))\nsys.path.insert(0, _d)\nfrom solution import *\nimport solution as _nafs_solution\nglobals().update({k: v for k, v in vars(_nafs_solution).items() if not k.startswith('__')})\n_items = json.load(open(os.path.join(_d, 'tests.json'), encoding='utf-8'))\n_passed, _fails = 0, []\nfor _i, _src in enumerate(_items):\n    try:\n        exec(compile(_src, 'test_%d' % (_i + 1), 'exec'), globals())\n        _passed += 1\n    except Exception as _e:\n        _fails.append('test %d: %s -> %s: %s' % (_i + 1, _src.strip()[:160], type(_e).__name__, str(_e)[:160]))\nsys.stdout.write('\\n%s credit %d/%d\\n' % (_nafs_nonce, _passed, len(_items)))\nsys.stdout.flush()\nif _fails:\n    sys.stderr.write('\\n'.join(_fails[:6]) + '\\n')\n    sys.exit(1)\nsys.stdout.write('\\n' + _nafs_nonce + '\\n')\nsys.stdout.flush()\n");
+        let runner = String::from(CODE_RUNNER);
         let mut items: Vec<String> = vec![];
         if let Some(tc) = inputs.test_code.as_deref() {
             let mut t = format!("{tc}\n");

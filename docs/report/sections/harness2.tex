@@ -1,0 +1,154 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 11 -- a Codex-style agent harness for small models on a CPU
+% ---------------------------------------------------------------------------
+\section{Phase 11: A Codex-Style Agent Harness for Small Models on a CPU}
+\label{sec:harness2}
+
+Phase~10 took leaves of Codex (the patch format, output truncation, the sandbox
+parameters) and kept a simple agent loop. Its live run (Section~\ref{sec:harness})
+showed where that loop loses time and accuracy on this machine: every step
+re-read almost its whole prompt, three of five actions were malformed, and one
+model call overran the run's cap. Phase~11 (25--26 October 2026) ports the
+\emph{harness} mechanisms of Codex's agent core \cite{openaicodex2026} (its turn
+loop, history, compaction, tool grammar and budget handling), adapted to a
+chat-completions server, a 1.7B and a 4B model, and four CPU cores. The source
+survey is in \texttt{docs/research/harness\_integration.md} (Section~5) and the
+decision in \texttt{docs/decisions/006-codex-harness.md}.
+
+\subsection{Where an agent step spends its time}
+
+A step's wall time is, to first order,
+\begin{equation}
+T_{\text{step}} \;=\; \frac{n_{\text{prompt}}-n_{\text{cached}}}{r_p} \;+\; \frac{n_{\text{dec}}}{r_d} \;+\; T_{\text{tools}},
+\label{eq:stepcost}
+\end{equation}
+where $n_{\text{cached}}$ prompt tokens are served from the server's cache, $r_p$
+is the prefill rate and $r_d$ the decode rate. On the reference machine System~2
+prefills about $r_p=31$ tokens/s and decodes $r_d\approx6$--$8$ tokens/s
+(measured 25 October 2026): a cold 1{,}969-token prompt took 64\,s to prefill, and
+the same prompt with one more exchange appended took 3\,s, because only the 21 new
+tokens were computed. Prefill is therefore not negligible next to decoding, and
+whether the cache is hit decides it.
+
+\subsection{What Codex does, and what carries over}
+
+Codex speaks only the Responses API and assumes frontier models, so nothing is
+embedded; Table~\ref{tab:codexport} lists the mechanisms and their adaptation.
+
+\begin{table*}[t]
+\centering
+\caption{Codex agent-harness mechanisms (\texttt{codex-rs} at \texttt{970111f6}) and their adaptation in \Sys{} (crate \texttt{nafs-harness}).}
+\label{tab:codexport}
+\scriptsize
+\begin{tabular}{@{}p{0.2\textwidth}p{0.36\textwidth}p{0.37\textwidth}@{}}
+\toprule
+Mechanism & In Codex & In \Sys{} \\
+\midrule
+Append-only history & \texttt{context\_manager}: items are only appended; a change of state is a new item; requests are sent incrementally when the new input extends the previous one & \texttt{context.rs}: the transcript only grows; the task message is never rewritten, so llama-server's slot cache reuses every earlier exchange (Proposition~\ref{prop:prefix}) \\
+Compaction & at 90\,\% of the window, a model-written handoff summary plus the user messages ($\le$20k tokens) replace the history & at \texttt{compact\_at\_tokens}, a \emph{harness-written} state replaces it: the task, the current files, the last verdict and the attempts so far; same prefix as the first message, so the system prompt and task stay cached \\
+Freeform \texttt{apply\_patch} & the patch is a freeform tool constrained by a Lark grammar & \texttt{grammar.rs}: the grammar in GBNF, rebuilt per step (only existing files can be updated, no unified-diff ranges, the step's allowed actions), with the reasoning span kept free \\
+Dispatch at item done & a tool call runs when its output item is complete, while the response still streams & the stream ends when the action is complete (unconstrained requests); under the grammar the server itself stops there \\
+Truncation on insertion & tool output capped (10k tokens) as it enters history & observations and evidence middle-truncated to 2\,kB, files to 6\,kB (a 10k-token output would take minutes to prefill here) \\
+Budget reminders & \texttt{rollout\_budget}, \texttt{token\_budget}: remaining-budget notes appended to history & ``Steps left: $n$'' appended to each failing observation; the last step offers no \texttt{run} \\
+Turn diff & \texttt{turn\_diff\_tracker}: the turn's net change as a unified diff & the run's net diff returned with the files \\
+Cancellation & a turn aborts in flight & the run's wall-clock cap holds \emph{inside} a model call (the stream is dropped, which stops the server) \\
+\midrule
+Not taken & parallel tool calls under a read/write lock; websocket reuse; remote and async compaction; MCP; approvals & one action per reply (the verifier runs after every change, so a second action would duplicate it); the rest needs server state llama.cpp does not have \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{An append-only transcript}
+
+\begin{proposition}[Prefix reuse]\label{prop:prefix}
+Let a server reuse the longest common prefix between a request and the token
+sequence cached in its slot, and let the slot hold the previous request of the
+run. In the Phase~10 layout, the files are part of the first user message, so
+after a step that changed a file the reusable prefix ends at the first changed
+byte of the file view: each such step prefills at least the rest of its prompt,
+and a run of $K$ steps prefills $\Theta(K\cdot L)$ tokens for prompts of length
+$L$. In the append-only layout the reusable prefix covers the whole previous
+request, so step $k$ prefills only the previous reply and its observation, and a
+run prefills each transcript token once: $\Theta(L_K)$ for a final transcript of
+length $L_K$, plus one task message per compaction.
+\end{proposition}
+\begin{proof}[Sketch]
+In the append layout request $k$ is request $k-1$ followed by the assistant
+message and the observation of step $k-1$. The cached sequence is request $k-1$
+followed by the generated tokens; the chat template renders the earlier assistant
+turn without its reasoning, so the common prefix is exactly request $k-1$. In the
+reset layout the first divergence is inside the first user message whenever a
+file changed. Summing over steps gives the two totals.
+\end{proof}
+
+Codex keeps its history append-only for the same reason (its incremental requests
+fail over to full ones on any mismatch), and prefix-sharing caches such as
+SGLang's RadixAttention rest on the same invariant \cite{zheng2024sglang}. One consequence is that the model must
+learn the new state from the observation rather than from a rewritten task
+message: after a patch the observation carries the edited files, and after a
+failing verdict the verifier's evidence. When the estimated transcript exceeds
+\texttt{compact\_at\_tokens} (2{,}600 tokens by default, which leaves room for a
+reply in System~1's 4{,}096-token slots) it is compacted into the task message
+with an ``already tried'' list in place of Codex's model-written summary: at
+6--8 tokens/s a summary would cost minutes, and the facts it needs are already
+structured.
+
+\subsection{Actions under a grammar}
+
+Codex constrains \texttt{apply\_patch} with a grammar; llama-server accepts a GBNF
+grammar in the request. The port specialises the grammar to each step: the
+\texttt{Update} and \texttt{Delete} targets are the workspace's files, an
+\texttt{@@} header cannot start with a range, a \texttt{run} block can name only
+a Python file that exists, and the last step offers only edits. When the grammar
+is complete only end-of-generation can be sampled, so nothing after the action is
+decoded. \texttt{SUBMIT} is no longer offered: the verifier ends the run, so
+\texttt{SUBMIT} only spent a step.
+
+A reasoning model needs one more rule. llama-server applies a request grammar
+from the first sampled token; with a plain grammar Qwen3-4B-Thinking was forced to
+emit the answer in place of its reasoning (measured on llama.cpp \texttt{797de63}).
+The grammar therefore opens with the reasoning span, any text up to
+\texttt{</think>}:
+\begin{lstlisting}
+root  ::= think action
+think ::= ( [^<] | "<" [^/] | "</" [^t] | "</t" [^h] | "</th" [^i]
+          | "</thi" [^n] | "</thin" [^k] | "</think" [^>] )* "</think>" [ \n]*
+action ::= patch | whole | run
+whole ::= "```python\n" codeline* "```"
+ctx   ::= "@@" ( " " [^-\n] [^\n]* )? "\n"
+\end{lstlisting}
+With this grammar and a 60-token reasoning budget the server closed the reasoning
+at the budget and sampled a well-formed answer. Reasoning stays unconstrained,
+which matters because format restrictions on the reasoning itself can cost
+accuracy \cite{tam2024speakfreely}; grammar-constrained decoding is otherwise
+cheap on the server side \cite{willard2023outlines,dong2024xgrammar}.
+
+\subsection{Which edits to offer}
+
+Codex edits only through patches. Small models are worse at diff formats than at
+whole-file rewrites \cite{diffxyz2025,aider2024editformats}, and a patch saves
+answer tokens only when the file is long (Eq.~\ref{eq:patch}). The live runs
+agree: in Phase~10 Qwen3-4B wrote a unified-diff header, an update of a file that
+did not exist, and an update hunk without line prefixes; in the first Phase~11
+smoke run Qwen3-1.7B wrote well-formed patches under the grammar that appended a
+second copy of the file. \texttt{edit\_format = "auto"} therefore offers the
+whole \texttt{solution.py} while it is missing or at most 80 lines long and a
+patch or the whole file above that; \texttt{"any"} offers both at every step, as
+Phase~10 did. Patches remain the edit for long files, where Eq.~\ref{eq:patch}
+favours them.
+
+\subsection{Smaller pieces}
+
+A workspace the verifier already judged is not judged again (a model that
+restores an earlier file is told so). Tracebacks name files relative to the run
+(\texttt{File "runner.py"}), not the sandbox's random directory. Each step
+records the server's token accounting (prompt tokens computed and served from the
+cache, decode tokens, finish reason), and each run returns the totals and its net
+diff. The Phase~10 loop remains selectable (\texttt{context = "reset"}), and the
+request may override \texttt{context}, \texttt{constrain}, \texttt{stream\_cut}
+and \texttt{edit\_format}, which is how the A/B below was run.
+
+\subsection{Results}
+
+\input{sections/harness_ab_tables.tex}
+\input{sections/harness2_results.tex}

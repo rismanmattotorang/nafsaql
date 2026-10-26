@@ -4361,6 +4361,80 @@
               "system1",
               "system2"
             ]
+          },
+          "context": {
+            "type": "string",
+            "enum": [
+              "append",
+              "reset"
+            ],
+            "description": "Phase 11 A/B override of `harness.context`: `append` keeps the transcript append-only so the server's prompt cache is reused (Codex history, compacted when long); `reset` is the Phase 10 loop"
+          },
+          "constrain": {
+            "type": "boolean",
+            "description": "Phase 11 A/B override of `harness.constrain` (sample each action under the step's GBNF grammar)"
+          },
+          "stream_cut": {
+            "type": "boolean",
+            "description": "Phase 11 A/B override of `harness.stream_cut` (end the stream when the action is complete)"
+          },
+          "edit_format": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "any",
+              "whole"
+            ],
+            "description": "Phase 11 A/B override of `harness.edit_format`: `auto` offers a patch only when solution.py is longer than `harness.whole_max_lines`, `any` always, `whole` never"
+          },
+          "thinking_budget": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 4096,
+            "description": "Override of `harness.thinking_budget` (System 2 reasoning tokens per step)"
+          },
+          "first_step_thinking_budget": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4096,
+            "description": "Override of `harness.first_step_thinking_budget` (reasoning tokens on the first step; 0 = off)"
+          },
+          "unstick": {
+            "type": "boolean",
+            "description": "Phase 11 A/B override of `harness.unstick` (after a step that reproduced judged files, compact the transcript and sample more diversely)"
+          }
+        }
+      },
+      "CodeAgentUsage": {
+        "type": "object",
+        "description": "One model call as the server reported it (Phase 11)",
+        "properties": {
+          "prompt_tokens": {
+            "type": "integer",
+            "description": "Prompt tokens prefilled (not served from the cache)"
+          },
+          "cached_tokens": {
+            "type": "integer",
+            "description": "Prompt tokens served from the server's cache"
+          },
+          "prefill_ms": {
+            "type": "number"
+          },
+          "decode_ms": {
+            "type": "number"
+          },
+          "completion_tokens": {
+            "type": "integer"
+          },
+          "reasoning_tokens": {
+            "type": "integer"
+          },
+          "finish_reason": {
+            "type": "string",
+            "description": "`stop`, `length`, or `action_complete` (the stream was cut after the action)"
+          },
+          "constrained": {
+            "type": "boolean"
           }
         }
       },
@@ -4398,6 +4472,13 @@
           },
           "ms": {
             "type": "integer"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/CodeAgentUsage"
+          },
+          "compacted": {
+            "type": "boolean",
+            "description": "The transcript was compacted before this step's call"
           }
         }
       },
@@ -4466,6 +4547,41 @@
           },
           "wall_ms": {
             "type": "integer"
+          },
+          "context": {
+            "type": "string",
+            "enum": [
+              "append",
+              "reset"
+            ]
+          },
+          "constrained": {
+            "type": "boolean"
+          },
+          "edit_format": {
+            "type": "string"
+          },
+          "verifier_calls": {
+            "type": "integer",
+            "description": "Sandbox runs of the verifier (a workspace already judged is not judged again)"
+          },
+          "compactions": {
+            "type": "integer"
+          },
+          "prefill_tokens": {
+            "type": "integer",
+            "description": "Prompt tokens prefilled over the run"
+          },
+          "cached_tokens": {
+            "type": "integer",
+            "description": "Prompt tokens served from the server's cache over the run"
+          },
+          "decoded_tokens": {
+            "type": "integer"
+          },
+          "diff": {
+            "type": "string",
+            "description": "The run's net change as a unified diff (returned files against the starting ones)"
           }
         }
       },

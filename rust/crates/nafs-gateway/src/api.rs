@@ -1338,10 +1338,20 @@ async fn harness_info(State(s): State<AppState>) -> Json<Value> {
             "model": c.harness.model,
             "max_steps": c.harness.max_steps,
             "wall_clock_s": c.harness.wall_clock_s,
+            "context": c.harness.context,
+            "compact_at_tokens": c.harness.compact_at_tokens,
+            "constrain": c.harness.constrain,
+            "grammar_supported": s.orch.active().s2.supports_grammar(),
+            "stream_cut": c.harness.stream_cut,
+            "edit_format": c.harness.edit_format,
+            "whole_max_lines": c.harness.whole_max_lines,
+            "unstick": c.harness.unstick,
+            "thinking_budget": c.harness.thinking_budget,
+            "first_step_thinking_budget": c.harness.first_step_thinking_budget,
         },
         "sources": [
             {"name": "Open Math Harness", "revision": "687f2a2", "license": "Apache-2.0", "parts": ["lean rules and verify protocol", "discovery scoring", "best-first candidate tree", "prover stop rule"]},
-            {"name": "OpenAI Codex (codex-rs)", "revision": "970111f6", "license": "Apache-2.0", "parts": ["apply_patch parser and fuzzy matcher", "middle truncation", "exec output format", "seatbelt -D parameters", "turn loop"]},
+            {"name": "OpenAI Codex (codex-rs)", "revision": "970111f6", "license": "Apache-2.0", "parts": ["apply_patch parser and fuzzy matcher", "middle truncation", "exec output format", "seatbelt -D parameters", "turn loop", "append-only history and compaction", "freeform apply_patch grammar (as GBNF)", "dispatch at item done (stream cut)", "budget reminders", "turn diff"]},
         ],
     }))
 }

@@ -147,7 +147,7 @@ numeric_tolerance = 1e-6
 memory_mb = 1024                       # RSS cap per verifier subprocess (FR-033); some MBPP+ tests need > 512 MB
 sympy_python = "python3.10"            # interpreter with SymPy; "" disables symbolic math checks
 rates_file = "data/runtime/verifier_rates.json"   # mutation-measured (r, phi), FR-035
-lean = ""                              # FR-090: absolute path of the `lean` executable (e.g. ~/.elan/toolchains/<v>/bin/lean); "" refuses Lean tasks
+lean = "~/.elan/toolchains/leanprover--lean4---v4.35.0/bin/lean"   # FR-090: the `lean` executable of an elan toolchain (core Lean 4.35.0 on the reference machine); "" refuses Lean tasks; a missing file turns Lean off with a warning
 lean_path = ""                         # LEAN_PATH of a Mathlib build ("" = core Lean only)
 lean_timeout_s = 120
 lean_memory_mb = 4096
@@ -166,3 +166,12 @@ thinking_budget = 512                  # reasoning tokens per step on System 2
 step_max_tokens = 768                  # answer tokens per step (a patch or a whole file)
 wall_clock_s = 900
 keep_exchanges = 3                     # exchanges kept after each context reset
+context = "append"                     # Phase 11: "append" = Codex transcript (prompt cache reused, compacted when long); "reset" = Phase 10 loop
+compact_at_tokens = 2600               # append mode: compact before a call when the transcript estimate exceeds this (System 1 slots hold 4,096 tokens)
+constrain = true                       # sample each action under the step's GBNF grammar (Codex's apply_patch grammar; llama-server only)
+stream_cut = true                      # end the model's stream as soon as its action is complete
+notes = 2                              # prose lines System 1 may write before an action under the grammar
+edit_format = "auto"                   # "auto": whole solution.py while it is missing or short, a patch or the whole file above; "any"; "whole"
+whole_max_lines = 80                   # "auto": solution.py lines above which a patch is offered
+unstick = true                         # after a step that reproduced judged files: compact the transcript, sample more diversely
+first_step_thinking_budget = 256       # System 2 reasoning tokens on the first step; thinking_budget after a failure (0 = thinking_budget always)

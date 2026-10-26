@@ -1,0 +1,40 @@
+% Phase 11 results text. Numbers come from harness_ab_gen.tex (scripts/gen_harness_ab.py).
+\textbf{Design of the A/B.} \texttt{scripts/harness\_ab.py} runs ten small Python
+tasks (six fixes of a buggy \texttt{solution.py}, four written from an empty
+workspace; four or five hidden asserts each) through the running gateway, once
+per arm, with the same model and a budget of six steps; the order of the arms is
+rotated from task to task so that a drift in machine load does not favour one
+arm. The arms are the Phase~10 loop (context rebuilt every step, no grammar, no
+stream cut, patches always offered), Phase~11 with \texttt{edit\_format =
+"auto"}, and, on System~1, Phase~11 with a patch offered at every step, which
+isolates the edit policy. The host was shared with the owner's other model
+servers (load average 5--9), so wall times are reported but are not speed
+claims; token counts and outcomes do not depend on load.
+
+\textbf{System~1.} Table~\ref{tab:harnessab} gives the totals. The Phase~11 arm
+verified \HABOneNewVerified{} of \HABOneNewN{} tasks in \HABOneNewCalls{} model
+calls; the Phase~10 loop verified \HABOneOldVerified{} in \HABOneOldCalls{}. The
+difference in verified tasks lies on two discordant tasks (Phase~11 verified the
+palindrome fix and \texttt{flatten}, where Phase~10 did not; no task went the
+other way), so with ten tasks it is indicative and not significant (exact
+McNemar $p=0.5$). The mechanism behind it is not in doubt: \HABOneOldMalformed{}
+of the Phase~10 loop's \HABOneOldActions{} steps held no action it could parse
+(the 1.7B model answered in prose or with \texttt{SUBMIT}), against
+\HABOneNewMalformed{} of \HABOneNewActions{} under the grammar, a reply that ran
+out of tokens before its fence closed. Offering a patch at every step was the
+worst arm: \HABOneAnyVerified{} of \HABOneAnyN{} verified, \HABOneAnyMalformed{}
+of \HABOneAnyActions{} steps malformed, and the most tokens decoded
+(\HABOneAnyDecoded{}). Most of its patches \emph{applied} and still broke the
+file: the 1.7B model prefixed added lines with extra plus signs (\texttt{++ def
+rle(s):}), left a mangled \texttt{End Patch} line inside the file, or replaced
+the whole file with \texttt{python check.py}; the grammar fixes the syntax of a
+patch, not its sense. Prefill was not where System~1 lost time: llama-server's chunked cache
+reuse (\texttt{--cache-reuse 256}) and its host-memory prompt cache served
+\HABOneOldHit\,\% of the Phase~10 loop's prompt tokens as well, against
+\HABOneNewHit\,\% for the append-only transcript. Phase~11 decoded more
+(\HABOneNewDecoded{} against \HABOneOldDecoded{} tokens) because its steps are
+whole files rather than unparseable prose, and spent \HABOneNewWall\,s against
+\HABOneOldWall\,s in all: \HABOneNewWallPerVerified\,s per verified task against
+\HABOneOldWallPerVerified\,s.
+
+\input{sections/harness2_results_s2.tex}

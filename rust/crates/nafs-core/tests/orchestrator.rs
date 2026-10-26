@@ -65,7 +65,7 @@ fn reply_for(body: &Value) -> (String, String) {
                 "Let me see what it prints.\n```run\npython solution.py\n```".into(),
             )
         } else {
-            ("t".into(), "*** Begin Patch\n*** Update File: solution.py\n@@ def sq(x):\n-    return x + x\n+    return x * x\n*** End Patch".into())
+            ("t".into(), "*** Begin Patch\n*** Update File: solution.py\n@@ def sq(x):\n-    return x + x\n+    return x * x\n*** End Patch\nThis squares x instead of doubling it.".into())
         };
     }
     // FR-091: a code task whose first attempt passes 2 of 3 asserts and whose repair makes things worse; only
@@ -1103,7 +1103,8 @@ async fn patch_repair_edits_the_candidate_and_survives_a_broken_patch() {
 
 #[tokio::test]
 async fn lean_tasks_need_a_configured_toolchain() {
-    let (o, _mock, _d) = setup(true).await;
+    // The shipped configuration names a toolchain; this test is about a server without one.
+    let (o, _mock, _d) = setup_with(true, |c| c.verifiers.lean.clear()).await;
     let mut q = req("1");
     q.verification = Some(VerificationInputs {
         lean: Some(LeanTask {
@@ -1160,6 +1161,80 @@ async fn code_agent_runs_patches_and_stops_on_the_verifier() {
         .as_str()
         .unwrap()
         .contains("1 of 2 tests passed"));
+    // Phase 11: the second request extends the first (prompt-cache prefix) and each carries the step's
+    // grammar (reasoning span first).
+    let all = s2_messages(&mock);
+    assert_eq!(all[1][..all[0].len()], all[0][..]);
+    let grammars: Vec<String> = mock
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|b| b["model"] == "system2")
+        .map(|b| b["grammar"].as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(
+        grammars[0].starts_with("root ::= think action\n"),
+        "{}",
+        grammars[0]
+    );
+    // solution.py is short, so "auto" offers the whole file and a run, not a patch.
+    assert!(
+        grammars[0].contains("action ::= whole | run\n"),
+        "{}",
+        grammars[0]
+    );
+    assert!(!grammars[0].contains("patch ::="));
+    assert_eq!(
+        (r.context.as_str(), r.constrained, r.edit_format.as_str()),
+        ("append", true, "auto")
+    );
+    // Under the grammar the server ends the action itself, so the stream is not cut and its timings arrive.
+    let u = r.steps[1].usage.as_ref().unwrap();
+    assert_eq!(u.finish_reason, "stop");
+    assert!(u.constrained && u.prompt_tokens.is_none() && u.completion_tokens == 8);
+    assert!(
+        r.diff.contains("-    return x + x\n+    return x * x\n"),
+        "{}",
+        r.diff
+    );
+    assert_eq!(
+        r.verifier_calls, 2,
+        "the starting files and the patched ones"
+    );
+
+    // The Phase 10 arm of the A/B: rebuilt context and no grammar.
+    let n = s2_messages(&mock).len();
+    let phase10 = CodeAgentRequest {
+        task: "AGENTTASK: fix sq(x) so that it returns x squared.".into(),
+        files: [(
+            "solution.py".to_string(),
+            "def sq(x):\n    return x + x\n\nprint(sq(3))\n".to_string(),
+        )]
+        .into_iter()
+        .collect(),
+        verification: VerificationInputs {
+            tests: Some(vec!["assert sq(3) == 9".into(), "assert sq(2) == 4".into()]),
+            ..Default::default()
+        },
+        context: Some("reset".into()),
+        constrain: Some(false),
+        stream_cut: Some(true),
+        ..Default::default()
+    };
+    let r = o.run_code_agent(phase10).await.unwrap();
+    assert!(r.passed && r.context == "reset" && !r.constrained);
+    // Unconstrained, the stream ends with the patch: the trailing sentence is never decoded.
+    let u = r.steps[1].usage.as_ref().unwrap();
+    assert_eq!(u.finish_reason, "action_complete");
+    assert!(!u.constrained && u.completion_tokens > 0);
+    let calls = mock.calls.lock().unwrap().clone();
+    let s2: Vec<&Value> = calls.iter().filter(|b| b["model"] == "system2").collect();
+    assert!(s2[n..].iter().all(|b| b.get("grammar").is_none()));
+    assert!(s2[n]["messages"][0]["content"]
+        .as_str()
+        .unwrap()
+        .contains("Reply SUBMIT"));
 
     let bad = CodeAgentRequest {
         task: "x".into(),

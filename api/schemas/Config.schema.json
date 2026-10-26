@@ -562,6 +562,34 @@
         },
         "keep_exchanges": {
           "type": "integer"
+        },
+        "context": {
+          "type": "string"
+        },
+        "compact_at_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "constrain": {
+          "type": "boolean"
+        },
+        "stream_cut": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "integer"
+        },
+        "edit_format": {
+          "type": "string"
+        },
+        "whole_max_lines": {
+          "type": "integer"
+        },
+        "unstick": {
+          "type": "boolean"
+        },
+        "first_step_thinking_budget": {
+          "type": "integer"
         }
       },
       "additionalProperties": false

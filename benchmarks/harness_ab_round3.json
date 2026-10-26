@@ -1,0 +1,632 @@
+{
+ "runs": [
+  {
+   "model": "system2",
+   "task": "fix_palindrome_case",
+   "arm": "phase11_r3",
+   "order": 0,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.4,
+   "finished": "2026-10-26T09:25:38",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 106.5,
+   "prefill_tokens": 135,
+   "cached_tokens": 207,
+   "decoded_tokens": 546,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 106352,
+     "usage": {
+      "prompt_tokens": 135,
+      "cached_tokens": 207,
+      "prefill_ms": 4328.208,
+      "decode_ms": 101946.561,
+      "completion_tokens": 546,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def is_palindrome(s):\n    cleaned = ''.join(filter(str.isalnum, s)).lower()\n    return cleaned == cleaned[::-1]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_palindrome_case",
+   "arm": "phase11_adapt",
+   "order": 1,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.4,
+   "finished": "2026-10-26T09:26:27",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 48.3,
+   "prefill_tokens": 1,
+   "cached_tokens": 341,
+   "decoded_tokens": 304,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 48284,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 341,
+      "prefill_ms": 166.496,
+      "decode_ms": 47975.592,
+      "completion_tokens": 304,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def is_palindrome(s):\n    # Process the string: lowercase and remove non-alphanumeric characters\n    cleaned = ''.join(filter(str.isalnum, s.lower()))\n    return cleaned == cleaned[::-1]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_second_largest",
+   "arm": "phase11_adapt",
+   "order": 0,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.4,
+   "finished": "2026-10-26T09:27:14",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 47.2,
+   "prefill_tokens": 1,
+   "cached_tokens": 372,
+   "decoded_tokens": 295,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 47113,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 372,
+      "prefill_ms": 145.491,
+      "decode_ms": 46729.967,
+      "completion_tokens": 295,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def second_largest(xs):\n    distinct = sorted(set(xs))\n    if len(distinct) < 2:\n        return None\n    return distinct[-2]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_second_largest",
+   "arm": "phase11_r3",
+   "order": 1,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.6,
+   "finished": "2026-10-26T09:28:45",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 91.5,
+   "prefill_tokens": 1,
+   "cached_tokens": 372,
+   "decoded_tokens": 553,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 91454,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 372,
+      "prefill_ms": 192.169,
+      "decode_ms": 91147.245,
+      "completion_tokens": 553,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def second_largest(xs):\n    unique_sorted = sorted(set(xs))\n    if len(unique_sorted) < 2:\n        return None\n    return unique_sorted[-2]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_rle",
+   "arm": "phase11_r3",
+   "order": 0,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.5,
+   "finished": "2026-10-26T09:30:24",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 98.6,
+   "prefill_tokens": 1,
+   "cached_tokens": 264,
+   "decoded_tokens": 607,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 98600,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 264,
+      "prefill_ms": 147.471,
+      "decode_ms": 98265.739,
+      "completion_tokens": 607,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def rle(s):\n    if s == \"\":\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(str(count) + s[i-1])\n            count = 1\n    result.append(str(count) + s[-1])\n    return ''.join(result)\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_rle",
+   "arm": "phase11_adapt",
+   "order": 1,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.3,
+   "finished": "2026-10-26T09:31:18",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 54.4,
+   "prefill_tokens": 1,
+   "cached_tokens": 264,
+   "decoded_tokens": 351,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 54434,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 264,
+      "prefill_ms": 144.762,
+      "decode_ms": 54234.035,
+      "completion_tokens": 351,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def rle(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(str(count) + s[i-1])\n            count = 1\n    result.append(str(count) + s[-1])\n    return ''.join(result)\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_fizzbuzz",
+   "arm": "phase11_adapt",
+   "order": 0,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.4,
+   "finished": "2026-10-26T09:32:17",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 58.6,
+   "prefill_tokens": 1,
+   "cached_tokens": 470,
+   "decoded_tokens": 353,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 58497,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 470,
+      "prefill_ms": 170.684,
+      "decode_ms": 58042.155,
+      "completion_tokens": 353,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def fizzbuzz(n):\n    out = []\n    for i in range(1, n+1):\n        if i % 3 == 0 and i % 5 == 0:\n            out.append('FizzBuzz')\n        elif i % 3 == 0:\n            out.append('Fizz')\n        elif i % 5 == 0:\n            out.append('Buzz')\n        else:\n            out.append(str(i))\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_fizzbuzz",
+   "arm": "phase11_r3",
+   "order": 1,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.2,
+   "finished": "2026-10-26T09:34:01",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 103.7,
+   "prefill_tokens": 1,
+   "cached_tokens": 470,
+   "decoded_tokens": 609,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 103667,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 470,
+      "prefill_ms": 142.314,
+      "decode_ms": 103395.945,
+      "completion_tokens": 609,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def fizzbuzz(n):\n    out = []\n    for i in range(1, n+1):\n        if i % 3 == 0 and i % 5 == 0:\n            out.append('FizzBuzz')\n        elif i % 3 == 0:\n            out.append('Fizz')\n        elif i % 5 == 0:\n            out.append('Buzz')\n        else:\n            out.append(str(i))\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_flatten",
+   "arm": "phase11_r3",
+   "order": 0,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.4,
+   "finished": "2026-10-26T09:35:16",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 75.0,
+   "prefill_tokens": 1,
+   "cached_tokens": 277,
+   "decoded_tokens": 558,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 75049,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 277,
+      "prefill_ms": 154.494,
+      "decode_ms": 74648.441,
+      "completion_tokens": 558,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def flatten(xs):\n    result = []\n    for x in xs:\n        if isinstance(x, list):\n            result.extend(flatten(x))\n        else:\n            result.append(x)\n    return result\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_flatten",
+   "arm": "phase11_adapt",
+   "order": 1,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.8,
+   "finished": "2026-10-26T09:35:49",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 33.4,
+   "prefill_tokens": 1,
+   "cached_tokens": 277,
+   "decoded_tokens": 302,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 33371,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 277,
+      "prefill_ms": 110.57,
+      "decode_ms": 33171.35,
+      "completion_tokens": 302,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def flatten(xs):\n    result = []\n    for x in xs:\n        if isinstance(x, list):\n            result.extend(flatten(x))\n        else:\n            result.append(x)\n    return result\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_caesar",
+   "arm": "phase11_adapt",
+   "order": 0,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 6.6,
+   "finished": "2026-10-26T09:36:29",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 39.7,
+   "prefill_tokens": 1,
+   "cached_tokens": 272,
+   "decoded_tokens": 356,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 39698,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 272,
+      "prefill_ms": 107.909,
+      "decode_ms": 39472.424,
+      "completion_tokens": 356,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def caesar(s, k):\n    result = []\n    for char in s:\n        if char.isalpha():\n            base = ord('a') if char.islower() else ord('A')\n            shifted = (ord(char) - base + k) % 26\n            if shifted < 0:\n                shifted += 26\n            result.append(chr(base + shifted))\n        else:\n            result.append(char)\n    return ''.join(result)\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_caesar",
+   "arm": "phase11_r3",
+   "order": 1,
+   "label": "SHARED MACHINE (user's other model servers and apps on the same 4 cores); round 3 build (no patch inside code blocks, warm-up of the agent prompt)",
+   "load_1m_after": 5.6,
+   "finished": "2026-10-26T09:37:54",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 84.9,
+   "prefill_tokens": 1,
+   "cached_tokens": 272,
+   "decoded_tokens": 626,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 84851,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 272,
+      "prefill_ms": 109.955,
+      "decode_ms": 84575.833,
+      "completion_tokens": 626,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def caesar(s, k):\n    result = []\n    for char in s:\n        if char.islower():\n            base = ord('a')\n            shifted = (ord(char) - base + k) % 26\n            result.append(chr(base + shifted))\n        elif char.isupper():\n            base = ord('A')\n            shifted = (ord(char) - base + k) % 26\n            result.append(chr(base + shifted))\n        else:\n            result.append(char)\n    return ''.join(result)\n"
+   }
+  }
+ ],
+ "arms": {
+  "phase10": {
+   "context": "reset",
+   "constrain": false,
+   "stream_cut": false,
+   "edit_format": "any"
+  },
+  "phase11": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto"
+  },
+  "phase11_any": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "any"
+  },
+  "phase11_u": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "unstick": true
+  },
+  "phase11_nou": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "unstick": false
+  },
+  "phase11_b512": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512
+  },
+  "phase11_b256": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 256
+  },
+  "phase11_r3": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512,
+   "first_step_thinking_budget": 0
+  },
+  "phase11_adapt": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512,
+   "first_step_thinking_budget": 256
+  }
+ }
+}

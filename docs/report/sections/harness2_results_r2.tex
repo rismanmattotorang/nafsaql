@@ -1,0 +1,35 @@
+% Phase 11 results, rounds 2 and 3. Numbers from harness_ab_macros.tex.
+\textbf{Round 2: breaking repetition, and the reasoning budget.} Round~1 showed
+a failure the grammar cannot touch: a small model that rewrites the same failing
+file step after step, anchored on its own previous reply (System~1 reproduced
+an already-judged file in four consecutive steps of one run). Two changes went
+into the build for round~2. Failing asserts now carry the value they got
+(\texttt{assert f(x) == y -> AssertionError: got 5}), the concise execution
+feedback that self-debugging relies on \cite{chen2024selfdebug}; and
+\texttt{unstick}: after a step that reproduced files the verifier had already
+judged, the transcript is compacted before the next call (the model no longer
+sees, and copies, its repeated reply; the attempts list says what was tried) and
+the step is sampled 0.3 hotter per repeat. Table~\ref{tab:harnessab2} gives the
+interleaved comparison on the same ten System~1 tasks: with \texttt{unstick} the
+agent verified \HABROneUVerified{} in \HABROneUCalls{} calls and \HABROneUWall\,s,
+without it \HABROneNoUVerified{} in \HABROneNoUCalls{} calls and
+\HABROneNoUWall\,s; the two discordant tasks both favour \texttt{unstick}, so it is
+on by default. The value-carrying evidence was in both arms and is not isolated;
+the Phase~11 arm verified 4 of 10 in round~1 and \HABROneNoUVerified{} without
+\texttt{unstick} in round~2, which is consistent with it helping but is not an
+interleaved comparison.
+
+On System~2 every call of round~1 spent its full reasoning budget, so round~2
+compared 512 and 256 reasoning tokens per step on six tasks. Both verified all
+six. Halving the budget halved the time of the four tasks it solved in one call
+(about 55\,s against 100\,s), but two tasks then needed four and six calls, \HABRTwoSmallMalformed{}
+of its \HABRTwoSmallActions{} steps were malformed, and the arm took
+\HABRTwoSmallWall\,s against \HABRTwoBigWall\,s: a smaller budget is not faster
+overall. The malformed steps exposed a gap in the grammar. With a short file only
+a whole file is offered, and System~2 wrote a Codex patch \emph{inside} the
+\verb|```python| block, which the grammar allowed (round~1's two such patches
+applied; round~2's four did not). A code line may no longer start with
+\texttt{*} (a top-level Python line never does), so the edit policy is now
+enforced by the grammar, not only by the prompt.
+
+\input{sections/harness2_results_r3.tex}

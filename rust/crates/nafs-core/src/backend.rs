@@ -40,6 +40,13 @@ pub struct GenRequest {
     /// P7-T03 / Phase 8: stop the stream early (finish_reason "early_escalation") when a confidence
     /// signal crosses its threshold.
     pub early_stop: Option<EarlyStop>,
+    /// GBNF grammar for the whole generation, reasoning span included (llama-server only; see
+    /// [`Backend::supports_grammar`]). Phase 11: the code agent's action grammar.
+    pub grammar: Option<String>,
+    /// Phase 11: end the stream as soon as the answer text so far holds a complete unit. The function returns
+    /// where the unit ends; the content is cut there and `finish_reason` is "action_complete". Dropping the
+    /// stream stops generation on the server, so nothing after the unit is decoded.
+    pub stop_after: Option<fn(&str) -> Option<usize>>,
 }
 
 /// Early-escalation thresholds on the draft's token log-probs. `below_mean` is the P7-T03 rule (running
@@ -318,6 +325,8 @@ impl Backend {
         }
         if let Some(rf) = &req.response_format {
             b["response_format"] = rf.clone();
+        } else if let Some(g) = req.grammar.as_ref().filter(|_| self.supports_grammar()) {
+            b["grammar"] = json!(g);
         }
         if let Some(budget) = req.thinking_budget {
             // Server-side budget forcing (Prop. 9): llama-server closes the reasoning span at the budget;
@@ -422,6 +431,7 @@ impl Backend {
             .as_ref()
             .map(|e| crate::sequential::WindowTracker::new(e.window.max(1)));
         let mut last = Instant::now();
+        let mut deltas = 0u32;
         let emit = |out: &mut GenOutput,
                     text: &str,
                     reasoning: bool,
@@ -484,6 +494,7 @@ impl Backend {
                 .unwrap_or("");
             if !reasoning.is_empty() {
                 out.reasoning_tokens += 1;
+                deltas += 1;
                 emit(&mut out, reasoning, true, sink);
             }
             if let Some(c) = delta.get("content").and_then(|x| x.as_str()) {
@@ -491,8 +502,19 @@ impl Backend {
                 if split.in_think || pieces.iter().any(|(_, r)| *r) {
                     out.reasoning_tokens += 1;
                 }
+                if !c.is_empty() {
+                    deltas += 1;
+                }
                 for (t, r) in pieces {
                     emit(&mut out, &t, r, sink);
+                }
+                if let Some(end) = req.stop_after.and_then(|f| f(&out.content)) {
+                    // The usage chunk never arrives after a cut: one streamed delta is one token on
+                    // llama-server and vLLM.
+                    out.content.truncate(end);
+                    out.finish_reason = "action_complete".into();
+                    out.completion_tokens = deltas;
+                    break;
                 }
             }
             let mut low_window: Option<f32> = None;
@@ -609,6 +631,11 @@ impl Backend {
             .trim_end_matches('/')
             .trim_end_matches("/v1")
             .to_string()
+    }
+
+    /// llama-server takes a GBNF `grammar` and applies it from the first sampled token, reasoning included.
+    pub fn supports_grammar(&self) -> bool {
+        self.kind == "llama"
     }
 
     /// Raw continuation with a cached prefix is a llama-server feature (`/completion`, `/apply-template`).
