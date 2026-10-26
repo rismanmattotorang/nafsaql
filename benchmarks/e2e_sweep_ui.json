@@ -1,6 +1,6 @@
 {
- "measured_at": "2026-10-26T00:25:52Z",
- "base": "http://127.0.0.1:8090",
+ "measured_at": "2026-10-26T13:55:11Z",
+ "base": "http://127.0.0.1:8080",
  "passed": 23,
  "failed": 0,
  "results": [

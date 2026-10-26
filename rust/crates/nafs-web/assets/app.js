@@ -114,7 +114,7 @@ function plain(t) {
     .replace(/\s*\(threshold 1\.0\)/g, '').replace(/[;,]?\s*e1_hat [\d.]+ (?:recorded for calibration|is not used)/g, '')
     .replace(/\bexact verifiers?\b/g, (m) => m.endsWith('s') ? 'exact checks' : 'exact check').replace(/\bverifier verdicts\b/g, 'check results').replace(/\bverifiers?\b/g, (m) => m.endsWith('s') ? 'checks' : 'check')
     .replace(/\bSystem 1 drafts?\b/g, (m) => m.endsWith('s') ? 'quick drafts' : 'quick draft').replace(/\bSystem 2 answers?\b/g, (m) => m.endsWith('s') ? 'thorough answers' : 'thorough answer').replace(/\be1_hat\b/g, 'predicted risk') // copy-lint: allow
-    .replace(/no fitted calibration \(uncalibrated prior\)/g, 'nothing learned yet').replace(/\bthe gate's estimator\b/g, "the routing's own estimate").replace(/\b(?:Aql )?[Gg]ate\b/g, 'routing').replace(/\bverifiable\b/g, 'checkable')
+    .replace(/no fitted calibration \(uncalibrated prior\)/g, 'nothing learned yet').replace(/Operator override: force_mode = (slow|fast)[^.]*\./g, (m, k) => k === 'slow' ? 'You asked for a thorough answer.' : 'You asked for a quick answer.').replace(/\bthe gate's estimator\b/g, "the routing's own estimate").replace(/\b(?:Aql )?[Gg]ate\b/g, 'routing').replace(/\bverifiable\b/g, 'checkable')
     .replace(/\bdeliberation\b/g, 'thinking longer').replace(/\bescalated to\b/g, 'sent to').replace(/\bescalate\b/g, 'think longer')
     .replace(/(^|.{0,2})\bSystem 1\b/g, (m, pre) => pre + cap(pre, 'the quick model')) // copy-lint: allow
     .replace(/(^|.{0,2})\bSystem 2\b/g, (m, pre) => pre + cap(pre, 'the thorough model')) // copy-lint: allow
@@ -374,6 +374,8 @@ const ASSURE = { verified: ['b-verified', icon.check, 'Checked', 'Checked exactl
   abstained: ['b-abstained', icon.alert, 'Not sure', 'No answer passed the checks in the time allowed, so this one comes with a caution.'] };
 // Plain-language badges; "Not checked" is shown only in Advanced mode, since most open questions have no exact check.
 const assureBadge = (a) => { if (a === 'unverified' && !advanced()) return ''; const [c, i, l, t] = ASSURE[a] || ASSURE.unverified; return `<span class="badge ${c}" title="${esc(t)}">${i}${l}</span>`; };
+// The server marks each thorough attempt in the reasoning stream ("[attempt 2]"); people see a plain divider.
+const plainReasoning = (t) => t.replace(/^\[attempt (\d+)\]\n?/gm, (m, n) => n === '1' ? '' : '\n— trying again —\n').replace(/\[previous candidate rejected\]\n?/g, '');
 // What the user sees while an answer is being made (the stations are Advanced-mode detail).
 const LIVE_LABEL = { A: 'Answering…', L: 'Double-checking…', M: 'Thinking it through…', T: 'Finishing…', X: 'Finishing…' };
 // One sentence on why this answer took the path it did, for the "Why?" popover.
@@ -456,7 +458,7 @@ class Turn {
     if (draft && adv) html += `<details class="fold draft"><summary>Quick draft · ${r?.draft_conditioned ? 'shown to the thorough model (test mode)' : 'replaced'}${this.decision ? ' — ' + esc(plain(this.decision.explanation).slice(0, 90)) : ''}</summary><div class="fb">${esc(draft)}</div></details>`;
     const reasoning = r ? r.reasoning : this.reason;
     if (reasoning) { const ntok = r ? r.usage.reasoning_tokens : reasoning.length / 4 | 0; const wasOpen = folds.querySelector('.reason')?.open;
-      html += `<details class="fold reason" ${wasOpen ?? (live) ? 'open' : ''}><summary>${icon.brain} ${adv ? `Reasoning · ${r ? ntok + ' tokens' : '~' + ntok + ' tokens so far'}${r?.usage?.thinking_budget ? ` (budget ${r.usage.thinking_budget})` : ''}` : live ? 'Thinking…' : 'Show thinking'}</summary><div class="fb">${esc(reasoning)}</div></details>`; }
+      html += `<details class="fold reason" ${wasOpen ?? (live) ? 'open' : ''}><summary>${icon.brain} ${adv ? `Reasoning · ${r ? ntok + ' tokens' : '~' + ntok + ' tokens so far'}${r?.usage?.thinking_budget ? ` (budget ${r.usage.thinking_budget})` : ''}` : live ? 'Thinking…' : 'Show thinking'}</summary><div class="fb">${esc(adv ? reasoning : plainReasoning(reasoning))}</div></details>`; }
     if (folds.innerHTML !== html) { const fb = folds.querySelector('.reason .fb'); const atBottom = fb && fb.scrollTop + fb.clientHeight >= fb.scrollHeight - 20; folds.innerHTML = html; const nfb = folds.querySelector('.reason .fb'); if (nfb && (atBottom || live)) nfb.scrollTop = nfb.scrollHeight; }
     { const tools = el.querySelector('.tools'); const open = new Set($$('.toolcard[open]', tools).map((x, i) => i)); const html = adv ? toolcardsHTML(this, live) : ''; if (tools.dataset.h !== html) { tools.dataset.h = html; tools.innerHTML = html; $$('.toolcard', tools).forEach((x, i) => { if (open.has(i)) x.open = true; }); } }
     const text = r ? r.message.content : this.answerText();
