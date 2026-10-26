@@ -1,0 +1,123 @@
+{
+ "measured_at": "2026-10-26T00:25:52Z",
+ "base": "http://127.0.0.1:8090",
+ "passed": 23,
+ "failed": 0,
+ "results": [
+  {
+   "check": "ui: #chat uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #rooms uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #chat renders without errors",
+   "pass": true,
+   "detail": "Chat \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #chat (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #eval renders without errors",
+   "pass": true,
+   "detail": "Experiments \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #eval (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #gate renders without errors",
+   "pass": true,
+   "detail": "Quality \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #gate (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #tazkiya renders without errors",
+   "pass": true,
+   "detail": "Learning \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #tazkiya (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #rooms renders without errors",
+   "pass": true,
+   "detail": "Rooms \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #rooms (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #bench renders without errors",
+   "pass": true,
+   "detail": "Speed \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #bench (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #system renders without errors",
+   "pass": true,
+   "detail": "Status \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #system (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #chat fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #eval fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #gate fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #tazkiya fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #rooms fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #bench fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #system fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  }
+ ]
+}
