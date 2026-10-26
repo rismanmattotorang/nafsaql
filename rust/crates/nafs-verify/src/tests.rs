@@ -595,12 +595,14 @@ async fn real_lean_accepts_proofs_and_rejects_the_known_attacks() {
 /// tokens and told it nothing).
 #[tokio::test]
 async fn sandbox_output_names_files_relative_to_the_run() {
+    // The hub's limits carry the interpreter resolved to an absolute path, which the Linux stages need.
+    let h = hub();
     let o = sandbox::run(
         &[("boom.py", "raise ValueError('x')\n")],
         "boom.py",
         None,
-        "python3",
-        &sandbox::SandboxLimits::default(),
+        &h.limits.python,
+        &h.limits,
     )
     .await
     .unwrap();
