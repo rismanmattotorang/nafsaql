@@ -40,12 +40,18 @@ mod tests {
         for (i, _) in code.char_indices() {
             let rest = &code[i..];
             for id in ["FR-", "NFR-", "ER-", "TR-", "OR-", "SR-"] {
-                if word_start(i) && rest.starts_with(id) && rest[id.len()..].starts_with(|c: char| c.is_ascii_digit()) {
+                if word_start(i)
+                    && rest.starts_with(id)
+                    && rest[id.len()..].starts_with(|c: char| c.is_ascii_digit())
+                {
                     return Some(rest.chars().take(10).collect());
                 }
             }
             for lead in ["Prop. ", "Theorem ", "Thm ", "System "] {
-                if word_start(i) && rest.starts_with(lead) && rest[lead.len()..].starts_with(|c: char| c.is_ascii_digit()) {
+                if word_start(i)
+                    && rest.starts_with(lead)
+                    && rest[lead.len()..].starts_with(|c: char| c.is_ascii_digit())
+                {
                     return Some(rest.chars().take(lead.len() + 2).collect());
                 }
             }
@@ -73,13 +79,22 @@ mod tests {
                 }
             }
         }
-        assert!(found.is_empty(), "internal terms in UI copy:\n{}", found.join("\n"));
+        assert!(
+            found.is_empty(),
+            "internal terms in UI copy:\n{}",
+            found.join("\n")
+        );
     }
 
     #[test]
     fn the_lint_catches_what_it_should() {
-        assert_eq!(internal_term("needs 700 pairs (FR-050)").as_deref(), Some("FR-050)"));
-        assert!(internal_term("System 2 thinks").is_some() && internal_term("by Theorem 2").is_some());
+        assert_eq!(
+            internal_term("needs 700 pairs (FR-050)").as_deref(),
+            Some("FR-050)")
+        );
+        assert!(
+            internal_term("System 2 thinks").is_some() && internal_term("by Theorem 2").is_some()
+        );
         assert!(internal_term("ê₁ 0.3").is_some() && internal_term("speed λ").is_some());
         assert!(internal_term("PERFORMER-1 and the System and SR-x").is_none());
     }
