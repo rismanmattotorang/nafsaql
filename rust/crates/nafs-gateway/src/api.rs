@@ -1397,6 +1397,7 @@ fn gate_view(s: &AppState) -> Value {
         "requirements": {"min_n": g.calibration_min_n, "min_per_class": g.calibration_min_per_class, "max_ece": g.calibration_max_ece, "dkw_n": g.dkw_n(), "epsilon": g.budget_epsilon, "delta": g.budget_delta},
         "params": s.orch.param_provenance(), "derived": s.orch.params(),
         "recalibrate_every_h": g.recalibrate_every_h,
+        "live_delta_c": s.orch.live_delta_c_view(),
     })
 }
 async fn get_gate(State(s): State<AppState>) -> Json<Value> {

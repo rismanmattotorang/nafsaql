@@ -6,6 +6,7 @@ pub mod domain;
 pub mod drift;
 pub mod gate;
 pub mod harness;
+pub mod live_cost;
 pub mod orchestrator;
 pub mod sequential;
 

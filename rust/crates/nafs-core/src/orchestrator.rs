@@ -4,6 +4,7 @@
 use crate::backend::{Backend, BackendHealth, CancelFlag, GenOutput, GenRequest, RawRequest};
 use crate::calibration::Calibration;
 use crate::config::{Caps, Config};
+use crate::live_cost::{self, RollingMedian};
 use crate::{domain, gate};
 use chrono::Utc;
 use nafs_harness::patch;
@@ -16,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
@@ -27,6 +28,8 @@ pub struct BackendPair {
     pub kind: String,
     pub s1: Arc<Backend>,
     pub s2: Arc<Backend>,
+    /// Rolling median of System 2 decode tok/s from deliberate stages (live latency cost).
+    pub s2_decode: Mutex<RollingMedian>,
 }
 
 /// Measured Phase-0 parameters that replace the configuration placeholders (FR-011, FR-021, H4).
@@ -255,6 +258,10 @@ impl Orchestrator {
                     set.system2.clone(),
                     cfg.backend_retry.clone(),
                 )),
+                s2_decode: Mutex::new(RollingMedian::new(
+                    cfg.gate.live_delta_c_window,
+                    cfg.gate.live_delta_c_min_samples,
+                )),
             }));
         }
         let active = pairs
@@ -377,6 +384,49 @@ impl Orchestrator {
             .get(d.as_str())
             .copied()
             .unwrap_or_else(|| self.cfg.delta_c(d))
+    }
+    /// Live latency cost of one backend pair: (median System 2 decode tok/s, delta_c multiplier).
+    /// None when `[gate] live_delta_c` is off or fewer than the minimum deliberate stages have been timed.
+    pub fn live_delta_c_scale(&self, pair: &BackendPair) -> Option<(f32, f32)> {
+        let g = &self.cfg.gate;
+        if !g.live_delta_c {
+            return None;
+        }
+        let median = pair.s2_decode.lock().unwrap().median()?;
+        Some((
+            median,
+            live_cost::scale(
+                g.live_delta_c_ref_tok_s,
+                median,
+                g.live_delta_c_min_scale,
+                g.live_delta_c_max_scale,
+            ),
+        ))
+    }
+    /// The live latency cost as GET /v1/gate shows it (active backend).
+    pub fn live_delta_c_view(&self) -> Value {
+        let g = &self.cfg.gate;
+        let pair = self.active();
+        let (n, window, min_samples, median) = {
+            let m = pair.s2_decode.lock().unwrap();
+            (m.len(), m.window(), m.min_samples(), m.median())
+        };
+        let applied = self.live_delta_c_scale(&pair);
+        let scale = applied.map(|(_, s)| s).unwrap_or(1.0);
+        json!({
+            "enabled": g.live_delta_c,
+            "applied": applied.is_some(),
+            "backend": pair.name,
+            "s2_decode_tok_s_median": median,
+            "samples": n, "window": window, "min_samples": min_samples,
+            "ref_tok_s": g.live_delta_c_ref_tok_s,
+            "clamp": [g.live_delta_c_min_scale, g.live_delta_c_max_scale],
+            "scale": scale,
+            "delta_c_s": Domain::all().iter().map(|d| (d.as_str().to_string(), json!({
+                "static": self.delta_c(*d), "live": self.delta_c(*d) * scale,
+            }))).collect::<serde_json::Map<_, _>>(),
+            "note": "delta_c x clamp(ref_tok_s / median System 2 decode tok/s). Applied to live requests only, never to lab (evaluation) requests; it changes routing only where a promoted calibration decides (calibrated and budget modes), since the fixed rule does not use delta_c.",
+        })
     }
     pub fn caps(&self, d: Domain) -> Caps {
         let p = self.params.read().unwrap();
@@ -1064,12 +1114,19 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
 
         // ---------------- Aql Gate ----------------
         let promoted = self.promotion(&cal).is_ok();
+        // Live latency cost: never for lab traffic, so evaluation runs and calibration stay reproducible.
+        let static_dc = self.delta_c(dom);
+        let live = if req.lab {
+            None
+        } else {
+            self.live_delta_c_scale(&pair)
+        };
         let ctx = gate::GateCtx {
             cfg: &cfg,
             mode: &gs.mode,
             lambda,
             e2: self.e2(dom),
-            delta_c: self.delta_c(dom),
+            delta_c: live.map(|(_, k)| static_dc * k).unwrap_or(static_dc),
             cal: &cal,
             promoted,
             budget: gs.escalation_budget,
@@ -1099,6 +1156,12 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             None => gate::decide(&feats, &ctx),
         };
         let mut gd = gd;
+        if let Some((median, k)) = live {
+            gd.explanation = format!(
+                "{} Latency cost delta_c = {:.0} s: {:.0} s x {:.2} for System 2 decoding at {:.1} tok/s (rolling median; reference {:.1}).",
+                gd.explanation, gd.delta_c, static_dc, k, median, cfg.gate.live_delta_c_ref_tok_s
+            );
+        }
         if let Some(d) = draft
             .as_ref()
             .filter(|d| d.finish_reason == "early_escalation")
@@ -1368,6 +1431,11 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         .map(|s| s.ms)
                         .sum();
                     dstage.ms = dstage.ms.saturating_sub(probe_ms);
+                    // Every deliberation (lab included) times System 2 for the live latency cost.
+                    pair.s2_decode
+                        .lock()
+                        .unwrap()
+                        .push_stage(dstage.tokens, dstage.decode_ms);
                     stages.push(dstage);
                     if usage.ttft_ms.is_none() {
                         usage.ttft_ms = out.ttft_ms.map(|t| {

@@ -391,6 +391,38 @@ pub struct GateCfg {
     /// (AUROC 0.56-0.65) but disagreement with the cheap samples does (benchmarks/confidence_signal_study.json).
     #[serde(default = "d_samples_domains")]
     pub samples_on_unverified_domains: Vec<String>,
+    /// Live latency cost (docs/research/deepinfer_assessment.md): scale delta_c by
+    /// `live_delta_c_ref_tok_s` over the rolling median of System 2 decode tok/s, clamped to
+    /// [live_delta_c_min_scale, live_delta_c_max_scale]. Off by default; never applied to lab requests.
+    #[serde(default)]
+    pub live_delta_c: bool,
+    /// System 2 decode speed at which delta_c_s holds (scale 1.0).
+    #[serde(default = "d_live_ref")]
+    pub live_delta_c_ref_tok_s: f32,
+    #[serde(default = "d_live_min_scale")]
+    pub live_delta_c_min_scale: f32,
+    #[serde(default = "d_live_max_scale")]
+    pub live_delta_c_max_scale: f32,
+    /// Deliberate stages in the rolling window, and how many are needed before the median is used.
+    #[serde(default = "d_live_window")]
+    pub live_delta_c_window: usize,
+    #[serde(default = "d_live_min_samples")]
+    pub live_delta_c_min_samples: usize,
+}
+fn d_live_ref() -> f32 {
+    6.9
+}
+fn d_live_min_scale() -> f32 {
+    0.5
+}
+fn d_live_max_scale() -> f32 {
+    3.0
+}
+fn d_live_window() -> usize {
+    16
+}
+fn d_live_min_samples() -> usize {
+    4
 }
 fn d_samples_domains() -> Vec<String> {
     vec!["math".into()]
@@ -732,6 +764,18 @@ impl Config {
                 "backend.active = '{}' is not defined under [backends]",
                 cfg.backend.active
             )));
+        }
+        let g = &cfg.gate;
+        if !(g.live_delta_c_ref_tok_s > 0.0
+            && g.live_delta_c_min_scale > 0.0
+            && g.live_delta_c_min_scale <= 1.0
+            && g.live_delta_c_max_scale >= 1.0
+            && g.live_delta_c_window >= 1
+            && (1..=g.live_delta_c_window).contains(&g.live_delta_c_min_samples))
+        {
+            return Err(NafsError::Config(
+                "[gate] live_delta_c needs ref_tok_s > 0, 0 < min_scale <= 1 <= max_scale and 1 <= min_samples <= window".into(),
+            ));
         }
         let mut h = Sha256::new();
         h.update(raw.as_bytes());
