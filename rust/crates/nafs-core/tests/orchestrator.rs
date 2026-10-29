@@ -57,6 +57,15 @@ fn reply_for(body: &Value) -> (String, String) {
             ("t".into(), "VAGUE reply".into())
         };
     }
+    // FR-090: a Lean task: the first attempt is a proof Lean rejects; once Lean's error is in the prompt, a real one.
+    if all.contains("Prove the theorem below in Lean 4") && model == "system2" {
+        let proof = if last.contains("Fix at least one error") {
+            "```lean\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nby omega\n```"
+        } else {
+            "```lean\ntheorem add_comm' (a b : Nat) : a + b = b + a :=\nby rfl\n```"
+        };
+        return ("t".into(), proof.into());
+    }
     // FR-093: the code agent first runs the file, then patches it once it has seen the output.
     if all.contains("AGENTTASK") {
         return if msgs.len() <= 2 {
@@ -1262,4 +1271,59 @@ async fn code_agent_runs_patches_and_stops_on_the_verifier() {
         .await
         .unwrap_err()
         .contains("flat file name"));
+}
+
+/// FR-090 end to end with the real Lean binary and a scripted model: the System 1 draft fails Lean, System 2's
+/// first proof fails with a Lean error, the error is in the next prompt, and the second proof is verified.
+/// Runs only when `NAFS_LEAN` names a `lean` executable (CI has none).
+#[tokio::test]
+async fn lean_task_is_repaired_from_lean_feedback_with_the_real_binary() {
+    let Ok(exe) = std::env::var("NAFS_LEAN") else {
+        eprintln!("NAFS_LEAN not set; skipping");
+        return;
+    };
+    let (o, mock, _d) = setup_with(true, |c| c.verifiers.lean = exe.clone()).await;
+    let q = ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: "Prove that addition commutes.".into(),
+        }],
+        verification: Some(VerificationInputs {
+            lean: Some(LeanTask {
+                statement: "theorem add_comm' (a b : Nat) : a + b = b + a :=\nsorry\n".into(),
+                theorem: None,
+            }),
+            ..Default::default()
+        }),
+        ephemeral: Some(true),
+        ..Default::default()
+    };
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(
+        r.assurance,
+        Assurance::Verified,
+        "{:?} {:?}",
+        r.uncertainty_notice,
+        r.verifier
+    );
+    assert_eq!(r.domain, Domain::Math, "a Lean task gets the maths caps");
+    assert_eq!(
+        r.verifier.as_ref().map(|v| v.verifier.as_str()),
+        Some("lean_proof")
+    );
+    assert!(r.message.content.contains("by omega"));
+    assert_eq!(r.rounds.len(), 2, "one rejected proof, one accepted");
+    let s2 = s2_messages(&mock);
+    assert_eq!(s2.len(), 2);
+    let repair = s2[1].last().unwrap()["content"].as_str().unwrap();
+    assert!(
+        repair.contains("Probe.lean:") && repair.contains("<verifier_evidence>"),
+        "{repair}"
+    );
+    // The first prompt carries the toolchain note and the statement.
+    let first = s2[0]
+        .iter()
+        .map(|m| m["content"].as_str().unwrap_or(""))
+        .collect::<String>();
+    assert!(first.contains("Mathlib is NOT available") && first.contains("theorem add_comm'"));
 }

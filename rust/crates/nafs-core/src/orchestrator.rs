@@ -102,9 +102,15 @@ fn domain_instruction(d: Domain) -> &'static str {
 }
 
 /// FR-090: what a prover is told (Open Math Harness `putnam.j2`, shortened for a small model).
-fn lean_instruction(statement: &str) -> String {
+fn lean_instruction(statement: &str, mathlib: bool) -> String {
+    // A core-Lean toolchain has no Mathlib: a model that writes `import Mathlib` (its habit) fails at once.
+    let library = if mathlib {
+        "You may `import Mathlib` once at the top."
+    } else {
+        "Mathlib is NOT available: write no import line, and use only core Lean 4 (tactics such as omega, simp, rfl, induction and decide, and lemmas from the Nat namespace such as Nat.add_comm)."
+    };
     format!(
-        "Prove the theorem below in Lean 4. Keep the theorem statement exactly as given, byte for byte; you may add helper lemmas before it. `sorry`, `axiom`, `native_decide` and commands that run code are not allowed. Return the complete file in one ```lean code block.\n```lean\n{}\n```",
+        "Prove the theorem below in Lean 4. Keep the theorem statement exactly as given, byte for byte; you may add helper lemmas before it. `sorry`, `axiom`, `native_decide` and commands that run code are not allowed. {library} This is Lean 4, not Lean 3: a proof is a `by` block (never `begin ... end`); try `rfl`, `simp` or `omega` first; induction is `induction n with | zero => ... | succ k ih => ...`. Return the complete file in one ```lean code block.\n```lean\n{}\n```",
         statement.trim()
     )
 }
@@ -530,6 +536,19 @@ impl Orchestrator {
     }
 
     // ---------------- Validation (review M14) ----------------
+    /// FR-090: a Lean task needs a toolchain and a usable frozen statement. Shared by `/v1/chat` and `/v1/verify`,
+    /// so a task that cannot be graded is a 400 on both, never a "failed" verdict.
+    pub fn validate_lean(&self, v: &VerificationInputs) -> Result<()> {
+        let Some(l) = &v.lean else { return Ok(()) };
+        if self.hub.lean.is_none() {
+            return Err(NafsError::BadRequest("verification.lean needs a Lean toolchain; none is configured on this server (verifiers.lean)".into()));
+        }
+        match nafs_harness::lean::frozen_objection(&l.statement) {
+            Some(e) => Err(NafsError::BadRequest(format!("verification.lean: {e}"))),
+            None => Ok(()),
+        }
+    }
+
     pub fn validate(&self, req: &ChatRequest) -> Result<()> {
         let bad = |m: &str| Err(NafsError::BadRequest(m.into()));
         if req.messages.is_empty() || req.messages.len() > 400 {
@@ -583,14 +602,7 @@ impl Orchestrator {
             if let Some(e) = v.validation_error() {
                 return Err(NafsError::BadRequest(e));
             }
-            if let Some(l) = &v.lean {
-                if self.hub.lean.is_none() {
-                    return bad("verification.lean needs a Lean toolchain; none is configured on this server (verifiers.lean)");
-                }
-                if let Some(e) = nafs_harness::lean::frozen_objection(&l.statement) {
-                    return Err(NafsError::BadRequest(format!("verification.lean: {e}")));
-                }
-            }
+            self.validate_lean(v)?;
         }
         if let Some(p) = &req.repair_policy {
             if p != "best" && p != "last" {
@@ -785,7 +797,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             cfg.assistant.system_prompt,
             match &verification.lean {
                 // FR-090: the Open Math Harness prover's rules, and the frozen statement to keep.
-                Some(l) => lean_instruction(&l.statement),
+                Some(l) => lean_instruction(&l.statement, !cfg.verifiers.lean_path.is_empty()),
                 None => domain_instruction(dom).to_string(),
             }
         );

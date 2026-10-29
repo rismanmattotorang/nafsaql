@@ -1309,6 +1309,7 @@ async fn verify_adhoc(
     if let Some(e) = b.verification.validation_error() {
         return Err(NafsError::BadRequest(e).into());
     }
+    s.orch.validate_lean(&b.verification)?;
     if b.answer.len() > 200_000 {
         return Err(NafsError::BadRequest("answer too long".into()).into());
     }

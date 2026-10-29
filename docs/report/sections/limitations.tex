@@ -21,6 +21,12 @@ constraints fix the syntax of an action, not its sense (a patch that applies can
 still break the file), and they need llama-server; on vLLM the harness relies on
 the stream cut alone.
 
+\textbf{Lean proofs need a stronger prover.} The verifier and the repair loop are
+validated end to end with the real Lean binary, but Qwen3-4B-Thinking (4-bit, CPU)
+abstained on $n+0=n$ within its budget (Section~\ref{sec:sweep}); Lean tasks
+therefore return \emph{abstained} unless the model writes valid Lean~4. The
+verified proofs reported are the harness's own test cases, not model output.
+
 \textbf{Shared weights.} Fast and slow paths from one model family make
 correlated errors; the collision term is measured rather than assumed small,
 and the judge shares the same bias, which is why exact verifiers carry the

@@ -1,7 +1,7 @@
 {
- "measured_at": "2026-10-21T11:43:26Z",
+ "measured_at": "2026-10-28T23:51:05Z",
  "base": "http://127.0.0.1:8080",
- "passed": 55,
+ "passed": 65,
  "failed": 0,
  "results": [
   {
@@ -12,22 +12,22 @@
   {
    "check": "GET /metrics",
    "pass": true,
-   "detail": "200 text/plain 79 B"
+   "detail": "200 text/plain 2287 B"
   },
   {
    "check": "GET /openapi.json",
    "pass": true,
-   "detail": "200 application/json 120817 B"
+   "detail": "200 application/json 132900 B"
   },
   {
    "check": "GET /v1/alerts",
    "pass": true,
-   "detail": "200 application/json 1033 B"
+   "detail": "200 application/json 1046 B"
   },
   {
    "check": "GET /v1/audits",
    "pass": true,
-   "detail": "200 application/json 1124 B"
+   "detail": "200 application/json 2180 B"
   },
   {
    "check": "GET /v1/bench/prompt-sets",
@@ -42,12 +42,12 @@
   {
    "check": "GET /v1/conversations",
    "pass": true,
-   "detail": "200 application/json 6363 B"
+   "detail": "200 application/json 11178 B"
   },
   {
    "check": "GET /v1/drift",
    "pass": true,
-   "detail": "200 application/json 16891 B"
+   "detail": "200 application/json 14352 B"
   },
   {
    "check": "GET /v1/eval/datasets",
@@ -57,7 +57,7 @@
   {
    "check": "GET /v1/eval/runs",
    "pass": true,
-   "detail": "200 application/json 27442 B"
+   "detail": "200 application/json 44186 B"
   },
   {
    "check": "GET /v1/gate",
@@ -72,17 +72,22 @@
   {
    "check": "GET /v1/gates",
    "pass": true,
-   "detail": "200 application/json 4361 B"
+   "detail": "200 application/json 4329 B"
+  },
+  {
+   "check": "GET /v1/harness",
+   "pass": true,
+   "detail": "200 application/json 1173 B"
   },
   {
    "check": "GET /v1/lab/insights",
    "pass": true,
-   "detail": "200 application/json 4338 B"
+   "detail": "200 application/json 4478 B"
   },
   {
    "check": "GET /v1/perf/stages",
    "pass": true,
-   "detail": "200 application/json 2034 B"
+   "detail": "200 application/json 1918 B"
   },
   {
    "check": "GET /v1/preferences",
@@ -92,32 +97,32 @@
   {
    "check": "GET /v1/rooms",
    "pass": true,
-   "detail": "200 application/json 2175 B"
+   "detail": "200 application/json 906 B"
   },
   {
    "check": "GET /v1/self-model",
    "pass": true,
-   "detail": "200 application/json 2715 B"
+   "detail": "200 application/json 2747 B"
   },
   {
    "check": "GET /v1/system",
    "pass": true,
-   "detail": "200 application/json 6118 B"
+   "detail": "200 application/json 6180 B"
   },
   {
    "check": "GET /v1/system/activity",
    "pass": true,
-   "detail": "200 application/json 35558 B"
+   "detail": "200 application/json 34455 B"
   },
   {
    "check": "GET /v1/tazkiya",
    "pass": true,
-   "detail": "200 application/json 1239 B"
+   "detail": "200 application/json 1240 B"
   },
   {
    "check": "GET /v1/tazkiya/review",
    "pass": true,
-   "detail": "200 application/json 3348 B"
+   "detail": "200 application/json 16470 B"
   },
   {
    "check": "GET /v1/verifiers",
@@ -132,7 +137,7 @@
   {
    "check": "chat: verified math reply",
    "pass": true,
-   "detail": "fast verified 6.9s"
+   "detail": "fast verified 1.7s"
   },
   {
    "check": "chat: stage timings recorded (NFR-030)",
@@ -142,7 +147,7 @@
   {
    "check": "chat: unverified math stages add up to the wall time",
    "pass": true,
-   "detail": "counted 32608 ms of 32612 ms; 1 sample_after stage(s)"
+   "detail": "counted 11935 ms of 11935 ms; 1 sample_after stage(s)"
   },
   {
    "check": "rooms: create normalises the name (201)",
@@ -202,7 +207,7 @@
   {
    "check": "perf: latency breakdown (P7-T01)",
    "pass": true,
-   "detail": "1070 replies"
+   "detail": "25 replies"
   },
   {
    "check": "system: switching to a stopped backend is refused",
@@ -210,24 +215,54 @@
    "detail": "503, active stays llama"
   },
   {
+   "check": "ui: #chat uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #rooms uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
    "check": "ui: #chat renders without errors",
    "pass": true,
    "detail": "Chat \u00b7 Nafs-Aql"
   },
   {
+   "check": "ui: #chat (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
    "check": "ui: #eval renders without errors",
    "pass": true,
-   "detail": "Lab \u00b7 Nafs-Aql"
+   "detail": "Experiments \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #eval (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
   },
   {
    "check": "ui: #gate renders without errors",
    "pass": true,
-   "detail": "Muhasaba \u00b7 gate and ledger \u00b7 Nafs-Aql"
+   "detail": "Quality \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #gate (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
   },
   {
    "check": "ui: #tazkiya renders without errors",
    "pass": true,
-   "detail": "Tazkiya \u00b7 Nafs-Aql"
+   "detail": "Learning \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #tazkiya (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
   },
   {
    "check": "ui: #rooms renders without errors",
@@ -235,14 +270,29 @@
    "detail": "Rooms \u00b7 Nafs-Aql"
   },
   {
+   "check": "ui: #rooms (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
    "check": "ui: #bench renders without errors",
    "pass": true,
-   "detail": "Performance \u00b7 Nafs-Aql"
+   "detail": "Speed \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #bench (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
   },
   {
    "check": "ui: #system renders without errors",
    "pass": true,
-   "detail": "System \u00b7 Nafs-Aql"
+   "detail": "Status \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #system (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
   },
   {
    "check": "ui: #chat fits a 375 px screen (no sideways scroll)",

@@ -145,7 +145,19 @@ Every request moves through a small, bounded automaton and the reply says where 
 | A sequential test on the mean-log-prob early escalation | Wald's bound: ≥ 260 tokens to separate the threshold from its 0.04 margin at 5 % error; drafts are 47–291 tokens | kept as a measured heuristic, never made more aggressive |
 | Quantum-consciousness mechanisms (Orch OR and descendants) | decoherence 10⁻¹³ s against 10⁻³ s dynamics; a CPU can follow at most ~30 two-level systems | nothing transfers as an algorithm; negative result, `docs/research/quantum_neuro_review.md` |
 
-**Quality of the build**: 95 Rust tests, 9 Python tests, a 26-probe security suite (one real sandbox-escape found and fixed), a 55-check end-to-end sweep over every endpoint and UI page (including phone-width layout), a 63-check live test of Rooms with simulated members (`scripts/rooms_test.py`), `clippy -D warnings` clean.
+**Quality of the build** (final validation run, 29 October 2026, one quiet host; `benchmarks/harness_sweep.json`, `benchmarks/e2e_sweep.json`):
+
+| Suite | Result |
+|---|---|
+| Rust unit and integration tests (nine crates, real Lean 4.35.0 included) | **190 / 190** |
+| 9 Python tests, `clippy -D warnings`, `rustfmt` | clean |
+| Security probes (`scripts/security_tests.py`; one real sandbox escape found and fixed earlier) | **26 / 26**, 0 open high findings |
+| End-to-end sweep over every endpoint and UI page, incl. phone-width layout (`scripts/e2e_sweep.py`) | **65 / 65** |
+| Rooms with simulated members (`scripts/rooms_test.py`) | **59 / 59** |
+| Math and code harness sweep: real Lean, 6 attacks, code credit, validation, code agent (`scripts/harness_sweep.py`) | **40 / 40** |
+| MVP acceptance A1–A9 (`scripts/mvp_acceptance.py`) | **9 / 9** (slow path 56 s against the 240 s target) |
+
+The sweep found and fixed three defects in the Lean integration (an inconsistent 400 between `/v1/chat` and `/v1/verify`, Lean tasks classified as open questions with no retries, and a prompt that did not say Mathlib is absent). **One honest limit it exposed:** Qwen3-4B-Thinking (4-bit, CPU) cannot yet write valid Lean 4, even for `n + 0 = n`, so Lean tasks end in a labelled *abstain* unless a stronger prover is used. The Lean verifier itself is exact: it accepts real proofs and rejects a hidden `sorryAx`, a user axiom, `native_decide`, `#eval`, a changed statement and a shadowed `HAdd` instance.
 
 ## Quick start
 
@@ -174,6 +186,7 @@ make test        # Rust tests: gate modes, calibration, judge, audits, cancellat
 make contract    # live SSE events and stored records against the JSON Schemas
 make acceptance  # MVP acceptance tests A1–A9 against the running stack
 python3 scripts/e2e_sweep.py   # every endpoint and every UI page, in headless Chrome
+python3 -I scripts/harness_sweep.py   # Lean, code credit, validation and the code agent (add --no-models for the fast part)
 ```
 
 <details>
@@ -219,7 +232,7 @@ The mathematics behind the gate (threshold rule, verifier-bounded precision, Bet
 
 ## Where the project stands
 
-Phases 0–10 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
+Phases 0–12 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
 
 | Gate | Status | Why |
 |:--:|:--:|---|
@@ -238,7 +251,7 @@ Phases 0–10 of the roadmap are implemented on the CPU reference machine; GPU t
 | [Slides](docs/slides/nafs_aql_slides.pdf) | the same story in 40 slides |
 | [Specification](docs/spec/nafs_aql_spec.pdf) | 100 requirements with identifiers, interfaces and a traceability matrix |
 | [Roadmap](docs/roadmap/nafs_aql_roadmap.pdf) · [Status](docs/roadmap/STATUS.md) | phases, gates, what is done and what is not |
-| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-074) |
+| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-076) |
 | [Results write-up](docs/publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
 | [Quantum consciousness and neuroscience review](docs/research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
 | [Math and code harness](docs/research/harness_integration.md) · [Decision 005](docs/decisions/005-harness-integration.md) | Phase 10: what was taken from Open Math Harness and Codex, what was not, and why |

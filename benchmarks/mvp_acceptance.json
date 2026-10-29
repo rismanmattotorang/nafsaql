@@ -1,69 +1,69 @@
 {
   "base": "http://127.0.0.1:8080",
-  "at": "2026-10-21T07:33:41+0700",
+  "at": "2026-10-29T07:19:40+0700",
   "results": [
     {
       "id": "MVP-A1",
       "name": "Fast reply",
       "pass": true,
-      "detail": "mode=fast assurance=unverified ttft=158ms rule=fixed",
-      "seconds": 1.4
+      "detail": "mode=fast assurance=unverified ttft=493ms rule=fixed",
+      "seconds": 2.8
     },
     {
       "id": "MVP-A2",
       "name": "Verified code + forced escalation",
       "pass": true,
       "detail": "verified=verified via fast; impossible test -> rule=forced_failed_verification escalate=True final=abstained",
-      "seconds": 242.5
+      "seconds": 225.3
     },
     {
       "id": "MVP-A3",
       "name": "Slow path within budget",
       "pass": true,
-      "detail": "mode=slow reasoning=274/1024 wall=53s assurance=verified",
-      "seconds": 52.8
+      "detail": "mode=slow reasoning=274/1024 wall=56s assurance=verified",
+      "seconds": 56.3
     },
     {
       "id": "MVP-A4",
       "name": "Abstention with notice",
       "pass": true,
       "detail": "assurance=abstained state=X notice=yes answer_nonempty=True",
-      "seconds": 76.8
+      "seconds": 81.5
     },
     {
       "id": "MVP-A5",
       "name": "Bounded loop (Lemma 1)",
       "pass": true,
       "detail": "model_calls=4 <= 1 + k + N(R+1) = 6 (k=2, N=1, R=2)",
-      "seconds": 54.5
+      "seconds": 92.4
     },
     {
       "id": "MVP-A6",
       "name": "SSE event order",
       "pass": true,
       "detail": "order: start phase token decision done",
-      "seconds": 0.5
+      "seconds": 1.1
     },
     {
       "id": "MVP-A7",
       "name": "Rooms over WebSocket",
       "pass": true,
       "detail": "bob saw alice's message=True, saw streamed answer=True, members=2",
-      "seconds": 1.3
+      "seconds": 23.2
     },
     {
       "id": "MVP-A8",
       "name": "Records and schemas",
       "pass": true,
       "detail": "decision retrievable=True, conversation messages=2, schemas: CONTRACT TESTS PASSED",
-      "seconds": 0.6
+      "seconds": 11.8
     },
     {
       "id": "MVP-A9",
       "name": "Degraded mode",
       "pass": true,
       "detail": "events=start phase token verification decision degraded done; reply degraded=True; System 2 back after restart=True",
-      "seconds": 20.6
+      "seconds": 39.6
     }
   ]
 }

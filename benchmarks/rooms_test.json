@@ -1,34 +1,34 @@
 {
- "measured_at": "2026-10-20T13:06:38Z",
+ "measured_at": "2026-10-28T23:51:30Z",
  "base": "http://127.0.0.1:8080",
- "slow": true,
- "passed": 63,
+ "slow": false,
+ "passed": 59,
  "failed": 0,
  "results": [
   {
    "check": "create: name is trimmed and collapsed, 201",
    "pass": true,
-   "detail": "201 T-0b07a6 Alpha"
+   "detail": "201 T-d59ce8 Alpha"
   },
   {
    "check": "create: the room starts empty",
    "pass": true,
-   "detail": "{'busy': False, 'conversation_id': 'ce365f0f-a2d0-485b-98ee-f293dbdc43b6', 'created_at': '2026-10-20T13:05:45.268469+00:00', 'last_activity': '2026-10-20T13:05:45.268469+00:00', 'members': 0, 'name': 'T-0b07a6 Alpha', 'profile': 'A', 'questions': 0, 'queued': 0, 'room_id': '4337f825-b4b1-4079-97ec-2"
+   "detail": "{'busy': False, 'conversation_id': '85401a24-a078-440d-ac2a-87f65e2d8f78', 'created_at': '2026-10-28T23:51:06.168328+00:00', 'last_activity': '2026-10-28T23:51:06.168328+00:00', 'members': 0, 'name': 'T-d59ce8 Alpha', 'profile': 'A', 'questions': 0, 'queued': 0, 'room_id': '6daaa0fa-21eb-4ce4-8a69-a"
   },
   {
-   "check": "create: duplicate 't-0b07a6 alpha' is a 409 conflict",
+   "check": "create: duplicate 't-d59ce8 alpha' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-0b07a6 alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-d59ce8 alpha' already exists\"}"
   },
   {
-   "check": "create: duplicate 'T-0b07a6    ALPHA' is a 409 conflict",
+   "check": "create: duplicate 'T-d59ce8    ALPHA' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-0b07a6 ALPHA' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-d59ce8 ALPHA' already exists\"}"
   },
   {
-   "check": "create: duplicate ' T-0b07a6 Alpha ' is a 409 conflict",
+   "check": "create: duplicate ' T-d59ce8 Alpha ' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-0b07a6 Alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-d59ce8 Alpha' already exists\"}"
   },
   {
    "check": "create: empty name is a 400",
@@ -58,12 +58,12 @@
   {
    "check": "create: markup is stored as plain text",
    "pass": true,
-   "detail": "T-0b07a6 <img src=x onerror=alert(1)>"
+   "detail": "T-d59ce8 <img src=x onerror=alert(1)>"
   },
   {
    "check": "list: every created room is listed, newest activity first",
    "pass": true,
-   "detail": "10 rooms"
+   "detail": "6 rooms"
   },
   {
    "check": "get: one room by id",
@@ -88,7 +88,7 @@
   {
    "check": "rename: onto another room's name (any case) is a 409",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-0b07a6 alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-d59ce8 alpha' already exists\"}"
   },
   {
    "check": "rename: changing only the case of its own name is allowed",
@@ -113,7 +113,7 @@
   {
    "check": "ws: welcome carries the name, the room, the members and the limits",
    "pass": true,
-   "detail": "{'assistant': {'busy': False, 'queued': 0, 'working_for': None}, 'cursor': 0, 'limits': {'burst': 4.0, 'message_chars': 8000, 'queue': 3}, 'pending': [], 'room': {'name': 'T-0b07a6 Alpha', 'room_id': '4337f825-b4b1-4079-97ec-2e41ccaad8b1'}, 'users': ['Ann'], 'you': 'Ann'}"
+   "detail": "{'assistant': {'busy': False, 'queued': 0, 'working_for': None}, 'cursor': 0, 'limits': {'burst': 4.0, 'message_chars': 8000, 'queue': 3}, 'pending': [], 'room': {'name': 'T-d59ce8 Alpha', 'room_id': '6daaa0fa-21eb-4ce4-8a69-a7905a5ee9a7'}, 'users': ['Ann'], 'you': 'Ann'}"
   },
   {
    "check": "ws: the member then sees its own presence frame",
@@ -228,7 +228,7 @@
   {
    "check": "ws: a rename reaches every member",
    "pass": true,
-   "detail": "{'payload': {'name': 'T-0b07a6 Alpha Renamed'}, 'type': 'room_renamed'}"
+   "detail": "{'payload': {'name': 'T-d59ce8 Alpha Renamed'}, 'type': 'room_renamed'}"
   },
   {
    "check": "ws: a departure is announced with the remaining members",
@@ -238,7 +238,7 @@
   {
    "check": "delete: 200 with a report of what was removed",
    "pass": true,
-   "detail": "{'deleted': True, 'disconnected': 2, 'name': 'T-0b07a6 Alpha Renamed', 'removed': {'memory_entries': 0, 'messages': 4, 'replies': 2}, 'room_id': '4337f825-b4b1-4079-97ec-2e41ccaad8b1'}"
+   "detail": "{'deleted': True, 'disconnected': 2, 'name': 'T-d59ce8 Alpha Renamed', 'removed': {'memory_entries': 0, 'messages': 4, 'replies': 2}, 'room_id': '6daaa0fa-21eb-4ce4-8a69-a7905a5ee9a7'}"
   },
   {
    "check": "delete: members are told first, then disconnected with code 4004",
@@ -258,7 +258,7 @@
   {
    "check": "delete: its decision record is gone",
    "pass": true,
-   "detail": "399bed09-94ec-4b1a-bc9c-e9f3c2604a0a"
+   "detail": "e0c6015e-c1c5-4c10-82ca-d3507bdad12a"
   },
   {
    "check": "delete: deleting again is a 404",
@@ -296,29 +296,9 @@
    "detail": ""
   },
   {
-   "check": "slow ws: a heartbeat arrives within 30 s",
-   "pass": true,
-   "detail": ""
-  },
-  {
-   "check": "slow ws: 64 members fit",
-   "pass": true,
-   "detail": ""
-  },
-  {
-   "check": "slow ws: the 65th member is refused (400)",
-   "pass": true,
-   "detail": "400"
-  },
-  {
-   "check": "slow ws: beyond four quick messages the sender is told the queue or rate limit is full",
-   "pass": true,
-   "detail": "['E_RATE_LIMITED']"
-  },
-  {
    "check": "cleanup: every room this script created was deleted",
    "pass": true,
-   "detail": "6 to clean, 0 left"
+   "detail": "3 to clean, 0 left"
   }
  ]
 }
