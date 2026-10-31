@@ -740,20 +740,29 @@ mod tests {
     #[test]
     fn every_turn_reaches_a_member_exactly_once_however_it_joins() {
         use std::collections::HashSet;
-        use std::sync::atomic::AtomicI64;
+        use std::sync::atomic::{AtomicI64, AtomicUsize};
         const TURNS: usize = 300;
+        // Joins the run must see, spread over it: turn i does not finish before (i + 1) * MIN_JOINS / TURNS
+        // joins, so a fast producer cannot outrun the joiners.
+        const MIN_JOINS: usize = 20;
         let h = Arc::new(RoomHub::new());
-        let stored = Arc::new(AtomicI64::new(0)); // two messages per turn, as the store keeps them
-                                                  // Members that join while the producer runs: each keeps its snapshot and its receiver.
+        // Two messages per turn, as the store keeps them.
+        let stored = Arc::new(AtomicI64::new(0));
+        // Members that join while the producer runs: each keeps its snapshot and its receiver.
         let joined = Arc::new(Mutex::new(Vec::new()));
+        let joins = Arc::new(AtomicUsize::new(0));
         let producer = {
-            let (h, stored) = (h.clone(), stored.clone());
+            let (h, stored, joins) = (h.clone(), stored.clone(), joins.clone());
             std::thread::spawn(move || {
                 for i in 0..TURNS {
                     h.enqueue(turn(i));
                     std::thread::yield_now();
                     h.start_turn(stored.load(Ordering::SeqCst));
-                    std::thread::yield_now();
+                    // Wait while the turn runs, before it is stored: the joiners keep going until the last
+                    // turn is stored, so they are still joining while the producer waits here.
+                    while joins.load(Ordering::SeqCst) < (i + 1) * MIN_JOINS / TURNS {
+                        std::thread::yield_now();
+                    }
                     stored.fetch_add(2, Ordering::SeqCst); // the orchestrator stores before it emits done
                     std::thread::yield_now();
                     h.finish_turn(&format!("t{i}"), Some(format!("DONE t{i}")));
@@ -762,11 +771,13 @@ mod tests {
         };
         let joiners: Vec<_> = (0..4)
             .map(|_| {
-                let (h, stored, joined) = (h.clone(), stored.clone(), joined.clone());
+                let (h, stored, joined, joins) =
+                    (h.clone(), stored.clone(), joined.clone(), joins.clone());
                 std::thread::spawn(move || {
                     while stored.load(Ordering::SeqCst) < 2 * TURNS as i64 {
                         let snap = h.subscribe(|| stored.load(Ordering::SeqCst));
                         joined.lock().unwrap().push(snap);
+                        joins.fetch_add(1, Ordering::SeqCst);
                         std::thread::sleep(std::time::Duration::from_micros(30));
                     }
                 })
@@ -777,7 +788,7 @@ mod tests {
             j.join().unwrap();
         }
         let members = std::mem::take(&mut *joined.lock().unwrap());
-        assert!(members.len() > 10, "joiners ran: {}", members.len());
+        assert!(members.len() >= MIN_JOINS, "joiners ran: {}", members.len());
         for (mut rx, pending, cursor) in members {
             // The turns the member gets from the stored messages, from `pending`, and from live frames.
             let from_store: HashSet<usize> = (0..(cursor as usize / 2)).collect();
