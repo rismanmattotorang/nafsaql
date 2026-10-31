@@ -1837,6 +1837,17 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                             out.completion_tokens,
                             out.completion_tokens.saturating_sub(out.reasoning_tokens),
                         ));
+                        // Candidates of one concurrent round decode at the same time: the first to finish carries the
+                        // round's time as `deliberate`; the later ones are listed as `*_overlap` and not counted again.
+                        let mut cand_stages = cand_stages;
+                        if w > 1 && i > 0 {
+                            for st in cand_stages
+                                .iter_mut()
+                                .filter(|st| st.stage == "deliberate" || st.stage == "probe")
+                            {
+                                st.stage = format!("{}_overlap", st.stage);
+                            }
+                        }
                         stages.extend(cand_stages);
                         if usage.ttft_ms.is_none() {
                             usage.ttft_ms = out.ttft_ms.map(|t| {

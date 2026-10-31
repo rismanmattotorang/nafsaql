@@ -381,9 +381,13 @@ const LIVE_LABEL = { A: 'Answering…', L: 'Double-checking…', M: 'Thinking it
 // One sentence on why this answer took the path it did, for the "Why?" popover.
 function whyText(r) {
   const parts = [];
+  const rescue = (r.usage?.stages || []).find(st => st.stage === 'rescue');
   if (r.decision?.rule === 'forced_override') parts.push(r.reasoning_mode === 'slow' ? 'You asked for a thorough answer, so it was thought through first.' : 'You asked for a quick answer, so it was written at once.');
   else if (r.reasoning_mode === 'slow') parts.push(r.decision?.features?.draft_verified === false ? 'The quick answer failed its check, so the question was thought through again more carefully.' : 'This question looked hard enough to deserve more thought, so a careful answer was written.');
+  else if (rescue?.note && /one passed/.test(rescue.note)) parts.push('The first quick answer failed its check, but one of the extra quick tries passed it, so no deeper thinking was needed.');
   else parts.push('This question looked simple enough for a quick answer.');
+  // A few extra quick tries are made, and checked, before the careful model is used (they add some seconds).
+  if (rescue?.note && !/one passed/.test(rescue.note) && r.reasoning_mode === 'slow') parts.push('A few extra quick tries were checked first, and none of them passed.');
   if (r.assurance === 'verified') parts.push('The answer was then checked exactly and passed.');
   else if (r.assurance === 'consensus') parts.push('Independent attempts agreed with it.');
   else if (r.assurance === 'abstained') parts.push('No answer passed the checks in the time allowed.');
@@ -501,8 +505,8 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-decision]'); if (!b) return; e.preventDefault();
   try { const d = await api.get('/v1/decisions/' + b.dataset.decision); modal(`<h3 style="margin-top:0">Decision record</h3><div class="codebox" style="max-height:60vh;overflow:auto">${esc(JSON.stringify(d, null, 2))}</div>`); } catch (err) { toast(err.message); }
 });
-// P7-T01: where the time went. Stage colours and a stacked bar (samples drawn with the draft overlap it, so they are listed, not stacked; samples drawn after it, sample_after, are stacked).
-const STAGE = { retrieval: ['Looking up earlier answers', 'var(--faint)'], draft: ['Quick draft', 'var(--fast)'], sample: ['Quick samples', 'var(--leaf)'], sample_after: ['Quick samples', 'var(--leaf)'], verify_draft: ['Checking the draft', 'var(--navy)'], probe: ['Progress check', 'var(--violet)'],
+// P7-T01: where the time went. Stage colours and a stacked bar (samples drawn with the draft overlap it, so they are listed, not stacked; samples drawn after it, sample_after, and the rescue tries before escalating, are stacked).
+const STAGE = { retrieval: ['Looking up earlier answers', 'var(--faint)'], draft: ['Quick draft', 'var(--fast)'], sample: ['Quick samples', 'var(--leaf)'], sample_after: ['Quick samples', 'var(--leaf)'], verify_draft: ['Checking the draft', 'var(--navy)'], rescue: ['Extra quick tries', 'var(--leaf)'], deliberate_overlap: ['Other tries at the same time', 'var(--slate)'], probe_overlap: ['Progress checks of those tries', 'var(--slate)'], probe: ['Progress check', 'var(--violet)'],
   deliberate: ['Thinking', 'var(--slow)'], verify: ['Checking', 'var(--navy)'], judge: ['Review', 'var(--amber)'], overhead: ['Other', 'var(--surface-3)'] };
 const stageBar = (parts) => { const tot = parts.reduce((a, p) => a + p.v, 0) || 1;
   return `<div class="stagebar">${parts.filter(p => p.v > 0).map(p => `<i style="width:${(p.v / tot * 100).toFixed(2)}%;background:${STAGE[p.k]?.[1] || 'var(--slate)'}" title="${esc(STAGE[p.k]?.[0] || p.k)} · ${p.label}"></i>`).join('')}</div>`; };

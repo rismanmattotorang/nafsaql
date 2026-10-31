@@ -1549,6 +1549,18 @@ async fn width_is_capped_by_the_system2_slots() {
     q.hedge_after_failure = Some(false);
     let r = o.handle(q, Emitter(None)).await.unwrap();
     assert_eq!(s2_ns(&mock), vec![2], "two slots, two choices (both wrong)");
+    // Both choices finished (neither passed): the first carries the round's time, the second is listed as overlapping.
+    let names: Vec<&str> = r.usage.stages.iter().map(|s| s.stage.as_str()).collect();
+    assert_eq!(
+        names.iter().filter(|n| **n == "deliberate").count(),
+        1,
+        "{names:?}"
+    );
+    assert_eq!(
+        names.iter().filter(|n| **n == "deliberate_overlap").count(),
+        1,
+        "{names:?}"
+    );
     assert_eq!(r.assurance, Assurance::Abstained);
     let mut bad = code_req("PARTASK");
     bad.parallel = Some(9);

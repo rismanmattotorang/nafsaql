@@ -371,6 +371,12 @@ fn qs(sorted: &[f64], p: f64) -> Option<f64> {
 /// unattributed overhead, and the engine's prefill and decode speed, KV-cache reuse and queue wait per
 /// model stage. "sample" stages overlap the draft and are excluded from the shares; "sample_after" (samples
 /// drawn after the draft) adds to the wall time and is counted.
+/// Stages that run at the same time as another counted stage: the samples drawn with the draft, and the later
+/// candidates of a concurrent System 2 round (`deliberate_overlap`, `probe_overlap`). Listed, never added to the wall time.
+fn overlaps(stage: &str) -> bool {
+    stage == "sample" || stage.ends_with("_overlap")
+}
+
 pub fn latency_breakdown(rows: &[StageRow]) -> Value {
     let mut paths = vec![];
     for mode in ["fast", "slow"] {
@@ -386,7 +392,7 @@ pub fn latency_breakdown(rows: &[StageRow]) -> Value {
         for r in &rs {
             for st in &r.2 {
                 by.entry(st.stage.clone()).or_default().push(st.ms as f64);
-                if st.stage != "sample" {
+                if !overlaps(&st.stage) {
                     attributed += st.ms as f64;
                 }
             }
@@ -398,8 +404,8 @@ pub fn latency_breakdown(rows: &[StageRow]) -> Value {
                 let sum: f64 = v.iter().sum();
                 json!({"stage": k, "n": v.len(), "p50_ms": qs(&v, 0.5), "p95_ms": qs(&v, 0.95),
                        "mean_ms": sum / v.len() as f64,
-                       "share": if k == "sample" { Value::Null } else { json!(sum / wall_total.max(1.0)) },
-                       "overlaps_draft": k == "sample"})
+                       "share": if overlaps(&k) { Value::Null } else { json!(sum / wall_total.max(1.0)) },
+                       "overlaps_draft": overlaps(&k)})
             })
             .collect();
         stages.sort_by(|a, b| {
@@ -470,6 +476,44 @@ mod tests {
             "needs level 2"
         );
         assert!(nfr007(&[l(2, 1.0)])["pass"].is_null());
+    }
+
+    /// A concurrent System 2 round decodes its candidates at the same time: only the first to finish counts toward the wall
+    /// time, so the shares of one path can never exceed 100 % (a live page once showed "Thinking 150 %").
+    #[test]
+    fn concurrent_candidates_do_not_count_twice() {
+        use nafs_types::StageTiming;
+        let st = |stage: &str, ms: u64| StageTiming {
+            stage: stage.into(),
+            ms,
+            ..Default::default()
+        };
+        // One slow reply of 1,000 ms: the first candidate took 950 ms, the check 50 ms; three more candidates ran in the
+        // same round and are listed as overlapping.
+        let rows: Vec<StageRow> = vec![(
+            "slow".into(),
+            1_000,
+            vec![
+                st("deliberate", 950),
+                st("deliberate_overlap", 960),
+                st("deliberate_overlap", 980),
+                st("deliberate_overlap", 1_000),
+                st("verify", 50),
+            ],
+        )];
+        let b = latency_breakdown(&rows);
+        let stages = b["paths"][0]["stages"].as_array().unwrap();
+        let total: f64 = stages.iter().filter_map(|s| s["share"].as_f64()).sum();
+        assert!(total <= 1.0 + 1e-9, "shares add to {total}");
+        let overlap = stages
+            .iter()
+            .find(|s| s["stage"] == "deliberate_overlap")
+            .unwrap();
+        assert!(overlap["share"].is_null() && overlap["overlaps_draft"] == true);
+        assert!(
+            (b["paths"][0]["overhead_share"].as_f64().unwrap()).abs() < 1e-9,
+            "the round's time is fully attributed"
+        );
     }
 
     #[test]

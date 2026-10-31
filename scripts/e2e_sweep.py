@@ -197,8 +197,15 @@ if "--no-ui" not in args:
             while time.time() - t < secs:  # drain events while the page loads its data
                 call("Runtime.evaluate", expression="1")
                 time.sleep(0.3)
+        # Stored questions and answers (the Learning page's review queue, the Experiments page's item answers) are
+        # user and model text, not the product's wording: they may contain any word, so they are hidden while the page
+        # text is read. Everything else, including the "Thinking it through" copy that sits in an `.answer` element in
+        # Chat, is still checked.
+        CONTENT = (".review .q,.review .answer,#eItems .answer,#eItems .codebox")
+        READ = ("(()=>{const s=document.createElement('style');s.textContent='" + CONTENT + "{display:none!important}';"
+                "document.head.appendChild(s);const t=document.querySelector('#app').innerText;s.remove();return t})()")
         def jargon():
-            text = call("Runtime.evaluate", expression="document.querySelector('#app').innerText", returnByValue=True)["result"].get("value", "")
+            text = call("Runtime.evaluate", expression=READ, returnByValue=True)["result"].get("value", "")
             return sorted({m.group(0) for m in JARGON.finditer(text)})
         for route in ["chat", "rooms"]:
             settle(f"{BASE}/?e2e=p{route}#/{route}", 4)
