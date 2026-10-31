@@ -17,6 +17,10 @@ OpenAI Codex
   (from utils/string/src/truncate.rs and core/src/tools/mod.rs). src/agent.rs follows the shape of
   core/src/session/turn.rs without copying it. The seatbelt parameter pattern in
   nafs-verify/src/sandbox.rs follows sandboxing/src/seatbelt.rs. These files were modified.
+  Phase 11: src/grammar.rs translates the Lark grammar core/assets/tools/apply_patch.lark into GBNF and
+  specialises it per step; src/context.rs (append-only transcript, compaction) and src/diff.rs (the run's net
+  diff) follow the designs of core/src/context_manager, core/src/compact.rs and core/src/turn_diff_tracker.rs
+  without copying their code.
 
 Open Math Harness
   https://github.com/openmathmodel/open-math-harness at revision 687f2a2 (2026-10-23), release 0.41.0

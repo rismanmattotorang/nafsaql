@@ -1309,6 +1309,7 @@ async fn verify_adhoc(
     if let Some(e) = b.verification.validation_error() {
         return Err(NafsError::BadRequest(e).into());
     }
+    s.orch.validate_lean(&b.verification)?;
     if b.answer.len() > 200_000 {
         return Err(NafsError::BadRequest("answer too long".into()).into());
     }
@@ -1333,15 +1334,36 @@ async fn harness_info(State(s): State<AppState>) -> Json<Value> {
             "fanout": c.deliberation.repair_fanout,
             "patch_repair": c.deliberation.patch_repair,
         },
+        // FR-094 / FR-095: concurrent hedged rounds, the System 2 slots they can use, and fused agreement samples.
+        "parallel": {
+            "enabled": c.deliberation.parallel.enabled,
+            "max_width": c.deliberation.parallel.max_width,
+            "hedge_after_failure": c.deliberation.parallel.hedge_after_failure,
+            "system2_slots": s.orch.active().s2.slots(),
+            "cost_factors": c.deliberation.parallel.cost_factors,
+            "fuse_always_samples": c.gate.fuse_always_samples,
+        },
+        // FR-096: System 1 samples drawn and verified before a failed draft is escalated.
+        "rescue": { "samples": c.gate.rescue_samples, "temperature": c.gate.rescue_temperature },
         "code_agent": {
             "enabled": c.harness.code_agent_enabled,
             "model": c.harness.model,
             "max_steps": c.harness.max_steps,
             "wall_clock_s": c.harness.wall_clock_s,
+            "context": c.harness.context,
+            "compact_at_tokens": c.harness.compact_at_tokens,
+            "constrain": c.harness.constrain,
+            "grammar_supported": s.orch.active().s2.supports_grammar(),
+            "stream_cut": c.harness.stream_cut,
+            "edit_format": c.harness.edit_format,
+            "whole_max_lines": c.harness.whole_max_lines,
+            "unstick": c.harness.unstick,
+            "thinking_budget": c.harness.thinking_budget,
+            "first_step_thinking_budget": c.harness.first_step_thinking_budget,
         },
         "sources": [
             {"name": "Open Math Harness", "revision": "687f2a2", "license": "Apache-2.0", "parts": ["lean rules and verify protocol", "discovery scoring", "best-first candidate tree", "prover stop rule"]},
-            {"name": "OpenAI Codex (codex-rs)", "revision": "970111f6", "license": "Apache-2.0", "parts": ["apply_patch parser and fuzzy matcher", "middle truncation", "exec output format", "seatbelt -D parameters", "turn loop"]},
+            {"name": "OpenAI Codex (codex-rs)", "revision": "970111f6", "license": "Apache-2.0", "parts": ["apply_patch parser and fuzzy matcher", "middle truncation", "exec output format", "seatbelt -D parameters", "turn loop", "append-only history and compaction", "freeform apply_patch grammar (as GBNF)", "dispatch at item done (stream cut)", "budget reminders", "turn diff"]},
         ],
     }))
 }

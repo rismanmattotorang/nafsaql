@@ -8,6 +8,7 @@ pub mod gate;
 pub mod harness;
 pub mod live_cost;
 pub mod orchestrator;
+pub mod parallel;
 pub mod sequential;
 
 pub use backend::{Backend, BackendHealth, GenOutput, GenRequest};

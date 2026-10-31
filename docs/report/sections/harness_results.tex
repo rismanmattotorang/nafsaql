@@ -1,3 +1,37 @@
+\textbf{Real Lean.} Lean~4.35.0 (core, no Mathlib) was installed with
+\texttt{elan} on the reference machine and the protocol was run against the real
+binary inside the macOS sandbox (Table~\ref{tab:reallean}). Lean resolves its own
+installation path, which needs \texttt{stat} on the directories above the
+toolchain; the profile now allows metadata reads of exactly those directories,
+passed as \texttt{-D} parameters, and their contents stay unreadable. All eight
+cases behave as the protocol intends. The decisive one is the shadowed instance: a
+candidate that declares a high-priority \texttt{HAdd Nat Nat Nat} returning 0 keeps
+the statement byte for byte and closes it with \texttt{rfl}; only the comparison of
+the fully elaborated types rejects it. A hidden \texttt{sorryAx} passes the textual
+rules and is rejected on Lean's own axioms report. A check takes about 0.6\,s once
+the statement's pristine type is cached (1.4\,s for the first).
+
+\begin{table}[t]
+\centering
+\caption{The Lean protocol against real Lean 4.35.0 (\texttt{real\_lean\_accepts\_proofs\_and\_rejects\_the\_known\_attacks}).}
+\label{tab:reallean}
+\scriptsize
+\begin{tabular}{@{}lll@{}}
+\toprule
+Candidate for \texttt{a + b = b + a} & Verdict & Decided by \\
+\midrule
+\texttt{by omega} & verified & Lean \\
+\texttt{Nat.add\_comm a b} & verified & Lean \\
+helper lemma, then the theorem & verified & Lean \\
+\texttt{by sorry} & partial (0.5) & Lean elaborates; \texttt{sorry} \\
+\texttt{by rfl} & errors (0.05) & Lean error \\
+\texttt{sorryAx \_ false} & rejected & axioms report \\
+\texttt{axiom cheat : False} & rejected & textual rule \\
+shadowed \texttt{HAdd} instance, \texttt{rfl} & rejected & \texttt{pp.all} type \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \textbf{Tests.} \texttt{nafs-harness} has 57 unit tests, including the ported
 upstream suites (Codex's streaming patch parser and fuzzy matcher, Open Math
 Harness's Lean textual rules, verify protocol and scoring). \texttt{nafs-verify}
@@ -29,7 +63,11 @@ action, so the run stopped at the deadline with the original file returned
 ranges from a hunk header (a leniency in the spirit of Codex's own heredoc
 stripping), with a test built from the live reply. And the run cap is checked
 between steps, so one step can overrun it by its own length; on this host a step
-budget of 512 reasoning and 768 answer tokens is too large for a 900\,s cap. The
-remaining tasks of the run (one agent task and three patch-repair chats) were
-still running when this version was written; \texttt{benchmarks/harness\_live\_check.json}
-holds the records.
+budget of 512 reasoning and 768 answer tokens is too large for a 900\,s cap. The third agent task (write run-length encoding from an empty workspace) failed
+the same way: its first patch updated a file that did not exist yet with lines
+lacking the \texttt{+} prefix, which the parser refused with the line number, and
+its second step ran out of budget inside the reasoning. The first patch-repair chat
+reached the gateway's 900\,s request timeout, and the run was then stopped by
+hand (4 of 6 items; \texttt{benchmarks/harness\_live\_check.json}). On this host,
+under this load, System~2 agent steps are too slow for the default caps; the
+measurement of patch repair (Eq.~\ref{eq:patch}) needs a quiet host.

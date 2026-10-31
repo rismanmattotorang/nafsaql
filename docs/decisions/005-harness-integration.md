@@ -39,5 +39,8 @@ suites), with each file's source and modifications in its header and both notice
 - **Patch repair on:** an interleaved A/B (`patch_repair` true vs false, same items, alternating) of at least 20
   code items whose first System 2 attempt fails, showing no loss of verified answers and lower mean wall time;
   record the patch failure rate f and check Eq. (patch) of the report.
-- **Lean in production:** install a toolchain (`elan`, core Lean needs no Mathlib), set `verifiers.lean`, and run the
-  verifier tests against the real binary; Mathlib statements additionally need a Mathlib build and `lean_path`.
+- **Lean in production: done 2026-10-24.** Core Lean 4.35.0 installed with `elan` (2.8 GB in `~/.elan`);
+  `verifiers.lean = "~/.elan/toolchains/leanprover--lean4---v4.35.0/bin/lean"` in `config/nafs-aql.toml`. The
+  real-binary test (`NAFS_LEAN=... cargo test -p nafs-verify real_lean`) passes all 8 cases, including a shadowed
+  `HAdd` instance caught only by the `pp.all` type comparison and a hidden `sorryAx` caught by the axioms report.
+  Mathlib statements still need a Mathlib build and `lean_path`.

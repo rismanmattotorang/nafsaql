@@ -1,0 +1,84 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 12 -- end-to-end validation sweep
+% ---------------------------------------------------------------------------
+\section{Phase 12: End-to-End Validation of the Whole System}
+\label{sec:sweep}
+
+Phase~12 (29 October 2026) ran every automated suite of \Sys{} against the live
+stack on the final code, on a quiet host (load average about 2 at the start), and
+added one suite for the harness of Sections~\ref{sec:harness} and~\ref{sec:harness2},
+which had no end-to-end coverage of its own.
+The sweep found three defects in the Phase~10 integration; all three are fixed and
+the suites were re-run in full afterwards (Table~\ref{tab:sweep}).
+
+\begin{table}[t]
+\centering
+\caption{Final validation run (29 October 2026, reference machine).}
+\label{tab:sweep}
+\scriptsize
+\begin{tabular}{@{}p{2.35cm}rp{3.1cm}@{}}
+\toprule
+Suite & Result & Covers \\
+\midrule
+Rust tests & 190/190 & nine crates, with real Lean 4.35.0 \\
+\texttt{fmt}, \texttt{clippy} & clean & \texttt{-D warnings}; Linux code via cross target \\
+API contract & pass & records, SSE, live bounds \\
+Security & 26/26 & sandbox escape, injection, auth, limits \\
+End-to-end & 65/65 & every endpoint, SSE, every UI page, phone width \\
+Rooms & 59/59 & presence, queue, delete, reconnect \\
+Artefacts & pass & OpenAPI, schemas, TOML, requirements \\
+Harness & 40/40 & Lean, code credit, validation, agent \\
+MVP acceptance A1--A9 & 9/9 & fast path to degraded mode \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{The harness sweep}
+
+\texttt{scripts/harness\_sweep.py} has a deterministic part and a model part. The
+deterministic part (35 checks) drives the gateway with the real Lean toolchain:
+three accepted proofs, a partial proof (0.5), a Lean error with a position, and
+six attacks (a hidden \texttt{sorryAx}, a user axiom, \texttt{native\_decide}, an
+\texttt{\#eval}, a changed statement, a shadowed instance), each rejected by the layer the
+protocol assigns to it. It also checks per-assert credit, head-and-tail evidence,
+that evidence names \texttt{Probe.lean} and never the sandbox path, and 14
+request-validation cases. The model part runs a Lean theorem through
+\texttt{/v1/chat}, the code agent on a fix task (verified in one call, 43\,s) and a
+System~2 code chat whose candidate tree is recorded (verified, 275\,s).
+
+\subsection{Defects found and fixed}
+
+\begin{enumerate}
+\item \textbf{Inconsistent validation.} \texttt{/v1/chat} refused a Lean task with
+an unusable statement (400), but \texttt{/v1/verify} returned a \emph{failed}
+verdict with HTTP 200, so a client could not tell a wrong proof from an
+ungradable task. Validation is now one function used by both.
+\item \textbf{Lean tasks were classified as open questions.} The domain
+classifier knew tests, schemas and reference answers but not
+\texttt{verification.lean}, so a proof request received the open-question limits
+(no retries, 512 reasoning tokens) and made a single attempt. Lean tasks are now
+mathematics (up to three attempts, 1024 tokens); a unit test pins it.
+\item \textbf{The prompt did not say that Mathlib is absent.} The model wrote
+\texttt{import Mathlib}, which fails on a core-Lean toolchain. The prompt now states
+which library is available, and adds a three-line Lean~4 syntax note (a proof is a
+\texttt{by} block, not \texttt{begin\ldots end}; try \texttt{rfl}, \texttt{simp},
+\texttt{omega}; the \texttt{induction ... with | zero | succ} form).
+\end{enumerate}
+
+\subsection{What the sweep says about the models}
+
+With these fixes the pipeline is correct end to end, which the deterministic
+integration test shows with the real binary: the System~1 draft fails Lean,
+System~2's first proof fails with a Lean error, the error appears in the next
+prompt, and the second proof is verified. The live models do not reach that
+point. For the theorem $n+0=n$, which \texttt{rfl} proves, Qwen3-4B-Thinking
+abstained after three attempts (826\,s); streaming the rounds shows Lean~3
+syntax from System~1 and, from System~2, \texttt{induction ... with} followed by
+an identifier, a stray inner \texttt{by}, and the same wrong proof on consecutive
+attempts. Every verdict was precise and no wrong proof was ever accepted: the
+system abstained with a notice, as Theorem~1 requires. The honest summary is that
+a 4B model quantised to 4 bits cannot yet write Lean~4 proofs on this CPU even
+for trivial statements; the verifier, the repair loop and the abstention are
+ready for a stronger prover, and the sweep's model checks therefore assert
+\emph{honesty} (verified, or abstained with a notice, never an unchecked proof)
+rather than success. Code tasks, which the same models handle, verify.

@@ -542,6 +542,7 @@ Responses: `202`, `404`, `403`.
 - `Calibration`
 - `LeanTask`: FR-090: a frozen Lean 4 statement (a whole file whose theorem is proved by `sorry`). The answer must keep the statement byte for byte and prove it; textual rules refuse `sorry`, `axiom`, `native_decide` and commands that run code, and Lean decides (Open Math Harness verify protocol). Needs `verifiers.lean` on the server.
 - `CodeAgentRequest`
+- `CodeAgentUsage`: One model call as the server reported it (Phase 11)
 - `CodeAgentStep`
 - `CodeAgentReply`
 - `HarnessInfo`

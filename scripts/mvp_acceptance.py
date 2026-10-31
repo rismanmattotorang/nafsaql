@@ -51,8 +51,13 @@ def a4():
     return ok, f"assurance={r['assurance']} state={r['trace_state']} notice={'yes' if r.get('uncertainty_notice') else 'no'} answer_nonempty={bool(r['message']['content'])}"
 def a5():
     r = post("/v1/chat", {"messages": [{"role": "user", "content": "Return the number 5."}], "verification": {"reference_answer": "-123456"}, "thinking_budget": 64, "ephemeral": True})
-    c = caps["math"]; bound = 1 + k + c["N"] * (c["R"] + 1)
-    return r["usage"]["model_calls"] <= bound, f"model_calls={r['usage']['model_calls']} <= 1 + k + N(R+1) = {bound} (k={k}, N={c['N']}, R={c['R']})"
+    c = caps["math"]
+    # FR-094: a concurrent round runs up to max_width candidates, so the width is part of N in the bound.
+    par = get("/v1/harness").get("parallel", {})
+    n_eff = max(c["N"], min(par.get("max_width", 1), par.get("system2_slots", 1)) if par.get("enabled") else 1)
+    rescue = get("/v1/harness").get("rescue", {}).get("samples", 0)   # FR-096: samples drawn before escalating a failed draft
+    bound = 1 + k + rescue + n_eff * (c["R"] + 1)
+    return r["usage"]["model_calls"] <= bound, f"model_calls={r['usage']['model_calls']} <= 1 + k + N(R+1) = {bound} (k={k}, rescue={rescue}, N={n_eff}, R={c['R']})"
 def a6():
     evs = stream({"messages": [{"role": "user", "content": "Name a colour."}], "force_mode": "fast", "ephemeral": True, "max_tokens": 16})
     names = [e for e, _ in evs]; ok = names[0] == "start" and "decision" in names and "token" in names and names[-1] == "done" and names.index("token") < names.index("done")

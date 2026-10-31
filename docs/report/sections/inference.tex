@@ -1,0 +1,174 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 13 -- parallel and concurrent inference on four CPU cores
+% ---------------------------------------------------------------------------
+\section{Phase 13: Parallel and Concurrent Inference on Four CPU Cores}
+\label{sec:inference}
+
+Phase~13 (30--31 October 2026) asked how far the four cores can be pushed by running work in parallel. The assessment of the
+100-prompt run (Section~\ref{sec:impl}) is the starting point: the gate and the exact checks are not the cost (under 2.5\,\% of
+model time); decode is, with System~2's thinking at 77.6\,\% and drafts at 17.9\,\%, and six prompts (failed code and timeouts)
+used 52\,\%. The research note is \texttt{docs/research/parallel\_inference.md} and the decision is
+\texttt{docs/decisions/007-parallel-inference.md}.
+
+\subsection{Literature and what transfers}
+
+Repeated sampling with an exact verifier raises coverage log-linearly with the number of samples
+\cite{brown2024monkeys}; hedged requests send a request to several replicas, keep the first answer and cancel the rest
+\cite{dean2013tail}; parallel streams over shared parameters behave like a larger model at a fraction of the cost of parameter
+scaling \cite{chen2025parscale}; confidence can cut parallel traces early \cite{fu2025deepconf}; instances can attend to a
+shared cache \cite{rodionov2025hogwild}; model-free speculation drafts from earlier text \cite{oliaro2024suffix}; table-lookup
+kernels speed low-bit models on CPUs \cite{wei2024tmac}. The first two need only what \Sys{} has (an exact verifier and a
+batching server) and were implemented. The others need trained transformations, models that cooperate (small ones are reported
+not to), or a different runtime, and were not.
+
+\subsection{The measurement that decides: batching and context depth}
+
+llama-server decodes its slots in one batch. Table~\ref{tab:batch} gives the throughput of $N$ concurrent streams on Qwen3-4B-Thinking
+(decode only, prompt cached) at three context depths, and Qwen3-1.7B at short context.
+
+\begin{table}[t]
+\centering
+\caption{Batched decode, $N=4$ streams against one (reference machine, idle).}
+\label{tab:batch}
+\scriptsize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Model, context & 1 stream & 4 streams & gain & $c(4)$ \\
+\midrule
+System 1, short & 15.8 & 36.9 & 2.34$\times$ & 1.71 \\
+System 2, short & 5.12 & 13.78 & 2.69$\times$ & 1.60 \\
+System 2, 800 tokens & 5.03 & 9.17 & 1.82$\times$ & 2.24 \\
+System 2, 1,600 tokens & 4.09 & 6.14 & 1.50$\times$ & 3.40 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+One stream is bandwidth-bound (about 16\,GB/s of weights per second at both sizes), so a few more streams are cheap, until
+compute saturates; but the gain falls with context, from 2.7$\times$ to 1.5$\times$ for System~2, and a repair prompt (the earlier
+candidate and the verifier's evidence) is about 1,600 tokens deep. A quantised KV cache with flash attention does not restore it
+(7.94 against 9.17 tok/s at 800 tokens, 6.36 against 6.14 at 1,600). Self-speculation does not help either: four llama.cpp
+n-gram modes gained at most 1.12$\times$ (code repair, 71\,\% of drafted tokens accepted) and lost up to 16\,\% (JSON), because
+verifying $k$ drafted tokens costs about $k$ steps on a compute-bound CPU.
+
+\subsection{One request with $n$ choices}
+
+Candidates sent as separate requests make every slot prefill the whole prompt, and prefill (31 tok/s on System~2) is
+compute-bound and gains nothing from batching. With a 703-token prompt and a 24-token answer one request takes 31.7\,s, four separate
+concurrent requests 124.5\,s ($3.9\times$) and one request with $n=4$ 39.1\,s ($1.23\times$): llama-server prefills once and forks
+the KV cache. \texttt{Backend::stream\_n} sends a round as one such request and delivers each choice when its own stream ends, so
+it can be verified while the others decode. The first live hedging runs, which used separate requests, were slow for exactly this reason.
+
+\subsection{Fusing the agreement samples with the draft}
+
+For an unverified maths draft the gate always draws $k=2$ cheap samples (A-060), after the draft: $1+c(2)=2.33$ draft times.
+Drawn in the draft's batch they cost $c(3)=1.78$, and they are dropped when the draft is stopped early (it is going to System~2
+whatever they say). In an interleaved A/B (14 GSM8K prompts, two repetitions, the stream closed at the gate's decision so no
+System~2 run is started) the median time to the decision fell from 23.1\,s to 17.9\,s ($-24\,\%$), with the fused arm faster in 23
+of 28 pairs (exact sign test $p=0.0005$). Escalations were 7 and 5 of 28 (discordant pairs 4 to 2, McNemar $p=0.69$), and the
+decision flips between two repeats of the same arm as often (6 of 28) as between arms, so the difference is sampling noise.
+
+\subsection{When does a concurrent round pay?}
+
+Take $R+1$ rounds, one-attempt success probability $p$ and batch cost factor $c(N)$, and let candidates be independent. A round
+of $N$ succeeds with $1-(1-p)^N$, so
+\begin{equation}
+U(N)=\frac{1-(1-p)^{N(R+1)}}{c(N)\sum_{k=0}^{R}(1-p)^{Nk}}
+\label{eq:util}
+\end{equation}
+is the verified answers per single-attempt time. Widening to $N$ pays iff $U(N)>U(1)$.
+
+\begin{proposition}[Limits of widening] \textnormal{[exact]}
+\label{prop:wide}
+As $p\to0$, $U(N)/U(1)\to N/c(N)$: widening pays iff the batch is cheaper than the same streams in series. As $p\to1$,
+$U(N)/U(1)\to 1/c(N)<1$ for any $c(N)>1$: it never pays.
+\end{proposition}
+\begin{proof}
+For small $p$, $1-(1-p)^{N(R+1)}\approx N(R+1)p$ and $\sum_k(1-p)^{Nk}\approx R+1$, so $U(N)\approx Np/c(N)$ and $U(1)\approx p$.
+For $p\to1$ the numerator tends to 1 for every $N$, and the sum to 1, so $U(N)\to1/c(N)$. \qed
+\end{proof}
+
+\emph{Consequence.} With the short-context costs the policy widens for $p\le0.48$; with the 1,600-token costs
+$[1.0,2.4,3.1,3.4]$ it widens only for $p\le0.07$ (hopeless tasks), because $c(4)=3.4$ is close to 4. The 100-prompt
+run also shows that attempts are not independent: of the eight code items that reached System~2, four passed on the first attempt
+and four failed all three, and no repair rescued one.
+
+\subsection{Hedging on System 2: implemented, measured, off}
+
+\texttt{nafs\_core::parallel} and the System~2 loop implement it: one future per candidate that generates, applies a patch and
+verifies, so verification overlaps the other candidates' decoding; candidates consumed in completion order; the first that passes
+wins and dropping the rest cancels their streams; the width from Eq.~(\ref{eq:util}) with an online Beta estimate of $p$; a
+\texttt{repair\_rounds} override; \texttt{hedge\_after\_failure}, which runs the first attempt alone; and a round deadline 5\,s inside the
+request cap. Table~\ref{tab:hedge} is the live A/B on those eight items (System~2 forced, idle host).
+
+\begin{table}[t]
+\centering
+\caption{Eight hard code items, System~2 forced (wall time in s; the sequential loop was run twice).}
+\label{tab:hedge}
+\scriptsize
+\begin{tabular}{@{}p{3.3cm}rr@{}}
+\toprule
+Arm & Verified & Wall \\
+\midrule
+sequential (1 + 2 serial repairs), run 1 & 4/8 & 4,052 \\
+sequential, run 2 & 3/8 & 4,523 \\
+four fresh at once, separate requests & 4/8 & 3,308 \\
+first alone, then four, one $n=4$ request & 4/7 & 3,558 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Four concurrent fresh candidates cost the easy items $+44$ to $+87\,\%$ and saved only on failing ones; the one-request variant was no
+faster on the failing items (872--930\,s against 636--901\,s), because a round at repair depth costs 2.2 to 3.4 single attempts
+(Table~\ref{tab:batch}). The two sequential runs disagree with each other (4/8 and 3/8), so no accuracy difference can be claimed
+at this size. Hedging on System~2 is therefore \emph{not} adopted: \texttt{deliberation.parallel.enabled = false}. Running it also exposed
+three defects, all fixed: separate requests prefilling $W$ times; the next attempt's budget sized from the single-stream speed,
+which let a round overrun the request cap (HTTP 504); and an error in a round's last candidate discarding the best candidate so far.
+
+\subsection{Cheap concurrent samples before System~2}
+
+Where batching is cheap (System~1, short context) and the verifier is exact, the cores are better spent \emph{before} the
+expensive model. When a draft fails its exact check, \Sys{} now draws $k=4$ System~1 samples in one request, verifies each as it finishes and
+keeps the first that passes. Let $f$ be the share of requests whose draft fails, $r$ the share of those that a sample rescues,
+$\rho$ the cost of the rescue stage (paid on every failed draft) and $E$ the cost of an escalation.
+
+\begin{proposition}[Rescue break-even] \textnormal{[exact]}
+\label{prop:rescue}
+The saving per request is $f\,(rE-\rho)$, positive iff $r>\rho/E$.
+\end{proposition}
+\begin{proof}
+Of the fraction $f$ with a failed draft, a share $r$ avoids the escalation ($-E$) and all pay $\rho$. \qed
+\end{proof}
+
+Offline on 60 MBPP+ items the draft passes 46.7\,\% of the time; of 32 failed drafts, 0, 0, 4 and 6 are rescued by 1, 2, 3 and 4
+samples (19\,\% with four, pass@5 56.7\,\%), and four samples in one request take 17.5\,s against 10.4\,s for the draft. Live, in an
+interleaved A/B of 40 items (rescue off against on, stream closed at the decision), escalations fell from 22 to 20 (three avoided,
+one in the other direction, since the draft itself is random); the rescue added a median 14.5\,s when it ran and 317\,s in all.
+Break-even is $317/3=106$\,s per avoided escalation, against 250--580\,s measured for an escalation (the eight code items of the
+100-prompt run: median 289\,s, mean 580\,s), so the rescue nets $+10.8$ to $+35.6$\,s per code item and trades no accuracy: every
+rescued answer passed the exact check. The sample is small and the two studies agree on the rate; it is on by default
+(\texttt{gate.rescue\_samples = 4}), and Lemma~1's call bound gains that term.
+
+\subsection{Serving topology and summary}
+
+System~2 now has four slots and 24,576 tokens of context (6,144 per slot) where it had two, since the 100-prompt run lost 476\,s
+to waiting for a System~2 slot. Table~\ref{tab:p13} summarises what was adopted and what was not. Every suite was re-run on the final code (31 October 2026): 206 Rust tests with real Lean, security 26/26, end-to-end 65/65, Rooms 59/59, the harness sweep 50/50 (it now covers the rescue, the parallel settings and their validation), and the nine acceptance tests, where Lemma~1's call bound for the maths request is $1+k+\text{rescue}+N(R+1)=10$ and 8 calls were used.
+
+\begin{table}[t]
+\centering
+\caption{Phase~13 outcomes.}
+\label{tab:p13}
+\scriptsize
+\begin{tabular}{@{}p{3.0cm}p{1.6cm}p{2.1cm}@{}}
+\toprule
+Change & Default & Evidence \\
+\midrule
+Fused agreement samples & on & $-24\,\%$, $p=0.0005$ \\
+System~1 rescue (4 samples) & on & 3 of 19 avoided; break-even 106\,s \\
+System~2 with 4 slots & on & 2.7$\times$ to 1.5$\times$ decode \\
+Concurrent hedging, System~2 & off & no width pays at depth \\
+$n$-choice requests & used & 39.1 against 124.5\,s \\
+n-gram speculation & no & $\le1.12\times$, down to $0.84\times$ \\
+q8\_0 KV cache & no & no gain at depth \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -211,6 +211,26 @@ pub struct ChatRequest {
     /// FR-092: allow a code retry to answer with a Codex patch to the candidate; default from configuration.
     #[serde(default)]
     pub patch_repair: Option<bool>,
+    /// FR-094: candidates generated at once per System 2 round on a verifiable task (1 = one at a time, the
+    /// sequential loop); default from the width policy in configuration. Capped by the System 2 slots.
+    #[serde(default)]
+    pub parallel: Option<u32>,
+    /// FR-094: repair rounds after the first on a verifiable task (0 = fresh candidates only), at most the domain's
+    /// configured R; default is the configured R. Lets a round of concurrent candidates replace serial repairs.
+    #[serde(default)]
+    pub repair_rounds: Option<u32>,
+    /// FR-094: run the first attempt alone and widen only after it fails (the concurrent round then replaces the serial
+    /// repairs). Easy tasks pass the first attempt and pay nothing for the width; default from configuration.
+    #[serde(default)]
+    pub hedge_after_failure: Option<bool>,
+    /// FR-096: System 1 samples drawn at once, and verified as they finish, when the draft fails its exact check and before
+    /// System 2 is used (0 = escalate at once); at most 4 (the System 1 slots). Default from configuration.
+    #[serde(default)]
+    pub rescue: Option<u32>,
+    /// FR-095: draw the agreement samples of an unverified draft (math) together with the draft in one batch instead of
+    /// after it; default from configuration.
+    #[serde(default)]
+    pub fuse_samples: Option<bool>,
     /// In-process lab traffic (evaluation and load-test runs). Never read from HTTP; such replies are stored
     /// as ephemeral and kept out of the operational alerts (OR-004), which describe the live service.
     #[serde(skip)]
@@ -560,6 +580,27 @@ pub struct CodeAgentRequest {
     /// "system2" or "system1"; default from configuration.
     #[serde(default)]
     pub model: Option<String>,
+    /// Phase 11 A/B override of `harness.context`: "append" (Codex transcript) or "reset" (Phase 10 loop).
+    #[serde(default)]
+    pub context: Option<String>,
+    /// Phase 11 A/B override of `harness.constrain`: sample actions under the action grammar.
+    #[serde(default)]
+    pub constrain: Option<bool>,
+    /// Phase 11 A/B override of `harness.stream_cut`: end the stream when the action is complete.
+    #[serde(default)]
+    pub stream_cut: Option<bool>,
+    /// Phase 11 A/B override of `harness.edit_format`: "auto", "any" or "whole".
+    #[serde(default)]
+    pub edit_format: Option<String>,
+    /// Phase 11 A/B override of `harness.unstick`: break a repetition loop (compact, sample more diversely).
+    #[serde(default)]
+    pub unstick: Option<bool>,
+    /// Override of `harness.thinking_budget` (System 2 reasoning tokens per step, 64..=4096).
+    #[serde(default)]
+    pub thinking_budget: Option<u32>,
+    /// Override of `harness.first_step_thinking_budget` (0 = off, else 64..=4096).
+    #[serde(default)]
+    pub first_step_thinking_budget: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -575,6 +616,33 @@ pub struct CodeAgentStep {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub score: Option<f64>,
     pub ms: u64,
+    /// What the step's model call cost (absent when the call failed).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage: Option<CodeAgentUsage>,
+    /// The transcript was compacted before this step's call.
+    #[serde(default)]
+    pub compacted: bool,
+}
+
+/// One model call of the code agent, as the server reported it (Phase 11).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CodeAgentUsage {
+    /// Prompt tokens prefilled (not served from the server's cache).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_tokens: Option<u32>,
+    /// Prompt tokens served from the cache.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cached_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefill_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decode_ms: Option<f64>,
+    pub completion_tokens: u32,
+    pub reasoning_tokens: u32,
+    /// stop, length, or action_complete (the stream was cut after the action).
+    pub finish_reason: String,
+    /// Sampled under the action grammar.
+    pub constrained: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -594,4 +662,29 @@ pub struct CodeAgentReply {
     pub model_calls: u32,
     pub model: String,
     pub wall_ms: u64,
+    /// "append" or "reset".
+    #[serde(default)]
+    pub context: String,
+    /// Whether actions were sampled under the action grammar.
+    #[serde(default)]
+    pub constrained: bool,
+    /// "auto", "any" or "whole".
+    #[serde(default)]
+    pub edit_format: String,
+    /// Sandbox runs of the verifier (a workspace already judged is not judged again).
+    #[serde(default)]
+    pub verifier_calls: u32,
+    #[serde(default)]
+    pub compactions: u32,
+    /// Prompt tokens prefilled over the run, and those served from the server's cache.
+    #[serde(default)]
+    pub prefill_tokens: u64,
+    #[serde(default)]
+    pub cached_tokens: u64,
+    /// Tokens decoded over the run (reasoning included).
+    #[serde(default)]
+    pub decoded_tokens: u64,
+    /// The run's net change as a unified diff (returned files against the starting ones).
+    #[serde(default)]
+    pub diff: String,
 }

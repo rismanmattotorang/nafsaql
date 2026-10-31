@@ -53,6 +53,14 @@ pub struct SandboxOutput {
     pub killed: Option<String>,
 }
 impl SandboxOutput {
+    /// Paths under the run's scratch directory as relative names (`File "runner.py"`): the model and the
+    /// records need the file name, not a random temporary path.
+    fn relative_to(mut self, dir: &Path) -> Self {
+        let prefix = format!("{}/", dir.display());
+        self.stdout = self.stdout.replace(&prefix, "");
+        self.stderr = self.stderr.replace(&prefix, "");
+        self
+    }
     /// Combined output with head and tail kept (Codex's middle truncation), for verifier evidence: the first
     /// failing assertion is near the head, the exception near the tail.
     pub fn excerpt(&self, max: usize) -> String {
@@ -287,7 +295,7 @@ pub enum Program {
 /// The macOS profile. Paths are policy parameters (`-D`), never interpolated into the policy text: the
 /// pattern OpenAI Codex's seatbelt module uses, so a path with a quote cannot change the policy.
 #[cfg(target_os = "macos")]
-fn seatbelt_profile(read_roots: usize) -> String {
+fn seatbelt_profile(read_roots: usize, ancestors: usize) -> String {
     let mut p = String::from(
         "(version 1)(allow default)(deny network*)(deny process-fork)(deny signal)(allow signal (target self))\
          (deny file-write* (require-not (subpath (param \"SANDBOX_DIR\"))))\
@@ -299,7 +307,29 @@ fn seatbelt_profile(read_roots: usize) -> String {
             "(allow file-read* (subpath (param \"READ_ROOT_{i}\")))"
         ));
     }
+    // Lean resolves its own path through symlinks, which needs `stat` on every directory above its
+    // toolchain (/Users, the home directory, ...). Metadata only, and only of those directories: their
+    // contents stay unreadable.
+    for i in 0..ancestors {
+        p.push_str(&format!(
+            "(allow file-read-metadata (literal (param \"ANCESTOR_{i}\")))"
+        ));
+    }
     p
+}
+
+/// Directories strictly above each read root, without duplicates (`/Users`, `/Users/me`, ...).
+#[cfg(target_os = "macos")]
+fn ancestors_of(roots: &[PathBuf]) -> Vec<PathBuf> {
+    let mut out: Vec<PathBuf> = vec![];
+    for r in roots {
+        for a in r.ancestors().skip(1) {
+            if a.parent().is_some() && !out.iter().any(|x| x == a) {
+                out.push(a.to_path_buf());
+            }
+        }
+    }
+    out
 }
 
 fn command_for(
@@ -317,10 +347,15 @@ fn command_for(
             Program::Python { .. } => &[],
         };
         let mut c = tokio::process::Command::new("/usr/bin/sandbox-exec");
-        c.arg("-p").arg(seatbelt_profile(roots.len()));
+        let ancestors = ancestors_of(roots);
+        c.arg("-p")
+            .arg(seatbelt_profile(roots.len(), ancestors.len()));
         c.arg(format!("-DSANDBOX_DIR={}", dir.display()));
         for (i, r) in roots.iter().enumerate() {
             c.arg(format!("-DREAD_ROOT_{i}={}", r.display()));
+        }
+        for (i, a) in ancestors.iter().enumerate() {
+            c.arg(format!("-DANCESTOR_{i}={}", a.display()));
         }
         c.arg("--");
         match program {
@@ -422,7 +457,9 @@ pub async fn run(
         python: python.to_string(),
         entry: dir.join(entry),
     };
-    let result = run_in(&dir, files, &program, stdin, limits).await;
+    let result = run_in(&dir, files, &program, stdin, limits)
+        .await
+        .map(|o| o.relative_to(&dir));
     let _ = std::fs::remove_dir_all(&dir);
     result
 }
@@ -453,7 +490,9 @@ pub async fn run_program(
             .collect(),
         env: env.to_vec(),
     };
-    let result = run_in(&dir, files, &program, stdin, limits).await;
+    let result = run_in(&dir, files, &program, stdin, limits)
+        .await
+        .map(|o| o.relative_to(&dir));
     let _ = std::fs::remove_dir_all(&dir);
     result
 }

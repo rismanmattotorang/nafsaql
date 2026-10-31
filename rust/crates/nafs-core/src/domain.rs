@@ -11,6 +11,10 @@ pub fn classify(text: &str, hint: Option<Domain>, v: Option<&VerificationInputs>
         if v.tests.as_ref().map(|t| !t.is_empty()).unwrap_or(false) || v.test_code.is_some() {
             return Domain::Code;
         }
+        // FR-090: a formal proof is mathematics (the maths caps: retries and a larger budget).
+        if v.lean.is_some() {
+            return Domain::Math;
+        }
         if v.reference_answer
             .as_ref()
             .map(|r| !r.trim().is_empty())
@@ -47,6 +51,22 @@ pub fn classify(text: &str, hint: Option<Domain>, v: Option<&VerificationInputs>
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn lean_tasks_are_mathematics() {
+        let v = VerificationInputs {
+            lean: Some(nafs_types::LeanTask {
+                statement: "theorem t : True :=\nsorry".into(),
+                theorem: None,
+            }),
+            ..Default::default()
+        };
+        // Whatever the wording, a Lean task gets the maths caps, not the open-question ones.
+        assert_eq!(
+            classify("Tell me about patience", None, Some(&v)),
+            Domain::Math
+        );
+    }
+
     #[test]
     fn heuristics() {
         assert_eq!(

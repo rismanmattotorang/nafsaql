@@ -10,6 +10,9 @@
 //! reached through closures and traits the host provides (`nafs-verify` runs both interpreters in its OS
 //! sandbox). See `docs/research/harness_integration.md` and this crate's `NOTICE`.
 pub mod agent;
+pub mod context;
+pub mod diff;
+pub mod grammar;
 pub mod lean;
 pub mod patch;
 pub mod scoring;

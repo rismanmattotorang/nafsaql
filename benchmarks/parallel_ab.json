@@ -1,0 +1,1020 @@
+{
+ "label": "IDLE HOST (load ~2), System 2 forced, MBPP+ hard items from perf_100",
+ "runs": [
+  {
+   "item": "mbpp_plus-239",
+   "arm": "seq",
+   "order": 0,
+   "client_s": 718.9,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 718.9,
+   "model_calls": 3,
+   "completion_tokens": 4189,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 2; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-239",
+   "arm": "par4_sep",
+   "order": 0,
+   "client_s": 448.0,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 447.8,
+   "model_calls": 2,
+   "completion_tokens": 2475,
+   "reasoning_tokens": 2046,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-300",
+   "arm": "par4_sep",
+   "order": 1,
+   "client_s": 443.0,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 443.0,
+   "model_calls": 4,
+   "completion_tokens": 4503,
+   "reasoning_tokens": 4092,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.70",
+    "candidate 2 (whole) fresh from the task; score 0.70",
+    "candidate 3 (whole) fresh from the task; score 0.70",
+    "candidate 4 (whole) fresh from the task; score 0.70"
+   ]
+  },
+  {
+   "item": "mbpp_plus-300",
+   "arm": "seq",
+   "order": 1,
+   "client_s": 702.0,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 702.0,
+   "model_calls": 3,
+   "completion_tokens": 3382,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.70",
+    "candidate 2 (whole) repairs candidate 1; score 0.70",
+    "candidate 3 (whole) repairs candidate 2; score 0.70"
+   ]
+  },
+  {
+   "item": "mbpp_plus-610",
+   "arm": "seq",
+   "order": 2,
+   "client_s": 189.3,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 189.3,
+   "model_calls": 1,
+   "completion_tokens": 1077,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-610",
+   "arm": "par4_sep",
+   "order": 2,
+   "client_s": 354.0,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 353.8,
+   "model_calls": 1,
+   "completion_tokens": 1051,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-91",
+   "arm": "par4_sep",
+   "order": 3,
+   "client_s": 238.8,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 238.8,
+   "model_calls": 1,
+   "completion_tokens": 784,
+   "reasoning_tokens": 710,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-91",
+   "arm": "seq",
+   "order": 3,
+   "client_s": 165.4,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 165.4,
+   "model_calls": 1,
+   "completion_tokens": 958,
+   "reasoning_tokens": 921,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-759",
+   "arm": "seq",
+   "order": 4,
+   "client_s": 644.4,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 644.3,
+   "model_calls": 3,
+   "completion_tokens": 3391,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 2; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-759",
+   "arm": "par4_sep",
+   "order": 4,
+   "client_s": 380.2,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 380.2,
+   "model_calls": 4,
+   "completion_tokens": 4463,
+   "reasoning_tokens": 4092,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) fresh from the task; score 0.05",
+    "candidate 3 (whole) fresh from the task; score 0.05",
+    "candidate 4 (whole) fresh from the task; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-274",
+   "arm": "par4_sep",
+   "order": 5,
+   "client_s": 341.6,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 341.6,
+   "model_calls": 1,
+   "completion_tokens": 1049,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-274",
+   "arm": "seq",
+   "order": 5,
+   "client_s": 192.1,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 192.0,
+   "model_calls": 1,
+   "completion_tokens": 1099,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-576",
+   "arm": "seq",
+   "order": 6,
+   "client_s": 636.5,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 636.5,
+   "model_calls": 3,
+   "completion_tokens": 3392,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 2; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-576",
+   "arm": "par4_sep",
+   "order": 6,
+   "client_s": 385.9,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 385.8,
+   "model_calls": 4,
+   "completion_tokens": 4455,
+   "reasoning_tokens": 4092,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) fresh from the task; score 0.05",
+    "candidate 3 (whole) fresh from the task; score 0.05",
+    "candidate 4 (whole) fresh from the task; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-311",
+   "arm": "par4_sep",
+   "order": 7,
+   "client_s": 717.3,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 717.3,
+   "model_calls": 4,
+   "completion_tokens": 6153,
+   "reasoning_tokens": 4092,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 0,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) fresh from the task; score 0.05",
+    "candidate 3 (whole) fresh from the task; score 0.05",
+    "candidate 4 (whole) fresh from the task; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-311",
+   "arm": "seq",
+   "order": 7,
+   "client_s": 803.7,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 803.6,
+   "model_calls": 3,
+   "completion_tokens": 4095,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 2; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-239",
+   "arm": "hedge_sep",
+   "order": 0,
+   "client_s": 924.5,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 924.4,
+   "model_calls": 2,
+   "completion_tokens": 2444,
+   "reasoning_tokens": 2046,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-300",
+   "arm": "hedge_sep",
+   "order": 1,
+   "client_s": 930.1,
+   "error": "HTTP 504: b'{\"code\":\"E_BACKEND_TIMEOUT\",\"message\":\"backend timeout: request wall-clock cap exceeded\"}'"
+  },
+  {
+   "item": "mbpp_plus-610",
+   "arm": "hedge_sep",
+   "order": 2,
+   "client_s": 216.9,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 216.9,
+   "model_calls": 1,
+   "completion_tokens": 1077,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-91",
+   "arm": "hedge_sep",
+   "order": 3,
+   "client_s": 206.5,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 206.4,
+   "model_calls": 1,
+   "completion_tokens": 1060,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-759",
+   "arm": "hedge_sep",
+   "order": 4,
+   "client_s": 930.1,
+   "error": "HTTP 504: b'{\"code\":\"E_BACKEND_TIMEOUT\",\"message\":\"backend timeout: request wall-clock cap exceeded\"}'"
+  },
+  {
+   "item": "mbpp_plus-274",
+   "arm": "hedge_sep",
+   "order": 5,
+   "client_s": 215.9,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 215.8,
+   "model_calls": 1,
+   "completion_tokens": 1051,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-576",
+   "arm": "hedge_sep",
+   "order": 6,
+   "client_s": 1950.1,
+   "error": "HTTP 504: b'{\"code\":\"E_BACKEND_TIMEOUT\",\"message\":\"backend timeout: request wall-clock cap exceeded\"}'"
+  },
+  {
+   "item": "mbpp_plus-311",
+   "arm": "hedge_sep",
+   "order": 7,
+   "client_s": 880.9,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 880.8,
+   "model_calls": 5,
+   "completion_tokens": 5710,
+   "reasoning_tokens": 5115,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 1; score 0.05",
+    "candidate 4 (whole) repairs candidate 1; score 0.05",
+    "candidate 5 (whole) repairs candidate 1; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-239",
+   "arm": "seq_b",
+   "order": 0,
+   "client_s": 1740.0,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 723.6,
+   "model_calls": 2,
+   "completion_tokens": 2990,
+   "reasoning_tokens": 2046,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-239",
+   "arm": "hedge",
+   "order": 0,
+   "client_s": 223.2,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 223.1,
+   "model_calls": 1,
+   "completion_tokens": 1228,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-300",
+   "arm": "hedge",
+   "order": 1,
+   "client_s": 929.9,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 929.8,
+   "model_calls": 2,
+   "completion_tokens": 2470,
+   "reasoning_tokens": 2046,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.70",
+    "candidate 2 (whole) repairs candidate 1; score 0.70"
+   ]
+  },
+  {
+   "item": "mbpp_plus-300",
+   "arm": "seq_b",
+   "order": 1,
+   "client_s": 780.7,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 780.6,
+   "model_calls": 3,
+   "completion_tokens": 3534,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.70",
+    "candidate 2 (whole) repairs candidate 1; score 0.70",
+    "candidate 3 (whole) repairs candidate 2; score 0.70"
+   ]
+  },
+  {
+   "item": "mbpp_plus-610",
+   "arm": "seq_b",
+   "order": 2,
+   "client_s": 226.1,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 226.0,
+   "model_calls": 1,
+   "completion_tokens": 1077,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-610",
+   "arm": "hedge",
+   "order": 2,
+   "client_s": 214.3,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 214.3,
+   "model_calls": 1,
+   "completion_tokens": 1051,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-91",
+   "arm": "hedge",
+   "order": 3,
+   "client_s": 224.2,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 224.1,
+   "model_calls": 1,
+   "completion_tokens": 1060,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-91",
+   "arm": "seq_b",
+   "order": 3,
+   "client_s": 189.1,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 189.1,
+   "model_calls": 1,
+   "completion_tokens": 958,
+   "reasoning_tokens": 921,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-759",
+   "arm": "seq_b",
+   "order": 4,
+   "client_s": 1756.7,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 764.6,
+   "model_calls": 3,
+   "completion_tokens": 3391,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 2; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-759",
+   "arm": "hedge",
+   "order": 4,
+   "client_s": 889.8,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 889.7,
+   "model_calls": 5,
+   "completion_tokens": 4615,
+   "reasoning_tokens": 2083,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 1; score 0.05",
+    "candidate 4 (whole) repairs candidate 1; score 0.05",
+    "candidate 5 (whole) repairs candidate 1; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-274",
+   "arm": "hedge",
+   "order": 5,
+   "client_s": 204.5,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 204.4,
+   "model_calls": 1,
+   "completion_tokens": 1051,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-274",
+   "arm": "seq_b",
+   "order": 5,
+   "client_s": 203.6,
+   "verified": true,
+   "assurance": "verified",
+   "wall_s": 203.5,
+   "model_calls": 1,
+   "completion_tokens": 1051,
+   "reasoning_tokens": 1023,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": true
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 1.00"
+   ]
+  },
+  {
+   "item": "mbpp_plus-576",
+   "arm": "seq_b",
+   "order": 6,
+   "client_s": 734.3,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 734.2,
+   "model_calls": 3,
+   "completion_tokens": 3392,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 2; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-576",
+   "arm": "hedge",
+   "order": 6,
+   "client_s": 930.1,
+   "error": "HTTP 504: b'{\"code\":\"E_BACKEND_TIMEOUT\",\"message\":\"backend timeout: request wall-clock cap exceeded\"}'"
+  },
+  {
+   "item": "mbpp_plus-311",
+   "arm": "hedge",
+   "order": 7,
+   "client_s": 1606.5,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 872.1,
+   "model_calls": 5,
+   "completion_tokens": 5849,
+   "reasoning_tokens": 5115,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 1; score 0.05",
+    "candidate 4 (whole) repairs candidate 1; score 0.05",
+    "candidate 5 (whole) repairs candidate 1; score 0.05"
+   ]
+  },
+  {
+   "item": "mbpp_plus-311",
+   "arm": "seq_b",
+   "order": 7,
+   "client_s": 901.8,
+   "verified": false,
+   "assurance": "abstained",
+   "wall_s": 901.5,
+   "model_calls": 3,
+   "completion_tokens": 4171,
+   "reasoning_tokens": 3069,
+   "rounds": [
+    {
+     "round": 0,
+     "passed": false
+    },
+    {
+     "round": 1,
+     "passed": false
+    },
+    {
+     "round": 2,
+     "passed": false
+    }
+   ],
+   "notes": [
+    "candidate 1 (whole) fresh from the task; score 0.05",
+    "candidate 2 (whole) repairs candidate 1; score 0.05",
+    "candidate 3 (whole) repairs candidate 2; score 0.05"
+   ]
+  }
+ ],
+ "note": "par4_sep and hedge_sep: the first implementation, W separate requests (each slot prefills the whole prompt). seq, seq_b, hedge, par4: see scripts/parallel_ab.py; hedge and par4 use one request with n choices."
+}

@@ -40,6 +40,13 @@ pub struct GenRequest {
     /// P7-T03 / Phase 8: stop the stream early (finish_reason "early_escalation") when a confidence
     /// signal crosses its threshold.
     pub early_stop: Option<EarlyStop>,
+    /// GBNF grammar for the whole generation, reasoning span included (llama-server only; see
+    /// [`Backend::supports_grammar`]). Phase 11: the code agent's action grammar.
+    pub grammar: Option<String>,
+    /// Phase 11: end the stream as soon as the answer text so far holds a complete unit. The function returns
+    /// where the unit ends; the content is cut there and `finish_reason` is "action_complete". Dropping the
+    /// stream stops generation on the server, so nothing after the unit is decoded.
+    pub stop_after: Option<fn(&str) -> Option<usize>>,
 }
 
 /// Early-escalation thresholds on the draft's token log-probs. `below_mean` is the P7-T03 rule (running
@@ -318,6 +325,8 @@ impl Backend {
         }
         if let Some(rf) = &req.response_format {
             b["response_format"] = rf.clone();
+        } else if let Some(g) = req.grammar.as_ref().filter(|_| self.supports_grammar()) {
+            b["grammar"] = json!(g);
         }
         if let Some(budget) = req.thinking_budget {
             // Server-side budget forcing (Prop. 9): llama-server closes the reasoning span at the budget;
@@ -329,6 +338,16 @@ impl Backend {
             }
         }
         b
+    }
+
+    /// Slots this backend can run at once (`max_in_flight`).
+    pub fn slots(&self) -> usize {
+        self.cfg.max_in_flight.max(1)
+    }
+
+    /// Slots free right now: the width a concurrent round can use without queueing behind itself.
+    pub fn free_slots(&self) -> usize {
+        self.sem.available_permits()
     }
 
     async fn acquire(&self) -> Result<tokio::sync::OwnedSemaphorePermit> {
@@ -406,6 +425,159 @@ impl Backend {
         Ok(out)
     }
 
+    /// FR-094: `n` completions of one prompt in one streaming request. llama-server prefills the prompt once and forks
+    /// its KV cache into `n` slots, so a round of candidates costs one prefill plus one batched decode: measured on
+    /// System 2 with a 703-token prompt, one request takes 31.7 s, four separate concurrent requests 124.5 s (each
+    /// prefills its own slot) and one request with n = 4 39.1 s (`benchmarks/prefill_share.json`).
+    ///
+    /// Each choice is sent on `tx` the moment its own stream ends, so the caller can verify it while the others are
+    /// still decoding. Returns the request's prompt tokens when every choice has ended; dropping the future closes the
+    /// connection, which stops all of them on the server. Needs `n` free slots on the server and takes `n` permits.
+    pub async fn stream_n(
+        &self,
+        req: &GenRequest,
+        n: usize,
+        tx: tokio::sync::mpsc::UnboundedSender<(usize, Result<GenOutput>)>,
+    ) -> Result<u32> {
+        let tq = Instant::now();
+        let _permit = {
+            let sem = self.sem.clone();
+            cancellable(req, async move {
+                sem.acquire_many_owned(n.max(1) as u32)
+                    .await
+                    .map_err(|_| NafsError::BackendUnavailable("semaphore closed".into()))
+            })
+            .await?
+        };
+        let queue_ms = tq.elapsed().as_millis() as u64;
+        let _g = InflightGuard::new(&self.role);
+        let t0 = Instant::now();
+        let mut body = self.body(req, true);
+        body["n"] = json!(n);
+        let resp = cancellable(req, self.post(&body)).await?;
+        let mut events = resp.bytes_stream().eventsource();
+        let idle = Duration::from_millis(self.retry.stream_idle_timeout_ms);
+        let mut outs: Vec<GenOutput> = (0..n).map(|_| GenOutput::default()).collect();
+        let mut splits: Vec<ThinkSplitter> = (0..n).map(|_| ThinkSplitter::default()).collect();
+        let mut deltas = vec![0u32; n];
+        let mut sent = vec![false; n];
+        let mut prompt_tokens = 0u32;
+        let mut last = Instant::now();
+        let mut timings: Option<Value> = None;
+        'read: loop {
+            let next = tokio::select! {
+                ev = events.next() => ev,
+                _ = tokio::time::sleep(Duration::from_millis(250)) => {
+                    if req.cancel.as_ref().map(|c| c.is_set()).unwrap_or(false) {
+                        return Err(NafsError::Cancelled);
+                    }
+                    if last.elapsed() > idle {
+                        return Err(NafsError::BackendTimeout(format!("{}: no data for {:?}", self.role, idle)));
+                    }
+                    continue;
+                }
+            };
+            last = Instant::now();
+            if req.cancel.as_ref().map(|c| c.is_set()).unwrap_or(false) {
+                return Err(NafsError::Cancelled);
+            }
+            let Some(ev) = next else { break };
+            let ev = ev
+                .map_err(|e| NafsError::BackendProtocol(format!("{}: SSE error {e}", self.role)))?;
+            if ev.data.trim() == "[DONE]" {
+                break;
+            }
+            let v: Value = match serde_json::from_str(&ev.data) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            if let Some(t) = v.get("timings").filter(|t| t.is_object()) {
+                timings = Some(t.clone());
+            }
+            if let Some(u) = v.get("usage").filter(|u| !u.is_null()) {
+                prompt_tokens = u["prompt_tokens"].as_u64().unwrap_or(0) as u32;
+            }
+            let Some(choices) = v["choices"].as_array() else {
+                continue;
+            };
+            for choice in choices {
+                let i = choice["index"].as_u64().unwrap_or(0) as usize;
+                if i >= n || sent[i] {
+                    continue;
+                }
+                let out = &mut outs[i];
+                let delta = &choice["delta"];
+                let reasoning = delta
+                    .get("reasoning_content")
+                    .and_then(|x| x.as_str())
+                    .or_else(|| delta.get("reasoning").and_then(|x| x.as_str()))
+                    .unwrap_or("");
+                if !reasoning.is_empty() {
+                    out.reasoning_tokens += 1;
+                    deltas[i] += 1;
+                    if out.ttft_ms.is_none() {
+                        out.ttft_ms = Some(t0.elapsed().as_millis() as u64);
+                    }
+                    out.reasoning.push_str(reasoning);
+                }
+                if let Some(c) = delta.get("content").and_then(|x| x.as_str()) {
+                    let pieces = splits[i].push(c);
+                    if splits[i].in_think || pieces.iter().any(|(_, r)| *r) {
+                        out.reasoning_tokens += 1;
+                    }
+                    if !c.is_empty() {
+                        deltas[i] += 1;
+                    }
+                    for (t, r) in pieces {
+                        if t.is_empty() {
+                            continue;
+                        }
+                        if out.ttft_ms.is_none() {
+                            out.ttft_ms = Some(t0.elapsed().as_millis() as u64);
+                        }
+                        if r {
+                            out.reasoning.push_str(&t);
+                        } else {
+                            out.content.push_str(&t);
+                        }
+                    }
+                }
+                if let Some(f) = choice["finish_reason"].as_str() {
+                    out.finish_reason = f.to_string();
+                    if let Some((t, r)) = splits[i].flush() {
+                        if r {
+                            out.reasoning.push_str(&t);
+                        } else {
+                            out.content.push_str(&t);
+                        }
+                    }
+                    out.completion_tokens = deltas[i];
+                    out.queue_ms = queue_ms;
+                    finish(out, t0);
+                    sent[i] = true;
+                    let _ = tx.send((i, Ok(std::mem::take(out))));
+                    if sent.iter().all(|x| *x) {
+                        break 'read;
+                    }
+                }
+            }
+        }
+        // A choice whose stream ended without a finish reason is an error, not a silent loss.
+        for (i, done) in sent.iter().enumerate() {
+            if !done {
+                let _ = tx.send((
+                    i,
+                    Err(NafsError::BackendProtocol(format!(
+                        "{}: choice {i} ended without a finish reason",
+                        self.role
+                    ))),
+                ));
+            }
+        }
+        let _ = timings;
+        Ok(prompt_tokens)
+    }
+
     async fn stream_inner(
         &self,
         req: &GenRequest,
@@ -422,6 +594,7 @@ impl Backend {
             .as_ref()
             .map(|e| crate::sequential::WindowTracker::new(e.window.max(1)));
         let mut last = Instant::now();
+        let mut deltas = 0u32;
         let emit = |out: &mut GenOutput,
                     text: &str,
                     reasoning: bool,
@@ -484,6 +657,7 @@ impl Backend {
                 .unwrap_or("");
             if !reasoning.is_empty() {
                 out.reasoning_tokens += 1;
+                deltas += 1;
                 emit(&mut out, reasoning, true, sink);
             }
             if let Some(c) = delta.get("content").and_then(|x| x.as_str()) {
@@ -491,8 +665,19 @@ impl Backend {
                 if split.in_think || pieces.iter().any(|(_, r)| *r) {
                     out.reasoning_tokens += 1;
                 }
+                if !c.is_empty() {
+                    deltas += 1;
+                }
                 for (t, r) in pieces {
                     emit(&mut out, &t, r, sink);
+                }
+                if let Some(end) = req.stop_after.and_then(|f| f(&out.content)) {
+                    // The usage chunk never arrives after a cut: one streamed delta is one token on
+                    // llama-server and vLLM.
+                    out.content.truncate(end);
+                    out.finish_reason = "action_complete".into();
+                    out.completion_tokens = deltas;
+                    break;
                 }
             }
             let mut low_window: Option<f32> = None;
@@ -609,6 +794,11 @@ impl Backend {
             .trim_end_matches('/')
             .trim_end_matches("/v1")
             .to_string()
+    }
+
+    /// llama-server takes a GBNF `grammar` and applies it from the first sampled token, reasoning included.
+    pub fn supports_grammar(&self) -> bool {
+        self.kind == "llama"
     }
 
     /// Raw continuation with a cached prefix is a llama-server feature (`/completion`, `/apply-template`).
