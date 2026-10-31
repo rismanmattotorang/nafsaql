@@ -166,6 +166,113 @@ async fn completion(State(m): State<Mock>, Json(body): Json<Value>) -> impl Into
 
 async fn chat(State(m): State<Mock>, Json(body): Json<Value>) -> impl IntoResponse {
     m.calls.lock().unwrap().push(body.clone());
+    // FR-094: a task whose System 2 candidates differ by seed: seed 3 is a correct, fast answer; the others are wrong and
+    // slow, so a concurrent round finishes with the fast one and the slow ones are still running when it passes.
+    if body["model"] == "system2" && body["messages"].to_string().contains("PARTASK") {
+        let code_of = |good: bool| {
+            let code = if good {
+                "def sq(x):\n    return x * x"
+            } else {
+                "def sq(x):\n    return 0"
+            };
+            format!("```python\n{code}\n```")
+        };
+        let chunk = |idx: usize, content: Option<String>, finish: Option<&str>| {
+            let delta = content
+                .map(|c| json!({"content": c}))
+                .unwrap_or_else(|| json!({}));
+            format!(
+                "data: {}\n\n",
+                json!({"choices":[{"index": idx, "delta": delta, "finish_reason": finish}]})
+            )
+        };
+        let n = body["n"].as_u64().unwrap_or(1) as usize;
+        let mut sse = String::new();
+        if n > 1 {
+            // One request, n choices (FR-094): choice 2 is correct and fast, the others wrong and slow, so the fast one
+            // ends first and the request is still running when its verdict is in.
+            tokio::time::sleep(std::time::Duration::from_millis(60)).await;
+            let mut first = String::new();
+            if n > 2 {
+                first.push_str(&chunk(2, Some(code_of(true)), None));
+                first.push_str(&chunk(2, None, Some("stop")));
+            }
+            let st = futures::stream::unfold(0usize, move |step| {
+                let first = first.clone();
+                let others: Vec<String> = (0..n)
+                    .filter(|i| n <= 2 || *i != 2)
+                    .map(|i| chunk(i, Some(code_of(false)), None) + &chunk(i, None, Some("stop")))
+                    .collect();
+                async move {
+                    match step {
+                        0 => Some((
+                            Ok::<_, std::convert::Infallible>(axum::body::Bytes::from(first)),
+                            1,
+                        )),
+                        1 => {
+                            tokio::time::sleep(std::time::Duration::from_millis(840)).await;
+                            Some((Ok(axum::body::Bytes::from(others.concat())), 2))
+                        }
+                        2 => Some((
+                            Ok(axum::body::Bytes::from(format!(
+                                "data: {}\n\ndata: [DONE]\n\n",
+                                json!({"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":8}})
+                            ))),
+                            3,
+                        )),
+                        _ => None,
+                    }
+                }
+            });
+            return (
+                [(header::CONTENT_TYPE, "text/event-stream")],
+                axum::body::Body::from_stream(st),
+            )
+                .into_response();
+        }
+        let seed = body["seed"].as_u64().unwrap_or(0);
+        let good = seed % 4 == 3;
+        tokio::time::sleep(std::time::Duration::from_millis(if good {
+            60
+        } else {
+            900
+        }))
+        .await;
+        sse.push_str(&chunk(0, Some(code_of(good)), None));
+        sse.push_str(&format!("data: {}\n\ndata: [DONE]\n\n", json!({"choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":20,"completion_tokens":8}})));
+        return ([(header::CONTENT_TYPE, "text/event-stream")], sse).into_response();
+    }
+    // FR-096: System 1 on a task whose draft is wrong; of the n rescue choices, choice 1 is right (RESCUEOK) or none is (RESCUENO).
+    if body["model"] == "system1"
+        && body["messages"].to_string().contains("RESCUE")
+        && body["stream"].as_bool().unwrap_or(false)
+    {
+        let ok = body["messages"].to_string().contains("RESCUEOK");
+        let n = body["n"].as_u64().unwrap_or(1) as usize;
+        let code_of = |good: bool| {
+            let code = if good {
+                "def sq(x):\n    return x * x"
+            } else {
+                "def sq(x):\n    return 0"
+            };
+            format!("```python\n{code}\n```")
+        };
+        let mut sse = String::new();
+        for i in 0..n {
+            let good = ok && n > 1 && i == 1;
+            sse.push_str(&format!("data: {}\n\n", json!({"choices":[{"index": i, "delta": {"content": code_of(good)}, "finish_reason": null,
+                "logprobs": {"content":[{"token":"x","logprob":-0.01}]}}]})));
+            sse.push_str(&format!(
+                "data: {}\n\n",
+                json!({"choices":[{"index": i, "delta": {}, "finish_reason": "stop"}]})
+            ));
+        }
+        sse.push_str(&format!(
+            "data: {}\n\ndata: [DONE]\n\n",
+            json!({"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":8}})
+        ));
+        return ([(header::CONTENT_TYPE, "text/event-stream")], sse).into_response();
+    }
     let (reasoning, content) = reply_for(&body);
     if body["messages"].to_string().contains("very slow")
         && body["stream"].as_bool().unwrap_or(false)
@@ -189,6 +296,31 @@ async fn chat(State(m): State<Mock>, Json(body): Json<Value>) -> impl IntoRespon
             axum::body::Body::from_stream(st),
         )
             .into_response();
+    }
+    if body["stream"].as_bool().unwrap_or(false) && body["n"].as_u64().unwrap_or(1) > 1 {
+        // n choices of the same scripted reply, each ending with its own finish reason.
+        let n = body["n"].as_u64().unwrap() as usize;
+        let mut sse = String::new();
+        for i in 0..n {
+            if !reasoning.is_empty() {
+                sse.push_str(&format!("data: {}\n\n", json!({"choices":[{"index":i,"delta":{"reasoning_content": reasoning},"finish_reason":null}]})));
+            }
+            for w in content.split_inclusive(' ') {
+                sse.push_str(&format!(
+                    "data: {}\n\n",
+                    json!({"choices":[{"index":i,"delta":{"content": w},"finish_reason":null}]})
+                ));
+            }
+            sse.push_str(&format!(
+                "data: {}\n\n",
+                json!({"choices":[{"index":i,"delta":{},"finish_reason":"stop"}]})
+            ));
+        }
+        sse.push_str(&format!(
+            "data: {}\n\ndata: [DONE]\n\n",
+            json!({"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":8}})
+        ));
+        return ([(header::CONTENT_TYPE, "text/event-stream")], sse).into_response();
     }
     if body["stream"].as_bool().unwrap_or(false) {
         let mut sse = String::new();
@@ -371,7 +503,9 @@ async fn abstains_within_lemma1_bound_when_nothing_verifies() {
     assert_eq!(r.trace_state, TraceState::X);
     assert!(r.uncertainty_notice.is_some() && !r.message.content.is_empty());
     let c = o.caps(Domain::Math);
-    assert!(r.usage.model_calls <= 1 + o.cfg.gate.k_samples as u32 + c.n * (c.r + 1));
+    // FR-096: the rescue samples drawn before the escalation are part of the bound.
+    let rescue = o.cfg.gate.rescue_samples as u32;
+    assert!(r.usage.model_calls <= 1 + o.cfg.gate.k_samples as u32 + rescue + c.n * (c.r + 1));
 }
 
 #[tokio::test]
@@ -886,7 +1020,7 @@ async fn unverified_math_drafts_always_get_the_agreement_samples() {
     // Phase 8: a math question without a reference answer is not verifiable; its draft is confident in
     // token terms (the mock's log-probs are -0.01), so the uncertainty band would skip the samples. The
     // configured domain list draws them anyway, and the gate records k = 2.
-    let (o, _mock, _d) = setup(true).await;
+    let (o, _mock, _d) = setup_with(true, |c| c.gate.fuse_always_samples = false).await;
     let r = ChatRequest {
         messages: vec![Message {
             role: "user".into(),
@@ -1326,4 +1460,364 @@ async fn lean_task_is_repaired_from_lean_feedback_with_the_real_binary() {
         .map(|m| m["content"].as_str().unwrap_or(""))
         .collect::<String>();
     assert!(first.contains("Mathlib is NOT available") && first.contains("theorem add_comm'"));
+}
+
+fn s2_calls(mock: &Mock) -> usize {
+    mock.calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|b| b["model"] == "system2")
+        .count()
+}
+
+/// The `n` of each System 2 request, in arrival order (1 for a plain request).
+fn s2_ns(mock: &Mock) -> Vec<u64> {
+    mock.calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|b| b["model"] == "system2")
+        .map(|b| b["n"].as_u64().unwrap_or(1))
+        .collect()
+}
+
+fn par_cfg(c: &mut Config, slots: usize) {
+    c.backends.get_mut("llama").unwrap().system2.max_in_flight = slots;
+}
+
+/// FR-094: four candidates run at once, the first to pass wins, and the slow ones are cancelled instead of awaited.
+#[tokio::test]
+async fn concurrent_candidates_finish_with_the_first_verified_and_cancel_the_rest() {
+    let (o, mock, _d) = setup_with(true, |c| par_cfg(c, 4)).await;
+    let mut q = code_req("PARTASK");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.parallel = Some(4);
+    q.repair_rounds = Some(0);
+    q.hedge_after_failure = Some(false);
+    let t = std::time::Instant::now();
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    let took = t.elapsed();
+    assert_eq!(
+        r.assurance,
+        Assurance::Verified,
+        "{:?}",
+        r.uncertainty_notice
+    );
+    assert!(r.message.content.contains("x * x"));
+    assert_eq!(
+        s2_ns(&mock),
+        vec![4],
+        "one request with four choices: the prompt is prefilled once"
+    );
+    assert_eq!(
+        r.usage.model_calls, 1,
+        "only the finished candidate is counted; the others were cancelled"
+    );
+    assert!(
+        took < std::time::Duration::from_millis(850),
+        "the 900 ms candidates were not awaited: {took:?}"
+    );
+    assert_eq!(r.rounds.len(), 1);
+}
+
+/// The same task one candidate at a time needs three serial attempts (seed 3 is the third), each slow.
+#[tokio::test]
+async fn the_sequential_loop_needs_the_serial_attempts_that_the_concurrent_round_skips() {
+    let (o, mock, _d) = setup_with(true, |c| par_cfg(c, 4)).await;
+    let mut q = code_req("PARTASK");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.parallel = Some(1);
+    let t = std::time::Instant::now();
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(r.assurance, Assurance::Verified);
+    assert_eq!(s2_calls(&mock), 3);
+    assert!(
+        t.elapsed() > std::time::Duration::from_millis(1800),
+        "two 900 ms failures come first"
+    );
+}
+
+/// Width follows the free slots, never more than the server can run at once.
+#[tokio::test]
+async fn width_is_capped_by_the_system2_slots() {
+    let (o, mock, _d) = setup_with(true, |c| par_cfg(c, 2)).await;
+    let mut q = code_req("PARTASK");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.parallel = Some(4);
+    q.repair_rounds = Some(0);
+    q.hedge_after_failure = Some(false);
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(s2_ns(&mock), vec![2], "two slots, two choices (both wrong)");
+    assert_eq!(r.assurance, Assurance::Abstained);
+    let mut bad = code_req("PARTASK");
+    bad.parallel = Some(9);
+    assert!(
+        o.handle(bad, Emitter(None)).await.is_err(),
+        "parallel is 1..=8"
+    );
+    let mut bad = code_req("PARTASK");
+    bad.repair_rounds = Some(9);
+    assert!(
+        o.handle(bad, Emitter(None)).await.is_err(),
+        "repair_rounds is 0..=8"
+    );
+}
+
+/// The width policy widens on a hard prior (code: 0.35) and stays at 1 when the request or the configuration says so.
+#[tokio::test]
+async fn the_width_policy_widens_on_hard_domains_when_enabled() {
+    let (o, mock, _d) = setup_with(true, |c| {
+        par_cfg(c, 4);
+        c.deliberation.parallel.enabled = true;
+        // The shipped table is the deep one (nothing widens at p = 0.35); this test is about the short-context table.
+        c.deliberation.parallel.cost_factors = vec![1.0, 1.5, 1.95, 1.83];
+    })
+    .await;
+    let mut q = code_req("PARTASK");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.repair_rounds = Some(0);
+    q.hedge_after_failure = Some(false);
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(r.assurance, Assurance::Verified);
+    assert_eq!(
+        s2_ns(&mock),
+        vec![4],
+        "p = 0.35 on code: four choices at once"
+    );
+
+    // Disabled in configuration (the default): the sequential loop.
+    let (o, mock, _d) = setup_with(true, |c| par_cfg(c, 4)).await;
+    let mut q = code_req("PARTASK");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.repair_rounds = Some(0);
+    q.hedge_after_failure = Some(false);
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(s2_calls(&mock), 1);
+    assert_eq!(r.assurance, Assurance::Abstained);
+}
+
+/// A round of siblings attaches every candidate to the same parent; the next round repairs the best of them.
+#[tokio::test]
+async fn siblings_share_a_parent_and_the_next_round_repairs_the_best() {
+    let (o, _mock, _d) = setup_with(true, |c| par_cfg(c, 4)).await;
+    let mut q = code_req("CODETASK");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.parallel = Some(2);
+    q.repair_rounds = Some(1);
+    q.hedge_after_failure = Some(false);
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    let notes: Vec<String> = r
+        .usage
+        .stages
+        .iter()
+        .filter_map(|s| s.note.clone())
+        .filter(|n| n.starts_with("candidate"))
+        .collect();
+    assert!(notes.len() >= 3, "{notes:?}");
+    assert!(
+        notes[0].contains("fresh from the task") && notes[1].contains("fresh from the task"),
+        "{notes:?}"
+    );
+    assert!(notes[2].contains("repairs candidate"), "{notes:?}");
+}
+
+/// The default schedule: the first attempt alone, and the width only after it fails. A task whose first attempt passes
+/// pays nothing for the width (the cost that hedging from the start showed on easy items, benchmarks/parallel_ab.json).
+#[tokio::test]
+async fn the_first_attempt_runs_alone_and_the_width_follows_a_failure() {
+    // Seed 1 (the solo first attempt) is wrong; the round of four after it has seeds 2..=5, and seed 3 is right.
+    let (o, mock, _d) = setup_with(true, |c| par_cfg(c, 4)).await;
+    let mut q = code_req("PARTASK");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.parallel = Some(4);
+    q.repair_rounds = Some(1);
+    let t = std::time::Instant::now();
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(
+        r.assurance,
+        Assurance::Verified,
+        "{:?}",
+        r.uncertainty_notice
+    );
+    assert_eq!(
+        s2_ns(&mock),
+        vec![1, 4],
+        "one solo attempt, then one request with four choices"
+    );
+    assert_eq!(
+        r.usage.model_calls, 2,
+        "the solo attempt and the first of the four to finish"
+    );
+    let took = t.elapsed();
+    assert!(
+        took >= std::time::Duration::from_millis(900)
+            && took < std::time::Duration::from_millis(1700),
+        "{took:?}"
+    );
+
+    // A first attempt that passes ends the run with no extra candidates: seed 3 as the solo attempt is not reachable
+    // through the API, so use the plain math task, which the first System 2 attempt answers correctly after the evidence.
+    let (o, mock, _d) = setup_with(true, |c| par_cfg(c, 4)).await;
+    let mut q = req("5");
+    q.force_mode = Some(ReasoningMode::Slow);
+    q.parallel = Some(4);
+    let r = o.handle(q, Emitter(None)).await.unwrap();
+    assert_eq!(r.assurance, Assurance::Verified);
+    assert!(
+        s2_calls(&mock) >= 2,
+        "attempt 1 is wrong (3); the repairs started before the first one passed run alongside it"
+    );
+}
+
+/// FR-095: the same samples drawn together with the draft share its batch. They are listed as overlapping stages, not
+/// counted after it, and the gate still records k = 2.
+#[tokio::test]
+async fn fused_samples_share_the_drafts_batch() {
+    let (o, _mock, _d) = setup_with(true, |c| c.gate.fuse_always_samples = true).await;
+    let q = || ChatRequest {
+        messages: vec![Message {
+            role: "user".into(),
+            content: "How many minutes from 3:40 pm to 6:05 pm?".into(),
+        }],
+        ephemeral: Some(true),
+        ..Default::default()
+    };
+    let r = o.handle(q(), Emitter(None)).await.unwrap();
+    assert_eq!(r.decision.features.k, 2);
+    assert_eq!(r.decision.features.agreement, Some(1.0));
+    assert!(
+        !r.usage.stages.iter().any(|s| s.stage == "sample_after"),
+        "{:?}",
+        r.usage.stages
+    );
+    assert_eq!(
+        r.usage
+            .stages
+            .iter()
+            .filter(|s| s.stage == "sample")
+            .count(),
+        2
+    );
+    assert_eq!(r.usage.model_calls, 3);
+    // The request can switch it off for one call (the A/B arm).
+    let mut sequential = q();
+    sequential.fuse_samples = Some(false);
+    let r = o.handle(sequential, Emitter(None)).await.unwrap();
+    assert!(r.usage.stages.iter().any(|s| s.stage == "sample_after"));
+}
+
+fn rescue_req(marker: &str) -> ChatRequest {
+    let mut q = code_req(marker);
+    q.messages[0].content = format!("{marker}: write sq(x) returning x squared.");
+    q
+}
+
+fn s1_ns(mock: &Mock) -> Vec<u64> {
+    mock.calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|b| b["model"] == "system1")
+        .map(|b| b["n"].as_u64().unwrap_or(1))
+        .collect()
+}
+
+/// FR-096: a failed draft gets k System 1 samples at once; one passes, so System 2 is never used.
+#[tokio::test]
+async fn a_failed_draft_is_rescued_by_a_concurrent_system1_sample() {
+    let (o, mock, _d) = setup_with(true, |c| c.gate.rescue_samples = 3).await;
+    let r = o
+        .handle(rescue_req("RESCUEOK"), Emitter(None))
+        .await
+        .unwrap();
+    assert_eq!(
+        r.assurance,
+        Assurance::Verified,
+        "{:?}",
+        r.uncertainty_notice
+    );
+    assert_eq!(
+        r.reasoning_mode,
+        ReasoningMode::Fast,
+        "answered on the fast path"
+    );
+    assert_eq!(r.states, vec![TraceState::A, TraceState::T]);
+    assert!(r.message.content.contains("x * x"));
+    assert_eq!(
+        s1_ns(&mock),
+        vec![1, 3],
+        "the draft, then one request with three choices"
+    );
+    assert_eq!(s2_calls(&mock), 0, "the escalation was avoided");
+    let st = r
+        .usage
+        .stages
+        .iter()
+        .find(|s| s.stage == "rescue")
+        .expect("a rescue stage");
+    assert!(st.note.as_deref().unwrap().contains("one passed"), "{st:?}");
+    assert!(r.usage.model_calls >= 2 && r.usage.verifier_calls >= 2);
+}
+
+/// Off by default, switchable per request, and never needed when the draft already passes.
+#[tokio::test]
+async fn rescue_is_on_by_default_and_off_per_request() {
+    // On by default (rescue_samples = 4): the failed draft is rescued and System 2 is never used.
+    let (o, mock, _d) = setup_with(true, |_| {}).await;
+    let r = o
+        .handle(rescue_req("RESCUEOK"), Emitter(None))
+        .await
+        .unwrap();
+    assert_eq!(r.assurance, Assurance::Verified);
+    assert_eq!(
+        s1_ns(&mock),
+        vec![1, 4],
+        "the draft, then one request with four choices"
+    );
+    assert_eq!(s2_calls(&mock), 0);
+    // `rescue: 0` on a request, or 0 in configuration, escalates at once.
+    let (o, mock, _d) = setup_with(true, |_| {}).await;
+    let mut q = rescue_req("RESCUEOK");
+    q.rescue = Some(0);
+    o.handle(q, Emitter(None)).await.unwrap();
+    assert!(
+        s1_ns(&mock).iter().all(|n| *n == 1),
+        "no rescue: {:?}",
+        s1_ns(&mock)
+    );
+    assert!(s2_calls(&mock) > 0, "the failed draft escalates");
+    let (o, mock, _d) = setup_with(true, |c| c.gate.rescue_samples = 0).await;
+    o.handle(rescue_req("RESCUEOK"), Emitter(None))
+        .await
+        .unwrap();
+    assert!(s1_ns(&mock).iter().all(|n| *n == 1) && s2_calls(&mock) > 0);
+    let mut bad = rescue_req("RESCUEOK");
+    bad.rescue = Some(5);
+    assert!(
+        o.handle(bad, Emitter(None)).await.is_err(),
+        "rescue is 0..=4"
+    );
+}
+
+/// When no sample passes, the task escalates exactly as it did before.
+#[tokio::test]
+async fn a_rescue_that_finds_nothing_escalates_as_before() {
+    let (o, mock, _d) = setup_with(true, |c| c.gate.rescue_samples = 3).await;
+    let r = o
+        .handle(rescue_req("RESCUENO"), Emitter(None))
+        .await
+        .unwrap();
+    assert_eq!(s1_ns(&mock), vec![1, 3]);
+    assert!(s2_calls(&mock) > 0, "nothing passed, so System 2 ran");
+    let st = r
+        .usage
+        .stages
+        .iter()
+        .find(|s| s.stage == "rescue")
+        .expect("a rescue stage");
+    assert!(
+        st.note.as_deref().unwrap().contains("none passed"),
+        "{st:?}"
+    );
 }

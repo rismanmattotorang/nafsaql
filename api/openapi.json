@@ -2921,6 +2921,32 @@
           "patch_repair": {
             "type": "boolean",
             "description": "FR-092: on code tasks a retry may answer with a Codex apply_patch to the candidate instead of the whole program. Default from configuration."
+          },
+          "parallel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8,
+            "description": "FR-094: candidates generated at once per System 2 round on a verifiable task (1 = one at a time). The first to pass wins and the rest are cancelled. Capped by the System 2 slots; default from the width policy in configuration."
+          },
+          "repair_rounds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 8,
+            "description": "FR-094: repair rounds after the first on a verifiable task (0 = fresh candidates only), at most the domain cap R. Default is R."
+          },
+          "hedge_after_failure": {
+            "type": "boolean",
+            "description": "FR-094: run the first System 2 attempt alone and widen only after it fails. Default from configuration (true)."
+          },
+          "rescue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4,
+            "description": "FR-096: System 1 samples drawn at once, and verified as they finish, when the draft fails its exact check and before System 2 is used (0 = escalate at once). Default from configuration."
+          },
+          "fuse_samples": {
+            "type": "boolean",
+            "description": "FR-095: draw the always-drawn agreement samples of an unverified maths draft together with the draft in one batch instead of after it. Default from configuration."
           }
         }
       },

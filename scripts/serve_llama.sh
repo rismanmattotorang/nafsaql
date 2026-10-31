@@ -37,7 +37,9 @@ case "${1:-status}" in
       [ -f models/Qwen3-0.6B-Q8_0.gguf ] || { echo "SPEC=1 needs models/Qwen3-0.6B-Q8_0.gguf: scripts/fetch_models.sh draft"; exit 1; }
       S2_EXTRA=(-md models/Qwen3-0.6B-Q8_0.gguf --spec-draft-n-max "${SPEC_N:-6}" --spec-draft-n-min 1 --spec-draft-p-min 0.6)
     fi
-    start_one system2 8002 "$S2" 2 16384 ${S2_EXTRA[@]+"${S2_EXTRA[@]}"}
+    # FR-094: four System 2 slots, because a batch of four streams decodes 2.25x the tokens per second of one stream for
+    # 1.78x the wall time (benchmarks/batch_scaling_system2.json); the context is 6,144 tokens per slot.
+    start_one system2 8002 "$S2" "${S2_SLOTS:-4}" "${S2_CTX:-24576}" ${S2_EXTRA[@]+"${S2_EXTRA[@]}"}
     for p in 8001 8002; do for i in $(seq 1 90); do curl -sf "localhost:$p/health" >/dev/null && { echo ":$p healthy"; break; }; sleep 1; done; done ;;
   stop)  for n in system1 system2; do [ -f "$RUN/$n.pid" ] && kill "$(cat $RUN/$n.pid)" 2>/dev/null && echo "stopped $n"; rm -f "$RUN/$n.pid"; done ;;
   stop-one) n=${2:?usage: stop-one system1|system2}; [ -f "$RUN/$n.pid" ] && kill "$(cat $RUN/$n.pid)" 2>/dev/null && echo "stopped $n"; rm -f "$RUN/$n.pid" ;;

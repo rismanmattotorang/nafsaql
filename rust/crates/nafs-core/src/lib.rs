@@ -7,6 +7,7 @@ pub mod drift;
 pub mod gate;
 pub mod harness;
 pub mod orchestrator;
+pub mod parallel;
 pub mod sequential;
 
 pub use backend::{Backend, BackendHealth, GenOutput, GenRequest};

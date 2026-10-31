@@ -211,6 +211,26 @@ pub struct ChatRequest {
     /// FR-092: allow a code retry to answer with a Codex patch to the candidate; default from configuration.
     #[serde(default)]
     pub patch_repair: Option<bool>,
+    /// FR-094: candidates generated at once per System 2 round on a verifiable task (1 = one at a time, the
+    /// sequential loop); default from the width policy in configuration. Capped by the System 2 slots.
+    #[serde(default)]
+    pub parallel: Option<u32>,
+    /// FR-094: repair rounds after the first on a verifiable task (0 = fresh candidates only), at most the domain's
+    /// configured R; default is the configured R. Lets a round of concurrent candidates replace serial repairs.
+    #[serde(default)]
+    pub repair_rounds: Option<u32>,
+    /// FR-094: run the first attempt alone and widen only after it fails (the concurrent round then replaces the serial
+    /// repairs). Easy tasks pass the first attempt and pay nothing for the width; default from configuration.
+    #[serde(default)]
+    pub hedge_after_failure: Option<bool>,
+    /// FR-096: System 1 samples drawn at once, and verified as they finish, when the draft fails its exact check and before
+    /// System 2 is used (0 = escalate at once); at most 4 (the System 1 slots). Default from configuration.
+    #[serde(default)]
+    pub rescue: Option<u32>,
+    /// FR-095: draw the agreement samples of an unverified draft (math) together with the draft in one batch instead of
+    /// after it; default from configuration.
+    #[serde(default)]
+    pub fuse_samples: Option<bool>,
     /// In-process lab traffic (evaluation and load-test runs). Never read from HTTP; such replies are stored
     /// as ephemeral and kept out of the operational alerts (OR-004), which describe the live service.
     #[serde(skip)]

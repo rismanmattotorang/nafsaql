@@ -4,8 +4,10 @@
 use crate::backend::{Backend, BackendHealth, CancelFlag, GenOutput, GenRequest, RawRequest};
 use crate::calibration::Calibration;
 use crate::config::{Caps, Config};
-use crate::{domain, gate};
+use crate::{domain, gate, parallel};
 use chrono::Utc;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use nafs_harness::patch;
 use nafs_harness::scoring::Verdict;
 use nafs_harness::search::{siblings_note, CandidateTree, Outcome};
@@ -61,6 +63,8 @@ pub struct Orchestrator {
     pub cfg: Arc<Config>,
     pub store: Arc<Store>,
     pub hub: VerifierHub,
+    /// FR-094: online one-attempt success estimate per domain, for the width of a concurrent round.
+    par: parallel::SuccessEstimator,
     pairs: Vec<Arc<BackendPair>>,
     active: RwLock<Arc<BackendPair>>,
     calibration: RwLock<Calibration>,
@@ -99,6 +103,19 @@ fn domain_instruction(d: Domain) -> &'static str {
         Domain::Factual => "Answer concisely and say clearly if you are not sure.",
         _ => "Answer helpfully and concisely.",
     }
+}
+
+/// One System 2 attempt as it comes back from its own future (FR-094): the generation, the patch applied to it, and
+/// its verdict, so that verification overlaps the other candidates' decoding.
+struct Candidate {
+    out: Option<GenOutput>,
+    err: Option<NafsError>,
+    stages: Vec<StageTiming>,
+    content: String,
+    edit: &'static str,
+    patch_error: Option<String>,
+    verdict: Option<VerifierResult>,
+    wall_ms: u64,
 }
 
 /// FR-090: what a prover is told (Open Math Harness `putnam.j2`, shortened for a small model).
@@ -316,10 +333,15 @@ impl Orchestrator {
             mode: cfg.gate.mode.clone(),
             escalation_budget: cfg.gate.escalation_budget,
         };
+        let par = parallel::SuccessEstimator::new(
+            cfg.deliberation.parallel.p_prior.clone(),
+            cfg.deliberation.parallel.prior_weight,
+        );
         Self {
             cfg,
             store,
             hub,
+            par,
             pairs,
             active: RwLock::new(active),
             calibration: RwLock::new(calibration),
@@ -603,6 +625,17 @@ impl Orchestrator {
                 return Err(NafsError::BadRequest(e));
             }
             self.validate_lean(v)?;
+        }
+        if req.rescue.is_some_and(|r| r > 4) {
+            return bad("rescue must be in [0, 4]");
+        }
+        if req.repair_rounds.is_some_and(|r| r > 8) {
+            return bad("repair_rounds must be in [0, 8]");
+        }
+        if let Some(w) = req.parallel {
+            if !(1..=8).contains(&w) {
+                return bad("parallel must be in [1, 8]");
+            }
         }
         if let Some(p) = &req.repair_policy {
             if p != "best" && p != "last" {
@@ -972,9 +1005,15 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             // P7-T02: under the fixed rule the k samples are drawn only after the draft and only when its
             // own confidence leaves the decision uncertain; confident drafts skip them and are not slowed.
             // (Samples requested on verifiable traffic are calibration data, so they are always drawn.)
+            // FR-095: samples that are always drawn have no uncertainty to wait for, so they can share the draft's batch.
+            let fuse = k > 0
+                && samples_always
+                && fixed_in_force
+                && req.fuse_samples.unwrap_or(cfg.gate.fuse_always_samples);
             let sequential = k > 0
                 && cfg.gate.samples_when_uncertain
                 && fixed_in_force
+                && !fuse
                 && !(verifiable && cfg.gate.samples_on_verifiable);
             let k_now = if sequential { 0 } else { k };
             let samples_fut = futures::future::join_all((0..k_now).map(|i| {
@@ -985,12 +1024,32 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 let b = pair.s1.clone();
                 async move { b.complete(&s).await }
             }));
-            let (d, mut samples) = tokio::join!(draft_fut, samples_fut);
-            let d = d?;
+            let (d, mut samples) = if fuse {
+                tokio::pin!(draft_fut);
+                tokio::pin!(samples_fut);
+                let mut done: Option<Vec<Result<GenOutput>>> = None;
+                let d = loop {
+                    tokio::select! {
+                        d = &mut draft_fut => break d,
+                        s = &mut samples_fut, if done.is_none() => { done = Some(s); }
+                    }
+                };
+                let samples = match done {
+                    Some(s) => s,
+                    // A draft stopped early is going to System 2 whatever the samples say: they are dropped, which
+                    // cancels them, so they do not slow the escalation.
+                    None if matches!(&d, Ok(o) if o.finish_reason == "early_escalation") => vec![],
+                    None => samples_fut.await,
+                };
+                (d, samples)
+            } else {
+                tokio::join!(draft_fut, samples_fut)
+            };
+            let mut d = d?;
             if cancel.is_set() {
                 return Err(NafsError::Cancelled);
             }
-            let mut k_drawn = k_now;
+            let mut k_drawn = if fuse { samples.len() as _ } else { k_now };
             if sequential && d.finish_reason != "early_escalation" {
                 let thr = gate::fixed_logprob_threshold(&cfg, lambda);
                 let uncertain = samples_always
@@ -1054,6 +1113,110 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 });
                 usage.verifier_calls += 1;
                 if let Some(v) = v {
+                    record_verdict(&v);
+                    em.send(StreamEvent::Verification {
+                        round: 0,
+                        result: v.clone(),
+                    });
+                    draft_verdict = Some(v);
+                }
+            }
+            // FR-096: a draft that fails its exact check gets `k` more System 1 samples at once before System 2 is used.
+            // System 1 batches well at short context (four streams cost 1.7 times one) and one request with n choices
+            // prefills the prompt once, so the samples are cheap; each is verified as it finishes and the first that
+            // passes replaces the draft. Measured on 60 MBPP+ items: 6 of 32 failed drafts rescued by 4 samples
+            // (benchmarks/s1_rescue.json), each one an escalation (190 to 570 s) avoided.
+            let rescue_k = req.rescue.unwrap_or(cfg.gate.rescue_samples as u32) as usize;
+            if verifiable
+                && rescue_k > 0
+                && req.force_mode.is_none()
+                && draft_verdict.as_ref().is_some_and(|v| !v.passed)
+                && pair.s1.free_slots() >= rescue_k
+            {
+                let tr = Instant::now();
+                em.send(StreamEvent::Phase {
+                    state: TraceState::A,
+                    label: format!("System 1 drawing {rescue_k} more samples at once (the draft failed its check)"),
+                });
+                let rreq = GenRequest {
+                    messages: prompt.clone(),
+                    max_tokens: req.max_tokens.unwrap_or(cfg.deliberation.draft_max_tokens),
+                    temperature: cfg.gate.rescue_temperature,
+                    top_p: 0.8,
+                    logprobs: false,
+                    thinking: Some(pair.s1.cfg.thinking),
+                    cancel: Some(cancel.clone()),
+                    ..Default::default()
+                };
+                let (rtx, mut rrx) =
+                    tokio::sync::mpsc::unbounded_channel::<(usize, Result<GenOutput>)>();
+                let s1 = &pair.s1;
+                let driver = s1.stream_n(&rreq, rescue_k, rtx);
+                tokio::pin!(driver);
+                let mut verifying: FuturesUnordered<
+                    futures::future::BoxFuture<'_, (String, Option<VerifierResult>)>,
+                > = FuturesUnordered::new();
+                let mut found: Option<(String, VerifierResult)> = None;
+                let (mut rx_open, mut driver_done) = (true, false);
+                let (mut drawn, mut r_tokens, mut r_prompt) = (0u32, 0u32, 0u32);
+                loop {
+                    tokio::select! {
+                        biased;
+                        Some((content, v)) = verifying.next(), if !verifying.is_empty() => {
+                            usage.verifier_calls += 1;
+                            if let Some(v) = v {
+                                if v.passed {
+                                    found = Some((content, v));
+                                    break;
+                                }
+                            }
+                        }
+                        m = rrx.recv(), if rx_open => match m {
+                            Some((_, Ok(o))) => {
+                                drawn += 1;
+                                r_tokens += o.completion_tokens;
+                                let content = o.content.clone();
+                                let verification = &verification;
+                                verifying.push(Box::pin(async move {
+                                    let v = self.hub.verify(&content, verification).await;
+                                    (content, v)
+                                }));
+                            }
+                            Some((_, Err(_))) => {}
+                            None => rx_open = false,
+                        },
+                        r = &mut driver, if !driver_done => {
+                            driver_done = true;
+                            match r {
+                                Ok(pt) => r_prompt = pt,
+                                Err(NafsError::Cancelled) => return Err(NafsError::Cancelled),
+                                Err(_) => {}
+                            }
+                        }
+                        else => break,
+                    }
+                }
+                // Leaving the loop drops the driver, which cancels the samples still decoding.
+                usage.model_calls += drawn;
+                usage.completion_tokens += r_tokens;
+                usage.prompt_tokens += r_prompt;
+                stages.push(StageTiming {
+                    stage: "rescue".into(),
+                    ms: tr.elapsed().as_millis() as u64,
+                    tokens: Some(r_tokens),
+                    note: Some(format!(
+                        "{drawn} of {rescue_k} samples finished; {}",
+                        if found.is_some() {
+                            "one passed its check"
+                        } else {
+                            "none passed"
+                        }
+                    )),
+                    ..Default::default()
+                });
+                metrics::counter!("nafs_rescue_total", "result" => if found.is_some() { "rescued" } else { "failed" }).increment(1);
+                if let Some((content, v)) = found {
+                    d.content = content;
                     record_verdict(&v);
                     em.send(StreamEvent::Verification {
                         round: 0,
@@ -1189,7 +1352,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             mode = ReasoningMode::Slow;
             // FR-022: R <= 1 on non-verifiable tasks; the judge makes that one retry meaningful.
             let max_r = if verifiable {
-                caps.r
+                req.repair_rounds.map_or(caps.r, |r| r.min(caps.r))
             } else if use_judge {
                 cfg.judge
                     .max_retries
@@ -1242,11 +1405,32 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             // (wall ms, completion tokens, answer tokens) of the previous attempt: its token rate sizes
             // the next attempt so that it ends before the cap.
             let mut last_attempt: Option<(u64, u32, u32)> = None;
+            let mut last_width = 1usize;
+            // FR-094: width of a round of concurrent candidates on a verifiable task. Width 1 is the sequential loop.
+            let par = &cfg.deliberation.parallel;
+            let costs: Vec<f64> = par.cost_factors.iter().map(|c| *c as f64).collect();
+            let width0: usize = if !verifiable {
+                1
+            } else if let Some(w) = req.parallel {
+                (w as usize).clamp(1, pair.s2.slots())
+            } else if par.enabled {
+                parallel::choose_width(
+                    self.par.p(dom.as_str()),
+                    max_r + 1,
+                    &costs,
+                    par.max_width as usize,
+                    pair.s2.free_slots(),
+                    par.min_gain as f64,
+                )
+            } else {
+                1
+            };
             'outer: for round in 0..=max_r {
                 let round_b = round_budget(budget, round, decay, cfg.deliberation.retry_min_budget);
-                for _ in 0..per_round {
-                    attempt += 1;
-                    let has_next = attempt < total;
+                for g in 0..per_round {
+                    // One group: `w` candidates generated from the same prompt at once, each verified the moment it
+                    // finishes; the first to pass wins and dropping `pending` cancels the rest (FR-094).
+                    let has_next_group = round < max_r || g + 1 < per_round;
                     if cancel.is_set() {
                         return Err(NafsError::Cancelled);
                     }
@@ -1256,15 +1440,40 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         break 'outer;
                     }
                     let floor = cfg.deliberation.retry_min_budget.min(round_b);
+                    // The width of this group (a first attempt alone, then the round) sets how much slower each stream
+                    // runs than the previous attempt did: scale its time by the measured batch cost of the new width
+                    // over the old one, or the next attempt is sized for a speed it will not have.
+                    let solo_first = round == 0
+                        && g == 0
+                        && req.hedge_after_failure.unwrap_or(par.hedge_after_failure);
+                    let w = if solo_first {
+                        1
+                    } else {
+                        width0.min(pair.s2.free_slots().max(1)).max(1)
+                    };
+                    let cost = |n: usize| {
+                        costs
+                            .get(n.saturating_sub(1))
+                            .copied()
+                            .unwrap_or(1.0)
+                            .max(1.0)
+                    };
+                    let stretch = cost(w) / cost(last_width);
                     let fit = last_attempt.and_then(|(ms, tokens, answer)| {
-                        fit_budget(cap_ms.saturating_sub(elapsed_ms), ms, tokens, answer)
+                        fit_budget(
+                            cap_ms.saturating_sub(elapsed_ms),
+                            (ms as f64 * stretch) as u64,
+                            tokens,
+                            answer,
+                        )
                     });
                     let budget = match fit {
                         None => round_b,
                         Some(fit) => {
                             if fit < floor {
                                 notice = Some(format!(
-                                    "Attempt {attempt} was skipped: at the previous attempt's speed only about {fit} reasoning tokens fit in the {} s left before the wall-clock cap (NFR-001).",
+                                    "Attempt {} was skipped: at the previous attempt's speed only about {fit} reasoning tokens fit in the {} s left before the wall-clock cap (NFR-001).",
+                                    attempt + 1,
                                     cap_ms.saturating_sub(elapsed_ms) / 1000
                                 ));
                                 break 'outer;
@@ -1272,35 +1481,25 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                             round_b.min(fit)
                         }
                     };
-                    let t_attempt = Instant::now();
+                    // A width above the free slots would queue behind itself; another user may hold some.
                     states.push(TraceState::M);
-                    em.send(StreamEvent::Phase { state: TraceState::M, label: format!("System 2 deliberating (attempt {attempt} of {total}, budget {budget} tokens)") });
-                    let sreq = GenRequest {
-                        messages: messages.clone(),
-                        max_tokens: budget.saturating_add(cfg.deliberation.answer_max_tokens),
-                        temperature: cfg.deliberation.slow_temperature,
-                        top_p: 0.95,
-                        logprobs: false,
-                        thinking: Some(true),
-                        thinking_budget: Some(budget),
-                        seed: Some(attempt as u64),
-                        cancel: Some(cancel.clone()),
-                        response_format: None,
-                        early_stop: None,
-                        grammar: None,
-                        stop_after: None,
-                    };
-                    let em2 = em.clone();
-                    let mut sink = move |t: &str, r: bool| {
-                        if !r || show_reasoning {
-                            em2.send(StreamEvent::Token {
-                                text: t.to_string(),
-                                mode: ReasoningMode::Slow,
-                                reasoning: r,
-                                round,
-                            });
-                        }
-                    };
+                    em.send(StreamEvent::Phase {
+                        state: TraceState::M,
+                        label: if w == 1 {
+                            format!("System 2 deliberating (attempt {} of {total}, budget {budget} tokens)", attempt + 1)
+                        } else {
+                            format!("System 2 deliberating ({w} attempts at once, round {} of {}, budget {budget} tokens)", round + 1, max_r + 1)
+                        },
+                    });
+                    let group_parent = parent;
+                    // FR-092: a patch edits the code of the candidate this group repairs.
+                    let parent_code: Option<String> = (patch_repair && parent != 0).then(|| {
+                        nafs_verify::extract_code(
+                            &tree.nodes[parent].candidate,
+                            verification.entry_point.as_deref(),
+                        )
+                        .unwrap_or_else(|| tree.nodes[parent].candidate.clone())
+                    });
                     // P7-T08: adaptive reasoning exit where the raw continuation path exists; any failure of
                     // that path other than cancellation falls back to the standard stream.
                     let ax = &cfg.deliberation.adaptive_exit;
@@ -1308,348 +1507,579 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     let adaptive = req.adaptive_exit.unwrap_or(ax.enabled)
                         && pair.s2.supports_raw()
                         && ax_domains.iter().any(|d| d == "all" || d == dom.as_str());
-                    let gen = if adaptive {
-                        match self
-                            .deliberate_adaptive(
-                                &pair.s2,
-                                &messages,
-                                budget,
-                                attempt as u64,
-                                &cancel,
-                                &verification,
-                                verifiable,
-                                &em,
-                                show_reasoning,
-                                round,
-                                &mut stages,
-                                req.adaptive_exit_rule.as_deref().unwrap_or(&ax.exit_rule),
-                                Some(t0 + Duration::from_secs(cfg.server.request_wall_clock_cap_s)),
-                            )
-                            .await
-                        {
-                            Err(NafsError::Cancelled) => Err(NafsError::Cancelled),
-                            Err(e) => {
-                                tracing::warn!(
-                                    "adaptive exit unavailable ({e}); using the standard path"
-                                );
-                                pair.s2.stream(&sreq, &mut sink).await
+                    let exit_rule: &str =
+                        req.adaptive_exit_rule.as_deref().unwrap_or(&ax.exit_rule);
+                    let deadline = t0 + Duration::from_secs(cfg.server.request_wall_clock_cap_s);
+                    let msgs = messages.clone();
+                    let seed_base = attempt as u64;
+                    // The second half of a candidate: patch, stages and the exact verdict. It runs inside the candidate's own
+                    // future so that verification overlaps the other candidates' decoding.
+                    let finish = |gen: Result<GenOutput>, wall_ms: u64, local: Vec<StageTiming>| {
+                        let parent_code = &parent_code;
+                        let verification = &verification;
+                        async move {
+                            let mut cand = Candidate {
+                                out: None,
+                                err: None,
+                                stages: local,
+                                content: String::new(),
+                                edit: "whole",
+                                patch_error: None,
+                                verdict: None,
+                                wall_ms,
+                            };
+                            let out = match gen {
+                                Ok(o) => o,
+                                Err(e) => {
+                                    cand.err = Some(e);
+                                    return cand;
+                                }
+                            };
+                            // The adaptive exit's probes run inside this call and are recorded as their own stages
+                            // just before it, so the deliberate stage is shown net of them (stage times then add up
+                            // to the wall time).
+                            let mut dstage = out.stage("deliberate");
+                            let probe_ms: u64 = cand
+                                .stages
+                                .iter()
+                                .rev()
+                                .take_while(|s| s.stage == "probe")
+                                .map(|s| s.ms)
+                                .sum();
+                            dstage.ms = dstage.ms.saturating_sub(probe_ms);
+                            cand.stages.push(dstage);
+                            cand.content = out.content.clone();
+                            if !out.content.trim().is_empty() {
+                                // FR-092: a patch in the reply edits the code of the candidate it repairs.
+                                if let (Some(base_code), Some(p)) =
+                                    (parent_code, patch::find_patch(&out.content))
+                                {
+                                    let mut ws: patch::Workspace =
+                                        [("solution.py".to_string(), base_code.clone())]
+                                            .into_iter()
+                                            .collect();
+                                    match patch::apply_patch(&mut ws, &p) {
+                                        Ok(_) => {
+                                            cand.content =
+                                                format!("```python\n{}```", ws["solution.py"]);
+                                            cand.edit = "patch";
+                                            metrics::counter!("nafs_patch_repairs_total", "result" => "applied").increment(1);
+                                        }
+                                        Err(e) => {
+                                            cand.edit = "patch_failed";
+                                            cand.patch_error = Some(format!("The patch was not applied: {e}\nReply with a corrected patch or the whole program."));
+                                            metrics::counter!("nafs_patch_repairs_total", "result" => "failed").increment(1);
+                                        }
+                                    }
+                                }
+                                if verifiable {
+                                    // Verified here, inside the candidate's own future, so that it overlaps the other
+                                    // candidates' decoding instead of waiting for them.
+                                    let tv = Instant::now();
+                                    cand.verdict = match &cand.patch_error {
+                                        // A patch that does not apply is not run: its error is the evidence.
+                                        Some(e) => Some(VerifierResult {
+                                            verifier: "code_tests".into(),
+                                            passed: false,
+                                            score: Some(0.0),
+                                            evidence: Some(e.clone()),
+                                            exact: true,
+                                            ..Default::default()
+                                        }),
+                                        None => self.hub.verify(&cand.content, verification).await,
+                                    };
+                                    cand.stages.push(StageTiming {
+                                        stage: "verify".into(),
+                                        ms: tv.elapsed().as_millis() as u64,
+                                        ..Default::default()
+                                    });
+                                }
                             }
-                            ok => ok,
+                            cand.out = Some(out);
+                            cand
                         }
-                    } else {
-                        pair.s2.stream(&sreq, &mut sink).await
                     };
-                    let out = match gen {
-                        Ok(o) => o,
-                        Err(NafsError::Cancelled) => return Err(NafsError::Cancelled),
-                        Err(e) => {
-                            if let Some(d) = draft.as_ref() {
-                                // MR-004 degraded mode: answer with the fast draft, labelled unverified.
-                                em.send(StreamEvent::Degraded {
-                                    reason: format!("System 2 unavailable: {e}"),
-                                });
-                                metrics::counter!("nafs_degraded_total").increment(1);
-                                degraded = true;
-                                mode = ReasoningMode::Fast;
-                                final_text = d.content.clone();
-                                assurance =
-                                    if draft_verdict.as_ref().map(|v| v.passed).unwrap_or(false) {
+                    let finish = &finish;
+                    let launch = |k: u32| {
+                        // Only the first candidate streams to the client; the others work silently.
+                        let em_k = if k == 0 { em.clone() } else { Emitter(None) };
+                        let msgs = &msgs;
+                        let cancel = &cancel;
+                        let verification = &verification;
+                        let pair = &pair;
+                        let cfg = &cfg;
+                        async move {
+                            let t_attempt = Instant::now();
+                            let seed = seed_base + 1 + k as u64;
+                            let mut local: Vec<StageTiming> = vec![];
+                            let sreq = GenRequest {
+                                messages: msgs.clone(),
+                                max_tokens: budget
+                                    .saturating_add(cfg.deliberation.answer_max_tokens),
+                                temperature: cfg.deliberation.slow_temperature,
+                                top_p: 0.95,
+                                logprobs: false,
+                                thinking: Some(true),
+                                thinking_budget: Some(budget),
+                                seed: Some(seed),
+                                cancel: Some(cancel.clone()),
+                                response_format: None,
+                                early_stop: None,
+                                grammar: None,
+                                stop_after: None,
+                            };
+                            let em2 = em_k.clone();
+                            let mut sink = move |t: &str, r: bool| {
+                                if !r || show_reasoning {
+                                    em2.send(StreamEvent::Token {
+                                        text: t.to_string(),
+                                        mode: ReasoningMode::Slow,
+                                        reasoning: r,
+                                        round,
+                                    });
+                                }
+                            };
+                            let gen = if adaptive {
+                                match self
+                                    .deliberate_adaptive(
+                                        &pair.s2,
+                                        msgs,
+                                        budget,
+                                        seed,
+                                        cancel,
+                                        verification,
+                                        verifiable,
+                                        &em_k,
+                                        show_reasoning,
+                                        round,
+                                        &mut local,
+                                        exit_rule,
+                                        Some(deadline),
+                                    )
+                                    .await
+                                {
+                                    Err(NafsError::Cancelled) => Err(NafsError::Cancelled),
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            "adaptive exit unavailable ({e}); using the standard path"
+                                        );
+                                        pair.s2.stream(&sreq, &mut sink).await
+                                    }
+                                    ok => ok,
+                                }
+                            } else {
+                                pair.s2.stream(&sreq, &mut sink).await
+                            };
+                            let wall_ms = t_attempt.elapsed().as_millis() as u64;
+                            finish(gen, wall_ms, local).await
+                        }
+                    };
+                    // FR-094: more than one candidate on the standard stream goes out as ONE request with `n` choices:
+                    // llama-server prefills the prompt once and forks its KV cache, where `w` separate requests each
+                    // prefill their own slot (31.7 s for one, 124.5 s for four separate, 39.1 s for n = 4 on a 703-token
+                    // prompt, benchmarks/prefill_share.json). The adaptive exit (maths) keeps its per-candidate requests.
+                    let n_mode = w > 1 && !adaptive;
+                    let mut pending: FuturesUnordered<futures::future::BoxFuture<'_, Candidate>> =
+                        FuturesUnordered::new();
+                    let (tx, mut rx) =
+                        tokio::sync::mpsc::unbounded_channel::<(usize, Result<GenOutput>)>();
+                    let mut delivered = vec![false; w];
+                    let mut rx_open = n_mode;
+                    let mut driver_done = !n_mode;
+                    let mut driver: futures::future::BoxFuture<'_, Result<u32>> = if n_mode {
+                        let sreq_n = GenRequest {
+                            messages: msgs.clone(),
+                            max_tokens: budget.saturating_add(cfg.deliberation.answer_max_tokens),
+                            temperature: cfg.deliberation.slow_temperature,
+                            top_p: 0.95,
+                            logprobs: false,
+                            thinking: Some(true),
+                            thinking_budget: Some(budget),
+                            // No fixed seed: the choices must differ, and a fixed seed may be shared by all of them.
+                            seed: None,
+                            cancel: Some(cancel.clone()),
+                            response_format: None,
+                            early_stop: None,
+                            grammar: None,
+                            stop_after: None,
+                        };
+                        let s2 = &pair.s2;
+                        Box::pin(async move { s2.stream_n(&sreq_n, w, tx).await })
+                    } else {
+                        drop(tx);
+                        Box::pin(async { Ok(0) })
+                    };
+                    if !n_mode {
+                        for k in 0..w as u32 {
+                            pending.push(Box::pin(launch(k)));
+                        }
+                    }
+                    for i in 0..w {
+                        attempt += 1;
+                        let is_last = i + 1 == w;
+                        let has_next = has_next_group || !is_last;
+                        if i > 0 && t0.elapsed().as_secs() > cfg.server.request_wall_clock_cap_s {
+                            notice = Some("Wall-clock cap reached (NFR-001).".into());
+                            break 'outer;
+                        }
+                        // A round never outlives the request cap: when the time is up the round is dropped (which
+                        // cancels its streams) and the best candidate so far is returned, not an error from the outer cap.
+                        // 5 s short of the cap: the gateway's own timer must not win the race against this one.
+                        let round_left = cap_ms
+                            .saturating_sub(5_000)
+                            .saturating_sub(t0.elapsed().as_millis() as u64);
+                        let round_timeout = tokio::time::sleep(Duration::from_millis(round_left));
+                        tokio::pin!(round_timeout);
+                        let cand = loop {
+                            if !n_mode {
+                                tokio::select! {
+                                    c = pending.next() => break c,
+                                    _ = &mut round_timeout => {
+                                        notice = Some("Wall-clock cap reached before the round finished (NFR-001); its attempts were cancelled.".into());
+                                        break 'outer;
+                                    }
+                                }
+                            }
+                            tokio::select! {
+                                biased;
+                                _ = &mut round_timeout => {
+                                    notice = Some("Wall-clock cap reached before the round finished (NFR-001); its attempts were cancelled.".into());
+                                    break 'outer;
+                                }
+                                c = pending.next(), if !pending.is_empty() => break c,
+                                m = rx.recv(), if rx_open => match m {
+                                    Some((k, res)) => {
+                                        delivered[k] = true;
+                                        let wall = res.as_ref().map(|o| o.wall_ms).unwrap_or(0);
+                                        pending.push(Box::pin(finish(res, wall, vec![])));
+                                    }
+                                    None => rx_open = false,
+                                },
+                                r = &mut driver, if !driver_done => {
+                                    driver_done = true;
+                                    match r {
+                                        Ok(pt) => usage.prompt_tokens += pt,
+                                        Err(NafsError::Cancelled) => return Err(NafsError::Cancelled),
+                                        Err(e) => {
+                                            // Choices that never arrived become failed candidates, not lost ones.
+                                            for (k, d) in delivered.iter_mut().enumerate() {
+                                                if !*d {
+                                                    *d = true;
+                                                    let err = NafsError::BackendProtocol(e.to_string());
+                                                    let _ = k;
+                                                    pending.push(Box::pin(finish(Err(err), 0, vec![])));
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                else => break None,
+                            }
+                        };
+                        let Some(cand) = cand else {
+                            break;
+                        };
+                        if cancel.is_set() {
+                            return Err(NafsError::Cancelled);
+                        }
+                        let Candidate {
+                            out: cand_out,
+                            err: cand_err,
+                            stages: cand_stages,
+                            content,
+                            edit,
+                            patch_error,
+                            verdict: cand_verdict,
+                            wall_ms: cand_wall_ms,
+                        } = cand;
+                        let out = match (cand_out, cand_err) {
+                            (Some(o), _) => o,
+                            (None, Some(NafsError::Cancelled)) => return Err(NafsError::Cancelled),
+                            (None, Some(e)) => {
+                                if !is_last {
+                                    // Another candidate of this round may still pass.
+                                    continue;
+                                }
+                                if let Some(d) = draft.as_ref() {
+                                    // MR-004 degraded mode: answer with the fast draft, labelled unverified.
+                                    em.send(StreamEvent::Degraded {
+                                        reason: format!("System 2 unavailable: {e}"),
+                                    });
+                                    metrics::counter!("nafs_degraded_total").increment(1);
+                                    degraded = true;
+                                    mode = ReasoningMode::Fast;
+                                    final_text = d.content.clone();
+                                    assurance = if draft_verdict
+                                        .as_ref()
+                                        .map(|v| v.passed)
+                                        .unwrap_or(false)
+                                    {
                                         Assurance::Verified
                                     } else {
                                         Assurance::Unverified
                                     };
-                                notice = Some("System 2 was unavailable; this is the unverified System 1 draft.".into());
+                                    notice = Some("System 2 was unavailable; this is the unverified System 1 draft.".into());
+                                    break 'outer;
+                                }
+                                if best.is_some() {
+                                    // An earlier candidate exists: report it as the best unverified one, as at the cap.
+                                    notice = Some(format!("A System 2 attempt failed ({e}); the best candidate so far is shown."));
+                                    break 'outer;
+                                }
+                                return Err(e);
+                            }
+                            (None, None) => continue,
+                        };
+                        usage.model_calls += 1;
+                        last_width = w;
+                        last_attempt = Some((
+                            cand_wall_ms,
+                            out.completion_tokens,
+                            out.completion_tokens.saturating_sub(out.reasoning_tokens),
+                        ));
+                        stages.extend(cand_stages);
+                        if usage.ttft_ms.is_none() {
+                            usage.ttft_ms = out.ttft_ms.map(|t| {
+                                (t + t0.elapsed().as_millis() as u64).saturating_sub(out.wall_ms)
+                            });
+                        }
+                        usage.prompt_tokens += out.prompt_tokens;
+                        usage.completion_tokens += out.completion_tokens;
+                        usage.reasoning_tokens += out.reasoning_tokens;
+                        if !out.reasoning.is_empty() {
+                            reasoning_all
+                                .push_str(&format!("[attempt {attempt}]\n{}\n", out.reasoning));
+                        }
+                        let cand_tokens =
+                            out.completion_tokens.saturating_sub(out.reasoning_tokens);
+                        if out.content.trim().is_empty() {
+                            metrics::counter!("nafs_budget_exhausted_total").increment(1);
+                            rounds.push(RoundRecord {
+                                round,
+                                candidate_tokens: 0,
+                                reasoning_tokens: out.reasoning_tokens,
+                                verifier: "none".into(),
+                                passed: false,
+                            });
+                            if has_next {
+                                em.send(StreamEvent::Retry {
+                                    round,
+                                    of: max_r,
+                                    evidence: Some("No answer within the token budget.".into()),
+                                });
+                            }
+                            continue;
+                        }
+                        if !(verifiable && tree_repair) {
+                            best = Some(content.clone());
+                        }
+                        if verifiable {
+                            usage.verifier_calls += 1;
+                            let v = cand_verdict.expect("verifiable inputs produce a verdict");
+                            if i == 0 {
+                                // The first candidate to finish is the unbiased sample of one attempt's success.
+                                self.par.record(dom.as_str(), v.passed);
+                            }
+                            let outcome = if patch_error.is_some() {
+                                Outcome::invalid(v.evidence.clone())
+                            } else {
+                                outcome_of(&v)
+                            };
+                            let score = outcome.score();
+                            let node = tree.add(group_parent, content.clone(), outcome);
+                            if tree_repair {
+                                best = tree.best().map(|n| n.candidate.clone());
+                            }
+                            if let Some(st) = stages.last_mut().filter(|s| s.stage == "verify") {
+                                st.note = Some(format!(
+                                    "candidate {node} ({edit}) {} {}; score {score:.2}",
+                                    if group_parent == 0 {
+                                        "fresh from"
+                                    } else {
+                                        "repairs"
+                                    },
+                                    if group_parent == 0 {
+                                        "the task".to_string()
+                                    } else {
+                                        format!("candidate {group_parent}")
+                                    }
+                                ));
+                            }
+                            record_verdict(&v);
+                            em.send(StreamEvent::Verification {
+                                round,
+                                result: v.clone(),
+                            });
+                            rounds.push(RoundRecord {
+                                round,
+                                candidate_tokens: cand_tokens,
+                                reasoning_tokens: out.reasoning_tokens,
+                                verifier: v.verifier.clone(),
+                                passed: v.passed,
+                            });
+                            let passed = v.passed;
+                            let evidence = v.evidence.clone();
+                            verdict = Some(v);
+                            if passed {
+                                final_text = content;
+                                assurance = Assurance::Verified;
                                 break 'outer;
                             }
-                            return Err(e);
-                        }
-                    };
-                    usage.model_calls += 1;
-                    last_attempt = Some((
-                        t_attempt.elapsed().as_millis() as u64,
-                        out.completion_tokens,
-                        out.completion_tokens.saturating_sub(out.reasoning_tokens),
-                    ));
-                    // The adaptive exit's probes run inside this call and are recorded as their own stages just
-                    // before it, so the deliberate stage is shown net of them (stage times then add up to the wall time).
-                    let mut dstage = out.stage("deliberate");
-                    let probe_ms: u64 = stages
-                        .iter()
-                        .rev()
-                        .take_while(|s| s.stage == "probe")
-                        .map(|s| s.ms)
-                        .sum();
-                    dstage.ms = dstage.ms.saturating_sub(probe_ms);
-                    stages.push(dstage);
-                    if usage.ttft_ms.is_none() {
-                        usage.ttft_ms = out.ttft_ms.map(|t| {
-                            (t + t0.elapsed().as_millis() as u64).saturating_sub(out.wall_ms)
-                        });
-                    }
-                    usage.prompt_tokens += out.prompt_tokens;
-                    usage.completion_tokens += out.completion_tokens;
-                    usage.reasoning_tokens += out.reasoning_tokens;
-                    if !out.reasoning.is_empty() {
-                        reasoning_all
-                            .push_str(&format!("[attempt {attempt}]\n{}\n", out.reasoning));
-                    }
-                    let cand_tokens = out.completion_tokens.saturating_sub(out.reasoning_tokens);
-                    if out.content.trim().is_empty() {
-                        metrics::counter!("nafs_budget_exhausted_total").increment(1);
-                        rounds.push(RoundRecord {
-                            round,
-                            candidate_tokens: 0,
-                            reasoning_tokens: out.reasoning_tokens,
-                            verifier: "none".into(),
-                            passed: false,
-                        });
-                        if has_next {
-                            em.send(StreamEvent::Retry {
-                                round,
-                                of: max_r,
-                                evidence: Some("No answer within the token budget.".into()),
-                            });
-                        }
-                        continue;
-                    }
-                    let mut content = out.content.clone();
-                    // FR-092: a patch in the reply edits the code of the candidate it repairs.
-                    let mut edit = "whole";
-                    let mut patch_error: Option<String> = None;
-                    if patch_repair && parent != 0 {
-                        if let Some(p) = patch::find_patch(&out.content) {
-                            let base_code = nafs_verify::extract_code(
-                                &tree.nodes[parent].candidate,
-                                verification.entry_point.as_deref(),
-                            )
-                            .unwrap_or_else(|| tree.nodes[parent].candidate.clone());
-                            let mut ws: patch::Workspace = [("solution.py".to_string(), base_code)]
-                                .into_iter()
-                                .collect();
-                            match patch::apply_patch(&mut ws, &p) {
-                                Ok(_) => {
-                                    content = format!("```python\n{}```", ws["solution.py"]);
-                                    edit = "patch";
-                                    metrics::counter!("nafs_patch_repairs_total", "result" => "applied").increment(1);
-                                }
-                                Err(e) => {
-                                    edit = "patch_failed";
-                                    patch_error = Some(format!("The patch was not applied: {e}\nReply with a corrected patch or the whole program."));
-                                    metrics::counter!("nafs_patch_repairs_total", "result" => "failed").increment(1);
-                                }
-                            }
-                        }
-                    }
-                    if !(verifiable && tree_repair) {
-                        best = Some(content.clone());
-                    }
-                    if verifiable {
-                        let tv = Instant::now();
-                        let v = match &patch_error {
-                            // A patch that does not apply is not run: its error is the evidence.
-                            Some(e) => Some(VerifierResult {
-                                verifier: "code_tests".into(),
-                                passed: false,
-                                score: Some(0.0),
-                                evidence: Some(e.clone()),
-                                exact: true,
-                                ..Default::default()
-                            }),
-                            None => self.hub.verify(&content, &verification).await,
-                        };
-                        stages.push(StageTiming {
-                            stage: "verify".into(),
-                            ms: tv.elapsed().as_millis() as u64,
-                            ..Default::default()
-                        });
-                        usage.verifier_calls += 1;
-                        let v = v.expect("verifiable inputs produce a verdict");
-                        let outcome = if patch_error.is_some() {
-                            Outcome::invalid(v.evidence.clone())
-                        } else {
-                            outcome_of(&v)
-                        };
-                        let score = outcome.score();
-                        let node = tree.add(parent, content.clone(), outcome);
-                        if tree_repair {
-                            best = tree.best().map(|n| n.candidate.clone());
-                        }
-                        if let Some(st) = stages.last_mut().filter(|s| s.stage == "verify") {
-                            st.note = Some(format!(
-                                "candidate {node} ({edit}) {} {}; score {score:.2}",
-                                if parent == 0 { "fresh from" } else { "repairs" },
-                                if parent == 0 {
-                                    "the task".to_string()
-                                } else {
-                                    format!("candidate {parent}")
-                                }
-                            ));
-                        }
-                        record_verdict(&v);
-                        em.send(StreamEvent::Verification {
-                            round,
-                            result: v.clone(),
-                        });
-                        rounds.push(RoundRecord {
-                            round,
-                            candidate_tokens: cand_tokens,
-                            reasoning_tokens: out.reasoning_tokens,
-                            verifier: v.verifier.clone(),
-                            passed: v.passed,
-                        });
-                        let passed = v.passed;
-                        let evidence = v.evidence.clone();
-                        verdict = Some(v);
-                        if passed {
-                            final_text = content;
-                            assurance = Assurance::Verified;
-                            break 'outer;
-                        }
-                        // FR-025: feed the verifier's evidence into the next attempt (Thm 5), delimited (SR-001).
-                        if has_next {
-                            em.send(StreamEvent::Retry {
-                                round,
-                                of: max_r,
-                                evidence: evidence.clone(),
-                            });
-                            // FR-091: the policy picks the candidate to repair; its own evidence goes with it,
-                            // and earlier repairs of it are shown as "already tried" (OMH).
-                            parent = if tree_repair { tree.choose() } else { node };
-                            messages = base.clone();
-                            if parent != 0 {
-                                let pn = &tree.nodes[parent];
-                                let ev = pn
-                                    .outcome
-                                    .as_ref()
-                                    .and_then(|o| o.evidence.clone())
-                                    .unwrap_or_default();
-                                let mut follow = evidence_prompt(&ev);
-                                if let Some(note) = siblings_note(&tree.siblings(parent, 3), 200) {
-                                    follow.push('\n');
-                                    follow.push_str(&delimit("earlier_attempts", &note, 900));
-                                }
-                                if patch_repair {
-                                    follow.push('\n');
-                                    follow.push_str(PATCH_REPAIR_HINT);
-                                }
-                                messages.push(Message {
-                                    role: "assistant".into(),
-                                    content: pn.candidate.clone(),
-                                });
-                                messages.push(Message {
-                                    role: "user".into(),
-                                    content: follow,
-                                });
-                            }
-                            let _ = evidence;
-                        }
-                    } else if use_judge {
-                        // FR-034: soft verifier with hard floors; a pass is at most "consensus" (Thm 1).
-                        em.send(StreamEvent::Phase { state: TraceState::M, label: "Judge scoring the answer (honesty, harm-avoidance, helpfulness, grounding)".into() });
-                        let tj = Instant::now();
-                        let judged = self
-                            .judge(&user.content, &out.content, Some(cancel.clone()))
-                            .await;
-                        stages.push(StageTiming {
-                            stage: "judge".into(),
-                            ms: tj.elapsed().as_millis() as u64,
-                            ..Default::default()
-                        });
-                        match judged {
-                            Ok(j) => {
-                                usage.verifier_calls += 1;
-                                usage.model_calls += 1;
-                                em.send(StreamEvent::Verification {
+                            // FR-025: feed the verifier's evidence into the next attempt (Thm 5), delimited (SR-001).
+                            if has_next {
+                                em.send(StreamEvent::Retry {
                                     round,
-                                    result: j.clone(),
+                                    of: max_r,
+                                    evidence: evidence.clone(),
                                 });
-                                rounds.push(RoundRecord {
-                                    round,
-                                    candidate_tokens: cand_tokens,
-                                    reasoning_tokens: out.reasoning_tokens,
-                                    verifier: "judge".into(),
-                                    passed: j.passed,
-                                });
-                                let harm = j
-                                    .details
-                                    .as_ref()
-                                    .and_then(|d| d["harm_avoidance"].as_f64())
-                                    .unwrap_or(1.0)
-                                    < cfg.judge.floor as f64;
-                                verdict = Some(j.clone());
-                                if j.passed {
-                                    final_text = out.content;
-                                    assurance = Assurance::Consensus;
-                                    break 'outer;
-                                }
-                                harmful = harm;
-                                best_judge = Some(j.clone());
-                                if has_next && !harm {
-                                    em.send(StreamEvent::Retry {
-                                        round,
-                                        of: max_r,
-                                        evidence: j.evidence.clone(),
-                                    });
+                                // FR-091: the policy picks the candidate to repair; its own evidence goes with it,
+                                // and earlier repairs of it are shown as "already tried" (OMH). Built once, after the
+                                // last candidate of a concurrent round, so it sees every sibling's verdict (FR-094).
+                                if has_next_group && is_last {
+                                    parent = if tree_repair { tree.choose() } else { node };
                                     messages = base.clone();
-                                    messages.push(Message {
-                                        role: "assistant".into(),
-                                        content: out.content,
+                                    if parent != 0 {
+                                        let pn = &tree.nodes[parent];
+                                        let ev = pn
+                                            .outcome
+                                            .as_ref()
+                                            .and_then(|o| o.evidence.clone())
+                                            .unwrap_or_default();
+                                        let mut follow = evidence_prompt(&ev);
+                                        if let Some(note) =
+                                            siblings_note(&tree.siblings(parent, 3), 200)
+                                        {
+                                            follow.push('\n');
+                                            follow.push_str(&delimit(
+                                                "earlier_attempts",
+                                                &note,
+                                                900,
+                                            ));
+                                        }
+                                        if patch_repair {
+                                            follow.push('\n');
+                                            follow.push_str(PATCH_REPAIR_HINT);
+                                        }
+                                        messages.push(Message {
+                                            role: "assistant".into(),
+                                            content: pn.candidate.clone(),
+                                        });
+                                        messages.push(Message {
+                                            role: "user".into(),
+                                            content: follow,
+                                        });
+                                    }
+                                }
+                                let _ = evidence;
+                            }
+                        } else if use_judge {
+                            // FR-034: soft verifier with hard floors; a pass is at most "consensus" (Thm 1).
+                            em.send(StreamEvent::Phase { state: TraceState::M, label: "Judge scoring the answer (honesty, harm-avoidance, helpfulness, grounding)".into() });
+                            let tj = Instant::now();
+                            let judged = self
+                                .judge(&user.content, &out.content, Some(cancel.clone()))
+                                .await;
+                            stages.push(StageTiming {
+                                stage: "judge".into(),
+                                ms: tj.elapsed().as_millis() as u64,
+                                ..Default::default()
+                            });
+                            match judged {
+                                Ok(j) => {
+                                    usage.verifier_calls += 1;
+                                    usage.model_calls += 1;
+                                    em.send(StreamEvent::Verification {
+                                        round,
+                                        result: j.clone(),
                                     });
-                                    messages.push(Message {
-                                        role: "user".into(),
-                                        content: judge_feedback_prompt(
-                                            j.evidence.as_deref().unwrap_or(""),
-                                        ),
+                                    rounds.push(RoundRecord {
+                                        round,
+                                        candidate_tokens: cand_tokens,
+                                        reasoning_tokens: out.reasoning_tokens,
+                                        verifier: "judge".into(),
+                                        passed: j.passed,
                                     });
-                                } else if harm {
+                                    let harm = j
+                                        .details
+                                        .as_ref()
+                                        .and_then(|d| d["harm_avoidance"].as_f64())
+                                        .unwrap_or(1.0)
+                                        < cfg.judge.floor as f64;
+                                    verdict = Some(j.clone());
+                                    if j.passed {
+                                        final_text = out.content;
+                                        assurance = Assurance::Consensus;
+                                        break 'outer;
+                                    }
+                                    harmful = harm;
+                                    best_judge = Some(j.clone());
+                                    if has_next && !harm {
+                                        em.send(StreamEvent::Retry {
+                                            round,
+                                            of: max_r,
+                                            evidence: j.evidence.clone(),
+                                        });
+                                        messages = base.clone();
+                                        messages.push(Message {
+                                            role: "assistant".into(),
+                                            content: out.content,
+                                        });
+                                        messages.push(Message {
+                                            role: "user".into(),
+                                            content: judge_feedback_prompt(
+                                                j.evidence.as_deref().unwrap_or(""),
+                                            ),
+                                        });
+                                    } else if harm {
+                                        break 'outer;
+                                    }
+                                }
+                                Err(NafsError::Cancelled) => return Err(NafsError::Cancelled),
+                                Err(e) => {
+                                    // Judge unavailable: fall back to draft agreement, labelled honestly.
+                                    let agrees = draft
+                                        .as_ref()
+                                        .map(|d| answer_similarity(&d.content, &out.content) >= 0.9)
+                                        .unwrap_or(false);
+                                    rounds.push(RoundRecord {
+                                        round,
+                                        candidate_tokens: cand_tokens,
+                                        reasoning_tokens: out.reasoning_tokens,
+                                        verifier: "none".into(),
+                                        passed: true,
+                                    });
+                                    final_text = out.content;
+                                    assurance = if agrees {
+                                        Assurance::Consensus
+                                    } else {
+                                        Assurance::Unverified
+                                    };
+                                    notice = Some(format!("The answer judge was unavailable ({e}); this answer was not scored."));
                                     break 'outer;
                                 }
                             }
-                            Err(NafsError::Cancelled) => return Err(NafsError::Cancelled),
-                            Err(e) => {
-                                // Judge unavailable: fall back to draft agreement, labelled honestly.
-                                let agrees = draft
+                        } else {
+                            // No judge: agreement with the independent draft is recorded as consensus (Thm 6).
+                            let agrees = !draft_conditioned
+                                && draft
                                     .as_ref()
                                     .map(|d| answer_similarity(&d.content, &out.content) >= 0.9)
                                     .unwrap_or(false);
-                                rounds.push(RoundRecord {
-                                    round,
-                                    candidate_tokens: cand_tokens,
-                                    reasoning_tokens: out.reasoning_tokens,
-                                    verifier: "none".into(),
-                                    passed: true,
-                                });
-                                final_text = out.content;
-                                assurance = if agrees {
-                                    Assurance::Consensus
-                                } else {
-                                    Assurance::Unverified
-                                };
-                                notice = Some(format!("The answer judge was unavailable ({e}); this answer was not scored."));
-                                break 'outer;
-                            }
+                            rounds.push(RoundRecord {
+                                round,
+                                candidate_tokens: cand_tokens,
+                                reasoning_tokens: out.reasoning_tokens,
+                                verifier: "none".into(),
+                                passed: true,
+                            });
+                            final_text = out.content;
+                            assurance = if agrees {
+                                Assurance::Consensus
+                            } else {
+                                Assurance::Unverified
+                            };
+                            break 'outer;
                         }
-                    } else {
-                        // No judge: agreement with the independent draft is recorded as consensus (Thm 6).
-                        let agrees = !draft_conditioned
-                            && draft
-                                .as_ref()
-                                .map(|d| answer_similarity(&d.content, &out.content) >= 0.9)
-                                .unwrap_or(false);
-                        rounds.push(RoundRecord {
-                            round,
-                            candidate_tokens: cand_tokens,
-                            reasoning_tokens: out.reasoning_tokens,
-                            verifier: "none".into(),
-                            passed: true,
-                        });
-                        final_text = out.content;
-                        assurance = if agrees {
-                            Assurance::Consensus
-                        } else {
-                            Assurance::Unverified
-                        };
-                        break 'outer;
                     }
                 }
             }

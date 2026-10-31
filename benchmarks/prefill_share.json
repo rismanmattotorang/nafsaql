@@ -1,0 +1,62 @@
+{
+ "one": [
+  {
+   "wall_s": 48.4,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 1
+  },
+  {
+   "wall_s": 31.5,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 1
+  },
+  {
+   "wall_s": 31.7,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 1
+  }
+ ],
+ "four_sep": [
+  {
+   "wall_s": 124.5,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 4
+  },
+  {
+   "wall_s": 126.7,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 4
+  },
+  {
+   "wall_s": 122.4,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 4
+  }
+ ],
+ "n4": [
+  {
+   "wall_s": 39.1,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 4
+  },
+  {
+   "wall_s": 37.9,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 4
+  },
+  {
+   "wall_s": 39.3,
+   "prompt_tokens": 703,
+   "completion_tokens": 24,
+   "choices": 4
+  }
+ ]
+}

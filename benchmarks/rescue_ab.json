@@ -1,0 +1,968 @@
+{
+ "label": "IDLE HOST (load ~2), stream closed at the gate decision",
+ "k": 4,
+ "runs": [
+  {
+   "id": "mbpp_plus-89",
+   "arm": "off",
+   "s": 6.52,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-89",
+   "arm": "on",
+   "s": 15.34,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-75",
+   "arm": "on",
+   "s": 9.39,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-75",
+   "arm": "off",
+   "s": 4.29,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-12",
+   "arm": "off",
+   "s": 11.12,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-12",
+   "arm": "on",
+   "s": 7.91,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-268",
+   "arm": "on",
+   "s": 34.03,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-268",
+   "arm": "off",
+   "s": 12.45,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-306",
+   "arm": "off",
+   "s": 25.49,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-306",
+   "arm": "on",
+   "s": 36.82,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-250",
+   "arm": "on",
+   "s": 11.83,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-250",
+   "arm": "off",
+   "s": 20.41,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-730",
+   "arm": "off",
+   "s": 22.41,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-730",
+   "arm": "on",
+   "s": 32.34,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-808",
+   "arm": "on",
+   "s": 14.97,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-808",
+   "arm": "off",
+   "s": 7.5,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-556",
+   "arm": "off",
+   "s": 12.24,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-556",
+   "arm": "on",
+   "s": 30.43,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-56",
+   "arm": "on",
+   "s": 6.77,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-56",
+   "arm": "off",
+   "s": 7.63,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-720",
+   "arm": "off",
+   "s": 6.61,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-720",
+   "arm": "on",
+   "s": 6.79,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-276",
+   "arm": "on",
+   "s": 9.98,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-276",
+   "arm": "off",
+   "s": 8.73,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-66",
+   "arm": "off",
+   "s": 5.26,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-66",
+   "arm": "on",
+   "s": 4.88,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-577",
+   "arm": "on",
+   "s": 26.39,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-577",
+   "arm": "off",
+   "s": 10.1,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-410",
+   "arm": "off",
+   "s": 6.89,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-410",
+   "arm": "on",
+   "s": 17.85,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-309",
+   "arm": "on",
+   "s": 5.09,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-309",
+   "arm": "off",
+   "s": 4.36,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-312",
+   "arm": "off",
+   "s": 9.58,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-312",
+   "arm": "on",
+   "s": 8.96,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-95",
+   "arm": "on",
+   "s": 5.7,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-95",
+   "arm": "off",
+   "s": 4.86,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-397",
+   "arm": "off",
+   "s": 5.44,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-397",
+   "arm": "on",
+   "s": 5.65,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-238",
+   "arm": "on",
+   "s": 5.6,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-238",
+   "arm": "off",
+   "s": 6.12,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-440",
+   "arm": "off",
+   "s": 9.4,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-440",
+   "arm": "on",
+   "s": 29.54,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-422",
+   "arm": "on",
+   "s": 21.83,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-422",
+   "arm": "off",
+   "s": 9.14,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-100",
+   "arm": "off",
+   "s": 16.43,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-100",
+   "arm": "on",
+   "s": 44.55,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-453",
+   "arm": "on",
+   "s": 32.32,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-453",
+   "arm": "off",
+   "s": 13.23,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-79",
+   "arm": "off",
+   "s": 9.09,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-79",
+   "arm": "on",
+   "s": 6.27,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-232",
+   "arm": "on",
+   "s": 20.23,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    false,
+    true
+   ],
+   "rescued": true,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-232",
+   "arm": "off",
+   "s": 10.14,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-310",
+   "arm": "off",
+   "s": 15.14,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-310",
+   "arm": "on",
+   "s": 12.91,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-643",
+   "arm": "on",
+   "s": 17.55,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-643",
+   "arm": "off",
+   "s": 8.95,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-798",
+   "arm": "off",
+   "s": 5.39,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-798",
+   "arm": "on",
+   "s": 3.1,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-632",
+   "arm": "on",
+   "s": 25.58,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-632",
+   "arm": "off",
+   "s": 8.39,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-6",
+   "arm": "off",
+   "s": 8.13,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-6",
+   "arm": "on",
+   "s": 20.85,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    false,
+    true
+   ],
+   "rescued": true,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-778",
+   "arm": "on",
+   "s": 24.79,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-778",
+   "arm": "off",
+   "s": 14.09,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-554",
+   "arm": "off",
+   "s": 7.09,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-554",
+   "arm": "on",
+   "s": 4.39,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-133",
+   "arm": "on",
+   "s": 5.73,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-133",
+   "arm": "off",
+   "s": 5.1,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-630",
+   "arm": "off",
+   "s": 6.79,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-630",
+   "arm": "on",
+   "s": 18.27,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-612",
+   "arm": "on",
+   "s": 15.91,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-612",
+   "arm": "off",
+   "s": 7.31,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-771",
+   "arm": "off",
+   "s": 15.75,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-771",
+   "arm": "on",
+   "s": 35.98,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-800",
+   "arm": "on",
+   "s": 5.59,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-800",
+   "arm": "off",
+   "s": 5.1,
+   "escalate": false,
+   "rule": "fixed",
+   "verdicts": [
+    true
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-125",
+   "arm": "off",
+   "s": 12.24,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  },
+  {
+   "id": "mbpp_plus-125",
+   "arm": "on",
+   "s": 35.28,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-67",
+   "arm": "on",
+   "s": 37.32,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": true
+  },
+  {
+   "id": "mbpp_plus-67",
+   "arm": "off",
+   "s": 13.16,
+   "escalate": true,
+   "rule": "forced_failed_verification",
+   "verdicts": [
+    false
+   ],
+   "rescued": false,
+   "rescue_run": false
+  }
+ ]
+}

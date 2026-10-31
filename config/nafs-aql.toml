@@ -19,7 +19,7 @@ active = "llama"                       # llama | vllm (switchable at runtime fro
 label = "llama.cpp (native macOS, GGUF Q4_K_M)"
 kind = "llama"
 system1 = { url = "http://127.0.0.1:8001/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "GGUF Q4_K_M (unsloth/Qwen3-1.7B-GGUF)", thinking = false, max_in_flight = 4 }
-system2 = { url = "http://127.0.0.1:8002/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 2 }
+system2 = { url = "http://127.0.0.1:8002/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 4 }
 
 [backends.vllm]
 label = "vLLM 0.30 CPU (Docker, carstenz/vllm-smoke): Qwen3-0.6B FP32 stand-in, two modes"
@@ -62,6 +62,9 @@ params_file = "data/runtime/gate_params.json"   # measured e2_hat, delta_c, caps
 sample_max_tokens_hard = 384           # math/code samples need room for 'Answer:' (review M11)
 samples_on_verifiable = false          # speed: skip the k samples when an exact verifier decides (Thm 1)
 samples_when_uncertain = true        # P7-T02: draw the k samples after the draft, only when its log-prob is within the band of the threshold
+fuse_always_samples = true               # FR-095: draw the always-drawn agreement samples (unverified maths) together with the draft, in one batch
+rescue_samples = 4                     # FR-096: on a failed exact check, draw this many System 1 samples at once (one request, n choices) before escalating; 0 = off; >= 3 needed to rescue anything (benchmarks/s1_rescue.json, rescue_ab.json)
+rescue_temperature = 0.7               # sampling temperature of the rescue samples
 uncertain_band = 0.10                  # nats around the fixed threshold (benchmarks/samples_ab_factual.json: samples tripled factual draft time)
 early_escalation_tokens = 32           # P7-T03 / FR-080: stop an unconfident open-ended draft after N tokens (0 = off)
 early_escalation_margin = 0.04          # below the fixed threshold by this much; 100% agreement on 40 prompts (benchmarks/early_escalation_study.json)
@@ -88,6 +91,7 @@ retry_min_budget = 96                  # FR-086: floor for a shrunken retry budg
 repair_policy = "best"                 # FR-091: repair the best-scoring candidate (Open Math Harness tree; equals "last" when verdicts are all-or-nothing)
 repair_fanout = 2                      # FR-091: repairs of one candidate before the search moves on
 patch_repair = false                   # FR-092: code retries may answer with a Codex apply_patch; off until measured (rule 3)
+
 caps = { code = { N = 1, R = 2, budget = 1024 }, math = { N = 1, R = 2, budget = 1024 }, structured = { N = 1, R = 2, budget = 512 }, factual = { N = 1, R = 0, budget = 512 }, open = { N = 1, R = 0, budget = 512 }, other = { N = 1, R = 0, budget = 512 } }
 caps_provenance = "Phase-1 defaults sized for the reference CPU; replace with the Prop. 3 cap from the Phase-0 Beta fit"
 cost_ratio = 0.15                      # c_p / L_a for the Prop. 3 cap M* = ceil(alpha/cost_ratio - alpha - beta)
@@ -109,6 +113,15 @@ reuse_probe_answer = true              # FR-085: a full-answer probe (code tests
 full_probe_every_tokens = 512          # FR-085: full-answer probes cost an answer each, so they are rarer than short ones
 full_probe_min_gap_tokens = 192
 full_probe_max_tokens = 384            # FR-085: longest full-answer probe; bounds the probe overhead on items that never pass (the final answer keeps answer_max_tokens)
+
+[deliberation.parallel]                # FR-094: concurrent hedged candidates on System 2 for verifiable tasks (needs max_in_flight slots)
+enabled = false                        # off until the interleaved A/B (scripts/parallel_ab.py) shows no loss; a request can set `parallel` per call
+max_width = 4                          # at most the System 2 slots
+cost_factors = [1.0, 2.4, 3.1, 3.4]    # measured wall-time factor of 1..4 concurrent streams at repair-prompt depth, ~1,600 tokens (benchmarks/batch_scaling_system2_depth1200.json); 1.0, 1.5, 1.9, 1.8 at short context
+min_gain = 0.05                        # widen only when verified answers per second improve by at least 5 %
+prior_weight = 6.0                     # the prior below counts as this many attempts of evidence
+hedge_after_failure = true             # first attempt alone, widen only after it fails: easy tasks pay nothing (benchmarks/parallel_ab.json: hedging from the start cost +44..87 % on them)
+p_prior = { code = 0.35, math = 0.6, structured = 0.6 }   # one-attempt success probability of System 2 on a task that reached it
 
 [judge]                                # FR-034 / SR-003 rubric judge on non-verifiable slow-path answers
 enabled = true

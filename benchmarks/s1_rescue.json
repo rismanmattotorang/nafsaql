@@ -1,0 +1,726 @@
+{
+ "k": 4,
+ "temp": 0.7,
+ "items": [
+  {
+   "id": "mbpp_plus-89",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 9.3,
+   "samples_s": 17.1
+  },
+  {
+   "id": "mbpp_plus-75",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 9.7,
+   "samples_s": 13.1
+  },
+  {
+   "id": "mbpp_plus-12",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 10.4,
+   "samples_s": 16.2
+  },
+  {
+   "id": "mbpp_plus-268",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    true
+   ],
+   "draft_s": 39.8,
+   "samples_s": 15.8
+  },
+  {
+   "id": "mbpp_plus-306",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 619.2,
+   "samples_s": 40.1
+  },
+  {
+   "id": "mbpp_plus-250",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 7.1,
+   "samples_s": 15.1
+  },
+  {
+   "id": "mbpp_plus-730",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 16.9,
+   "samples_s": 22.5
+  },
+  {
+   "id": "mbpp_plus-808",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 7.1,
+   "samples_s": 12.8
+  },
+  {
+   "id": "mbpp_plus-556",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 12.6,
+   "samples_s": 22.0
+  },
+  {
+   "id": "mbpp_plus-56",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 10.7,
+   "samples_s": 14.1
+  },
+  {
+   "id": "mbpp_plus-720",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 7.6,
+   "samples_s": 11.4
+  },
+  {
+   "id": "mbpp_plus-276",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 10.7,
+   "samples_s": 17.5
+  },
+  {
+   "id": "mbpp_plus-66",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 658.8,
+   "samples_s": 11.5
+  },
+  {
+   "id": "mbpp_plus-577",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 13.2,
+   "samples_s": 23.1
+  },
+  {
+   "id": "mbpp_plus-410",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 8.2,
+   "samples_s": 14.8
+  },
+  {
+   "id": "mbpp_plus-309",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 5.3,
+   "samples_s": 14.0
+  },
+  {
+   "id": "mbpp_plus-312",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 13.4,
+   "samples_s": 22.5
+  },
+  {
+   "id": "mbpp_plus-95",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 7.4,
+   "samples_s": 10.2
+  },
+  {
+   "id": "mbpp_plus-397",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 7.8,
+   "samples_s": 16.0
+  },
+  {
+   "id": "mbpp_plus-238",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 8.3,
+   "samples_s": 13.9
+  },
+  {
+   "id": "mbpp_plus-440",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 13.0,
+   "samples_s": 25.7
+  },
+  {
+   "id": "mbpp_plus-422",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 8.0,
+   "samples_s": 18.6
+  },
+  {
+   "id": "mbpp_plus-100",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 21.2,
+   "samples_s": 62.6
+  },
+  {
+   "id": "mbpp_plus-453",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 986.2,
+   "samples_s": 31.7
+  },
+  {
+   "id": "mbpp_plus-79",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 10.4,
+   "samples_s": 17.4
+  },
+  {
+   "id": "mbpp_plus-232",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    true
+   ],
+   "draft_s": 8.1,
+   "samples_s": 14.6
+  },
+  {
+   "id": "mbpp_plus-310",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 12.2,
+   "samples_s": 18.1
+  },
+  {
+   "id": "mbpp_plus-643",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 9.8,
+   "samples_s": 17.2
+  },
+  {
+   "id": "mbpp_plus-798",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 5.7,
+   "samples_s": 11.1
+  },
+  {
+   "id": "mbpp_plus-632",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    true,
+    false
+   ],
+   "draft_s": 17.0,
+   "samples_s": 21.4
+  },
+  {
+   "id": "mbpp_plus-6",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    true,
+    true
+   ],
+   "draft_s": 14.1,
+   "samples_s": 28.4
+  },
+  {
+   "id": "mbpp_plus-778",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 20.5,
+   "samples_s": 37.8
+  },
+  {
+   "id": "mbpp_plus-554",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 8.9,
+   "samples_s": 16.0
+  },
+  {
+   "id": "mbpp_plus-133",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 9.6,
+   "samples_s": 19.7
+  },
+  {
+   "id": "mbpp_plus-630",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 11.6,
+   "samples_s": 20.7
+  },
+  {
+   "id": "mbpp_plus-612",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    true,
+    true
+   ],
+   "draft_s": 11.6,
+   "samples_s": 17.9
+  },
+  {
+   "id": "mbpp_plus-771",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 19.1,
+   "samples_s": 28.4
+  },
+  {
+   "id": "mbpp_plus-800",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 6.4,
+   "samples_s": 8.6
+  },
+  {
+   "id": "mbpp_plus-125",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 14.2,
+   "samples_s": 26.3
+  },
+  {
+   "id": "mbpp_plus-67",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 15.9,
+   "samples_s": 23.7
+  },
+  {
+   "id": "mbpp_plus-568",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 5.1,
+   "samples_s": 10.0
+  },
+  {
+   "id": "mbpp_plus-737",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 8.2,
+   "samples_s": 14.9
+  },
+  {
+   "id": "mbpp_plus-559",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 10.6,
+   "samples_s": 19.9
+  },
+  {
+   "id": "mbpp_plus-124",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 8.7,
+   "samples_s": 16.3
+  },
+  {
+   "id": "mbpp_plus-579",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    false,
+    true
+   ],
+   "draft_s": 10.0,
+   "samples_s": 17.6
+  },
+  {
+   "id": "mbpp_plus-721",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 23.4,
+   "samples_s": 44.9
+  },
+  {
+   "id": "mbpp_plus-93",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 5.9,
+   "samples_s": 11.4
+  },
+  {
+   "id": "mbpp_plus-569",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 8.3,
+   "samples_s": 12.4
+  },
+  {
+   "id": "mbpp_plus-240",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 13.1,
+   "samples_s": 20.9
+  },
+  {
+   "id": "mbpp_plus-272",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 8.4,
+   "samples_s": 12.3
+  },
+  {
+   "id": "mbpp_plus-72",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 9.7,
+   "samples_s": 17.0
+  },
+  {
+   "id": "mbpp_plus-790",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 10.2,
+   "samples_s": 18.4
+  },
+  {
+   "id": "mbpp_plus-477",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 6.3,
+   "samples_s": 11.6
+  },
+  {
+   "id": "mbpp_plus-793",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    true,
+    false
+   ],
+   "draft_s": 13.7,
+   "samples_s": 25.1
+  },
+  {
+   "id": "mbpp_plus-745",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 16.5,
+   "samples_s": 28.6
+  },
+  {
+   "id": "mbpp_plus-450",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 11.5,
+   "samples_s": 15.5
+  },
+  {
+   "id": "mbpp_plus-395",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 10.5,
+   "samples_s": 18.2
+  },
+  {
+   "id": "mbpp_plus-766",
+   "draft_pass": true,
+   "sample_pass": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "draft_s": 8.3,
+   "samples_s": 12.8
+  },
+  {
+   "id": "mbpp_plus-749",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 7.4,
+   "samples_s": 23.3
+  },
+  {
+   "id": "mbpp_plus-145",
+   "draft_pass": false,
+   "sample_pass": [
+    false,
+    false,
+    false,
+    false
+   ],
+   "draft_s": 11.8,
+   "samples_s": 22.5
+  }
+ ]
+}

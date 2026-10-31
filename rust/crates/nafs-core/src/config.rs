@@ -377,6 +377,19 @@ pub struct GateCfg {
     pub samples_when_uncertain: bool,
     #[serde(default = "d_band")]
     pub uncertain_band: f32,
+    /// FR-095: for domains whose samples are always drawn (`samples_on_unverified_domains`: math), draw them together
+    /// with the draft in one batch rather than after it. Four streams cost 1.7 times one on this CPU, so draft plus two
+    /// samples take about 1.8 draft times instead of 2.3; the samples are cancelled when the draft is stopped early.
+    #[serde(default)]
+    pub fuse_always_samples: bool,
+    /// FR-096: when the draft fails its exact check, draw this many System 1 samples at once (one request, n choices) and
+    /// verify them before escalating to System 2; 0 turns it off. At least 3 are needed to rescue anything on MBPP+
+    /// (0, 0, 12 % and 19 % of failed drafts for 1 to 4 samples, `benchmarks/s1_rescue.json`).
+    #[serde(default)]
+    pub rescue_samples: u8,
+    /// Sampling temperature of the rescue samples (the draft itself uses `deliberation.draft_temperature`).
+    #[serde(default = "d_rescue_temp")]
+    pub rescue_temperature: f32,
     /// P7-T03 early escalation: under the fixed rule, stop an unverifiable draft once this many tokens
     /// have a running mean log-prob below the threshold minus `early_escalation_margin` (0 = off).
     #[serde(default = "d_early_tokens")]
@@ -498,6 +511,73 @@ pub struct DeliberationCfg {
     /// program (fewer decode tokens). Whole code is always accepted. Off until measured (rule 3).
     #[serde(default)]
     pub patch_repair: bool,
+    /// FR-094: concurrent hedged attempts on System 2 for verifiable tasks.
+    #[serde(default)]
+    pub parallel: ParallelCfg,
+}
+
+/// FR-094 (`nafs_core::parallel`): width of a System 2 round on a verifiable task, from the measured cost of
+/// batching concurrent streams and an online estimate of the one-attempt success probability.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParallelCfg {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Most candidates in one round (at most the System 2 slots, `backends.*.system2.max_in_flight`).
+    #[serde(default = "d_par_width")]
+    pub max_width: u32,
+    /// Measured wall-time factor of 1, 2, 3, ... concurrent streams at the depth of a repair prompt, about 1,600 tokens
+    /// (`benchmarks/batch_scaling_system2_depth1200.json`). At short context the factors are 1.0, 1.5, 1.9, 1.8, but a repair
+    /// prompt carries the earlier candidate and the verifier's evidence, and the batch gain fades with context depth.
+    #[serde(default = "d_par_costs")]
+    pub cost_factors: Vec<f32>,
+    /// Widen only when verified answers per second improve by at least this fraction.
+    #[serde(default = "d_par_gain")]
+    pub min_gain: f32,
+    /// Prior probability that one System 2 attempt passes on a task that reached it, per domain.
+    #[serde(default = "d_par_prior")]
+    pub p_prior: BTreeMap<String, f32>,
+    /// The prior counts as this many attempts of evidence.
+    #[serde(default = "d_par_weight")]
+    pub prior_weight: f32,
+    /// Run the first attempt alone and widen only after it fails. Measured on the 8 hard code items of the 100-prompt run
+    /// (`benchmarks/parallel_ab.json`): four concurrent candidates from the start cost +44 % to +87 % on tasks that pass
+    /// the first attempt and save only on failing ones, so the width is spent where the first attempt has failed.
+    #[serde(default = "d_true")]
+    pub hedge_after_failure: bool,
+}
+fn d_rescue_temp() -> f32 {
+    0.7
+}
+fn d_par_width() -> u32 {
+    4
+}
+fn d_par_costs() -> Vec<f32> {
+    vec![1.0, 2.4, 3.1, 3.4]
+}
+fn d_par_gain() -> f32 {
+    0.05
+}
+fn d_par_prior() -> BTreeMap<String, f32> {
+    [("code", 0.35f32), ("math", 0.6), ("structured", 0.6)]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v))
+        .collect()
+}
+fn d_par_weight() -> f32 {
+    6.0
+}
+impl Default for ParallelCfg {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_width: d_par_width(),
+            cost_factors: d_par_costs(),
+            min_gain: d_par_gain(),
+            p_prior: d_par_prior(),
+            prior_weight: d_par_weight(),
+            hedge_after_failure: true,
+        }
+    }
 }
 fn d_repair_policy() -> String {
     "best".into()

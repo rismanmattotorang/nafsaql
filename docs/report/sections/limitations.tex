@@ -27,6 +27,11 @@ abstained on $n+0=n$ within its budget (Section~\ref{sec:sweep}); Lean tasks
 therefore return \emph{abstained} unless the model writes valid Lean~4. The
 verified proofs reported are the harness's own test cases, not model output.
 
+\textbf{Parallelism results are small-sample.} The rescue (40 live pairs, 3 avoided escalations,
+60 offline items) and the hedging comparison (8 items; the sequential loop itself gave 4/8 and 3/8) are indicative; the batch-scaling
+numbers are medians of two or three repetitions on one machine. Hedging on System~2 is off because of what was measured here;
+a host with a cheaper batch at depth could change that (Section~\ref{sec:inference}).
+
 \textbf{Shared weights.} Fast and slow paths from one model family make
 correlated errors; the collision term is measured rather than assumed small,
 and the judge shares the same bias, which is why exact verifiers carry the

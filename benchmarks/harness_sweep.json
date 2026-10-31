@@ -1,13 +1,13 @@
 {
-  "when": "2026-10-29T07:10:46",
-  "seconds": 1149,
-  "passed": 40,
-  "total": 40,
+  "when": "2026-10-31T08:41:36",
+  "seconds": 928,
+  "passed": 50,
+  "total": 50,
   "checks": [
     {
       "name": "info: GET /v1/harness",
       "pass": true,
-      "detail": "['code_agent', 'lean', 'repair', 'sources']"
+      "detail": "['code_agent', 'lean', 'parallel', 'repair', 'rescue', 'sources']"
     },
     {
       "name": "info: Lean toolchain is available",
@@ -18,6 +18,26 @@
       "name": "info: both sources are named with revisions",
       "pass": true,
       "detail": ""
+    },
+    {
+      "name": "info: parallel settings (FR-094/095) are reported",
+      "pass": true,
+      "detail": "{'cost_factors': [1.0, 2.4000000953674316, 3.0999999046325684, 3.4000000953674316], 'enabled': False, 'fuse_always_samples': True, 'hedge_after_failure': True, 'max_width': 4, 'system2_slots': 4}"
+    },
+    {
+      "name": "info: System 2 has four slots and fused samples are on",
+      "pass": true,
+      "detail": "{'cost_factors': [1.0, 2.4000000953674316, 3.0999999046325684, 3.4000000953674316], 'enabled': False, 'fuse_always_samples': True, 'hedge_after_failure': True, 'max_width': 4, 'system2_slots': 4}"
+    },
+    {
+      "name": "info: hedging is off by default (measured: no width pays at repair depth)",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "name": "info: rescue (FR-096) draws 4 System 1 samples",
+      "pass": true,
+      "detail": "{'samples': 4, 'temperature': 0.699999988079071}"
     },
     {
       "name": "openapi: /v1/harness and /v1/harness/code are documented",
@@ -130,6 +150,26 @@
       "detail": "bad request: verification.lean: the Lean statement has no `theorem <name> ... :="
     },
     {
+      "name": "validate: parallel 0 is a 400",
+      "pass": true,
+      "detail": "bad request: parallel must be in [1, 8]"
+    },
+    {
+      "name": "validate: parallel 9 is a 400",
+      "pass": true,
+      "detail": "bad request: parallel must be in [1, 8]"
+    },
+    {
+      "name": "validate: rescue 5 is a 400",
+      "pass": true,
+      "detail": "bad request: rescue must be in [0, 4]"
+    },
+    {
+      "name": "validate: repair_rounds 9 is a 400",
+      "pass": true,
+      "detail": "bad request: repair_rounds must be in [0, 8]"
+    },
+    {
       "name": "agent: no tests is a 400",
       "pass": true,
       "detail": "bad request: verification must hold code tests (tests, or test_code with entry_p"
@@ -180,19 +220,29 @@
       "detail": ""
     },
     {
+      "name": "model: a failed draft draws the System 1 rescue samples before escalating",
+      "pass": true,
+      "detail": "30s verdicts=[False] escalate=True"
+    },
+    {
+      "name": "model: rescue 0 escalates the failed draft at once",
+      "pass": true,
+      "detail": ""
+    },
+    {
       "name": "model: easy theorem: a Lean task gets the maths caps and the Lean verifier",
       "pass": true,
-      "detail": "abstained domain=math calls=3 826s"
+      "detail": "abstained domain=math calls=8 690s"
     },
     {
       "name": "model: easy theorem: verified, or abstained with a notice (never an unchecked proof)",
       "pass": true,
-      "detail": "abstained domain=math calls=3 826s"
+      "detail": "abstained domain=math calls=8 690s"
     },
     {
       "name": "model: code agent fixes a function and the verifier accepts",
       "pass": true,
-      "detail": "verified calls=1 actions=['write'] 43s"
+      "detail": "verified calls=1 actions=['write'] 45s"
     },
     {
       "name": "model: the agent's step records are complete",
@@ -202,7 +252,7 @@
     {
       "name": "model: a verified code chat on System 2 records its candidate tree",
       "pass": true,
-      "detail": "verified ['candidate 1 (whole) fresh from the task; score 1.00'] 275s"
+      "detail": "verified ['candidate 1 (whole) fresh from the task; score 1.00'] 145s"
     }
   ]
 }

@@ -86,6 +86,7 @@ Every request moves through a small, bounded automaton and the reply says where 
 | 🧭 **Sequential evidence (Phase 8)** | The rules that read a *stream* of evidence come from sequential analysis and decision neuroscience: a lowest-window confidence signal whose early crossing *is* the full-draft decision (a running minimum), a posterior stopping rule with a collapsing bound for the adaptive exit, Wald's bound on what an early escalation can promise, and the optimal probe interval. A review of quantum theories of consciousness is included as a negative result, with the test each idea failed. |
 | 🧮 **Math and code harness (Phase 10)** | Mechanisms taken from two open agent harnesses, as pure Rust in `nafs-harness`. From [Open Math Harness](https://github.com/openmathmodel/open-math-harness): **Lean 4 as an exact verifier** under its frozen-statement protocol (no `sorry`, no axioms, the elaborated type must match), and **best-first repair** over a tree of candidates scored by the verifier, with per-assert credit on code. From [OpenAI Codex](https://github.com/openai/codex): **`apply_patch` repairs** with its fuzzy matcher, head-and-tail evidence, and a **code agent** (`POST /v1/harness/code`) that patches and runs its workspace in the sandbox and stops only when the hidden tests pass. |
 | 🤖 **Codex-style agent harness (Phase 11)** | The code agent's loop rebuilt on the mechanisms of Codex's agent core, adapted to a 1.7B/4B model on four CPU cores: an **append-only transcript** so llama-server's prompt cache reuses every earlier exchange (a cold 1,969-token prompt prefilled in 64 s, the same prompt plus one exchange in 3 s), harness-written **compaction**, Codex's `apply_patch` grammar as a **per-step GBNF grammar** that keeps the reasoning span free and stops decoding at the end of the action, a **whole-file edit policy** for short files, budget reminders, the run's cap enforced inside a model call, and the run's net diff. |
+| ⚡ **Parallel inference on four cores (Phase 13)** | Measured first, then built where it pays: llama-server batches 4 streams at **2.3–2.7×** the tokens per second at short context but only **1.5×** at the 1,600 tokens of a repair prompt. So the cores are used *before* the expensive model: agreement samples share the draft's batch (**−24 %** time to the gate's decision), a failed draft gets 4 concurrent System 1 samples, each verified as it finishes, before System 2 is used, and rounds go out as one request with `n` choices so the prompt is prefilled once. Hedged candidates on System 2 are implemented and **off**: they did not pay. System 2 has 4 slots. |
 | 🔌 **Two serving profiles** | llama.cpp on bare metal (the reference), and vLLM's CPU backend in Docker, behind one OpenAI-compatible gateway. |
 
 <table>
@@ -118,6 +119,9 @@ Every request moves through a small, bounded automaton and the reply says where 
 | Early escalation of unconfident drafts | 100 % agreement with full-draft decisions on 40 prompts; ~116 tokens saved per early escalation | `benchmarks/early_escalation_study.json` |
 | Prompt-cache and verifier warm-up | First token 9.8 s → ~1 s; first verification 0.45 s → 3 ms | `docs/roadmap/STATUS.md` |
 | Agreement samples on unverified math drafts (Phase 8) | wrong drafts flagged with AUROC **0.76** (token confidence 0.56–0.65); "any disagreement" catches **8 of 12** wrong drafts at 25 % escalation, expected accuracy **0.80 → 0.91–0.93** | `benchmarks/confidence_signal_study.json` (60 drafts with samples) |
+| Agreement samples drawn **with** the draft, not after it (Phase 13) | time to the gate's decision **23.1 s → 17.9 s (−24 %)**, faster in 23 of 28 pairs (p = 0.0005); escalation 7 vs 5 of 28 (noise) | `benchmarks/fuse_ab.json` |
+| Four System 1 samples verified before a failed draft is escalated (Phase 13) | 22 → 20 escalations over 40 items (3 avoided, 1 the other way); **+14.5 s median** when it runs, break-even 106 s against 250–580 s per escalation; 6 of 32 failed drafts rescued offline | `benchmarks/rescue_ab.json`, `s1_rescue.json` |
+| One request with `n` choices instead of `n` requests (Phase 13) | 703-token prompt: **39.1 s vs 124.5 s** for four candidates (the prompt is prefilled once) | `benchmarks/prefill_share.json` |
 
 **Verifier quality** (true-accept *r*, false-accept φ with 95 % upper bound)
 
@@ -144,18 +148,21 @@ Every request moves through a small, bounded automaton and the reply says where 
 | Posterior exit rule for non-verifiable deliberation (Phase 8) | same answers on 6 factual prompts, **382 vs 357** reasoning tokens (more cautious when probes disagree first) | an option, not the default: `benchmarks/exit_rule_run.json` |
 | A sequential test on the mean-log-prob early escalation | Wald's bound: ≥ 260 tokens to separate the threshold from its 0.04 margin at 5 % error; drafts are 47–291 tokens | kept as a measured heuristic, never made more aggressive |
 | Quantum-consciousness mechanisms (Orch OR and descendants) | decoherence 10⁻¹³ s against 10⁻³ s dynamics; a CPU can follow at most ~30 two-level systems | nothing transfers as an algorithm; negative result, `docs/research/quantum_neuro_review.md` |
+| Concurrent hedged candidates on System 2 (Phase 13) | batched decode gain falls from **2.7× to 1.5×** between short context and 1,600 tokens, so a round of four costs 2.2–3.4 single attempts; 8 hard code items: 4/8 and 3/8 verified by the sequential loop (two runs) against 4/8 hedged, no faster on failing items | implemented and tested, **off by default** (`deliberation.parallel`): `benchmarks/parallel_ab.json`, `batch_scaling_system2_depth*.json` |
+| n-gram self-speculation (llama.cpp `ngram-simple`, `-map-k`, `-mod`) | best **1.12×** (code repair, 71 % of drafts accepted), worst **0.84×** (JSON) | not adopted: `benchmarks/ngram_ab_system1.json` |
+| q8_0 KV cache with flash attention, for batched decode | 6.36 vs 6.14 tok/s at 1,600 tokens; worse at 800 | f16 cache stays: `benchmarks/batch_scaling_system2_kvq8_*.json` |
 
-**Quality of the build** (final validation run, 29 October 2026, one quiet host; `benchmarks/harness_sweep.json`, `benchmarks/e2e_sweep.json`):
+**Quality of the build** (final validation run, 31 October 2026, one quiet host; `benchmarks/harness_sweep.json`, `benchmarks/e2e_sweep.json`):
 
 | Suite | Result |
 |---|---|
-| Rust unit and integration tests (nine crates, real Lean 4.35.0 included) | **190 / 190** |
+| Rust unit and integration tests (nine crates, real Lean 4.35.0 included) | **206 / 206** |
 | 9 Python tests, `clippy -D warnings`, `rustfmt` | clean |
 | Security probes (`scripts/security_tests.py`; one real sandbox escape found and fixed earlier) | **26 / 26**, 0 open high findings |
 | End-to-end sweep over every endpoint and UI page, incl. phone-width layout (`scripts/e2e_sweep.py`) | **65 / 65** |
 | Rooms with simulated members (`scripts/rooms_test.py`) | **59 / 59** |
-| Math and code harness sweep: real Lean, 6 attacks, code credit, validation, code agent (`scripts/harness_sweep.py`) | **40 / 40** |
-| MVP acceptance A1–A9 (`scripts/mvp_acceptance.py`) | **9 / 9** (slow path 56 s against the 240 s target) |
+| Math and code harness sweep: real Lean, 6 attacks, code credit, validation, code agent, rescue, parallel settings (`scripts/harness_sweep.py`) | **50 / 50** |
+| MVP acceptance A1–A9 (`scripts/mvp_acceptance.py`) | **9 / 9** (slow path 49 s against the 240 s target; A5's call bound includes the rescue samples) |
 
 The sweep found and fixed three defects in the Lean integration (an inconsistent 400 between `/v1/chat` and `/v1/verify`, Lean tasks classified as open questions with no retries, and a prompt that did not say Mathlib is absent). **One honest limit it exposed:** Qwen3-4B-Thinking (4-bit, CPU) cannot yet write valid Lean 4, even for `n + 0 = n`, so Lean tasks end in a labelled *abstain* unless a stronger prover is used. The Lean verifier itself is exact: it accepts real proofs and rejects a hidden `sorryAx`, a user axiom, `native_decide`, `#eval`, a changed statement and a shadowed `HAdd` instance.
 
@@ -232,7 +239,7 @@ The mathematics behind the gate (threshold rule, verifier-bounded precision, Bet
 
 ## Where the project stands
 
-Phases 0–12 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
+Phases 0–13 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
 
 | Gate | Status | Why |
 |:--:|:--:|---|
@@ -251,9 +258,10 @@ Phases 0–12 of the roadmap are implemented on the CPU reference machine; GPU t
 | [Slides](docs/slides/nafs_aql_slides.pdf) | the same story in 40 slides |
 | [Specification](docs/spec/nafs_aql_spec.pdf) | 100 requirements with identifiers, interfaces and a traceability matrix |
 | [Roadmap](docs/roadmap/nafs_aql_roadmap.pdf) · [Status](docs/roadmap/STATUS.md) | phases, gates, what is done and what is not |
-| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-076) |
+| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-082) |
 | [Results write-up](docs/publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
 | [Quantum consciousness and neuroscience review](docs/research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
+| [Parallel and concurrent inference](docs/research/parallel_inference.md) · [Decision 007](docs/decisions/007-parallel-inference.md) | Phase 13: batch scaling at depth, what was adopted (fused samples, System 1 rescue, `n`-choice rounds, 4 slots) and what was measured and left off |
 | [Math and code harness](docs/research/harness_integration.md) · [Decision 005](docs/decisions/005-harness-integration.md) | Phase 10: what was taken from Open Math Harness and Codex, what was not, and why |
 | [Codex-style harness](docs/research/harness_integration.md#5-phase-11-the-codex-agent-harness-adapted-to-small-models-on-a-cpu) · [Decision 006](docs/decisions/006-codex-harness.md) | Phase 11: the Codex agent-core mechanisms ported, the measured A/B against the Phase 10 loop, and the defaults it set |
 | [User guide](docs/user_guide.md) · [Runbook](docs/operations/operator_runbook.md) · [API reference](docs/api/api_reference.md) | using, operating and integrating |

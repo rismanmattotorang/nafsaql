@@ -51,6 +51,12 @@ def deterministic(base):
     check("info: Lean toolchain is available", lean_on, info.get("lean", {}).get("executable"))
     check("info: both sources are named with revisions", s == 200 and {x["name"] for x in info["sources"]} >= {"Open Math Harness", "OpenAI Codex (codex-rs)"} and all(x.get("revision") for x in info["sources"]))
 
+    par = info.get("parallel", {}) if s == 200 else {}
+    check("info: parallel settings (FR-094/095) are reported", {"enabled", "max_width", "system2_slots", "cost_factors", "fuse_always_samples", "hedge_after_failure"} <= set(par), par)
+    check("info: System 2 has four slots and fused samples are on", par.get("system2_slots") == 4 and par.get("fuse_always_samples") is True, par)
+    check("info: hedging is off by default (measured: no width pays at repair depth)", par.get("enabled") is False)
+    check("info: rescue (FR-096) draws 4 System 1 samples", info.get("rescue", {}).get("samples") == 4, info.get("rescue"))
+
     s, spec = call(base, "GET", "/openapi.json")
     paths = spec.get("paths", {}) if s == 200 else {}
     check("openapi: /v1/harness and /v1/harness/code are documented", "/v1/harness" in paths and "/v1/harness/code" in paths)
@@ -99,6 +105,14 @@ def deterministic(base):
     ]:
         s, d = call(base, "POST", "/v1/chat", body)
         check(name, s == 400 and d.get("code") == "E_BAD_REQUEST", d.get("message", "")[:80])
+    for name, patch_body in [
+        ("validate: parallel 0 is a 400", {"parallel": 0}),
+        ("validate: parallel 9 is a 400", {"parallel": 9}),
+        ("validate: rescue 5 is a 400", {"rescue": 5}),
+        ("validate: repair_rounds 9 is a 400", {"repair_rounds": 9}),
+    ]:
+        s, d = call(base, "POST", "/v1/chat", {"messages": msg, **patch_body})
+        check(name, s == 400 and d.get("code") == "E_BAD_REQUEST", d.get("message", "")[:80])
     base_req = {"task": "t", "verification": {"tests": ["assert True"]}}
     for name, patch in [
         ("agent: no tests is a 400", {"verification": {}}),
@@ -141,9 +155,41 @@ def lean_chat(base, statement, question, name, must_verify):
         check(f"model: {name}: the verified answer has no import line", "import " not in d["message"]["content"])
 
 
+def stream_decision(base, body):
+    """Stream a request and stop at the gate's decision event: (phases, verdicts, decision)."""
+    req = urllib.request.Request(base + "/v1/chat/stream", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    ev, phases, verdicts = None, [], []
+    with urllib.request.urlopen(req, timeout=900) as r:
+        for raw in r:
+            line = raw.decode().rstrip("\n")
+            if line.startswith("event:"):
+                ev = line[6:].strip()
+            elif line.startswith("data:"):
+                d = json.loads(line[5:])["data"]
+                if ev == "phase":
+                    phases.append(d.get("label", ""))
+                elif ev == "verification":
+                    verdicts.append(bool(d["result"]["passed"]))
+                elif ev == "decision":
+                    return phases, verdicts, d
+    return phases, verdicts, None
+
+
+def rescue_check(base):
+    rows = {json.loads(l)["id"]: json.loads(l) for l in open(os.path.join(ROOT, "data/bench/mbpp_plus.jsonl"))}
+    it = rows["mbpp_plus-268"]  # its System 1 draft failed in both arms of the live A/B (benchmarks/rescue_ab.json)
+    t = time.time()
+    phases, verdicts, dec = stream_decision(base, {"messages": [{"role": "user", "content": it["prompt"]}], "verification": it["verification"], "ephemeral": True})
+    drew = any("drawing 4 more samples" in p for p in phases)
+    check("model: a failed draft draws the System 1 rescue samples before escalating", dec is not None and drew and len(verdicts) >= 1, f"{time.time() - t:.0f}s verdicts={verdicts} escalate={dec and dec.get('escalate')}")
+    phases, verdicts, dec = stream_decision(base, {"messages": [{"role": "user", "content": it["prompt"]}], "verification": it["verification"], "ephemeral": True, "rescue": 0})
+    check("model: rescue 0 escalates the failed draft at once", dec is not None and not any("drawing" in p for p in phases) and dec.get("escalate") is True)
+
+
 def models(base, hard=False):
     # Whether a 4B model writes a valid Lean 4 proof is model strength, not harness correctness (the repair
     # pipeline with real Lean is tested deterministically in nafs-core). What must hold is honesty either way.
+    rescue_check(base)
     lean_chat(base, EASY, "Prove in Lean 4 that adding zero to a natural number leaves it unchanged.", "easy theorem", False)
     if hard:
         lean_chat(base, STATEMENT, "Prove in Lean 4 that addition of natural numbers is commutative.", "add_comm", False)

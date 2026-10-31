@@ -154,6 +154,32 @@
     "patch_repair": {
       "type": "boolean",
       "description": "FR-092: a code retry may answer with a Codex apply_patch to the candidate"
+    },
+    "parallel": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "description": "FR-094: concurrent System 2 candidates per round (first verified wins)"
+    },
+    "repair_rounds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "description": "FR-094: repair rounds after the first (0 = fresh candidates only)"
+    },
+    "fuse_samples": {
+      "type": "boolean",
+      "description": "FR-095: draw agreement samples together with the draft"
+    },
+    "hedge_after_failure": {
+      "type": "boolean",
+      "description": "FR-094: first attempt alone, widen only after it fails"
+    },
+    "rescue": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "FR-096: System 1 samples verified before a failed draft is escalated"
     }
   }
 }

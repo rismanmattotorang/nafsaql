@@ -1334,6 +1334,17 @@ async fn harness_info(State(s): State<AppState>) -> Json<Value> {
             "fanout": c.deliberation.repair_fanout,
             "patch_repair": c.deliberation.patch_repair,
         },
+        // FR-094 / FR-095: concurrent hedged rounds, the System 2 slots they can use, and fused agreement samples.
+        "parallel": {
+            "enabled": c.deliberation.parallel.enabled,
+            "max_width": c.deliberation.parallel.max_width,
+            "hedge_after_failure": c.deliberation.parallel.hedge_after_failure,
+            "system2_slots": s.orch.active().s2.slots(),
+            "cost_factors": c.deliberation.parallel.cost_factors,
+            "fuse_always_samples": c.gate.fuse_always_samples,
+        },
+        // FR-096: System 1 samples drawn and verified before a failed draft is escalated.
+        "rescue": { "samples": c.gate.rescue_samples, "temperature": c.gate.rescue_temperature },
         "code_agent": {
             "enabled": c.harness.code_agent_enabled,
             "model": c.harness.model,

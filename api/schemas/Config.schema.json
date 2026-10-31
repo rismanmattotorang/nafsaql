@@ -219,6 +219,15 @@
         "samples_when_uncertain": {
           "type": "boolean"
         },
+        "fuse_always_samples": {
+          "type": "boolean"
+        },
+        "rescue_samples": {
+          "type": "integer"
+        },
+        "rescue_temperature": {
+          "type": "number"
+        },
         "uncertain_band": {
           "type": "number"
         },
@@ -380,6 +389,48 @@
             "full_probe_max_tokens": {
               "type": "integer",
               "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "parallel": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "max_width": {
+              "type": "integer"
+            },
+            "cost_factors": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "min_gain": {
+              "type": "number"
+            },
+            "prior_weight": {
+              "type": "number"
+            },
+            "hedge_after_failure": {
+              "type": "boolean"
+            },
+            "p_prior": {
+              "type": "object",
+              "properties": {
+                "code": {
+                  "type": "number"
+                },
+                "math": {
+                  "type": "number"
+                },
+                "structured": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
