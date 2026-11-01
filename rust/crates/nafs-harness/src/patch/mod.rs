@@ -43,18 +43,37 @@ impl PatchSummary {
     }
 }
 
-/// The patch envelope inside `text` (from the first `*** Begin Patch` line to the next `*** End Patch`
-/// line), or None. Small models put prose or a Markdown fence around the patch; only the envelope counts.
+/// A line that opens a file section of a patch.
+fn is_file_header(line: &str) -> bool {
+    let t = line.trim();
+    ["*** Update File:", "*** Add File:", "*** Delete File:"]
+        .iter()
+        .any(|h| t.starts_with(h))
+}
+
+/// Whether `line` opens a patch: the envelope's first line, or, for a model that dropped it, the first file
+/// section (measured: Qwen3-1.7B on llama.cpp and Smiley Core, without a grammar, wrote the sections and the
+/// closing line but not `*** Begin Patch`).
+pub fn is_patch_start(line: &str) -> bool {
+    line.trim() == parser::BEGIN_PATCH_MARKER || is_file_header(line)
+}
+
+/// The patch envelope inside `text` (from the first `*** Begin Patch` line, or the first file section when
+/// that line is missing, to the next `*** End Patch` line), or None. Small models put prose or a Markdown
+/// fence around the patch; only the envelope counts.
 pub fn find_patch(text: &str) -> Option<String> {
     let lines: Vec<&str> = text.lines().collect();
-    let start = lines
-        .iter()
-        .position(|l| l.trim() == parser::BEGIN_PATCH_MARKER)?;
+    let start = lines.iter().position(|l| is_patch_start(l))?;
     let end = lines[start..]
         .iter()
         .position(|l| l.trim() == parser::END_PATCH_MARKER)?
         + start;
-    Some(lines[start..=end].join("\n"))
+    let body = lines[start..=end].join("\n");
+    if lines[start].trim() == parser::BEGIN_PATCH_MARKER {
+        Some(body)
+    } else {
+        Some(format!("{}\n{body}", parser::BEGIN_PATCH_MARKER))
+    }
 }
 
 /// A workspace-relative path: no root, no `..`, no empty name; `./` segments are dropped.
@@ -294,6 +313,18 @@ mod tests {
         )
         .unwrap();
         assert!(w.contains_key("d/x.py"));
+    }
+
+    #[test]
+    fn a_patch_without_its_begin_line_is_still_found() {
+        let reply = "*** Update File: a.py\n@@\n-x = 1\n+x = 2\n\n*** End Patch";
+        let p = find_patch(reply).unwrap();
+        assert!(p.starts_with("*** Begin Patch\n*** Update File: a.py"));
+        let mut w = ws(&[("a.py", "x = 1\n")]);
+        apply_patch(&mut w, &p).unwrap();
+        assert_eq!(w["a.py"], "x = 2\n");
+        // No closing line, no patch: a half-written reply is not an action.
+        assert!(find_patch("*** Update File: a.py\n@@\n-x = 1\n+x = 2").is_none());
     }
 
     #[test]

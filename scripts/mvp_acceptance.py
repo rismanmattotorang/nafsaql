@@ -87,7 +87,10 @@ def a8():
     ok = d["decision_id"] == r["decision_id"] and len(conv["messages"]) >= 2 and rc.returncode == 0
     return ok, f"decision retrievable={d['decision_id'] == r['decision_id']}, conversation messages={len(conv['messages'])}, schemas: {rc.stdout.strip().splitlines()[-1]}"
 def a9():
-    subprocess.run([f"{ROOT}/scripts/serve_llama.sh", "stop-one", "system2"], capture_output=True)
+    # The engine in use: Smiley Core (default, Phase 15) or llama.cpp; System 2 is stopped and must come back.
+    smiley = get("/healthz").get("backend") == "smiley"
+    script, port = (f"{ROOT}/scripts/serve_smiley.sh", 8202) if smiley else (f"{ROOT}/scripts/serve_llama.sh", 8002)
+    subprocess.run([script, "stop-one", "system2"], capture_output=True)
     time.sleep(1)
     try:
         evs = stream({"messages": [{"role": "user", "content": "What is 2 + 2?"}], "verification": {"reference_answer": "5"}, "ephemeral": True})
@@ -95,11 +98,11 @@ def a9():
         ok = "degraded" in names and done and done[0]["degraded"] and done[0]["reasoning_mode"] == "fast"
         detail = f"events={' '.join(dict.fromkeys(names))}; reply degraded={done[0]['degraded'] if done else None}"
     finally:
-        subprocess.run([f"{ROOT}/scripts/serve_llama.sh", "start"], capture_output=True)
+        subprocess.run([script, "start"], capture_output=True)
     # Recovery is part of the test: System 2 must be healthy again (NFR-010).
     back = False
     for _ in range(120):
-        try: urllib.request.urlopen("http://127.0.0.1:8002/health", timeout=2); back = True; break
+        try: urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2); back = True; break
         except Exception: time.sleep(1)
     return ok and back, detail + f"; System 2 back after restart={back}"
 

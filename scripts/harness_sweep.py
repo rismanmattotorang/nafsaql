@@ -53,7 +53,11 @@ def deterministic(base):
 
     par = info.get("parallel", {}) if s == 200 else {}
     check("info: parallel settings (FR-094/095) are reported", {"enabled", "max_width", "system2_slots", "cost_factors", "fuse_always_samples", "hedge_after_failure"} <= set(par), par)
-    check("info: System 2 has four slots and fused samples are on", par.get("system2_slots") == 4 and par.get("fuse_always_samples") is True, par)
+    # The slots are the active backend's: four on llama.cpp (Phase 13), one stream per model on Smiley Core (Phase 15).
+    sysinfo = json.load(urllib.request.urlopen(base + "/v1/system", timeout=30))
+    active = next(b for b in sysinfo["backends"] if b["active"])
+    check(f"info: System 2 reports the {active['name']} backend's slots and fused samples are on",
+          par.get("system2_slots") == active["system2"]["max_in_flight"] and par.get("fuse_always_samples") is True, {**par, "backend": active["name"]})
     check("info: hedging is off by default (measured: no width pays at repair depth)", par.get("enabled") is False)
     check("info: rescue (FR-096) draws 4 System 1 samples", info.get("rescue", {}).get("samples") == 4, info.get("rescue"))
     ca = info.get("code_agent", {})
@@ -184,7 +188,15 @@ def rescue_check(base):
     t = time.time()
     phases, verdicts, dec = stream_decision(base, {"messages": [{"role": "user", "content": it["prompt"]}], "verification": it["verification"], "ephemeral": True})
     drew = any("drawing 4 more samples" in p for p in phases)
-    check("model: a failed draft draws the System 1 rescue samples before escalating", dec is not None and drew and len(verdicts) >= 1, f"{time.time() - t:.0f}s verdicts={verdicts} escalate={dec and dec.get('escalate')}")
+    # The rescue is one n-choice request: it runs only on a backend with the slots for it (llama.cpp, four per model).
+    # Smiley Core decodes one stream per model (Phase 15), so there the failed draft escalates at once.
+    sysinfo = json.load(urllib.request.urlopen(base + "/v1/system", timeout=30))
+    active = next(b for b in sysinfo["backends"] if b["active"])
+    slots = active["system1"]["max_in_flight"]
+    if slots >= 4:
+        check("model: a failed draft draws the System 1 rescue samples before escalating", dec is not None and drew and len(verdicts) >= 1, f"{time.time() - t:.0f}s verdicts={verdicts} escalate={dec and dec.get('escalate')}")
+    else:
+        check(f"model: on a {slots}-slot backend a failed draft escalates without the rescue", dec is not None and not drew and dec.get("escalate") is True, f"{time.time() - t:.0f}s verdicts={verdicts} escalate={dec and dec.get('escalate')} backend={active['name']}")
     phases, verdicts, dec = stream_decision(base, {"messages": [{"role": "user", "content": it["prompt"]}], "verification": it["verification"], "ephemeral": True, "rescue": 0})
     check("model: rescue 0 escalates the failed draft at once", dec is not None and not any("drawing" in p for p in phases) and dec.get("escalate") is True)
 

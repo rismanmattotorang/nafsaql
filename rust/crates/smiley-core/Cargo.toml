@@ -1,0 +1,18 @@
+# Vendored from the owner's Smiley project (~/Downloads/Smiley, revision 7cb6028, `smiley/engine` -> third_party/smiley-core,
+# Apache-2.0) on 2026-11-01 so that the workspace builds without the third_party checkout. Modified for Nafs-Aql:
+# `SessionCfg::assistant_prefix` (a continuation prefix, used for the reasoning budget) and `Emitted::logprob`
+# (the sampled token's log-probability, for the gate). See README.md in this directory.
+[package]
+name = "smiley-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Smiley Core — a CPU inference engine that reports the bytes it moved (vendored into Nafs-Aql)"
+
+# memmap2 is the only dependency, on purpose. Everything else this crate needs is
+# either trivial (f16 conversion is twenty lines) or a liability: a tensor framework
+# would re-introduce the materialise-a-dequantised-buffer pattern that principle P1
+# of the spec exists to forbid, and rayon would make thread count and barrier count
+# unpredictable when both are quantities this engine measures and reports.
+[dependencies]
+memmap2 = { workspace = true }

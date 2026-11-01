@@ -1,0 +1,13 @@
+# text	ids   (golden from llama-tokenize --no-bos on Qwen2.5-0.5B-Instruct-Q4_K_M.gguf)
+Hello world	9707,1879
+it's 2026! Don't we've I'll you'd	275,594,220,17,15,17,21,0,4320,944,582,3003,358,3278,498,4172
+Normalisasi katalog produk kecantikan ParagonCorp	12206,285,10215,595,7750,60874,1962,65263,22222,4270,6113,94795
+a,b;c... (d) [e] {f} <g>	64,8402,78632,1112,320,67,8,508,68,60,314,69,92,366,70,29
+line one\nline two\n\nline four	1056,825,198,1056,1378,271,1056,3040
+  leading and trailing  	220,6388,323,27748,256
+<|im_start|>user\nSummarise this.<|im_end|>\n<|im_start|>assistant\n	151644,872,198,9190,5612,1064,419,13,151645,198,151644,77091,198
+café naïve — “quoted” über	924,58858,94880,586,1959,1036,63725,854,13785
+ 	220
+INCI: Aqua, Glycerin, Niacinamide 5%, Sodium Hyaluronate 0.1%	687,11237,25,71407,11,479,67490,258,11,451,17569,258,65696,220,20,13384,82441,10112,278,36090,349,220,15,13,16,4
+SKU-12345 / batch#7  qty:  48	89755,12,16,17,18,19,20,608,7162,2,22,220,43185,25,220,220,19,23
+Tab\there\tand\ttab	8582,197,6739,52477,58149

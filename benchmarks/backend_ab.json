@@ -1,0 +1,1068 @@
+{
+ "runs": [
+  {
+   "ok": true,
+   "client_s": 8.1,
+   "wall_s": 8.082,
+   "ttft_s": 0.775,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 115,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 8078,
+     "prefill_ms": 769.2,
+     "prompt_n": 66,
+     "cache_n": 73,
+     "tokens": 115
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 3,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Step 1: Calculate the time from 3:40 pm to 6:05 pm.\n\n- From 3:40 pm to 4:40 pm is 60 minutes.\n- From 4:40 pm to 6:05 pm is 1 hour and 25 minutes (60 minutes + 2",
+   "round": 0,
+   "engine": "llama",
+   "kind": "math",
+   "prompt": "A train leaves at 3:40 pm and arrives at 6:05 pm the same da",
+   "checkable": true,
+   "load_before": 34.11,
+   "at": "13:06:22"
+  },
+  {
+   "ok": true,
+   "client_s": 9.8,
+   "wall_s": 9.74,
+   "ttft_s": 1.539,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 115,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 9740,
+     "prefill_ms": 1537.341994,
+     "prompt_n": 66,
+     "cache_n": 73,
+     "tokens": 115
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Step 1: Calculate the time from 3:40 pm to 6:05 pm.\n\n- From 3:40 pm to 4:40 pm is 60 minutes.\n- From 4:40 pm to 6:05 pm is 1 hour and 25 minutes (60 minutes + 2",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "math",
+   "prompt": "A train leaves at 3:40 pm and arrives at 6:05 pm the same da",
+   "checkable": true,
+   "load_before": 22.51,
+   "at": "13:06:58"
+  },
+  {
+   "ok": true,
+   "client_s": 5.1,
+   "wall_s": 5.061,
+   "ttft_s": 0.851,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 72,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 5061,
+     "prefill_ms": 849.541886,
+     "prompt_n": 48,
+     "cache_n": 100,
+     "tokens": 72
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Natalia sold 48 clips in April. In May, she sold half as many, which is $ \\frac{48}{2} = 24 $ clips.\n\nTotal clips sold = Clips in April + Clips in May  \nTotal c",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "math",
+   "prompt": "Natalia sold clips to 48 of her friends in April, and then s",
+   "checkable": true,
+   "load_before": 20.43,
+   "at": "13:07:03"
+  },
+  {
+   "ok": true,
+   "client_s": 39.4,
+   "wall_s": 39.416,
+   "ttft_s": 2.824,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 73,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 39416,
+     "prefill_ms": 2784.279,
+     "prompt_n": 75,
+     "cache_n": 73,
+     "tokens": 73
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Natalia sold 48 clips in April. In May, she sold half as many, which is $ \\frac{48}{2} = 24 $ clips.\n\nTotal clips sold = Clips in April + Clips in May  \nTotal c",
+   "round": 0,
+   "engine": "llama",
+   "kind": "math",
+   "prompt": "Natalia sold clips to 48 of her friends in April, and then s",
+   "checkable": true,
+   "load_before": 16.59,
+   "at": "13:07:58"
+  },
+  {
+   "ok": true,
+   "client_s": 37.8,
+   "wall_s": 37.795,
+   "ttft_s": 0.407,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 145,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 37795,
+     "prefill_ms": 110.255,
+     "prompt_n": 1,
+     "cache_n": 144,
+     "tokens": 145
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Let\u2019s solve this step by step.\n\nLet the cost of the ball be $ x $.  \nThen the cost of the bat is $ x + 1.00 $ (since it's $1.00 more than the ball).\n\nThe total ",
+   "round": 0,
+   "engine": "llama",
+   "kind": "math",
+   "prompt": "A bat and a ball cost $1.10 in total. The bat costs $1.00 mo",
+   "checkable": true,
+   "load_before": 14.97,
+   "at": "13:08:35"
+  },
+  {
+   "ok": true,
+   "client_s": 26.5,
+   "wall_s": 25.616,
+   "ttft_s": 4.301,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 143,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 25616,
+     "prefill_ms": 4297.010383,
+     "prompt_n": 72,
+     "cache_n": 73,
+     "tokens": 143
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Let's denote the cost of the ball as $ x $ dollars. Then the cost of the bat is $ x + 1.00 $ dollars (since it's $1.00 more than the ball).\n\nThe total cost is:\n",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "math",
+   "prompt": "A bat and a ball cost $1.10 in total. The bat costs $1.00 mo",
+   "checkable": true,
+   "load_before": 26.47,
+   "at": "13:09:46"
+  },
+  {
+   "ok": true,
+   "client_s": 23.3,
+   "wall_s": 23.29,
+   "ttft_s": 0.966,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 199,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 23289,
+     "prefill_ms": 964.1574969999999,
+     "prompt_n": 38,
+     "cache_n": 100,
+     "tokens": 199
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Let the current age of Ann be $ A $ and Tom be $ T $.\n\nFrom the first statement:  \n$$ T = 2A $$\n\nFrom the second statement:  \nIn 6 years, their ages will be $ A",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "math",
+   "prompt": "Tom is twice as old as Ann. In 6 years the sum of their ages",
+   "checkable": true,
+   "load_before": 53.52,
+   "at": "13:10:09"
+  },
+  {
+   "ok": true,
+   "client_s": 90.3,
+   "wall_s": 90.293,
+   "ttft_s": 9.899,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 314,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 90293,
+     "prefill_ms": 9858.429,
+     "prompt_n": 65,
+     "cache_n": 73,
+     "tokens": 314
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "Let\u2019s solve the problem step by step.\n\n1. Let Tom\u2019s current age be $ T $.\n2. Let Ann\u2019s current age be $ A $.\n3. According to the problem:  \n   $$\n   T = 2A\n   $",
+   "round": 0,
+   "engine": "llama",
+   "kind": "math",
+   "prompt": "Tom is twice as old as Ann. In 6 years the sum of their ages",
+   "checkable": true,
+   "load_before": 39.25,
+   "at": "13:12:13"
+  },
+  {
+   "ok": true,
+   "client_s": 7.1,
+   "wall_s": 7.081,
+   "ttft_s": 0.486,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 113,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 6985,
+     "prefill_ms": 314.564,
+     "prompt_n": 28,
+     "cache_n": 106,
+     "tokens": 113
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 95,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```python\ndef is_palindrome(s):\n    # Filter out non-alphanumeric characters and convert to lowercase\n    filtered = [c.lower() for c in s if c.isalnum()]\n    r",
+   "round": 0,
+   "engine": "llama",
+   "kind": "code",
+   "prompt": "Write a Python function is_palindrome(s) that ignores case a",
+   "checkable": true,
+   "load_before": 35.45,
+   "at": "13:12:20"
+  },
+  {
+   "ok": true,
+   "client_s": 9.7,
+   "wall_s": 9.723,
+   "ttft_s": 1.544,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 76,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 9626,
+     "prefill_ms": 1542.0721509999998,
+     "prompt_n": 61,
+     "cache_n": 73,
+     "tokens": 76
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 97,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```python\ndef is_palindrome(s):\n    s = ''.join(c.lower() for c in s if c.isalnum())\n    return s == s[::-1]\n```\n\nExplanation: This function converts the input ",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "code",
+   "prompt": "Write a Python function is_palindrome(s) that ignores case a",
+   "checkable": true,
+   "load_before": 31.35,
+   "at": "13:13:01"
+  },
+  {
+   "ok": true,
+   "client_s": 9.9,
+   "wall_s": 9.878,
+   "ttft_s": 0.715,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 70,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 9669,
+     "prefill_ms": 713.995276,
+     "prompt_n": 24,
+     "cache_n": 106,
+     "tokens": 70
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 209,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```python\ndef chunks(xs, n):\n    return [xs[i:i+n] for i in range(0, len(xs), n)]\n```\n\nThis function splits the list `xs` into chunks of size `n` using a list c",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "code",
+   "prompt": "Write a Python function chunks(xs, n) that splits a list int",
+   "checkable": true,
+   "load_before": 27.37,
+   "at": "13:13:11"
+  },
+  {
+   "ok": true,
+   "client_s": 41.1,
+   "wall_s": 41.078,
+   "ttft_s": 2.601,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 102,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 40991,
+     "prefill_ms": 2582.678,
+     "prompt_n": 57,
+     "cache_n": 73,
+     "tokens": 102
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 87,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```python\ndef chunks(xs, n):\n    \"\"\"Split a list into chunks of size n.\"\"\"\n    return [xs[i:i+n] for i in range(0, len(xs), n)]\n```\n\nExplanation: This function ",
+   "round": 0,
+   "engine": "llama",
+   "kind": "code",
+   "prompt": "Write a Python function chunks(xs, n) that splits a list int",
+   "checkable": true,
+   "load_before": 23.52,
+   "at": "13:14:25"
+  },
+  {
+   "ok": true,
+   "client_s": 20.8,
+   "wall_s": 20.73,
+   "ttft_s": 1.028,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 101,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 20659,
+     "prefill_ms": 986.642,
+     "prompt_n": 32,
+     "cache_n": 106,
+     "tokens": 101
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 70,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```python\ndef second_largest(xs):\n    unique = list(set(xs))\n    if len(unique) < 2:\n        return None\n    unique.sort(reverse=True)\n    return unique[1]\n```\n",
+   "round": 0,
+   "engine": "llama",
+   "kind": "code",
+   "prompt": "Write a Python function second_largest(xs) that returns the ",
+   "checkable": true,
+   "load_before": 16.34,
+   "at": "13:14:45"
+  },
+  {
+   "ok": true,
+   "client_s": 12.3,
+   "wall_s": 12.321,
+   "ttft_s": 2.799,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 87,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 12246,
+     "prefill_ms": 2797.010061,
+     "prompt_n": 65,
+     "cache_n": 73,
+     "tokens": 87
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 74,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```python\ndef second_largest(xs):\n    unique_sorted = sorted(set(xs))\n    if len(unique_sorted) < 2:\n        return None\n    return unique_sorted[-2]\n```\n\nExpla",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "code",
+   "prompt": "Write a Python function second_largest(xs) that returns the ",
+   "checkable": true,
+   "load_before": 15.13,
+   "at": "13:15:38"
+  },
+  {
+   "ok": true,
+   "client_s": 8.7,
+   "wall_s": 8.712,
+   "ttft_s": 2.908,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 42,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 8567,
+     "prefill_ms": 2906.273883,
+     "prompt_n": 74,
+     "cache_n": 73,
+     "tokens": 42
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 144,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```json\n{\n  \"title\": \"The Great Gatsby\",\n  \"author\": \"F. Scott Fitzgerald\",\n  \"year\": 1925,\n  \"available\": true\n}\n```",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "structured",
+   "prompt": "Create a JSON object for a library book with fields title (s",
+   "checkable": true,
+   "load_before": 14.26,
+   "at": "13:15:47"
+  },
+  {
+   "ok": true,
+   "client_s": 15.2,
+   "wall_s": 15.169,
+   "ttft_s": 1.261,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 43,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 15168,
+     "prefill_ms": 1204.217,
+     "prompt_n": 74,
+     "cache_n": 73,
+     "tokens": 43
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```json\n{\n  \"title\": \"The Great Gatsby\",\n  \"author\": \"F. Scott Fitzgerald\",\n  \"year\": 1925,\n  \"available\": true\n}\n```",
+   "round": 0,
+   "engine": "llama",
+   "kind": "structured",
+   "prompt": "Create a JSON object for a library book with fields title (s",
+   "checkable": true,
+   "load_before": 14.96,
+   "at": "13:16:18"
+  },
+  {
+   "ok": true,
+   "client_s": 5.9,
+   "wall_s": 5.887,
+   "ttft_s": 0.903,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 23,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 5887,
+     "prefill_ms": 887.882,
+     "prompt_n": 30,
+     "cache_n": 103,
+     "tokens": 23
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```json\n{\n  \"name\": \"John Doe\",\n  \"age\": 30\n}\n```",
+   "round": 0,
+   "engine": "llama",
+   "kind": "structured",
+   "prompt": "Create a JSON object describing a person with name (string) ",
+   "checkable": true,
+   "load_before": 13.8,
+   "at": "13:16:24"
+  },
+  {
+   "ok": true,
+   "client_s": 3.9,
+   "wall_s": 3.928,
+   "ttft_s": 1.743,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 22,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 3928,
+     "prefill_ms": 1741.073958,
+     "prompt_n": 60,
+     "cache_n": 73,
+     "tokens": 22
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null,
+     "tokens": null
+    }
+   ],
+   "answer": "```json\n{\n  \"name\": \"John Doe\",\n  \"age\": 30\n}\n```",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "structured",
+   "prompt": "Create a JSON object describing a person with name (string) ",
+   "checkable": true,
+   "load_before": 12.12,
+   "at": "13:17:08"
+  },
+  {
+   "ok": true,
+   "client_s": 3.3,
+   "wall_s": 3.266,
+   "ttft_s": 1.453,
+   "mode": "fast",
+   "assurance": "unverified",
+   "verified": false,
+   "model_calls": 1,
+   "completion_tokens": 17,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 3255,
+     "prefill_ms": 1451.8906590000001,
+     "prompt_n": 45,
+     "cache_n": 73,
+     "tokens": 17
+    }
+   ],
+   "answer": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "factual",
+   "prompt": "What is the capital of Indonesia, and on which island is it ",
+   "checkable": false,
+   "load_before": 12.03,
+   "at": "13:17:11"
+  },
+  {
+   "ok": true,
+   "client_s": 4.5,
+   "wall_s": 4.516,
+   "ttft_s": 1.113,
+   "mode": "fast",
+   "assurance": "unverified",
+   "verified": false,
+   "model_calls": 1,
+   "completion_tokens": 18,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 4516,
+     "prefill_ms": 1107.858,
+     "prompt_n": 44,
+     "cache_n": 74,
+     "tokens": 18
+    }
+   ],
+   "answer": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "round": 0,
+   "engine": "llama",
+   "kind": "factual",
+   "prompt": "What is the capital of Indonesia, and on which island is it ",
+   "checkable": false,
+   "load_before": 10.3,
+   "at": "13:17:34"
+  },
+  {
+   "ok": true,
+   "client_s": 20.8,
+   "wall_s": 20.763,
+   "ttft_s": 0.893,
+   "mode": "fast",
+   "assurance": "unverified",
+   "verified": false,
+   "model_calls": 1,
+   "completion_tokens": 103,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 20763,
+     "prefill_ms": 880.129,
+     "prompt_n": 31,
+     "cache_n": 74,
+     "tokens": 103
+    }
+   ],
+   "answer": "Sure! Here are three practical tips for writing clear technical documentation:\n\n1. **Use Simple Language**: Avoid jargon and keep explanations straightforward t",
+   "round": 0,
+   "engine": "llama",
+   "kind": "open",
+   "prompt": "Give three practical tips for writing clear technical docume",
+   "checkable": false,
+   "load_before": 10.12,
+   "at": "13:17:55"
+  },
+  {
+   "ok": true,
+   "client_s": 10.5,
+   "wall_s": 10.531,
+   "ttft_s": 0.452,
+   "mode": "fast",
+   "assurance": "unverified",
+   "verified": false,
+   "model_calls": 1,
+   "completion_tokens": 97,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 10531,
+     "prefill_ms": 450.33307,
+     "prompt_n": 19,
+     "cache_n": 86,
+     "tokens": 97
+    }
+   ],
+   "answer": "Sure! Here are three practical tips for writing clear technical documentation:\n\n1. **Use Simple Language**: Avoid jargon and keep explanations straightforward t",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "open",
+   "prompt": "Give three practical tips for writing clear technical docume",
+   "checkable": false,
+   "load_before": 10.07,
+   "at": "13:18:44"
+  },
+  {
+   "ok": true,
+   "client_s": 9.0,
+   "wall_s": 8.988,
+   "ttft_s": 0.747,
+   "mode": "fast",
+   "assurance": "unverified",
+   "verified": false,
+   "model_calls": 1,
+   "completion_tokens": 78,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 8988,
+     "prefill_ms": 745.433617,
+     "prompt_n": 24,
+     "cache_n": 86,
+     "tokens": 78
+    }
+   ],
+   "answer": "A process is a program in execution, consisting of a program code, data, and a process control block (PCB). It is the basic unit of execution in an operating sy",
+   "round": 0,
+   "engine": "smiley",
+   "kind": "open",
+   "prompt": "Explain the difference between a process and a thread in two",
+   "checkable": false,
+   "load_before": 9.82,
+   "at": "13:18:53"
+  },
+  {
+   "ok": true,
+   "client_s": 12.5,
+   "wall_s": 12.479,
+   "ttft_s": 0.858,
+   "mode": "fast",
+   "assurance": "unverified",
+   "verified": false,
+   "model_calls": 1,
+   "completion_tokens": 73,
+   "reasoning_tokens": 0,
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 12478,
+     "prefill_ms": 838.65,
+     "prompt_n": 24,
+     "cache_n": 86,
+     "tokens": 73
+    }
+   ],
+   "answer": "A **process** is a program in execution, consisting of a sequence of instructions and data. It is the basic unit of execution in an operating system and is inde",
+   "round": 0,
+   "engine": "llama",
+   "kind": "open",
+   "prompt": "Explain the difference between a process and a thread in two",
+   "checkable": false,
+   "load_before": 8.85,
+   "at": "13:19:25"
+  },
+  {
+   "ok": true,
+   "agent": true,
+   "engine": "llama",
+   "status": "verified",
+   "verified": true,
+   "wall_s": 53.27,
+   "model_calls": 1,
+   "steps": [
+    [
+     "system1",
+     "write",
+     4,
+     true
+    ]
+   ],
+   "constrained": true,
+   "cascade": true,
+   "round": 0,
+   "kind": "agent",
+   "prompt": "agent",
+   "checkable": true,
+   "at": "13:54:27"
+  },
+  {
+   "ok": true,
+   "agent": true,
+   "engine": "smiley",
+   "status": "verified",
+   "verified": true,
+   "wall_s": 262.781,
+   "model_calls": 2,
+   "steps": [
+    [
+     "system1",
+     "patch",
+     1,
+     false
+    ],
+    [
+     "system2",
+     "patch",
+     1,
+     true
+    ]
+   ],
+   "constrained": false,
+   "cascade": true,
+   "round": 0,
+   "kind": "agent",
+   "prompt": "agent",
+   "checkable": true,
+   "at": "13:59:40"
+  }
+ ],
+ "switches": [
+  {
+   "to": "llama",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 25993,
+   "warmed": 13,
+   "switch_s": 26.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "llama",
+   "warm_ms": 15251,
+   "warmed": 13,
+   "switch_s": 15.3
+  },
+  {
+   "to": "llama",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 43575,
+   "warmed": 13,
+   "switch_s": 43.6
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "llama",
+   "warm_ms": 33748,
+   "warmed": 13,
+   "switch_s": 33.7
+  },
+  {
+   "to": "llama",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 30997,
+   "warmed": 13,
+   "switch_s": 31.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "llama",
+   "warm_ms": 32835,
+   "warmed": 13,
+   "switch_s": 32.8
+  },
+  {
+   "to": "llama",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 40187,
+   "warmed": 13,
+   "switch_s": 40.2
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "llama",
+   "warm_ms": 16061,
+   "warmed": 13,
+   "switch_s": 16.1
+  },
+  {
+   "to": "llama",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 40068,
+   "warmed": 13,
+   "switch_s": 40.1
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "llama",
+   "warm_ms": 18257,
+   "warmed": 13,
+   "switch_s": 18.3
+  },
+  {
+   "to": "llama",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 39184,
+   "warmed": 13,
+   "switch_s": 39.2
+  },
+  {
+   "to": "smiley",
+   "warm_ms": 0,
+   "warmed": 0,
+   "switch_s": 0.0
+  },
+  {
+   "to": "llama",
+   "warm_ms": 18781,
+   "warmed": 13,
+   "switch_s": 18.8
+  }
+ ]
+}

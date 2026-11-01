@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Smiley Core backend (Phase 15): system1 served by nafs-smiley-server on :8201. Paths assume a checkout at
+     /opt/nafs-aql. Install beside (or instead of) the llama-server agents:
+     cp deploy/launchd/org.nafs-aql.smiley-*.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/org.nafs-aql.smiley-system1.plist
+     then switch the gateway: curl -X POST localhost:8080/v1/system/backend -d '{"name":"smiley"}' -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>org.nafs-aql.smiley-system1</string>
+  <key>ProgramArguments</key><array><string>/opt/nafs-aql/rust/target/release/nafs-smiley-server</string><string>-m</string><string>models/Qwen3-1.7B-Q4_K_M.gguf</string><string>--alias</string><string>system1</string><string>-t</string><string>4</string><string>-c</string><string>8192</string><string>--host</string><string>127.0.0.1</string><string>--port</string><string>8201</string></array>
+  <key>WorkingDirectory</key><string>/opt/nafs-aql</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>StandardOutPath</key><string>/opt/nafs-aql/logs/smiley-system1.log</string>
+  <key>StandardErrorPath</key><string>/opt/nafs-aql/logs/smiley-system1.log</string>
+</dict>
+</plist>

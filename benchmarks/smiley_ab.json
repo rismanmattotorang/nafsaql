@@ -1,0 +1,1349 @@
+{
+ "runs": [
+  {
+   "wall_s": 21.6,
+   "ttft_s": 1.249,
+   "content": "The train leaves at 3:40 pm and arrives at 6:05 pm. To find the duration, we calculate the time from 3:40 pm to 6:05 pm.\n\nFrom 3:40 pm to 4:40 pm is 60 minutes.  \nFrom 4:40 pm to 6:05 pm is 1 hour and 25 minutes, which is 85 minutes.\n\nTotal duration = 60 + 85 = 145 minutes.\n\nAnswer: <number>",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 57,
+   "cache_n": 7,
+   "prompt_ms": 1196.559,
+   "predicted_n": 119,
+   "predicted_ms": 20339.117,
+   "tok_s": 5.80162845810858,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 119,
+    "prompt_tokens": 64,
+    "total_tokens": 183,
+    "prompt_tokens_details": {
+     "cached_tokens": 7
+    }
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "math",
+   "load_before": 22.23,
+   "at": "12:41:40"
+  },
+  {
+   "wall_s": 16.24,
+   "ttft_s": 4.709,
+   "content": "The train leaves at 3:40 pm and arrives at 6:05 pm. To find the duration, we calculate the time from 3:40 pm to 6:05 pm.\n\nFrom 3:40 pm to 4:40 pm is 60 minutes.  \nFrom 4:40 pm to 6:05 pm is 1 hour and 25 minutes, which is 85 minutes.\n\nTotal duration = 60 + 85 = 145 minutes.\n\nAnswer: <number>",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 64,
+   "cache_n": 0,
+   "prompt_ms": 4706.817550000001,
+   "predicted_n": 118,
+   "predicted_ms": 11391.427586999998,
+   "tok_s": 10.358666558585044,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 130521188304,
+    "bytes_per_token": 1106111765,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 118,
+    "prompt_tokens": 64,
+    "total_tokens": 182
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "math",
+   "load_before": 17.88,
+   "at": "12:41:56"
+  },
+  {
+   "wall_s": 11.39,
+   "ttft_s": 1.199,
+   "content": "```python\ndef run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1])\n            result.append(str(count))\n            count = 1\n    result.append(s[-1])\n    result.append(str(count))\n    return ''.join(result)\n```",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 45,
+   "cache_n": 17,
+   "prompt_ms": 1197.354116,
+   "predicted_n": 98,
+   "predicted_ms": 10074.568811999998,
+   "tok_s": 9.72746346059699,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 108076377232,
+    "bytes_per_token": 1102820175,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 98,
+    "prompt_tokens": 62,
+    "total_tokens": 160
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "code",
+   "load_before": 15.45,
+   "at": "12:42:07"
+  },
+  {
+   "wall_s": 22.02,
+   "ttft_s": 1.723,
+   "content": "```python\ndef run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1])\n            result.append(str(count))\n            count = 1\n    result.append(s[-1])\n    result.append(str(count))\n    return ''.join(result)\n```",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 45,
+   "cache_n": 17,
+   "prompt_ms": 1675.066,
+   "predicted_n": 99,
+   "predicted_ms": 20285.198,
+   "tok_s": 4.831108870615904,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 99,
+    "prompt_tokens": 62,
+    "total_tokens": 161,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "code",
+   "load_before": 13.75,
+   "at": "12:42:29"
+  },
+  {
+   "wall_s": 4.19,
+   "ttft_s": 0.74,
+   "content": "1. Use simple language and avoid jargon to ensure clarity for all readers.  \n2. Organize content with clear headings and sections to improve navigation.  \n3. Include examples and diagrams to illustrate complex concepts.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 23,
+   "cache_n": 17,
+   "prompt_ms": 709.421,
+   "predicted_n": 44,
+   "predicted_ms": 3449.841,
+   "tok_s": 12.464342559555643,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 44,
+    "prompt_tokens": 40,
+    "total_tokens": 84,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "open",
+   "load_before": 12.28,
+   "at": "12:42:34"
+  },
+  {
+   "wall_s": 5.01,
+   "ttft_s": 0.533,
+   "content": "1. Use simple language and avoid jargon to ensure clarity for all readers.  \n2. Organize content with clear headings and sections to improve navigation and understanding.  \n3. Include examples and diagrams to illustrate complex concepts and enhance comprehension.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 23,
+   "cache_n": 17,
+   "prompt_ms": 531.101838,
+   "predicted_n": 48,
+   "predicted_ms": 4433.911878,
+   "tok_s": 10.82565493422736,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 52113558640,
+    "bytes_per_token": 1085699138,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 48,
+    "prompt_tokens": 40,
+    "total_tokens": 88
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "open",
+   "load_before": 11.7,
+   "at": "12:42:39"
+  },
+  {
+   "wall_s": 2.31,
+   "ttft_s": 0.653,
+   "content": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 27,
+   "cache_n": 17,
+   "prompt_ms": 650.997806,
+   "predicted_n": 17,
+   "predicted_ms": 1640.228023,
+   "tok_s": 10.364412607039089,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 17719683328,
+    "bytes_per_token": 1042334313,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 17,
+    "prompt_tokens": 44,
+    "total_tokens": 61
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "fact",
+   "load_before": 11.24,
+   "at": "12:42:41"
+  },
+  {
+   "wall_s": 6.57,
+   "ttft_s": 1.678,
+   "content": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 27,
+   "cache_n": 17,
+   "prompt_ms": 1654.612,
+   "predicted_n": 18,
+   "predicted_ms": 4891.155,
+   "tok_s": 3.4756616790921573,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 18,
+    "prompt_tokens": 44,
+    "total_tokens": 62,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 0,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "fact",
+   "load_before": 11.24,
+   "at": "12:42:47"
+  },
+  {
+   "wall_s": 142.62,
+   "ttft_s": 3.363,
+   "content": "To find the duration of the trip, calculate the time difference between 3:40 pm and 6:05 pm.\n\n1. **From 3:40 pm to 6:40 pm** is exactly **3 hours** (since 6:40 - 3:40 = 3 hours).\n2. However, the train arrives at **6:05 pm**, which is **35 minutes earlier** than 6:40 pm.\n3. So subtract 35 minutes from the 3 hours:  \n   $ 3 \\text{ hours} = 180 \\text{ minutes} $  \n   $ 180 - 35 = 145 \\text{ minutes} ",
+   "reasoning_tokens_est": 111,
+   "prompt_n": 55,
+   "cache_n": 7,
+   "prompt_ms": 3136.294,
+   "predicted_n": 296,
+   "predicted_ms": 139255.529,
+   "tok_s": 2.11840780842533,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 296,
+    "prompt_tokens": 62,
+    "total_tokens": 358,
+    "prompt_tokens_details": {
+     "cached_tokens": 7
+    }
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "math",
+   "load_before": 11.06,
+   "at": "12:45:10"
+  },
+  {
+   "wall_s": 90.7,
+   "ttft_s": 13.861,
+   "content": "To find the duration of the trip, we calculate the time difference between 3:40 pm and 6:05 pm.\n\n**Step 1:** Subtract the departure time from the arrival time.\n\n- From **3:40 pm** to **6:05 pm**, we can break it into:\n  - Hours: 6 - 3 = **3 hours**\n  - Minutes: 05 - 40 = **-35 minutes**\n\nSince the minutes are negative, we borrow 1 hour (60 minutes) from the hours:\n- Adjusted minutes: -35 + 60 = **",
+   "reasoning_tokens_est": 114,
+   "prompt_n": 191,
+   "cache_n": 61,
+   "prompt_ms": 23114.467266,
+   "predicted_n": 320,
+   "predicted_ms": 67114.421436,
+   "tok_s": 4.767976735151484,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 805194113740,
+    "bytes_per_token": 2516231605,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 320,
+    "prompt_tokens": 252,
+    "total_tokens": 572
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "math",
+   "load_before": 11.37,
+   "at": "12:46:41"
+  },
+  {
+   "wall_s": 58.28,
+   "ttft_s": 3.97,
+   "content": "def run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1] + str(count))\n            count = 1\n    result.append(s[-1] + str(count))\n    return ''.join(result)",
+   "reasoning_tokens_est": 139,
+   "prompt_n": 172,
+   "cache_n": 76,
+   "prompt_ms": 12915.196154,
+   "predicted_n": 218,
+   "predicted_ms": 44824.31511699999,
+   "tok_s": 4.863431809966945,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 546013895188,
+    "bytes_per_token": 2504650895,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 218,
+    "prompt_tokens": 248,
+    "total_tokens": 466
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "code",
+   "load_before": 13.97,
+   "at": "12:47:39"
+  },
+  {
+   "wall_s": 36.57,
+   "ttft_s": 2.409,
+   "content": "def run_length_encode(s):\n    if not s:\n        return \"\"\n    current_char = s[0]\n    count = 1\n    result = []\n    for i in range(1, len(s)):\n        if s[i] == current_char:\n            count += 1\n        else:\n            result.append(current_char)\n            result.append(str(count))\n            current_char = s[i]\n            count = 1\n    result.append(current_char)\n    result.append(str(c",
+   "reasoning_tokens_est": 124,
+   "prompt_n": 43,
+   "cache_n": 17,
+   "prompt_ms": 2299.815,
+   "predicted_n": 234,
+   "predicted_ms": 34157.581,
+   "tok_s": 6.821326135477802,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 234,
+    "prompt_tokens": 60,
+    "total_tokens": 294,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "code",
+   "load_before": 10.89,
+   "at": "12:48:16"
+  },
+  {
+   "wall_s": 34.05,
+   "ttft_s": 0.614,
+   "content": "1. Use active voice and avoid jargon to make instructions direct and accessible. For example, say \"Click the Save button\" instead of \"The Save button should be clicked.\"\n\n2. Include concrete examples for every concept to eliminate ambiguity. Show exactly how to perform a task with step-by-step screenshots or code snippets that users can immediately apply.\n\n3. Keep sentences short and focused on on",
+   "reasoning_tokens_est": 165,
+   "prompt_n": 21,
+   "cache_n": 17,
+   "prompt_ms": 559.259,
+   "predicted_n": 231,
+   "predicted_ms": 33615.401,
+   "tok_s": 6.842101928220342,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 231,
+    "prompt_tokens": 38,
+    "total_tokens": 269,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "open",
+   "load_before": 8.77,
+   "at": "12:48:50"
+  },
+  {
+   "wall_s": 37.05,
+   "ttft_s": 0.99,
+   "content": "1. Use active voice and avoid jargon to make instructions direct and accessible. For example, say \"Click the Save button\" instead of \"The Save button may be clicked.\"  \n\n2. Include concrete, step-by-step examples for every procedure, starting with simple scenarios. This helps users immediately apply concepts without confusion.  \n\n3. Always define acronyms and technical terms the first time they ap",
+   "reasoning_tokens_est": 169,
+   "prompt_n": 150,
+   "cache_n": 54,
+   "prompt_ms": 8192.850989999999,
+   "predicted_n": 224,
+   "predicted_ms": 28672.023796999998,
+   "tok_s": 7.812493515837466,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 560488369996,
+    "bytes_per_token": 2502180223,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 224,
+    "prompt_tokens": 204,
+    "total_tokens": 428
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "open",
+   "load_before": 9.51,
+   "at": "12:49:27"
+  },
+  {
+   "wall_s": 36.31,
+   "ttft_s": 1.318,
+   "content": "The capital of Indonesia is Jakarta, located on the island of Java.",
+   "reasoning_tokens_est": 153,
+   "prompt_n": 154,
+   "cache_n": 58,
+   "prompt_ms": 12378.55658,
+   "predicted_n": 142,
+   "predicted_ms": 23810.438677000006,
+   "tok_s": 5.963770845480755,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 353592468132,
+    "bytes_per_token": 2490087803,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 142,
+    "prompt_tokens": 212,
+    "total_tokens": 354
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "fact",
+   "load_before": 7.99,
+   "at": "12:50:03"
+  },
+  {
+   "wall_s": 49.27,
+   "ttft_s": 5.756,
+   "content": "The capital of Indonesia is Jakarta, located on the island of Java.",
+   "reasoning_tokens_est": 150,
+   "prompt_n": 25,
+   "cache_n": 17,
+   "prompt_ms": 5708.402,
+   "predicted_n": 144,
+   "predicted_ms": 43515.578,
+   "tok_s": 3.286179491859214,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 144,
+    "prompt_tokens": 42,
+    "total_tokens": 186,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 0,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "fact",
+   "load_before": 10.99,
+   "at": "12:50:52"
+  },
+  {
+   "wall_s": 12.23,
+   "ttft_s": 1.496,
+   "content": "The train leaves at 3:40 pm and arrives at 6:05 pm. To find the duration, we calculate the time from 3:40 pm to 6:05 pm.\n\nFrom 3:40 pm to 4:40 pm is 60 minutes.  \nFrom 4:40 pm to 6:05 pm is 1 hour and 25 minutes, which is 85 minutes.\n\nTotal duration = 60 + 85 = 145 minutes.\n\nAnswer: <number>",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 47,
+   "cache_n": 17,
+   "prompt_ms": 1490.974275,
+   "predicted_n": 118,
+   "predicted_ms": 10628.456006999995,
+   "tok_s": 11.102271103374202,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 130521188304,
+    "bytes_per_token": 1106111765,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 118,
+    "prompt_tokens": 64,
+    "total_tokens": 182
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "math",
+   "load_before": 8.94,
+   "at": "12:51:05"
+  },
+  {
+   "wall_s": 11.1,
+   "ttft_s": 0.62,
+   "content": "The train leaves at 3:40 pm and arrives at 6:05 pm. To find the duration, we calculate the time from 3:40 pm to 6:05 pm.\n\nFrom 3:40 pm to 4:40 pm is 60 minutes.  \nFrom 4:40 pm to 6:05 pm is 1 hour and 25 minutes, which is 85 minutes.\n\nTotal duration = 60 + 85 = 145 minutes.\n\nAnswer: <number>",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 63,
+   "prompt_ms": 561.601,
+   "predicted_n": 119,
+   "predicted_ms": 10482.419,
+   "tok_s": 11.256943650125033,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 119,
+    "prompt_tokens": 64,
+    "total_tokens": 183,
+    "prompt_tokens_details": {
+     "cached_tokens": 63
+    }
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "math",
+   "load_before": 11.73,
+   "at": "12:51:16"
+  },
+  {
+   "wall_s": 7.86,
+   "ttft_s": 0.115,
+   "content": "```python\ndef run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1])\n            result.append(str(count))\n            count = 1\n    result.append(s[-1])\n    result.append(str(count))\n    return ''.join(result)\n```",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 61,
+   "prompt_ms": 82.78,
+   "predicted_n": 99,
+   "predicted_ms": 7747.545,
+   "tok_s": 12.64916822038465,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 99,
+    "prompt_tokens": 62,
+    "total_tokens": 161,
+    "prompt_tokens_details": {
+     "cached_tokens": 61
+    }
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "code",
+   "load_before": 10.93,
+   "at": "12:51:24"
+  },
+  {
+   "wall_s": 7.7,
+   "ttft_s": 0.771,
+   "content": "```python\ndef run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1])\n            result.append(str(count))\n            count = 1\n    result.append(s[-1])\n    result.append(str(count))\n    return ''.join(result)\n```",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 45,
+   "cache_n": 17,
+   "prompt_ms": 768.0078649999999,
+   "predicted_n": 98,
+   "predicted_ms": 6847.232389999998,
+   "tok_s": 14.312351972035232,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 108076377232,
+    "bytes_per_token": 1102820175,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 98,
+    "prompt_tokens": 62,
+    "total_tokens": 160
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "code",
+   "load_before": 10.1,
+   "at": "12:51:31"
+  },
+  {
+   "wall_s": 3.86,
+   "ttft_s": 0.462,
+   "content": "1. Use simple language and avoid jargon to ensure clarity for all readers.  \n2. Organize content with clear headings and sections to improve navigation and understanding.  \n3. Include examples and diagrams to illustrate complex concepts and enhance comprehension.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 23,
+   "cache_n": 17,
+   "prompt_ms": 459.007225,
+   "predicted_n": 48,
+   "predicted_ms": 3361.7346039999993,
+   "tok_s": 14.278343074104255,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 52113558640,
+    "bytes_per_token": 1085699138,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 48,
+    "prompt_tokens": 40,
+    "total_tokens": 88
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "open",
+   "load_before": 9.53,
+   "at": "12:51:35"
+  },
+  {
+   "wall_s": 3.5,
+   "ttft_s": 0.101,
+   "content": "1. Use simple language and avoid jargon to ensure clarity for all readers.  \n2. Organize content with clear headings and sections to improve navigation.  \n3. Include examples and diagrams to illustrate complex concepts.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 39,
+   "prompt_ms": 76.892,
+   "predicted_n": 44,
+   "predicted_ms": 3387.951,
+   "tok_s": 12.69203716346547,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 44,
+    "prompt_tokens": 40,
+    "total_tokens": 84,
+    "prompt_tokens_details": {
+     "cached_tokens": 39
+    }
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "open",
+   "load_before": 8.93,
+   "at": "12:51:39"
+  },
+  {
+   "wall_s": 1.45,
+   "ttft_s": 0.091,
+   "content": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 43,
+   "prompt_ms": 78.844,
+   "predicted_n": 18,
+   "predicted_ms": 1359.366,
+   "tok_s": 12.505829923655586,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 18,
+    "prompt_tokens": 44,
+    "total_tokens": 62,
+    "prompt_tokens_details": {
+     "cached_tokens": 43
+    }
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "fact",
+   "load_before": 8.61,
+   "at": "12:51:40"
+  },
+  {
+   "wall_s": 1.53,
+   "ttft_s": 0.426,
+   "content": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 27,
+   "cache_n": 17,
+   "prompt_ms": 423.872683,
+   "predicted_n": 17,
+   "predicted_ms": 1096.3177199999996,
+   "tok_s": 15.50645373131432,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 17719683328,
+    "bytes_per_token": 1042334313,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 17,
+    "prompt_tokens": 44,
+    "total_tokens": 61
+   },
+   "round": 1,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "fact",
+   "load_before": 8.61,
+   "at": "12:51:42"
+  },
+  {
+   "wall_s": 64.38,
+   "ttft_s": 2.436,
+   "content": "To find the duration of the trip, we calculate the time difference between 3:40 pm and 6:05 pm.\n\n**Step 1:** Subtract the departure time from the arrival time.\n\n- From **3:40 pm** to **6:05 pm**, we can break it into:\n  - Hours: 6 - 3 = **3 hours**\n  - Minutes: 05 - 40 = **-35 minutes**\n\nSince the minutes are negative, we borrow 1 hour (60 minutes) from the hours:\n- Adjusted minutes: -35 + 60 = **",
+   "reasoning_tokens_est": 114,
+   "prompt_n": 174,
+   "cache_n": 78,
+   "prompt_ms": 10995.322794,
+   "predicted_n": 320,
+   "predicted_ms": 53054.84040100002,
+   "tok_s": 6.031494913213769,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 805194113740,
+    "bytes_per_token": 2516231605,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 320,
+    "prompt_tokens": 252,
+    "total_tokens": 572
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "math",
+   "load_before": 8.61,
+   "at": "12:52:46"
+  },
+  {
+   "wall_s": 57.73,
+   "ttft_s": 2.314,
+   "content": "To find the duration of the trip, calculate the time difference between 3:40 pm and 6:05 pm.\n\n**Step 1:** Subtract the departure time from the arrival time.\n\n- From **3:40 pm** to **6:40 pm** is exactly **3 hours**.\n- However, the arrival time is **6:05 pm**, which is **35 minutes earlier** than 6:40 pm.\n\n**Step 2:** Adjust for the difference.\n- Total time = 3 hours - 35 minutes\n- Convert 3 hours ",
+   "reasoning_tokens_est": 111,
+   "prompt_n": 45,
+   "cache_n": 17,
+   "prompt_ms": 2290.143,
+   "predicted_n": 301,
+   "predicted_ms": 55420.137,
+   "tok_s": 5.413194846486936,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 301,
+    "prompt_tokens": 62,
+    "total_tokens": 363,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "math",
+   "load_before": 10.75,
+   "at": "12:53:44"
+  },
+  {
+   "wall_s": 40.0,
+   "ttft_s": 2.069,
+   "content": "def run_length_encode(s):\n    if not s:\n        return \"\"\n    current_char = s[0]\n    count = 1\n    result = []\n    for i in range(1, len(s)):\n        if s[i] == current_char:\n            count += 1\n        else:\n            result.append(current_char)\n            result.append(str(count))\n            current_char = s[i]\n            count = 1\n    result.append(current_char)\n    result.append(str(c",
+   "reasoning_tokens_est": 124,
+   "prompt_n": 43,
+   "cache_n": 17,
+   "prompt_ms": 2016.316,
+   "predicted_n": 234,
+   "predicted_ms": 37935.4,
+   "tok_s": 6.142020382017851,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 234,
+    "prompt_tokens": 60,
+    "total_tokens": 294,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "code",
+   "load_before": 8.25,
+   "at": "12:54:24"
+  },
+  {
+   "wall_s": 41.39,
+   "ttft_s": 2.323,
+   "content": "def run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1] + str(count))\n            count = 1\n    result.append(s[-1] + str(count))\n    return ''.join(result)",
+   "reasoning_tokens_est": 139,
+   "prompt_n": 172,
+   "cache_n": 76,
+   "prompt_ms": 10289.378812,
+   "predicted_n": 218,
+   "predicted_ms": 30926.285280999982,
+   "tok_s": 7.049019887750033,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 546013895188,
+    "bytes_per_token": 2504650895,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 218,
+    "prompt_tokens": 248,
+    "total_tokens": 466
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "code",
+   "load_before": 8.38,
+   "at": "12:55:05"
+  },
+  {
+   "wall_s": 36.01,
+   "ttft_s": 1.05,
+   "content": "1. Use active voice and avoid jargon to make instructions direct and accessible. For example, say \"Click the Save button\" instead of \"The Save button may be clicked.\"  \n\n2. Include concrete, step-by-step examples for every procedure, starting with simple scenarios. This helps users immediately apply concepts without confusion.  \n\n3. Always define acronyms and technical terms the first time they ap",
+   "reasoning_tokens_est": 169,
+   "prompt_n": 150,
+   "cache_n": 54,
+   "prompt_ms": 7126.228553000001,
+   "predicted_n": 224,
+   "predicted_ms": 28706.191860000006,
+   "tok_s": 7.803194554416942,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 560488369996,
+    "bytes_per_token": 2502180223,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 224,
+    "prompt_tokens": 204,
+    "total_tokens": 428
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "open",
+   "load_before": 6.78,
+   "at": "12:55:41"
+  },
+  {
+   "wall_s": 32.72,
+   "ttft_s": 0.59,
+   "content": "1. Use active voice and avoid jargon to make instructions direct and accessible. For example, say \"Click the Save button\" instead of \"The Save button should be clicked.\"\n\n2. Include concrete examples for every concept to eliminate ambiguity. Show exactly how to perform a task with step-by-step screenshots or code snippets that users can immediately apply.\n\n3. Keep sentences short and focused on on",
+   "reasoning_tokens_est": 165,
+   "prompt_n": 21,
+   "cache_n": 17,
+   "prompt_ms": 586.984,
+   "predicted_n": 231,
+   "predicted_ms": 32132.522,
+   "tok_s": 7.157857077013749,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 231,
+    "prompt_tokens": 38,
+    "total_tokens": 269,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "open",
+   "load_before": 7.29,
+   "at": "12:56:14"
+  },
+  {
+   "wall_s": 20.35,
+   "ttft_s": 0.683,
+   "content": "The capital of Indonesia is Jakarta, located on the island of Java.",
+   "reasoning_tokens_est": 150,
+   "prompt_n": 25,
+   "cache_n": 17,
+   "prompt_ms": 678.552,
+   "predicted_n": 144,
+   "predicted_ms": 19671.19,
+   "tok_s": 7.269514452353925,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 144,
+    "prompt_tokens": 42,
+    "total_tokens": 186,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "fact",
+   "load_before": 11.76,
+   "at": "12:56:34"
+  },
+  {
+   "wall_s": 23.66,
+   "ttft_s": 0.878,
+   "content": "The capital of Indonesia is Jakarta, located on the island of Java.",
+   "reasoning_tokens_est": 153,
+   "prompt_n": 154,
+   "cache_n": 58,
+   "prompt_ms": 6861.9825439999995,
+   "predicted_n": 142,
+   "predicted_ms": 16684.85689400001,
+   "tok_s": 8.510711293608049,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 353592468132,
+    "bytes_per_token": 2490087803,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 142,
+    "prompt_tokens": 212,
+    "total_tokens": 354
+   },
+   "round": 1,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "fact",
+   "load_before": 10.18,
+   "at": "12:56:58"
+  },
+  {
+   "wall_s": 6.37,
+   "ttft_s": 0.058,
+   "content": "The train leaves at 3:40 pm and arrives at 6:05 pm. To find the duration, we calculate the time from 3:40 pm to 6:05 pm.\n\nFrom 3:40 pm to 4:40 pm is 60 minutes.  \nFrom 4:40 pm to 6:05 pm is 1 hour and 25 minutes, which is 85 minutes.\n\nTotal duration = 60 + 85 = 145 minutes.\n\nAnswer: <number>",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 63,
+   "prompt_ms": 47.146,
+   "predicted_n": 119,
+   "predicted_ms": 6307.604,
+   "tok_s": 18.707578979276438,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 119,
+    "prompt_tokens": 64,
+    "total_tokens": 183,
+    "prompt_tokens_details": {
+     "cached_tokens": 63
+    }
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "math",
+   "load_before": 10.69,
+   "at": "12:57:04"
+  },
+  {
+   "wall_s": 6.3,
+   "ttft_s": 0.625,
+   "content": "The train leaves at 3:40 pm and arrives at 6:05 pm. To find the duration, we calculate the time from 3:40 pm to 6:05 pm.\n\nFrom 3:40 pm to 4:40 pm is 60 minutes.  \nFrom 4:40 pm to 6:05 pm is 1 hour and 25 minutes, which is 85 minutes.\n\nTotal duration = 60 + 85 = 145 minutes.\n\nAnswer: <number>",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 47,
+   "cache_n": 17,
+   "prompt_ms": 623.1637129999999,
+   "predicted_n": 118,
+   "predicted_ms": 5581.658972000001,
+   "tok_s": 21.140668140411066,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 130521188304,
+    "bytes_per_token": 1106111765,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 118,
+    "prompt_tokens": 64,
+    "total_tokens": 182
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "math",
+   "load_before": 10.47,
+   "at": "12:57:11"
+  },
+  {
+   "wall_s": 5.46,
+   "ttft_s": 0.738,
+   "content": "```python\ndef run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1])\n            result.append(str(count))\n            count = 1\n    result.append(s[-1])\n    result.append(str(count))\n    return ''.join(result)\n```",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 45,
+   "cache_n": 17,
+   "prompt_ms": 736.130329,
+   "predicted_n": 98,
+   "predicted_ms": 4643.137600999999,
+   "tok_s": 21.106417345652993,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 108076377232,
+    "bytes_per_token": 1102820175,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 98,
+    "prompt_tokens": 62,
+    "total_tokens": 160
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "code",
+   "load_before": 11.0,
+   "at": "12:57:16"
+  },
+  {
+   "wall_s": 5.02,
+   "ttft_s": 0.054,
+   "content": "```python\ndef run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1])\n            result.append(str(count))\n            count = 1\n    result.append(s[-1])\n    result.append(str(count))\n    return ''.join(result)\n```",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 61,
+   "prompt_ms": 44.557,
+   "predicted_n": 99,
+   "predicted_ms": 4969.349,
+   "tok_s": 19.72089301838128,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 99,
+    "prompt_tokens": 62,
+    "total_tokens": 161,
+    "prompt_tokens_details": {
+     "cached_tokens": 61
+    }
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "code",
+   "load_before": 10.52,
+   "at": "12:57:21"
+  },
+  {
+   "wall_s": 2.2,
+   "ttft_s": 0.058,
+   "content": "1. Use simple language and avoid jargon to ensure clarity for all readers.  \n2. Organize content with clear headings and sections to improve navigation.  \n3. Include examples and diagrams to illustrate complex concepts.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 39,
+   "prompt_ms": 49.981,
+   "predicted_n": 44,
+   "predicted_ms": 2142.284,
+   "tok_s": 20.072035267032753,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 44,
+    "prompt_tokens": 40,
+    "total_tokens": 84,
+    "prompt_tokens_details": {
+     "cached_tokens": 39
+    }
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "open",
+   "load_before": 10.07,
+   "at": "12:57:23"
+  },
+  {
+   "wall_s": 2.57,
+   "ttft_s": 0.28,
+   "content": "1. Use simple language and avoid jargon to ensure clarity for all readers.  \n2. Organize content with clear headings and sections to improve navigation and understanding.  \n3. Include examples and diagrams to illustrate complex concepts and enhance comprehension.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 23,
+   "cache_n": 17,
+   "prompt_ms": 278.48141100000004,
+   "predicted_n": 48,
+   "predicted_ms": 2250.0273760000005,
+   "tok_s": 21.333073771454412,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 52113558640,
+    "bytes_per_token": 1085699138,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 48,
+    "prompt_tokens": 40,
+    "total_tokens": 88
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "open",
+   "load_before": 9.59,
+   "at": "12:57:26"
+  },
+  {
+   "wall_s": 1.12,
+   "ttft_s": 0.328,
+   "content": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 27,
+   "cache_n": 17,
+   "prompt_ms": 326.41672900000003,
+   "predicted_n": 17,
+   "predicted_ms": 780.927709,
+   "tok_s": 21.768980411476218,
+   "smiley": {
+    "budget_forced": false,
+    "bytes_moved": 17719683328,
+    "bytes_per_token": 1042334313,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 17,
+    "prompt_tokens": 44,
+    "total_tokens": 61
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "smiley",
+   "kind": "fact",
+   "load_before": 9.59,
+   "at": "12:57:27"
+  },
+  {
+   "wall_s": 0.89,
+   "ttft_s": 0.067,
+   "content": "The capital of Indonesia is Jakarta, and it is located on the island of Java.",
+   "reasoning_tokens_est": 0,
+   "prompt_n": 1,
+   "cache_n": 43,
+   "prompt_ms": 58.806,
+   "predicted_n": 18,
+   "predicted_ms": 823.035,
+   "tok_s": 20.655257674339488,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 18,
+    "prompt_tokens": 44,
+    "total_tokens": 62,
+    "prompt_tokens_details": {
+     "cached_tokens": 43
+    }
+   },
+   "round": 2,
+   "model": "system1",
+   "engine": "llama",
+   "kind": "fact",
+   "load_before": 9.59,
+   "at": "12:57:28"
+  },
+  {
+   "wall_s": 44.37,
+   "ttft_s": 1.639,
+   "content": "To find the duration of the trip, calculate the time difference between 3:40 pm and 6:05 pm.\n\n**Step 1:** Subtract the departure time from the arrival time.\n\n- From **3:40 pm** to **6:40 pm** is exactly **3 hours**.\n- However, the arrival time is **6:05 pm**, which is **35 minutes earlier** than 6:40 pm.\n\n**Step 2:** Adjust for the difference.\n- Total time = 3 hours - 35 minutes\n- Convert 3 hours ",
+   "reasoning_tokens_est": 111,
+   "prompt_n": 45,
+   "cache_n": 17,
+   "prompt_ms": 1636.191,
+   "predicted_n": 301,
+   "predicted_ms": 42733.809,
+   "tok_s": 7.020202669038934,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 301,
+    "prompt_tokens": 62,
+    "total_tokens": 363,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "math",
+   "load_before": 9.59,
+   "at": "12:58:12"
+  },
+  {
+   "wall_s": 42.63,
+   "ttft_s": 1.874,
+   "content": "To find the duration of the trip, we calculate the time difference between 3:40 pm and 6:05 pm.\n\n**Step 1:** Subtract the departure time from the arrival time.\n\n- From **3:40 pm** to **6:05 pm**, we can break it into:\n  - Hours: 6 - 3 = **3 hours**\n  - Minutes: 05 - 40 = **-35 minutes**\n\nSince the minutes are negative, we borrow 1 hour (60 minutes) from the hours:\n- Adjusted minutes: -35 + 60 = **",
+   "reasoning_tokens_est": 114,
+   "prompt_n": 174,
+   "cache_n": 78,
+   "prompt_ms": 8373.034693000001,
+   "predicted_n": 320,
+   "predicted_ms": 34005.720639,
+   "tok_s": 9.410181404390029,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 805194113740,
+    "bytes_per_token": 2516231605,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 320,
+    "prompt_tokens": 252,
+    "total_tokens": 572
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "math",
+   "load_before": 8.54,
+   "at": "12:58:55"
+  },
+  {
+   "wall_s": 41.25,
+   "ttft_s": 2.114,
+   "content": "def run_length_encode(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    for i in range(1, len(s)):\n        if s[i] == s[i-1]:\n            count += 1\n        else:\n            result.append(s[i-1] + str(count))\n            count = 1\n    result.append(s[-1] + str(count))\n    return ''.join(result)",
+   "reasoning_tokens_est": 139,
+   "prompt_n": 172,
+   "cache_n": 76,
+   "prompt_ms": 8551.396285,
+   "predicted_n": 218,
+   "predicted_ms": 32464.767505999993,
+   "tok_s": 6.714971852477003,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 546013895188,
+    "bytes_per_token": 2504650895,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 218,
+    "prompt_tokens": 248,
+    "total_tokens": 466
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "code",
+   "load_before": 7.77,
+   "at": "12:59:36"
+  },
+  {
+   "wall_s": 40.97,
+   "ttft_s": 2.485,
+   "content": "def run_length_encode(s):\n    if not s:\n        return \"\"\n    current_char = s[0]\n    count = 1\n    result = []\n    for i in range(1, len(s)):\n        if s[i] == current_char:\n            count += 1\n        else:\n            result.append(current_char)\n            result.append(str(count))\n            current_char = s[i]\n            count = 1\n    result.append(current_char)\n    result.append(str(c",
+   "reasoning_tokens_est": 124,
+   "prompt_n": 43,
+   "cache_n": 17,
+   "prompt_ms": 2481.805,
+   "predicted_n": 234,
+   "predicted_ms": 38484.955,
+   "tok_s": 6.054313952036582,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 234,
+    "prompt_tokens": 60,
+    "total_tokens": 294,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "code",
+   "load_before": 12.71,
+   "at": "13:00:17"
+  },
+  {
+   "wall_s": 37.44,
+   "ttft_s": 1.059,
+   "content": "1. Use active voice and avoid jargon to make instructions direct and accessible. For example, say \"Click the Save button\" instead of \"The Save button should be clicked.\"\n\n2. Include concrete examples for every concept to eliminate ambiguity. Show exactly how to perform a task with step-by-step screenshots or code snippets that users can immediately apply.\n\n3. Keep sentences short and focused on on",
+   "reasoning_tokens_est": 165,
+   "prompt_n": 21,
+   "cache_n": 17,
+   "prompt_ms": 1054.973,
+   "predicted_n": 231,
+   "predicted_ms": 36378.927,
+   "tok_s": 6.322341502815626,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 231,
+    "prompt_tokens": 38,
+    "total_tokens": 269,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "open",
+   "load_before": 9.29,
+   "at": "13:00:55"
+  },
+  {
+   "wall_s": 33.84,
+   "ttft_s": 0.889,
+   "content": "1. Use active voice and avoid jargon to make instructions direct and accessible. For example, say \"Click the Save button\" instead of \"The Save button may be clicked.\"  \n\n2. Include concrete, step-by-step examples for every procedure, starting with simple scenarios. This helps users immediately apply concepts without confusion.  \n\n3. Always define acronyms and technical terms the first time they ap",
+   "reasoning_tokens_est": 169,
+   "prompt_n": 150,
+   "cache_n": 54,
+   "prompt_ms": 7280.014131,
+   "predicted_n": 224,
+   "predicted_ms": 26320.243257999995,
+   "tok_s": 8.510559640512273,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 560488369996,
+    "bytes_per_token": 2502180223,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 224,
+    "prompt_tokens": 204,
+    "total_tokens": 428
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "open",
+   "load_before": 8.42,
+   "at": "13:01:28"
+  },
+  {
+   "wall_s": 23.7,
+   "ttft_s": 0.982,
+   "content": "The capital of Indonesia is Jakarta, located on the island of Java.",
+   "reasoning_tokens_est": 153,
+   "prompt_n": 154,
+   "cache_n": 58,
+   "prompt_ms": 7030.940814,
+   "predicted_n": 142,
+   "predicted_ms": 16550.253805999997,
+   "tok_s": 8.579928843660419,
+   "smiley": {
+    "budget_forced": true,
+    "bytes_moved": 353592468132,
+    "bytes_per_token": 2490087803,
+    "simd": "avx2+fma"
+   },
+   "usage": {
+    "completion_tokens": 142,
+    "prompt_tokens": 212,
+    "total_tokens": 354
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "smiley",
+   "kind": "fact",
+   "load_before": 7.13,
+   "at": "13:01:52"
+  },
+  {
+   "wall_s": 19.32,
+   "ttft_s": 0.782,
+   "content": "The capital of Indonesia is Jakarta, located on the island of Java.",
+   "reasoning_tokens_est": 150,
+   "prompt_n": 25,
+   "cache_n": 17,
+   "prompt_ms": 778.906,
+   "predicted_n": 144,
+   "predicted_ms": 18536.587,
+   "tok_s": 7.714473004118828,
+   "smiley": null,
+   "usage": {
+    "completion_tokens": 144,
+    "prompt_tokens": 42,
+    "total_tokens": 186,
+    "prompt_tokens_details": {
+     "cached_tokens": 17
+    }
+   },
+   "round": 2,
+   "model": "system2",
+   "engine": "llama",
+   "kind": "fact",
+   "load_before": 6.65,
+   "at": "13:02:12"
+  }
+ ],
+ "label": "SHARED HOST (owner's other workloads on the same 4 cores)"
+}

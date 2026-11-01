@@ -1,0 +1,6 @@
+# tensor	format	start	count	blob_off  (golden f32 produced by llama-quantize ... F32)
+blk.0.attn_norm.weight	F32	0	960	0
+blk.12.ffn_down.weight	Q4_K	4096	2048	3840
+blk.0.attn_q.weight	Q5_0	4096	2048	12032
+blk.0.ffn_down.weight	Q6_K	4096	2048	20224
+token_embd.weight	Q8_0	4096	2048	28416

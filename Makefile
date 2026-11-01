@@ -2,13 +2,14 @@
 TECTONIC := $(abspath tools/tectonic)
 
 PHONY_EXTRA = acceptance tazkiya-build regression-suite
-.PHONY: help up down up-vllm down-vllm build test $(PHONY_EXTRA) contract rooms-test docs report slides spec roadmap tables validate models models-vllm datasets vm-setup clean
+.PHONY: help up down up-llama down-llama up-vllm down-vllm build test $(PHONY_EXTRA) contract rooms-test docs report slides spec roadmap tables validate models models-vllm datasets vm-setup clean
 
 help:
 	@echo "Run the system (Phase 1):"
 	@echo "  make models        download GGUF weights for the native llama.cpp backend (~3.6 GB)"
-	@echo "  make up            build, start llama-server (S1 :8001, S2 :8002) and the gateway -> http://127.0.0.1:8080"
-	@echo "  make down          stop gateway and llama-server"
+	@echo "  make up            build, start Smiley Core (S1 :8201, S2 :8202, the default engine) and the gateway -> http://127.0.0.1:8080"
+	@echo "  make down          stop the gateway and both engines"
+	@echo "  make up-llama      start llama-server (S1 :8001, S2 :8002) and switch the gateway to it (batching, grammar, n-choice rescue)"
 	@echo "  make vm-setup      create the nafs-vllm Lima VM and install vLLM (CPU, no Docker)"
 	@echo "  make models-vllm   download Hugging Face weights for vLLM"
 	@echo "  make up-vllm       start vLLM :8101 in the VM (Qwen3-1.7B BF16, both modes), switch the gateway to it"
@@ -40,12 +41,21 @@ rooms-test:      ## live test of Rooms against the running stack (add SLOW=1 for
 	python3 -I scripts/rooms_test.py $(if $(SLOW),--slow,)
 
 up: build
-	scripts/serve_llama.sh start
+	scripts/serve_smiley.sh start
 	scripts/gateway.sh start
 	@echo "Open http://127.0.0.1:8080"
 
 down:
 	scripts/gateway.sh stop
+	scripts/serve_smiley.sh stop
+	scripts/serve_llama.sh stop
+
+up-llama:
+	scripts/serve_llama.sh start
+	curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"name":"llama"}'; echo
+
+down-llama:
+	curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"name":"smiley"}'; echo
 	scripts/serve_llama.sh stop
 
 vm-setup:
@@ -56,8 +66,8 @@ up-vllm:
 	curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"name":"vllm"}'; echo
 
 down-vllm:
+	curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"name":"smiley"}'; echo
 	scripts/serve_vllm.sh stop
-	curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"name":"llama"}'; echo
 
 models:
 	scripts/fetch_models.sh profile-a

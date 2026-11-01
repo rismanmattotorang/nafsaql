@@ -87,7 +87,9 @@ Every request moves through a small, bounded automaton and the reply says where 
 | 🧮 **Math and code harness (Phase 10)** | Mechanisms taken from two open agent harnesses, as pure Rust in `nafs-harness`. From [Open Math Harness](https://github.com/openmathmodel/open-math-harness): **Lean 4 as an exact verifier** under its frozen-statement protocol (no `sorry`, no axioms, the elaborated type must match), and **best-first repair** over a tree of candidates scored by the verifier, with per-assert credit on code. From [OpenAI Codex](https://github.com/openai/codex): **`apply_patch` repairs** with its fuzzy matcher, head-and-tail evidence, and a **code agent** (`POST /v1/harness/code`) that patches and runs its workspace in the sandbox and stops only when the hidden tests pass. |
 | 🤖 **Codex-style agent harness (Phase 11)** | The code agent's loop rebuilt on the mechanisms of Codex's agent core, adapted to a 1.7B/4B model on four CPU cores: an **append-only transcript** so llama-server's prompt cache reuses every earlier exchange (a cold 1,969-token prompt prefilled in 64 s, the same prompt plus one exchange in 3 s), harness-written **compaction**, Codex's `apply_patch` grammar as a **per-step GBNF grammar** that keeps the reasoning span free and stops decoding at the end of the action, a **whole-file edit policy** for short files, budget reminders, the run's cap enforced inside a model call, and the run's net diff. |
 | ⚡ **Parallel inference on four cores (Phase 13)** | Measured first, then built where it pays: llama-server batches 4 streams at **2.3–2.7×** the tokens per second at short context but only **1.5×** at the 1,600 tokens of a repair prompt. So the cores are used *before* the expensive model: agreement samples share the draft's batch (**−24 %** time to the gate's decision), a failed draft gets 4 concurrent System 1 samples, each verified as it finishes, before System 2 is used, and rounds go out as one request with `n` choices so the prompt is prefilled once. Hedged candidates on System 2 are implemented and **off**: they did not pay. System 2 has 4 slots. |
-| 🔌 **Two serving profiles** | llama.cpp on bare metal (the reference), and vLLM's CPU backend in Docker, behind one OpenAI-compatible gateway. |
+| 🪜 **Engine knobs, the model switch, a cascade in the harness (Phase 14)** | Measured on the reference machine: the engine's own flags (flash attention, micro-batch, threads, polling) were **inconclusive on a shared host** and stay unchanged; co-scheduling the two servers showed **nothing to arbitrate** on four cores (the pair writes 7.1–7.8 tokens/s in every variant); the switch from System 1 to System 2 inside a request costs **about 1.5 s** and no System 1 slot survives the decision. Built: a **cascade in the code agent** (four System 1 candidates in one request, each judged by the exact verifier; System 2 only when none passes: **−26 % wall time**, six of ten tasks never reach System 2), **retries with Codex's backoff**, and a **warm-first backend switch** (the new pair is primed before the atomic swap). |
+| 🦀 **Smiley Core, the Rust engine, as the default backend (Phase 15)** | The owner's Rust CPU engine is vendored into the workspace and served behind the gateway as a third backend. Measured against llama.cpp: **1.13× decode** on both models alone and **131 s vs 303 s** for twelve checked prompts through the whole gateway (9/9 on both, faster in 10 of 12), so it is the **default** (`make up`); llama.cpp stays one command away (`make up-llama`) for several concurrent users, since Smiley Core decodes one stream per model. A hardening fix came out of it: the code agent now accepts a patch that omits its `*** Begin Patch` line. |
+| 🔌 **Three serving profiles** | llama.cpp on bare metal (the reference), vLLM's CPU backend in Docker, and **Smiley Core**, the project owner's own Rust CPU engine (vendored in `rust/crates/smiley-core`, served by `nafs-smiley-server`), behind one OpenAI-compatible gateway; the switch between them is warm-first. |
 
 <table>
 <tr>
@@ -122,6 +124,10 @@ Every request moves through a small, bounded automaton and the reply says where 
 | Agreement samples drawn **with** the draft, not after it (Phase 13) | time to the gate's decision **23.1 s → 17.9 s (−24 %)**, faster in 23 of 28 pairs (p = 0.0005); escalation 7 vs 5 of 28 (noise) | `benchmarks/fuse_ab.json` |
 | Four System 1 samples verified before a failed draft is escalated (Phase 13) | 22 → 20 escalations over 40 items (3 avoided, 1 the other way); **+14.5 s median** when it runs, break-even 106 s against 250–580 s per escalation; 6 of 32 failed drafts rescued offline | `benchmarks/rescue_ab.json`, `s1_rescue.json` |
 | One request with `n` choices instead of `n` requests (Phase 13) | 703-token prompt: **39.1 s vs 124.5 s** for four candidates (the prompt is prefilled once) | `benchmarks/prefill_share.json` |
+| A cascade in the code agent: four System 1 candidates judged first, System 2 only when none passes (Phase 14) | 10 tasks interleaved: 10/10 verified in both arms, **1,467 s vs 1,987 s (−26 %)**, faster in 7 of 10 pairs (p = 0.17), 6 of 10 verified by System 1 alone (median 34 s vs 85 s) | `benchmarks/harness_ab_cascade.json` |
+| The switch inside a request, System 1 to System 2 (Phase 14) | decision to System 2's first token **1.1–4.7 s** (median 1.5 s); gate 0.8–0.9 s without the rescue; no System 1 slot busy after the decision | `benchmarks/handoff_latency.json` |
+| Engine flags and co-scheduling (Phase 14) | flag matrix inconclusive on a shared host (per-round ratios 0.07×–3.8×); both servers decoding keep 47–65 % each and write 7.1–7.8 tokens/s together in every variant | `benchmarks/engine_tuning.json`, `cosched_ab.json` |
+| Smiley Core vs llama.cpp, engine alone and through the gateway (Phase 15) | decode 14.3 vs 12.6 (System 1) and 7.4 vs 6.6 (System 2) tokens/s; 12 prompts 131 s vs 303 s, 9/9 checked on both, Smiley Core faster in 10 of 12 pairs (p = 0.02, median 1.59×); shared host | `benchmarks/smiley_ab.json`, `benchmarks/backend_ab.json` |
 
 **Verifier quality** (true-accept *r*, false-accept φ with 95 % upper bound)
 
@@ -209,6 +215,17 @@ Switch with *Use this backend* on the System page. The recipe was built and debu
 </details>
 
 <details>
+<summary><b>Smiley Core backend</b> (the default serving profile since Phase 15)</summary>
+
+```bash
+make up                 # the default: builds nafs-smiley-server, serves Qwen3-1.7B on :8201 and Qwen3-4B-Thinking on :8202, starts the gateway
+make up-llama           # starts llama-server on :8001/:8002 and switches the gateway to it (four slots, grammar, n-choice rescue)
+make down-llama         # switches back to Smiley Core and stops llama-server
+```
+
+The engine is the owner's Smiley Core (`third_party/smiley-core`, vendored as `rust/crates/smiley-core` with two marked additions: a continuation prefix for the reasoning budget and per-token log-probabilities for the gate). It decodes one stream per model, so the gateway runs it without the grammar, the `n`-choice rescue and the raw-continuation exit (the standard path, as for vLLM). **It is the default backend:** the engine alone decodes 14.3 vs 12.6 tokens/s (System 1) and 7.4 vs 6.6 (System 2), and through the whole gateway the same twelve checked prompts took **131 s against 303 s** (9/9 checked on both, faster in 10 of 12 pairs, p = 0.02); the code agent verifies on both. The price is one stream per model: a second concurrent request waits, and the rescue and the cascade have one candidate. `make up-llama` switches to llama.cpp (four slots, grammar) for a shared deployment. Details: [docs/research/smiley_backend.md](docs/research/smiley_backend.md).
+
+<details>
 <summary><b>Configuration, security and deployment</b></summary>
 
 - Config lives in `config/nafs-aql.toml`; `rust/target/release/nafs-gateway --check` validates it and the bind policy.
@@ -258,10 +275,12 @@ Phases 0–13 of the roadmap are implemented on the CPU reference machine; GPU t
 | [Slides](docs/slides/nafs_aql_slides.pdf) | the same story in 40 slides |
 | [Specification](docs/spec/nafs_aql_spec.pdf) | 100 requirements with identifiers, interfaces and a traceability matrix |
 | [Roadmap](docs/roadmap/nafs_aql_roadmap.pdf) · [Status](docs/roadmap/STATUS.md) | phases, gates, what is done and what is not |
-| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-082) |
+| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-091) |
 | [Results write-up](docs/publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
 | [Quantum consciousness and neuroscience review](docs/research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
 | [Parallel and concurrent inference](docs/research/parallel_inference.md) · [Decision 007](docs/decisions/007-parallel-inference.md) | Phase 13: batch scaling at depth, what was adopted (fused samples, System 1 rescue, `n`-choice rounds, 4 slots) and what was measured and left off |
+| [Engine knobs, the model switch, the harness cascade](docs/research/engine_switching_harness.md) · [Decision 008](docs/decisions/008-engine-switching-harness.md) | Phase 14: the flag matrix and co-scheduling measured (unchanged), the switch timed, the cascade and retries built and measured, the warm-first backend switch |
+| [Smiley Core as the third backend](docs/research/smiley_backend.md) · [Decision 009](docs/decisions/009-smiley-backend.md) | Phase 15: the owner's Rust CPU engine vendored and served behind the gateway; the engines compared alone and the whole service compared on each backend; which one is the default and why |
 | [Math and code harness](docs/research/harness_integration.md) · [Decision 005](docs/decisions/005-harness-integration.md) | Phase 10: what was taken from Open Math Harness and Codex, what was not, and why |
 | [Codex-style harness](docs/research/harness_integration.md#5-phase-11-the-codex-agent-harness-adapted-to-small-models-on-a-cpu) · [Decision 006](docs/decisions/006-codex-harness.md) | Phase 11: the Codex agent-core mechanisms ported, the measured A/B against the Phase 10 loop, and the defaults it set |
 | [User guide](docs/user_guide.md) · [Runbook](docs/operations/operator_runbook.md) · [API reference](docs/api/api_reference.md) | using, operating and integrating |

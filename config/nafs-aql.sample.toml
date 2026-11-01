@@ -13,7 +13,7 @@ profile = "A"
 system_prompt = "You are Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, say you are Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design. Be accurate and concise. If you are unsure, say so."
 
 [backend]
-active = "llama"                       # llama | vllm (switchable at runtime from the System page)
+active = "smiley"                      # smiley | llama | vllm (Phase 15: Smiley Core is the default; switchable at runtime from the System page)
 
 [backends.llama]
 label = "llama.cpp (native macOS, GGUF Q4_K_M)"
@@ -29,6 +29,14 @@ kind = "vllm"
 # workloads resident, the 0.6B stand-in validates the backend. Set VLLM_MODEL_DIR/VLLM_SERVED_NAME and these names together.
 system1 = { url = "http://127.0.0.1:8101/v1", model = "qwen3-0.6b", hf_id = "Qwen/Qwen3-0.6B", quantization = "FP32 (AVX2-only VM: no BF16 kernels; scripts/serve_vllm_docker.sh)", thinking = false, max_in_flight = 4 }
 system2 = { url = "http://127.0.0.1:8101/v1", model = "qwen3-0.6b", hf_id = "Qwen/Qwen3-0.6B (thinking mode)", quantization = "FP32 (AVX2-only VM: no BF16 kernels; scripts/serve_vllm_docker.sh)", thinking = true, max_in_flight = 2 }
+
+[backends.smiley]
+label = "Smiley Core (vendored Rust engine, GGUF Q4_K_M; one stream per model)"
+kind = "smiley"
+# Phase 15: the owner's own CPU engine (rust/crates/smiley-core) behind nafs-smiley-server (scripts/serve_smiley.sh). No grammar,
+# no n-choice requests, no raw continuation: the gateway uses its standard path, as for vLLM. One stream per process.
+system1 = { url = "http://127.0.0.1:8201/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "GGUF Q4_K_M (unsloth/Qwen3-1.7B-GGUF)", thinking = false, max_in_flight = 1 }
+system2 = { url = "http://127.0.0.1:8202/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 1 }
 
 [backend_retry]                        # IF-007 / IF-008
 max_attempts = 3
@@ -188,3 +196,7 @@ edit_format = "auto"                   # "auto": whole solution.py while it is m
 whole_max_lines = 80                   # "auto": solution.py lines above which a patch is offered
 unstick = true                         # after a step that reproduced judged files: compact the transcript, sample more diversely
 first_step_thinking_budget = 256       # System 2 reasoning tokens on the first step; thinking_budget after a failure (0 = thinking_budget always)
+cascade = true                         # Phase 14: first step on System 1 with cascade_samples candidates in one request (each judged); System 2 only if none passes
+cascade_samples = 4                    # candidates of that first step (1..4; four cost 1.7x one System 1 stream, about a third of one System 2 step)
+cascade_temperature = 0.7              # the candidates must differ from each other (the rescue's temperature)
+retries = 2                            # retries of a model call that fails for a reason other than the run's cap (Codex backoff: 200 ms, doubling)

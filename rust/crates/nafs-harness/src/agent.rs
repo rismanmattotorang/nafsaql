@@ -302,7 +302,7 @@ pub fn parse_action(reply: &str) -> Action {
 /// action is prose the loop would discard, and at 6-8 tokens/s each discarded line costs seconds.
 pub fn action_end(text: &str) -> Option<usize> {
     let mut ends = vec![];
-    if let Some(begin) = line_start(text, "*** Begin Patch", 0)
+    if let Some(begin) = patch_start(text)
         && let Some(end) = line_start(text, "*** End Patch", begin)
     {
         ends.push(end + "*** End Patch".len());
@@ -314,6 +314,19 @@ pub fn action_end(text: &str) -> Option<usize> {
         ends.push(b.end);
     }
     ends.into_iter().min()
+}
+
+/// Offset of the line that opens a patch (the envelope's first line, or the first file section when a model
+/// dropped it, see [`patch::is_patch_start`]).
+fn patch_start(text: &str) -> Option<usize> {
+    let mut at = 0;
+    for line in text.split_inclusive('\n') {
+        if patch::is_patch_start(line) {
+            return Some(at + line.len() - line.trim_start().len());
+        }
+        at += line.len();
+    }
+    None
 }
 
 /// Offset of the first line at or after `from` whose trimmed text is `marker`, as the parser reads lines.

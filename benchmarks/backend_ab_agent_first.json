@@ -1,0 +1,86 @@
+[
+ {
+  "ok": true,
+  "agent": true,
+  "engine": "llama",
+  "status": "verified",
+  "verified": true,
+  "wall_s": 291.151,
+  "model_calls": 2,
+  "steps": [
+   [
+    "system1",
+    "write",
+    4,
+    false
+   ],
+   [
+    "system2",
+    "write",
+    1,
+    true
+   ]
+  ],
+  "constrained": true,
+  "cascade": true,
+  "round": 0,
+  "kind": "agent",
+  "prompt": "agent",
+  "checkable": true,
+  "at": "13:24:16"
+ },
+ {
+  "ok": true,
+  "agent": true,
+  "engine": "smiley",
+  "status": "deadline",
+  "verified": false,
+  "wall_s": 900.002,
+  "model_calls": 6,
+  "steps": [
+   [
+    "system1",
+    "none",
+    1,
+    null
+   ],
+   [
+    "system2",
+    "none",
+    1,
+    null
+   ],
+   [
+    "system2",
+    "none",
+    1,
+    null
+   ],
+   [
+    "system2",
+    "none",
+    1,
+    null
+   ],
+   [
+    "system2",
+    "none",
+    1,
+    null
+   ],
+   [
+    "system2",
+    "model_error",
+    0,
+    null
+   ]
+  ],
+  "constrained": false,
+  "cascade": true,
+  "round": 0,
+  "kind": "agent",
+  "prompt": "agent",
+  "checkable": true,
+  "at": "13:39:40"
+ }
+]
