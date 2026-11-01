@@ -14,7 +14,8 @@ jobs:
   rust:
     strategy:
       fail-fast: false
-      matrix: { os: [ubuntu-24.04, macos-14] }
+      # macos-14 images are retired on 2026-11-02 (scheduled brownouts cancel the job before it starts).
+      matrix: { os: [ubuntu-24.04, macos-15] }
     runs-on: ${{ matrix.os }}
     defaults: { run: { working-directory: rust } }
     steps:
