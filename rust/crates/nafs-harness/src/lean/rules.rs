@@ -180,6 +180,8 @@ const EXEC_WORDS: &[&str] = &[
     "command_elab", "term_elab", "tactic", "delab", "app_unexpander", "implemented_by", "extern",
     "unsafe", "Lean", "Mathlib", "Aesop", "Batteries", "Qq", "IO", "EIO", "BaseIO",
     "println!", "eprintln!", "asTask",
+    // Read a file at elaboration time: the content comes back in the error text shown to the model.
+    "include_str", "include_bytes",
 ];
 
 /// Options a candidate may not set: `pp.*` would change the `pp.all` type the
@@ -632,6 +634,16 @@ mod protocol_tests {
             None,
             "a comment is not code"
         );
+    }
+
+    #[test]
+    fn a_candidate_may_not_read_a_file_while_lean_elaborates() {
+        let statement = extract_statement(FROZEN).unwrap();
+        let partial = format!("import Mathlib\n\n{statement} by\n  sorry\n");
+        for word in ["include_str", "include_bytes"] {
+            let evil = format!("{partial}\ndef leak := {word} \"/etc/hosts\"\n");
+            assert!(protocol_objection(statement, &evil).is_some(), "{word}");
+        }
     }
 
     /// Blank lines and trailing spaces do not count between lines of code,

@@ -268,6 +268,22 @@ pub enum Action {
     Run(String),
     Submit,
     None,
+    /// A reply that parses, but to an action this turn does not offer; the model is told why (the text).
+    Disallowed(&'static str),
+}
+
+/// Shown when a patch arrives for a file the turn asked to be rewritten whole.
+const PATCH_NOT_OFFERED: &str = "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block.";
+
+/// The action of a reply under the turn's rules. A grammar already makes an action the turn does not offer
+/// impossible; a host without one (Smiley Core, vLLM) lets the model write a patch for a short file it was asked to
+/// rewrite whole, and a patch assembled from a short file's lines often applies with the wrong indentation and
+/// repeats that mistake step after step, so it is refused with the instruction instead of applied.
+fn parse_allowed(reply: &str, allowed: &Allowed) -> Action {
+    match parse_action(reply) {
+        Action::Patch(_) if !allowed.patch => Action::Disallowed(PATCH_NOT_OFFERED),
+        action => action,
+    }
 }
 
 /// The one action of a reply. A patch envelope wins over a code block (a patch may quote code); a ```run
@@ -588,13 +604,7 @@ pub async fn run_agent(
             constrain: cfg.constrain,
             // A run on the last step cannot change the outcome.
             allowed: Allowed {
-                patch: match cfg.edit_format {
-                    EditFormat::Any => true,
-                    EditFormat::Whole => false,
-                    EditFormat::Auto => ws
-                        .get(&cfg.main_file)
-                        .is_some_and(|c| c.lines().count() > cfg.whole_max_lines),
-                },
+                patch: patch_offered(cfg, &ws),
                 whole: true,
                 // A cascade candidate is judged by its files alone, so it is offered no run either.
                 run: steps_left > 0 && !cascade,
@@ -657,7 +667,7 @@ pub async fn run_agent(
             let mut cands = vec![];
             let mut passed = 0u32;
             for r in &replies {
-                let action = parse_action(&r.text);
+                let action = parse_allowed(&r.text, &turn.allowed);
                 let mut w = ws.clone();
                 let (kind, obs, changed, files) =
                     apply_action(env, &action, &mut w, cfg, append, false).await;
@@ -703,7 +713,7 @@ pub async fn run_agent(
             (reply, w, kind, obs, changed, files)
         } else {
             let reply = replies.into_iter().next().expect("one reply");
-            let action = parse_action(&reply.text);
+            let action = parse_allowed(&reply.text, &turn.allowed);
             let mut w = std::mem::take(&mut ws);
             let (kind, obs, changed, files) =
                 apply_action(env, &action, &mut w, cfg, append, true).await;
@@ -849,6 +859,7 @@ async fn apply_action(
             }
         }
         Action::Submit => ("submit", String::new(), !append),
+        Action::Disallowed(why) => ("none", (*why).to_string(), false),
         Action::None => (
             "none",
             if append {
@@ -863,6 +874,18 @@ async fn apply_action(
     (kind, observation, changed, changed_files)
 }
 
+/// Whether a turn over `ws` offers a patch: always on `Any`, never on `Whole`, and on `Auto` only for a main file
+/// longer than `whole_max_lines` (a patch saves output tokens only when the file is long).
+fn patch_offered(cfg: &AgentConfig, ws: &Workspace) -> bool {
+    match cfg.edit_format {
+        EditFormat::Any => true,
+        EditFormat::Whole => false,
+        EditFormat::Auto => ws
+            .get(&cfg.main_file)
+            .is_some_and(|c| c.lines().count() > cfg.whole_max_lines),
+    }
+}
+
 fn task_message(
     task: &str,
     ws: &Workspace,
@@ -870,14 +893,21 @@ fn task_message(
     attempts: &[Attempt],
     cfg: &AgentConfig,
 ) -> String {
-    context::task_message(
+    let message = context::task_message(
         task,
         ws,
         cfg.max_file_bytes,
         last.as_ref().map(|v| (v.passed, v.evidence.as_deref())),
         attempts,
         cfg.max_observation_bytes,
-    )
+    );
+    // Say what this turn offers: a model that is not told writes a patch (the system prompt lists patches first).
+    match message.strip_suffix("Reply with one action.") {
+        Some(head) if !patch_offered(cfg, ws) => format!(
+            "{head}Reply with one action: the whole new solution.py in one ```python block, or a ```run block."
+        ),
+        _ => message,
+    }
 }
 
 /// The Phase 10 per-step message (Reset mode), unchanged.
@@ -1005,6 +1035,8 @@ mod tests {
         AgentConfig {
             context: ContextMode::Reset,
             constrain: false,
+            // These tests apply patches to a short file, which the default ("auto") format would refuse.
+            edit_format: EditFormat::Any,
             ..AgentConfig::default()
         }
     }
@@ -1072,7 +1104,16 @@ mod tests {
     #[tokio::test]
     async fn append_mode_keeps_every_earlier_message_byte_identical() {
         let mut env = Script::new(&["```run\npython solution.py\n```", "hmm", FIX]);
-        let out = run_agent(&mut env, "Write add(a, b).", ws(), &AgentConfig::default()).await;
+        let out = run_agent(
+            &mut env,
+            "Write add(a, b).",
+            ws(),
+            &AgentConfig {
+                edit_format: EditFormat::Any,
+                ..AgentConfig::default()
+            },
+        )
+        .await;
         assert_eq!(out.status, Status::Verified);
         assert_eq!(out.model_calls, 3);
         for w in env.seen.windows(2) {
@@ -1094,7 +1135,16 @@ mod tests {
         let wrong = "*** Begin Patch\n*** Update File: solution.py\n@@ def add(a, b):\n-    return a - b\n+    return b - a\n*** End Patch";
         let fix = "*** Begin Patch\n*** Update File: solution.py\n@@ def add(a, b):\n-    return b - a\n+    return a + b\n*** End Patch";
         let mut env = Script::new(&[wrong, fix]);
-        let out = run_agent(&mut env, "t", ws(), &AgentConfig::default()).await;
+        let out = run_agent(
+            &mut env,
+            "t",
+            ws(),
+            &AgentConfig {
+                edit_format: EditFormat::Any,
+                ..AgentConfig::default()
+            },
+        )
+        .await;
         assert_eq!(out.status, Status::Verified);
         let obs = &out.steps[0].observation;
         assert!(obs.contains("M solution.py"));
@@ -1135,6 +1185,7 @@ mod tests {
         let mut env = Script::new(&["a".repeat(3000).as_str(), "b".repeat(3000).as_str(), FIX]);
         let cfg = AgentConfig {
             compact_at_tokens: 1600,
+            edit_format: EditFormat::Any,
             ..AgentConfig::default()
         };
         let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
@@ -1235,6 +1286,24 @@ mod tests {
         assert_eq!(out.workspace, ws(), "the best workspace seen is returned");
     }
 
+    /// Without a grammar nothing stops a model from patching a file it was asked to rewrite whole (Smiley Core and
+    /// vLLM have none): the patch is refused with the instruction, not applied.
+    #[tokio::test]
+    async fn a_patch_is_refused_for_a_file_the_turn_asked_to_rewrite_whole() {
+        let whole = "```python\ndef add(a, b):\n    return a + b\n```";
+        let mut env = Script::new(&[FIX, whole]);
+        let cfg = AgentConfig {
+            constrain: false,
+            ..AgentConfig::default()
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        assert_eq!(out.status, Status::Verified);
+        assert_eq!(out.steps[0].action, "none");
+        assert!(out.steps[0].observation.contains("A patch is not accepted"));
+        assert_eq!(out.steps[1].action, "write");
+        assert!(out.workspace["solution.py"].contains("a + b"));
+    }
+
     #[tokio::test]
     async fn auto_edit_format_offers_a_patch_only_for_a_long_main_file() {
         let long: String = (0..100).map(|i| format!("x{i} = {i}\n")).collect();
@@ -1304,6 +1373,7 @@ mod tests {
         let mut env = Script::new(&[WRONG0, FIX, CLOSER]);
         let cfg = AgentConfig {
             cascade_samples: 3,
+            edit_format: EditFormat::Any,
             ..AgentConfig::default()
         };
         let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
@@ -1384,7 +1454,16 @@ mod tests {
     async fn a_transient_model_error_is_retried_with_backoff_and_the_cap_is_not() {
         let mut env = Script::new(&[FIX]);
         env.fail_first = 2;
-        let out = run_agent(&mut env, "t", ws(), &AgentConfig::default()).await;
+        let out = run_agent(
+            &mut env,
+            "t",
+            ws(),
+            &AgentConfig {
+                edit_format: EditFormat::Any,
+                ..AgentConfig::default()
+            },
+        )
+        .await;
         assert_eq!(out.status, Status::Verified);
         assert_eq!((out.model_calls, out.steps[0].retries), (3, 2));
         assert_eq!(env.backoffs, vec![1, 2]);
@@ -1396,6 +1475,7 @@ mod tests {
             ws(),
             &AgentConfig {
                 retries: 0,
+                edit_format: EditFormat::Any,
                 ..AgentConfig::default()
             },
         )

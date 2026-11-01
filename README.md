@@ -196,6 +196,7 @@ Open **http://127.0.0.1:8080**. Try the *Verified math* example, then press **Th
 
 ```bash
 make test        # Rust tests: gate modes, calibration, judge, audits, cancellation, verifiers, sandbox
+scripts/live_sweep.sh   # every live suite against the running stack: contract, security, Rooms, end to end, harness, MVP acceptance (about 45 min)
 make contract    # live SSE events and stored records against the JSON Schemas
 make acceptance  # MVP acceptance tests A1–A9 against the running stack
 python3 scripts/e2e_sweep.py   # every endpoint and every UI page, in headless Chrome
@@ -281,6 +282,7 @@ Phases 0–13 of the roadmap are implemented on the CPU reference machine; GPU t
 | [Parallel and concurrent inference](docs/research/parallel_inference.md) · [Decision 007](docs/decisions/007-parallel-inference.md) | Phase 13: batch scaling at depth, what was adopted (fused samples, System 1 rescue, `n`-choice rounds, 4 slots) and what was measured and left off |
 | [Engine knobs, the model switch, the harness cascade](docs/research/engine_switching_harness.md) · [Decision 008](docs/decisions/008-engine-switching-harness.md) | Phase 14: the flag matrix and co-scheduling measured (unchanged), the switch timed, the cascade and retries built and measured, the warm-first backend switch |
 | [Smiley Core as the third backend](docs/research/smiley_backend.md) · [Decision 009](docs/decisions/009-smiley-backend.md) | Phase 15: the owner's Rust CPU engine vendored and served behind the gateway; the engines compared alone and the whole service compared on each backend; which one is the default and why |
+| [End-to-end code review](docs/research/code_review_2026-11.md) | Nov 2026: what four independent reviews found across the crates, scripts, deployment files and CI, what was fixed and tested, and what was left and why |
 | [Math and code harness](docs/research/harness_integration.md) · [Decision 005](docs/decisions/005-harness-integration.md) | Phase 10: what was taken from Open Math Harness and Codex, what was not, and why |
 | [Codex-style harness](docs/research/harness_integration.md#5-phase-11-the-codex-agent-harness-adapted-to-small-models-on-a-cpu) · [Decision 006](docs/decisions/006-codex-harness.md) | Phase 11: the Codex agent-core mechanisms ported, the measured A/B against the Phase 10 loop, and the defaults it set |
 | [User guide](docs/user_guide.md) · [Runbook](docs/operations/operator_runbook.md) · [API reference](docs/api/api_reference.md) | using, operating and integrating |

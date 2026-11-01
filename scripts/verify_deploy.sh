@@ -25,9 +25,12 @@ except Exception as e:
 # docker compose (needs a token file to resolve secrets)
 if shutil.which("docker"):
     tok = "deploy/docker/secrets/nafs_tokens"; created = not os.path.exists(tok)
-    if created: open(tok, "w").write("verification-placeholder-token\n")
-    rc, out = run(["docker", "compose", "-f", "deploy/docker/docker-compose.yml", "config", "-q"])
-    if created: os.remove(tok)
+    # The placeholder token is publicly known: it must not outlive this check, whatever happens in between.
+    try:
+        if created: open(tok, "w").write("verification-placeholder-token\n")
+        rc, out = run(["docker", "compose", "-f", "deploy/docker/docker-compose.yml", "config", "-q"])
+    finally:
+        if created and os.path.exists(tok): os.remove(tok)
     add("docker compose file", "pass" if rc == 0 else "fail", out or "valid")
 else:
     add("docker compose file", "skipped", "docker not installed")

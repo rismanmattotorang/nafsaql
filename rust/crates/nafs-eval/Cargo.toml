@@ -16,10 +16,8 @@ nafs-verify = { path = "../nafs-verify" }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-uuid = { workspace = true }
 chrono = { workspace = true }
 fastrand = { workspace = true }
-tracing = { workspace = true }
 reqwest = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
@@ -30,3 +28,4 @@ path = "src/main.rs"
 
 [dev-dependencies]
 nafs-memory = { path = "../nafs-memory" }
+uuid = { workspace = true }

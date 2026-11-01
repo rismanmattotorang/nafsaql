@@ -10,7 +10,11 @@ case "${1:-status}" in
          nohup "$BIN" --config "${NAFS_CONFIG:-config/nafs-aql.toml}" > logs/gateway.log 2>&1 & echo $! > $PID
          for i in $(seq 1 30); do curl -sf localhost:8080/healthz >/dev/null && break; sleep 0.5; done
          echo "gateway on http://127.0.0.1:8080 (pid $(cat $PID))"; curl -s localhost:8080/healthz; echo ;;
-  stop) [ -f $PID ] && kill "$(cat $PID)" 2>/dev/null && echo "gateway stopped"; rm -f $PID; pkill -f "target/release/nafs-gateway" 2>/dev/null || true ;;
+  stop) # Only a process that is our gateway is signalled: the pid file's, then an orphan still serving :8080.
+        is_gateway() { ps -p "$1" -o command= 2>/dev/null | grep -q "nafs-gateway"; }
+        if [ -f $PID ]; then p=$(cat $PID); if is_gateway "$p"; then kill "$p" 2>/dev/null && echo "gateway stopped"; fi; rm -f $PID; fi
+        p=$(lsof -ti tcp:8080 -sTCP:LISTEN 2>/dev/null | head -1 || true)
+        if [ -n "$p" ] && is_gateway "$p"; then kill "$p" 2>/dev/null && echo "stopped the gateway still serving :8080 (pid $p)"; fi ;;
   restart) "$0" stop; sleep 1; "$0" start ;;
   status) curl -s localhost:8080/healthz || echo "gateway down"; echo ;;
   logs) tail -n 60 logs/gateway.log ;;

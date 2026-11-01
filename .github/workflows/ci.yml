@@ -1,6 +1,15 @@
 # CI for Nafs-Aql (OR-001, NFR-023, ER-006). Model-dependent tests (MVP acceptance, contract --live) run locally with `make up`.
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+# The workflow only reads the repository; actions are pinned to commits (the comment names the release).
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   rust:
     strategy:
@@ -9,25 +18,34 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults: { run: { working-directory: rust } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with: { components: "rustfmt, clippy" }
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with: { workspaces: rust }
       # The verifier sandbox needs unprivileged user namespaces, which Ubuntu 24.04 blocks through AppArmor by default.
       - name: Allow unprivileged user namespaces (verifier sandbox)
         if: runner.os == 'Linux'
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: cargo fmt --all -- --check
-      - run: cargo clippy --workspace --release -- -D warnings
-      - run: cargo test --workspace --release
+      - run: cargo clippy --workspace --release --locked -- -D warnings
+      - run: cargo test --workspace --release --locked
+  # Supply chain (rust/deny.toml): RustSec advisories, permissive licenses only, crates.io as the only source.
+  supply-chain:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+        with:
+          manifest-path: rust/Cargo.toml
+          command: check
   artifacts:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: "3.12" }
-      - run: pip install jsonschema pyyaml openapi-spec-validator
+      - run: pip install jsonschema==4.23.0 pyyaml==6.0.2 openapi-spec-validator==0.7.1
       - run: openapi-spec-validator api/openapi.yaml
       - run: python -c "import glob,json; from jsonschema import Draft202012Validator as V; [V.check_schema(json.load(open(f))) for f in glob.glob('api/schemas/*.json')]; print('schemas ok')"
       - run: python -c "import yaml; yaml.safe_load(open('config/vllm_launch.yaml'))"

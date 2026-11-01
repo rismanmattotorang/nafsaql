@@ -442,6 +442,48 @@ fn kill_group(pid: i32) {
     }
 }
 
+/// A private scratch directory (mode 0700: other local users cannot read the candidate or the hidden tests)
+/// that is removed when dropped, also when the request is cancelled mid-run. Model code may `chmod 000` what it
+/// created inside, so permissions are restored before the removal.
+struct Scratch {
+    path: PathBuf,
+}
+impl Scratch {
+    fn new() -> Result<Self, String> {
+        let raw = std::env::temp_dir().join(format!("nafs-sbx-{}", uuid::Uuid::new_v4()));
+        let mut builder = std::fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)]
+        std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+        builder
+            .create(&raw)
+            .map_err(|e| format!("sandbox setup failed: {e}"))?;
+        // Seatbelt matches resolved paths: /var/folders is a symlink to /private/var/folders.
+        Ok(Scratch {
+            path: std::fs::canonicalize(&raw).unwrap_or(raw),
+        })
+    }
+}
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        #[cfg(unix)]
+        fn make_removable(p: &Path) {
+            use std::os::unix::fs::PermissionsExt;
+            if std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir()) {
+                let _ = std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o700));
+                if let Ok(entries) = std::fs::read_dir(p) {
+                    for e in entries.flatten() {
+                        make_removable(&e.path());
+                    }
+                }
+            }
+        }
+        #[cfg(unix)]
+        make_removable(&self.path);
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
+}
+
 /// Run `entry` (one of `files`) with `python` inside the sandbox. `stdin` is written then closed.
 pub async fn run(
     files: &[(&str, &str)],
@@ -450,10 +492,8 @@ pub async fn run(
     python: &str,
     limits: &SandboxLimits,
 ) -> Result<SandboxOutput, String> {
-    let raw = std::env::temp_dir().join(format!("nafs-sbx-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&raw).map_err(|e| format!("sandbox setup failed: {e}"))?;
-    // Seatbelt matches resolved paths: /var/folders is a symlink to /private/var/folders.
-    let dir: PathBuf = std::fs::canonicalize(&raw).unwrap_or(raw.clone());
+    let scratch = Scratch::new()?;
+    let dir = scratch.path.clone();
     let program = Program::Python {
         python: python.to_string(),
         entry: dir.join(entry),
@@ -461,7 +501,6 @@ pub async fn run(
     let result = run_in(&dir, files, &program, stdin, limits)
         .await
         .map(|o| o.relative_to(&dir));
-    let _ = std::fs::remove_dir_all(&dir);
     result
 }
 
@@ -476,9 +515,8 @@ pub async fn run_program(
     stdin: Option<&str>,
     limits: &SandboxLimits,
 ) -> Result<SandboxOutput, String> {
-    let raw = std::env::temp_dir().join(format!("nafs-sbx-{}", uuid::Uuid::new_v4()));
-    std::fs::create_dir_all(&raw).map_err(|e| format!("sandbox setup failed: {e}"))?;
-    let dir: PathBuf = std::fs::canonicalize(&raw).unwrap_or(raw.clone());
+    let scratch = Scratch::new()?;
+    let dir = scratch.path.clone();
     let program = Program::Native {
         exe: exe.to_path_buf(),
         args: args
@@ -494,7 +532,6 @@ pub async fn run_program(
     let result = run_in(&dir, files, &program, stdin, limits)
         .await
         .map(|o| o.relative_to(&dir));
-    let _ = std::fs::remove_dir_all(&dir);
     result
 }
 

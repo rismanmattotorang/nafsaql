@@ -21,6 +21,18 @@ ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
 ReadWritePaths=/opt/nafs-aql/data/runtime /opt/nafs-aql/config
+# Conversations and traces are private to the service user.
+UMask=0077
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 # The verifier sandbox needs unprivileged user namespaces (unshare -rn) for network isolation.
 RestrictNamespaces=false
 

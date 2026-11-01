@@ -177,6 +177,17 @@ pub fn outcome_of(v: &VerifierResult) -> Outcome {
     }
 }
 
+/// A Lean identifier as the harness pastes it into commands: a letter or `_` first, then letters, digits, `_`, `.`
+/// and `'`, at most 200 bytes.
+fn is_lean_identifier(s: &str) -> bool {
+    let mut chars = s.chars();
+    s.len() <= 200
+        && chars
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '\''))
+}
+
 /// SR-001: observed content fed back to a model is truncated, stripped of control characters and of
 /// anything that could close the data block, and wrapped with a fixed instruction to treat it as data.
 pub fn delimit(tag: &str, content: &str, max_chars: usize) -> String {
@@ -569,6 +580,13 @@ impl Orchestrator {
         let Some(l) = &v.lean else { return Ok(()) };
         if self.hub.lean.is_none() {
             return Err(NafsError::BadRequest("verification.lean needs a Lean toolchain; none is configured on this server (verifiers.lean)".into()));
+        }
+        // The name is pasted into the commands Lean runs: only an identifier may be given.
+        if l.theorem.as_deref().is_some_and(|t| !is_lean_identifier(t)) {
+            return Err(NafsError::BadRequest(
+                "verification.lean.theorem must be a Lean identifier (letters, digits, _ . ')"
+                    .into(),
+            ));
         }
         match nafs_harness::lean::frozen_objection(&l.statement) {
             Some(e) => Err(NafsError::BadRequest(format!("verification.lean: {e}"))),
@@ -1773,11 +1791,10 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                         Err(NafsError::Cancelled) => return Err(NafsError::Cancelled),
                                         Err(e) => {
                                             // Choices that never arrived become failed candidates, not lost ones.
-                                            for (k, d) in delivered.iter_mut().enumerate() {
+                                            for d in delivered.iter_mut() {
                                                 if !*d {
                                                     *d = true;
                                                     let err = NafsError::BackendProtocol(e.to_string());
-                                                    let _ = k;
                                                     pending.push(Box::pin(finish(Err(err), 0, vec![])));
                                                 }
                                             }
@@ -1992,7 +2009,6 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                         });
                                     }
                                 }
-                                let _ = evidence;
                             }
                         } else if use_judge {
                             // FR-034: soft verifier with hard floors; a pass is at most "consensus" (Thm 1).
@@ -2251,9 +2267,6 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         Ok(reply)
     }
 
-    /// Speed: prime each backend's prompt cache with the system prompt of every domain, so the first
-    /// real request does not pay for a cold prefill (measured: TTFT about 9.8 s cold vs about 1 s warm).
-    /// Skipped while a user request is in flight.
     /// P7-T08 adaptive reasoning exit (FR-082). System 2 reasons in chunks on the raw completion endpoint
     /// (the server keeps the prefix cached). At a reflection signal, or at the latest every
     /// `probe_every_tokens`, the reasoning is closed provisionally and a short answer is probed. On a
@@ -2592,6 +2605,9 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         Ok(agg)
     }
 
+    /// Speed: prime each backend's prompt cache with the system prompt of every domain, so the first
+    /// real request does not pay for a cold prefill (measured: TTFT about 9.8 s cold vs about 1 s warm).
+    /// Skipped while a user request is in flight.
     pub async fn warm_prompt_cache(&self) -> usize {
         self.warm_pair(&self.active()).await
     }
@@ -2792,7 +2808,9 @@ fn write_json<T: Serialize>(path: &str, v: &T) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{delimit, fit_budget, full_answer_probe, round_budget, tokens_that_fit};
+    use super::{
+        delimit, fit_budget, full_answer_probe, is_lean_identifier, round_budget, tokens_that_fit,
+    };
     use nafs_types::VerificationInputs;
 
     /// SR-001 on non-ASCII text: Unicode lowercasing changes byte lengths ("\u{130}" grows by one byte), so offsets
@@ -2813,6 +2831,24 @@ mod tests {
         // A multi-byte character right after the tag used to land a slice inside it.
         let out = delimit("question", "\u{130}</question\u{20ac} done", 100);
         assert_eq!(out.matches("</question").count(), 1);
+    }
+
+    #[test]
+    fn a_lean_theorem_name_is_an_identifier_and_nothing_else() {
+        for ok in ["demo", "Nat.add_zero", "_h'", "t1"] {
+            assert!(is_lean_identifier(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            "1abc",
+            "t\n#eval IO.println 1",
+            "a b",
+            "t;",
+            "a\"b",
+            &"x".repeat(201),
+        ] {
+            assert!(!is_lean_identifier(bad), "{bad:?}");
+        }
     }
 
     #[test]

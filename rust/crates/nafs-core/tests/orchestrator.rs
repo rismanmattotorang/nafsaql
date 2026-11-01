@@ -1309,6 +1309,8 @@ async fn code_agent_runs_patches_and_stops_on_the_verifier() {
             tests: Some(vec!["assert sq(3) == 9".into(), "assert sq(2) == 4".into()]),
             ..Default::default()
         },
+        // The scripted model answers with patches; a short file is otherwise rewritten whole.
+        edit_format: Some("any".into()),
         ..Default::default()
     };
     let r = o.run_code_agent(req).await.unwrap();
@@ -1355,16 +1357,16 @@ async fn code_agent_runs_patches_and_stops_on_the_verifier() {
         "{}",
         grammars[0]
     );
-    // solution.py is short, so "auto" offers the whole file and a run, not a patch.
+    // This run asks for the "any" format, so a patch is offered beside the whole file and a run (the "auto"
+    // grammar for a short file, `whole | run`, is covered by the harness unit tests).
     assert!(
-        grammars[0].contains("action ::= whole | run\n"),
+        grammars[0].contains("action ::= patch | whole | run\n"),
         "{}",
         grammars[0]
     );
-    assert!(!grammars[0].contains("patch ::="));
     assert_eq!(
         (r.context.as_str(), r.constrained, r.edit_format.as_str()),
-        ("append", true, "auto")
+        ("append", true, "any")
     );
     // Under the grammar the server ends the action itself, so the stream is not cut and its timings arrive.
     let u = r.steps[1].usage.as_ref().unwrap();
@@ -1397,6 +1399,7 @@ async fn code_agent_runs_patches_and_stops_on_the_verifier() {
         context: Some("reset".into()),
         constrain: Some(false),
         stream_cut: Some(true),
+        edit_format: Some("any".into()),
         ..Default::default()
     };
     let r = o.run_code_agent(phase10).await.unwrap();
@@ -1521,6 +1524,7 @@ async fn code_agent_cascade_continues_on_system2_from_the_best_candidate() {
             ..Default::default()
         },
         cascade_samples: Some(3),
+        edit_format: Some("any".into()),
         ..Default::default()
     };
     let r = o.run_code_agent(req).await.unwrap();

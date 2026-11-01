@@ -339,6 +339,10 @@ fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Msg>) {
         Ok(s) => s,
         Err(poisoned) => poisoned.into_inner(),
     };
+    // The client may have left while this request waited for the session: nobody wants the prefill.
+    if tx.is_closed() {
+        return;
+    }
     let cancel = AtomicBool::new(false);
     sess.reset();
     sess.cfg.system = p.system.clone();
@@ -396,20 +400,46 @@ fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Msg>) {
     });
 }
 
+/// Requests that may be queued behind the running one (the gateway sends at most one per model at a time).
+const MAX_WAITING: usize = 8;
+
+/// Counts a request as processing (the `requests_processing` metric) until dropped.
+struct BusyGuard(Arc<App>);
+impl Drop for BusyGuard {
+    fn drop(&mut self) {
+        self.0.busy.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
 async fn chat(State(app): State<Arc<App>>, Json(body): Json<Value>) -> Response {
     let p = match plan(&body) {
         Ok(p) => p,
         Err(e) => return bad(e),
     };
+    // One session decodes one request at a time; the others wait. A bounded wait queue keeps a burst of (possibly
+    // abandoned) long prompts from piling up blocking threads and CPU-hours of prefill.
+    if app
+        .busy
+        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
+            (n < MAX_WAITING).then_some(n + 1)
+        })
+        .is_err()
+    {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error": {"message": "too many requests are waiting for this model", "type": "overloaded_error", "code": 503}})),
+        )
+            .into_response();
+    }
+    let busy = BusyGuard(app.clone());
     app.requests.fetch_add(1, Ordering::SeqCst);
-    app.busy.fetch_add(1, Ordering::SeqCst);
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<Msg>();
     let app2 = app.clone();
     let p = Arc::new(p);
     let p2 = p.clone();
     tokio::task::spawn_blocking(move || {
+        let _busy = busy; // released when the generation ends, also if it panics
         generate(&app2, &p2, tx);
-        app2.busy.fetch_sub(1, Ordering::SeqCst);
     });
     let id = format!("chatcmpl-{}", app.requests.load(Ordering::SeqCst));
     let model = app.alias.clone();
