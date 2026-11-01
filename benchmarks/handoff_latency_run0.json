@@ -1,0 +1,127 @@
+{
+ "started": "2026-11-01T09:45:54",
+ "load_at_start": 16.84,
+ "runs": [
+  {
+   "prompt": "What is 17 + 26? Answer with the number.",
+   "rescue": 4,
+   "escalated": true,
+   "draft_end_s": 45.6048948764801,
+   "decision_s": 76.41087102890015,
+   "s2_first_s": 130.24964904785156,
+   "draft_to_decision_s": 30.805976152420044,
+   "decision_to_s2_first_s": 53.838778018951416,
+   "s1_busy_after_decision_s": 0.0,
+   "s1_busy_max_after_decision": 0.0,
+   "total_s": 641.7586119174957,
+   "mode": "slow",
+   "assurance": "abstained",
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 47890,
+     "queue_ms": 0,
+     "prefill_ms": 5997.667,
+     "prompt_n": 51,
+     "cache_n": 73
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 6,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "rescue",
+     "ms": 28499,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 104267,
+     "queue_ms": 0,
+     "prefill_ms": 12472.416000000001,
+     "prompt_n": 53,
+     "cache_n": 214
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 206877,
+     "queue_ms": 0,
+     "prefill_ms": 13981.479000000001,
+     "prompt_n": 124,
+     "cache_n": 392
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 254182,
+     "queue_ms": 0,
+     "prefill_ms": 15561.460000000001,
+     "prompt_n": 162,
+     "cache_n": 460
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    }
+   ],
+   "phases": [
+    [
+     0.014597177505493164,
+     "A",
+     "System 1 drafting"
+    ],
+    [
+     47.912715911865234,
+     "A",
+     "System 1 drawing 4 more samples at once (the draft failed its check)"
+    ],
+    [
+     76.4108989238739,
+     "L",
+     "The draft failed an exact verifier, so it is never kept (FR-012)."
+    ],
+    [
+     76.41091704368591,
+     "M",
+     "System 2 deliberating (attempt 1 of 3, budget 128 tokens)"
+    ],
+    [
+     180.68811202049255,
+     "M",
+     "System 2 deliberating (attempt 2 of 3, budget 128 tokens)"
+    ],
+    [
+     387.5623390674591,
+     "M",
+     "System 2 deliberating (attempt 3 of 3, budget 128 tokens)"
+    ]
+   ]
+  }
+ ]
+}

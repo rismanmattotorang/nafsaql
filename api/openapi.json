@@ -1320,6 +1320,20 @@
                   "properties": {
                     "active_backend": {
                       "type": "string"
+                    },
+                    "previous": {
+                      "type": "string"
+                    },
+                    "warmed_prefixes": {
+                      "type": "integer",
+                      "description": "Phase 14: constant prompt prefixes primed on the new pair before the switch"
+                    },
+                    "warm_ms": {
+                      "type": "integer"
+                    },
+                    "in_flight": {
+                      "type": "integer",
+                      "description": "Requests still running on the previous pair (they finish there)"
                     }
                   }
                 }
@@ -4428,6 +4442,15 @@
           "unstick": {
             "type": "boolean",
             "description": "Phase 11 A/B override of `harness.unstick` (after a step that reproduced judged files, compact the transcript and sample more diversely)"
+          },
+          "cascade": {
+            "type": "boolean",
+            "description": "Phase 14 override of `harness.cascade`: the first step goes to System 1 with `cascade_samples` candidates in one request, each judged by the verifier; System 2 continues from the best only when none passes"
+          },
+          "cascade_samples": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
           }
         }
       },
@@ -4505,6 +4528,18 @@
           "compacted": {
             "type": "boolean",
             "description": "The transcript was compacted before this step's call"
+          },
+          "model": {
+            "type": "string",
+            "description": "The model this step went to (`system1` on a cascade step)"
+          },
+          "samples": {
+            "type": "integer",
+            "description": "Candidates judged on this step (1 outside a cascade step)"
+          },
+          "retries": {
+            "type": "integer",
+            "description": "Model calls retried before this step's reply arrived"
           }
         }
       },
@@ -4608,6 +4643,13 @@
           "diff": {
             "type": "string",
             "description": "The run's net change as a unified diff (returned files against the starting ones)"
+          },
+          "cascade": {
+            "type": "boolean",
+            "description": "Phase 14: the first step went to System 1 with `cascade_samples` candidates"
+          },
+          "cascade_samples": {
+            "type": "integer"
           }
         }
       },

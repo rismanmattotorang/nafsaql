@@ -2573,7 +2573,18 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
     }
 
     pub async fn warm_prompt_cache(&self) -> usize {
-        let pair = self.active();
+        self.warm_pair(&self.active()).await
+    }
+
+    /// The backend pair by name, for a warm-up before a switch.
+    pub fn pair(&self, name: &str) -> Option<Arc<BackendPair>> {
+        self.pairs.iter().find(|p| p.name == name).cloned()
+    }
+
+    /// Prime `pair`'s servers with the constant prefixes of every request (the system prompt per domain, the
+    /// agent's prompt), so the first real request on them does not pay a cold prefill (measured: TTFT about
+    /// 9.8 s cold against about 1 s warm). Stops as soon as a user request is in flight.
+    pub async fn warm_pair(&self, pair: &Arc<BackendPair>) -> usize {
         let mut warmed = 0;
         for d in Domain::all() {
             if self.inflight.load(Ordering::SeqCst) > 0 {

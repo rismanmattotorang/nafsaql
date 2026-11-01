@@ -56,6 +56,8 @@ def deterministic(base):
     check("info: System 2 has four slots and fused samples are on", par.get("system2_slots") == 4 and par.get("fuse_always_samples") is True, par)
     check("info: hedging is off by default (measured: no width pays at repair depth)", par.get("enabled") is False)
     check("info: rescue (FR-096) draws 4 System 1 samples", info.get("rescue", {}).get("samples") == 4, info.get("rescue"))
+    ca = info.get("code_agent", {})
+    check("info: the Phase 14 cascade and retries are reported", {"cascade", "cascade_samples", "retries"} <= set(ca) and ca.get("retries") == 2, {k: ca.get(k) for k in ("cascade", "cascade_samples", "retries")})
 
     s, spec = call(base, "GET", "/openapi.json")
     paths = spec.get("paths", {}) if s == 200 else {}
@@ -123,6 +125,7 @@ def deterministic(base):
         ("agent: max_steps 0 is a 400", {"max_steps": 0}),
         ("agent: an unknown model is a 400", {"model": "gpt"}),
         ("agent: too many files is a 400", {"files": {f"f{i}.py": "x" for i in range(17)}}),
+        ("agent: cascade_samples 9 is a 400 (Phase 14)", {"cascade_samples": 9}),
     ]:
         s, d = call(base, "POST", "/v1/harness/code", {**base_req, **patch})
         check(name, s == 400 and d.get("code") == "E_BAD_REQUEST", d.get("message", "")[:80])
@@ -203,7 +206,8 @@ def models(base, hard=False):
     check("model: code agent fixes a function and the verifier accepts", s == 200 and d.get("passed") and d.get("assurance") == "verified",
           f"{d.get('status')} calls={d.get('model_calls')} actions={[x['action'] for x in d.get('steps', [])]} {time.time() - t:.0f}s")
     if s == 200:
-        check("model: the agent's step records are complete", all({"step", "action", "observation", "ms"} <= set(x) for x in d["steps"]) and d["steps"])
+        check("model: the agent's step records are complete", all({"step", "action", "observation", "ms", "model", "samples", "retries"} <= set(x) for x in d["steps"]) and d["steps"])
+        check("model: the reply says whether the cascade ran (Phase 14)", "cascade" in d and "cascade_samples" in d, {k: d.get(k) for k in ("cascade", "cascade_samples")})
 
     t = time.time()
     s, d = call(base, "POST", "/v1/chat", {

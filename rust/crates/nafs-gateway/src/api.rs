@@ -1358,6 +1358,9 @@ async fn harness_info(State(s): State<AppState>) -> Json<Value> {
             "edit_format": c.harness.edit_format,
             "whole_max_lines": c.harness.whole_max_lines,
             "unstick": c.harness.unstick,
+            "cascade": c.harness.cascade,
+            "cascade_samples": c.harness.cascade_samples,
+            "retries": c.harness.retries,
             "thinking_budget": c.harness.thinking_budget,
             "first_step_thinking_budget": c.harness.first_step_thinking_budget,
         },
@@ -1569,9 +1572,24 @@ async fn set_backend(
         }
     }
     let before = s.orch.active().name.clone();
+    // Phase 14: the new pair is warmed before it becomes active, so the first requests on it do not pay a cold
+    // prefill; the swap itself is one atomic pointer exchange, and requests already in flight keep the pair they
+    // started on (they hold it by reference), so nothing is interrupted or re-sent.
+    let t = std::time::Instant::now();
+    let warmed = match s.orch.pair(&b.name) {
+        Some(p) if before != b.name => s.orch.warm_pair(&p).await,
+        _ => 0,
+    };
+    let warm_ms = t.elapsed().as_millis() as u64;
     s.orch.set_active(&b.name)?;
-    tracing::info!("active backend switched from '{before}' to '{}'", b.name);
-    Ok(Json(json!({"active_backend": b.name})))
+    tracing::info!(
+        "active backend switched from '{before}' to '{}' ({warmed} prefixes warmed in {warm_ms} ms)",
+        b.name
+    );
+    Ok(Json(
+        json!({"active_backend": b.name, "previous": before, "warmed_prefixes": warmed, "warm_ms": warm_ms,
+        "in_flight": s.orch.inflight.load(std::sync::atomic::Ordering::SeqCst)}),
+    ))
 }
 async fn activity(State(s): State<AppState>) -> ApiResult<Json<Value>> {
     Ok(Json(json!(s.store.recent_replies(200)?)))

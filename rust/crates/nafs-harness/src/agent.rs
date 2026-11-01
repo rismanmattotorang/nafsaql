@@ -42,10 +42,45 @@ pub trait AgentEnv: Send {
         messages: Vec<(String, String)>,
         turn: &Turn,
     ) -> BoxFuture<'_, Result<Reply, String>>;
+    /// `n` replies to the same `messages` in one request where the server can batch them (llama-server's `n`:
+    /// the prompt is prefilled once and the choices decode in one batch, 1.7 times one stream's wall time for
+    /// four on System 1 at this depth). The default asks for them one after another.
+    fn complete_n(
+        &mut self,
+        messages: Vec<(String, String)>,
+        turn: &Turn,
+        n: usize,
+    ) -> BoxFuture<'_, Result<Vec<Reply>, String>> {
+        let turn = turn.clone();
+        Box::pin(async move {
+            let mut out = Vec::with_capacity(n.max(1));
+            for _ in 0..n.max(1) {
+                out.push(self.complete(messages.clone(), &turn).await?);
+            }
+            Ok(out)
+        })
+    }
+    /// Wait before retrying a failed model call (Codex `responses_retry`: 200 ms, doubling, jitter 0.9-1.1).
+    /// The default does not wait; a host sleeps.
+    fn backoff(&mut self, _attempt: u32) -> BoxFuture<'_, ()> {
+        Box::pin(async {})
+    }
     /// Run `file` of `ws` in the sandbox; the result is already formatted for the model.
     fn run(&mut self, ws: &Workspace, file: &str) -> BoxFuture<'_, String>;
     /// The exact verifier on the workspace.
     fn verify(&mut self, ws: &Workspace) -> BoxFuture<'_, Verdict>;
+}
+
+/// Which model a turn goes to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Stage {
+    /// The run's model (System 2 by default).
+    #[default]
+    Main,
+    /// The cascade's first step: the quick model, several candidates in one request, each judged by the
+    /// verifier; the main model continues from the best one only when none passes.
+    Cheap,
 }
 
 /// What one model call may produce, for the host to turn into a request.
@@ -68,6 +103,10 @@ pub struct Turn {
     /// Consecutive steps that reproduced files the verifier had already judged; a host samples more
     /// diversely as this grows (see [`AgentConfig::unstick`]).
     pub repeats: u32,
+    /// Which model answers this turn (see [`AgentConfig::cascade_samples`]).
+    pub stage: Stage,
+    /// Candidates asked for in one request (1 outside a cascade step).
+    pub samples: usize,
 }
 
 impl Turn {
@@ -188,12 +227,23 @@ pub struct AgentConfig {
     pub max_file_bytes: usize,
     /// The file a whole-file ```python reply replaces, and the one the verifier imports.
     pub main_file: String,
+    /// Phase 14 cascade: the first step goes to the quick model ([`Stage::Cheap`]) with this many candidates
+    /// in one request; every candidate's files are judged by the verifier, the first that passes ends the
+    /// run, and otherwise the main model continues from the best-scoring one. 0 = off. This is Nafs-Aql's
+    /// own two-system idea inside the agent: on this CPU four quick candidates cost 1.7 times one quick
+    /// stream and about a third of one thorough step.
+    pub cascade_samples: usize,
+    /// Retries of a model call that fails for a reason other than the run's cap (Codex retries a sampling
+    /// request up to `stream_max_retries` times with backoff).
+    pub retries: u32,
     pub deadline: Option<Instant>,
 }
 
 impl Default for AgentConfig {
     fn default() -> Self {
         AgentConfig {
+            cascade_samples: 0,
+            retries: 2,
             max_steps: 8,
             context: ContextMode::Append,
             keep_exchanges: 4,
@@ -376,6 +426,12 @@ pub struct Step {
     pub usage: Option<Usage>,
     /// The transcript was compacted before this step's call.
     pub compacted: bool,
+    /// The model the step went to.
+    pub stage: Stage,
+    /// Candidates judged on this step (1 outside a cascade step).
+    pub samples: u32,
+    /// Model calls retried before this step's reply arrived.
+    pub retries: u32,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -511,6 +567,8 @@ pub async fn run_agent(
             m.extend(exchanges[keep..].iter().cloned());
             m
         };
+        // The cascade: the first step goes to the quick model with several candidates in one request.
+        let cascade = step == 1 && cfg.cascade_samples > 0;
         let turn = Turn {
             step,
             last: steps_left == 0,
@@ -525,16 +583,35 @@ pub async fn run_agent(
                         .is_some_and(|c| c.lines().count() > cfg.whole_max_lines),
                 },
                 whole: true,
-                run: steps_left > 0,
+                // A cascade candidate is judged by its files alone, so it is offered no run either.
+                run: steps_left > 0 && !cascade,
             },
             existing: ws.keys().cloned().collect(),
             runnable: ws.keys().filter(|k| k.ends_with(".py")).cloned().collect(),
             notes: cfg.notes,
             repeats: if cfg.unstick { repeats } else { 0 },
             deadline: cfg.deadline,
+            stage: if cascade { Stage::Cheap } else { Stage::Main },
+            samples: if cascade { cfg.cascade_samples } else { 1 },
         };
-        calls += 1;
-        let reply = match env.complete(messages, &turn).await {
+        // One request per attempt; a failure that is not the run's cap is retried with backoff.
+        let mut retries = 0u32;
+        let replies = loop {
+            calls += 1;
+            match env.complete_n(messages.clone(), &turn, turn.samples).await {
+                Ok(r) if !r.is_empty() => break Ok(r),
+                Ok(_) => break Err("the model returned no reply".to_string()),
+                Err(e) => {
+                    let over = cfg.deadline.is_some_and(|d| Instant::now() >= d);
+                    if over || retries >= cfg.retries || e.contains("wall-clock cap") {
+                        break Err(e);
+                    }
+                    retries += 1;
+                    env.backoff(retries).await;
+                }
+            }
+        };
+        let replies = match replies {
             Ok(r) => r,
             Err(e) => {
                 let over = cfg.deadline.is_some_and(|d| Instant::now() >= d);
@@ -546,6 +623,9 @@ pub async fn run_agent(
                     ms: t.elapsed().as_millis() as u64,
                     usage: None,
                     compacted,
+                    stage: turn.stage,
+                    samples: 0,
+                    retries,
                 });
                 status = if over {
                     Status::Deadline
@@ -555,45 +635,76 @@ pub async fn run_agent(
                 break;
             }
         };
-        let action = parse_action(&reply.text);
-        let mut changed_files: Vec<String> = vec![];
-        let (kind, mut observation, changed) = match &action {
-            Action::Patch(p) => match patch::apply_patch(&mut ws, p) {
-                Ok(s) => {
-                    changed_files.extend(s.added.iter().chain(&s.modified).cloned());
-                    ("patch", s.to_model_text(), true)
-                }
-                Err(e) => ("patch", format!("The patch was not applied: {e}"), false),
-            },
-            Action::WholeFile(code) => {
-                ws.insert(cfg.main_file.clone(), code.clone());
-                ("write", format!("Success. Replaced {}.", cfg.main_file), true)
-            }
-            Action::Run(file) => {
-                let file = file.trim_start_matches("./");
-                if ws.contains_key(file) {
-                    ("run", env.run(&ws, file).await, false)
+        let samples = replies.len() as u32;
+        // Every candidate's action is applied to its own copy of the files and judged; the run ends on the first
+        // that passes, and otherwise continues from the best-scoring one (ties: the first). The chosen candidate's
+        // reply and observation are what the transcript keeps, so the main model sees what was tried.
+        let mut judged: Option<(Verdict, Option<u32>)> = None;
+        let (reply, mut ws_next, kind, mut observation, changed, changed_files) = if samples > 1 {
+            let mut cands = vec![];
+            let mut passed = 0u32;
+            for r in &replies {
+                let action = parse_action(&r.text);
+                let mut w = ws.clone();
+                let (kind, obs, changed, files) =
+                    apply_action(env, &action, &mut w, cfg, append, false).await;
+                let verdict = if changed {
+                    let (v, seen_at) = judge.judge(env, &w, step).await;
+                    passed += v.passed as u32;
+                    Some((v, seen_at))
                 } else {
-                    ("run", format!("No such file in the workspace: {file}"), false)
+                    None
+                };
+                let done = verdict.as_ref().is_some_and(|(v, _)| v.passed);
+                cands.push((action, w, kind, obs, changed, files, verdict));
+                if done {
+                    // The first candidate that passes ends the run; the rest are not judged.
+                    break;
                 }
             }
-            Action::Submit => ("submit", String::new(), !append),
-            Action::None => (
-                "none",
-                if append {
-                    "No action found. Reply with exactly one action: a patch, a ```python block with the whole solution.py, or a ```run block."
-                } else {
-                    "No action found. Reply with exactly one action: a patch, a ```python block with the whole solution.py, a ```run block, or SUBMIT."
-                }
-                .into(),
-                false,
-            ),
+            let pick = cands
+                .iter()
+                .position(|c| c.6.as_ref().is_some_and(|(v, _)| v.passed))
+                .unwrap_or_else(|| {
+                    let mut best = 0usize;
+                    for (i, c) in cands.iter().enumerate() {
+                        let s = c.6.as_ref().map_or(-1.0, |(v, _)| v.score);
+                        if s > cands[best].6.as_ref().map_or(-1.0, |(v, _)| v.score) {
+                            best = i;
+                        }
+                    }
+                    best
+                });
+            let (_, w, kind, mut obs, changed, files, verdict) = cands.swap_remove(pick);
+            if append {
+                obs.push_str(&format!(
+                    "\nQuick model: {samples} candidates in one request, {passed} passed the hidden tests; this is candidate {}.",
+                    pick + 1
+                ));
+            }
+            judged = verdict;
+            let mut reply = replies[pick].clone();
+            // The prompt was prefilled once; the choices' decoding adds up.
+            reply.usage.completion_tokens = replies.iter().map(|r| r.usage.completion_tokens).sum();
+            reply.usage.reasoning_tokens = replies.iter().map(|r| r.usage.reasoning_tokens).sum();
+            (reply, w, kind, obs, changed, files)
+        } else {
+            let reply = replies.into_iter().next().expect("one reply");
+            let action = parse_action(&reply.text);
+            let mut w = std::mem::take(&mut ws);
+            let (kind, obs, changed, files) =
+                apply_action(env, &action, &mut w, cfg, append, true).await;
+            (reply, w, kind, obs, changed, files)
         };
+        std::mem::swap(&mut ws, &mut ws_next);
         observation = truncate_middle(&observation, cfg.max_observation_bytes);
         let mut verdict = None;
         if changed {
             // The exact verifier decides after every change: a passing workspace ends the run at once.
-            let (v, seen_at) = judge.judge(env, &ws, step).await;
+            let (v, seen_at) = match judged.take() {
+                Some(j) => j,
+                None => judge.judge(env, &ws, step).await,
+            };
             repeats = if seen_at.is_some() { repeats + 1 } else { 0 };
             compact_next = cfg.unstick && append && seen_at.is_some();
             if let Some(s) = seen_at.filter(|_| append) {
@@ -661,6 +772,9 @@ pub async fn run_agent(
             ms: t.elapsed().as_millis() as u64,
             usage: Some(reply.usage.clone()),
             compacted,
+            stage: turn.stage,
+            samples,
+            retries,
         });
         if verdict.as_ref().is_some_and(|v| v.passed) {
             let c = transcript.compactions;
@@ -686,6 +800,54 @@ pub async fn run_agent(
     };
     let c = transcript.compactions;
     finish(status, workspace, verdict, steps, calls, &judge, c)
+}
+
+/// Apply one action to `ws`: (kind, what the model is shown, whether the files changed, the files changed).
+/// A `run` is executed only when `execute_run` (a cascade candidate is judged by its files alone).
+async fn apply_action(
+    env: &mut dyn AgentEnv,
+    action: &Action,
+    ws: &mut Workspace,
+    cfg: &AgentConfig,
+    append: bool,
+    execute_run: bool,
+) -> (&'static str, String, bool, Vec<String>) {
+    let mut changed_files: Vec<String> = vec![];
+    let (kind, observation, changed) = match action {
+        Action::Patch(p) => match patch::apply_patch(ws, p) {
+            Ok(s) => {
+                changed_files.extend(s.added.iter().chain(&s.modified).cloned());
+                ("patch", s.to_model_text(), true)
+            }
+            Err(e) => ("patch", format!("The patch was not applied: {e}"), false),
+        },
+        Action::WholeFile(code) => {
+            ws.insert(cfg.main_file.clone(), code.clone());
+            ("write", format!("Success. Replaced {}.", cfg.main_file), true)
+        }
+        Action::Run(file) => {
+            let file = file.trim_start_matches("./");
+            if !execute_run {
+                ("run", "A candidate that only runs a file changes nothing.".into(), false)
+            } else if ws.contains_key(file) {
+                ("run", env.run(ws, file).await, false)
+            } else {
+                ("run", format!("No such file in the workspace: {file}"), false)
+            }
+        }
+        Action::Submit => ("submit", String::new(), !append),
+        Action::None => (
+            "none",
+            if append {
+                "No action found. Reply with exactly one action: a patch, a ```python block with the whole solution.py, or a ```run block."
+            } else {
+                "No action found. Reply with exactly one action: a patch, a ```python block with the whole solution.py, a ```run block, or SUBMIT."
+            }
+            .into(),
+            false,
+        ),
+    };
+    (kind, observation, changed, changed_files)
 }
 
 fn task_message(
@@ -750,6 +912,9 @@ mod tests {
         seen: Vec<Vec<(String, String)>>,
         turns: Vec<Turn>,
         verifies: u32,
+        /// Model calls that fail with a transient error before the first reply.
+        fail_first: u32,
+        backoffs: Vec<u32>,
     }
 
     impl Script {
@@ -759,6 +924,8 @@ mod tests {
                 seen: vec![],
                 turns: vec![],
                 verifies: 0,
+                fail_first: 0,
+                backoffs: vec![],
             }
         }
     }
@@ -771,6 +938,10 @@ mod tests {
         ) -> BoxFuture<'_, Result<Reply, String>> {
             self.seen.push(m);
             self.turns.push(turn.clone());
+            if self.fail_first > 0 {
+                self.fail_first -= 1;
+                return Box::pin(async { Err("system2: no data for 180s".to_string()) });
+            }
             let r = self
                 .replies
                 .pop_front()
@@ -778,17 +949,30 @@ mod tests {
                 .ok_or_else(|| "script exhausted".to_string());
             Box::pin(async move { r })
         }
+        fn backoff(&mut self, attempt: u32) -> BoxFuture<'_, ()> {
+            self.backoffs.push(attempt);
+            Box::pin(async {})
+        }
         fn run(&mut self, ws: &Workspace, file: &str) -> BoxFuture<'_, String> {
             let out = format!("ran {file} ({} files)", ws.len());
             Box::pin(async move { out })
         }
         fn verify(&mut self, ws: &Workspace) -> BoxFuture<'_, Verdict> {
             self.verifies += 1;
-            let ok = ws.get("solution.py").is_some_and(|s| s.contains("a + b"));
+            let code = ws.get("solution.py").cloned().unwrap_or_default();
+            let ok = code.contains("a + b");
+            // Partial credit for a candidate that at least returns something of `a` (the cascade picks by score).
+            let closer = code.contains("return a\n");
             Box::pin(async move {
                 Verdict {
                     passed: ok,
-                    score: if ok { 1.0 } else { 0.05 },
+                    score: if ok {
+                        1.0
+                    } else if closer {
+                        0.5
+                    } else {
+                        0.05
+                    },
                     evidence: (!ok).then(|| "assert add(1, 2) == 3 failed".to_string()),
                 }
             })
@@ -1099,6 +1283,114 @@ mod tests {
         assert!(env.turns.iter().all(|t| t.repeats == 0));
     }
 
+    const WRONG0: &str = "```python\ndef add(a, b):\n    return 0\n```";
+    const CLOSER: &str = "```python\ndef add(a, b):\n    return a\n```";
+
+    #[tokio::test]
+    async fn a_cascade_step_ends_the_run_on_the_first_candidate_that_passes() {
+        let mut env = Script::new(&[WRONG0, FIX, CLOSER]);
+        let cfg = AgentConfig {
+            cascade_samples: 3,
+            ..AgentConfig::default()
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        assert_eq!(out.status, Status::Verified);
+        assert_eq!(
+            out.model_calls, 1,
+            "one request carried the three candidates"
+        );
+        assert_eq!(
+            (out.steps[0].samples, out.steps[0].stage),
+            (3, Stage::Cheap)
+        );
+        assert!(out.workspace["solution.py"].contains("a + b"));
+        assert!(
+            out.steps[0]
+                .observation
+                .contains("3 candidates in one request, 1 passed")
+        );
+        // The Script's default complete_n asked for the candidates one by one, all on the cheap stage.
+        assert_eq!(env.turns.len(), 3);
+        assert!(
+            env.turns
+                .iter()
+                .all(|t| t.stage == Stage::Cheap && t.samples == 3 && !t.allowed.run)
+        );
+        assert_eq!(
+            env.verifies,
+            1 + 2,
+            "the start, then the candidates that changed the files"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cascade_that_fails_continues_on_the_main_model_from_the_best_candidate() {
+        // The main model's fix is a whole file: the chosen candidate's text, not the start, is what a patch would match.
+        let whole_fix = "```python\ndef add(a, b):\n    return a + b\n```";
+        let mut env = Script::new(&[WRONG0, "hmm", CLOSER, whole_fix]);
+        let cfg = AgentConfig {
+            cascade_samples: 3,
+            ..AgentConfig::default()
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        assert_eq!(
+            out.status,
+            Status::Verified,
+            "{:?}",
+            out.steps
+                .iter()
+                .map(|s| (&s.action, &s.observation))
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(out.model_calls, 2);
+        let s0 = &out.steps[0];
+        assert_eq!(
+            (s0.samples, s0.stage, s0.verdict.as_ref().map(|v| v.score)),
+            (3, Stage::Cheap, Some(0.5))
+        );
+        assert!(
+            s0.observation.contains("this is candidate 3"),
+            "{}",
+            s0.observation
+        );
+        assert_eq!(
+            (
+                out.steps[1].samples,
+                out.steps[1].stage,
+                out.steps[1].action.as_str()
+            ),
+            (1, Stage::Main, "write")
+        );
+        // The main model saw the chosen candidate's reply and observation, not the others.
+        let second = env.seen.last().unwrap();
+        assert!(second[2].1.contains("return a\n") && !second[2].1.contains("return 0"));
+        assert!(second[3].1.contains("Hidden tests: failed"));
+    }
+
+    #[tokio::test]
+    async fn a_transient_model_error_is_retried_with_backoff_and_the_cap_is_not() {
+        let mut env = Script::new(&[FIX]);
+        env.fail_first = 2;
+        let out = run_agent(&mut env, "t", ws(), &AgentConfig::default()).await;
+        assert_eq!(out.status, Status::Verified);
+        assert_eq!((out.model_calls, out.steps[0].retries), (3, 2));
+        assert_eq!(env.backoffs, vec![1, 2]);
+        let mut env = Script::new(&[FIX]);
+        env.fail_first = 1;
+        let out = run_agent(
+            &mut env,
+            "t",
+            ws(),
+            &AgentConfig {
+                retries: 0,
+                ..AgentConfig::default()
+            },
+        )
+        .await;
+        assert_eq!(out.status, Status::ModelError);
+        assert!(env.backoffs.is_empty());
+    }
+
     #[test]
     fn the_turn_grammar_follows_the_workspace() {
         let t = Turn {
@@ -1111,6 +1403,8 @@ mod tests {
             notes: 2,
             deadline: None,
             repeats: 0,
+            stage: Stage::Main,
+            samples: 1,
         };
         let g = t.grammar(true).unwrap();
         assert!(

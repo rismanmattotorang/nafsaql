@@ -641,6 +641,18 @@
         },
         "first_step_thinking_budget": {
           "type": "integer"
+        },
+        "cascade": {
+          "type": "boolean"
+        },
+        "cascade_samples": {
+          "type": "integer"
+        },
+        "cascade_temperature": {
+          "type": "number"
+        },
+        "retries": {
+          "type": "integer"
         }
       },
       "additionalProperties": false

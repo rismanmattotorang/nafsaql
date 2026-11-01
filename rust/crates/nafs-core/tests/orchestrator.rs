@@ -66,6 +66,10 @@ fn reply_for(body: &Value) -> (String, String) {
         };
         return ("t".into(), proof.into());
     }
+    // Phase 14: the cascade's second step, on System 2, repairs the best System 1 candidate (x + x) with a patch.
+    if all.contains("CASCADETASK") && model == "system2" {
+        return ("t".into(), "*** Begin Patch\n*** Update File: solution.py\n@@ def sq(x):\n-    return x + x\n+    return x * x\n*** End Patch".into());
+    }
     // FR-093: the code agent first runs the file, then patches it once it has seen the output.
     if all.contains("AGENTTASK") {
         return if msgs.len() <= 2 {
@@ -296,6 +300,35 @@ async fn chat(State(m): State<Mock>, Json(body): Json<Value>) -> impl IntoRespon
             axum::body::Body::from_stream(st),
         )
             .into_response();
+    }
+    // Phase 14: the cascade's first step on System 1, n candidates in one request. CASCADETASK: candidate 2 is
+    // right, the others wrong; CASCADEFAIL: none is right, candidate 1 passes one of the two tests (x + x).
+    if body["stream"].as_bool().unwrap_or(false)
+        && body["n"].as_u64().unwrap_or(1) > 1
+        && body["messages"].to_string().contains("CASCADETASK")
+    {
+        let n = body["n"].as_u64().unwrap() as usize;
+        let fail = body["messages"].to_string().contains("CASCADEFAIL");
+        let mut sse = String::new();
+        for i in 0..n {
+            let code = if i == 2 && !fail {
+                "def sq(x):\n    return x * x\n"
+            } else if i == 1 {
+                "def sq(x):\n    return x + x\n"
+            } else {
+                "def sq(x):\n    return 0\n"
+            };
+            sse.push_str(&format!("data: {}\n\n", json!({"choices":[{"index":i,"delta":{"content": format!("```python\n{code}```")},"finish_reason":null}]})));
+            sse.push_str(&format!(
+                "data: {}\n\n",
+                json!({"choices":[{"index":i,"delta":{},"finish_reason":"stop"}]})
+            ));
+        }
+        sse.push_str(&format!(
+            "data: {}\n\ndata: [DONE]\n\n",
+            json!({"choices":[],"usage":{"prompt_tokens":20,"completion_tokens":8}})
+        ));
+        return ([(header::CONTENT_TYPE, "text/event-stream")], sse).into_response();
     }
     if body["stream"].as_bool().unwrap_or(false) && body["n"].as_u64().unwrap_or(1) > 1 {
         // n choices of the same scripted reply, each ending with its own finish reason.
@@ -1262,7 +1295,8 @@ async fn lean_tasks_need_a_configured_toolchain() {
 
 #[tokio::test]
 async fn code_agent_runs_patches_and_stops_on_the_verifier() {
-    let (o, mock, _d) = setup(true).await;
+    // The plain loop: the Phase 14 cascade (on by default) is tested on its own below.
+    let (o, mock, _d) = setup_with(true, |c| c.harness.cascade = false).await;
     let req = CodeAgentRequest {
         task: "AGENTTASK: fix sq(x) so that it returns x squared.".into(),
         files: [(
@@ -1407,6 +1441,143 @@ async fn code_agent_runs_patches_and_stops_on_the_verifier() {
         .contains("flat file name"));
 }
 
+/// Phase 14: the cascade. The first step goes to System 1 with four candidates in one request; the verifier judges
+/// each, and the run ends on the one that passes without a System 2 call.
+#[tokio::test]
+async fn code_agent_cascade_verifies_on_a_system1_candidate_without_system2() {
+    let (o, mock, _d) = setup_with(true, |c| c.harness.cascade = true).await;
+    let req = CodeAgentRequest {
+        task: "CASCADETASK: fix sq(x) so that it returns x squared.".into(),
+        files: [(
+            "solution.py".to_string(),
+            "def sq(x):\n    return x - 1\n".to_string(),
+        )]
+        .into_iter()
+        .collect(),
+        verification: VerificationInputs {
+            tests: Some(vec!["assert sq(3) == 9".into(), "assert sq(2) == 4".into()]),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let r = o.run_code_agent(req).await.unwrap();
+    assert_eq!(
+        (r.status.as_str(), r.passed, r.cascade, r.cascade_samples),
+        ("verified", true, true, 4),
+        "{r:?}"
+    );
+    assert_eq!(r.model_calls, 1, "one n-choice request on System 1");
+    let s0 = &r.steps[0];
+    assert_eq!(
+        (s0.model.as_str(), s0.samples, s0.action.as_str(), s0.passed),
+        ("system1", 4, "write", Some(true))
+    );
+    assert!(
+        s0.observation.contains(
+            "4 candidates in one request, 1 passed the hidden tests; this is candidate 3"
+        ),
+        "{}",
+        s0.observation
+    );
+    assert!(r.files["solution.py"].contains("return x * x"));
+    let calls = mock.calls.lock().unwrap().clone();
+    let agent: Vec<&Value> = calls
+        .iter()
+        .filter(|b| b["messages"].to_string().contains("CASCADETASK"))
+        .collect();
+    assert_eq!(agent.len(), 1);
+    assert_eq!(
+        (agent[0]["model"].as_str(), agent[0]["n"].as_u64()),
+        (Some("system1"), Some(4))
+    );
+    assert!(
+        agent[0]["grammar"]
+            .as_str()
+            .unwrap()
+            .starts_with("root ::= notes action\n"),
+        "System 1 plans in notes, not a think span"
+    );
+    assert_eq!(
+        r.verifier_calls,
+        1 + 3,
+        "the start, then each candidate up to the one that passed (the fourth is not judged)"
+    );
+}
+
+/// When no System 1 candidate passes, System 2 continues from the best-scoring one (x + x passes one of two tests).
+#[tokio::test]
+async fn code_agent_cascade_continues_on_system2_from_the_best_candidate() {
+    let (o, mock, _d) = setup_with(true, |c| c.harness.cascade = true).await;
+    let req = CodeAgentRequest {
+        task: "CASCADETASK CASCADEFAIL: fix sq(x) so that it returns x squared.".into(),
+        files: [(
+            "solution.py".to_string(),
+            "def sq(x):\n    return x - 1\n".to_string(),
+        )]
+        .into_iter()
+        .collect(),
+        verification: VerificationInputs {
+            tests: Some(vec!["assert sq(3) == 9".into(), "assert sq(2) == 4".into()]),
+            ..Default::default()
+        },
+        cascade_samples: Some(3),
+        ..Default::default()
+    };
+    let r = o.run_code_agent(req).await.unwrap();
+    assert_eq!(
+        (r.status.as_str(), r.model_calls, r.cascade_samples),
+        ("verified", 2, 3),
+        "{r:?}"
+    );
+    let (s0, s1) = (&r.steps[0], &r.steps[1]);
+    assert_eq!(
+        (s0.model.as_str(), s0.samples, s0.passed),
+        ("system1", 3, Some(false))
+    );
+    assert!(
+        s0.observation.contains(
+            "3 candidates in one request, 0 passed the hidden tests; this is candidate 2"
+        ),
+        "{}",
+        s0.observation
+    );
+    assert!(
+        s0.score.unwrap() > 0.1 && s0.score.unwrap() < 1.0,
+        "the best candidate carries partial credit: {:?}",
+        s0.score
+    );
+    assert_eq!(
+        (s1.model.as_str(), s1.samples, s1.action.as_str(), s1.passed),
+        ("system2", 1, "patch", Some(true))
+    );
+    let calls = mock.calls.lock().unwrap().clone();
+    let models: Vec<&str> = calls
+        .iter()
+        .filter(|b| b["messages"].to_string().contains("CASCADETASK"))
+        .map(|b| b["model"].as_str().unwrap())
+        .collect();
+    assert_eq!(models, ["system1", "system2"]);
+    // A run asked for on System 1 itself gets no cascade.
+    let r = o
+        .run_code_agent(CodeAgentRequest {
+            task: "AGENTTASK: fix sq(x) so that it returns x squared.".into(),
+            files: [(
+                "solution.py".to_string(),
+                "def sq(x):\n    return x + x\n".to_string(),
+            )]
+            .into_iter()
+            .collect(),
+            verification: VerificationInputs {
+                tests: Some(vec!["assert sq(3) == 9".into()]),
+                ..Default::default()
+            },
+            model: Some("system1".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert!(!r.cascade && r.steps.iter().all(|s| s.samples == 1));
+}
 /// FR-090 end to end with the real Lean binary and a scripted model: the System 1 draft fails Lean, System 2's
 /// first proof fails with a Lean error, the error is in the next prompt, and the second proof is verified.
 /// Runs only when `NAFS_LEAN` names a `lean` executable (CI has none).

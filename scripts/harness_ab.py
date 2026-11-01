@@ -37,6 +37,10 @@ ARMS = {
                    "first_step_thinking_budget": 0},
     "phase11_adapt": {"context": "append", "constrain": True, "stream_cut": True, "edit_format": "auto", "thinking_budget": 512,
                       "first_step_thinking_budget": 256},
+    # Phase 14: the cascade (first step on System 1 with 4 candidates in one request, System 2 only if none passes)
+    # against the Phase 11 default (System 2 from the first step); everything else at the production defaults.
+    "s2": {"cascade": False},
+    "cascade": {"cascade": True, "cascade_samples": 4},
 }
 
 TASKS = [
@@ -108,9 +112,11 @@ def summary(r):
         "compactions": r.get("compactions"), "wall_s": round(r.get("wall_ms", 0) / 1000, 1),
         "prefill_tokens": r.get("prefill_tokens"), "cached_tokens": r.get("cached_tokens"),
         "decoded_tokens": r.get("decoded_tokens"),
+        "cascade": r.get("cascade"), "cascade_samples": r.get("cascade_samples"),
+        "s1_steps": sum(1 for s in steps if s.get("model") == "system1"), "s2_steps": sum(1 for s in steps if s.get("model") == "system2"),
         "actions": [s["action"] for s in steps],
         "malformed": sum(1 for s in steps if s["action"] == "none" or s["observation"].startswith("The patch was not applied")),
-        "steps": [{k: s.get(k) for k in ("step", "action", "passed", "score", "ms", "usage", "compacted")} | {"observation": s["observation"][:300]} for s in steps],
+        "steps": [{**{k: s.get(k) for k in ("step", "action", "passed", "score", "ms", "usage", "compacted", "model", "samples", "retries")}, "observation": s["observation"][:300]} for s in steps],
         "files": r.get("files"),
     }
 

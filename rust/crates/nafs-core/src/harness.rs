@@ -1,11 +1,15 @@
 //! The code agent (FR-093) bound to Nafs-Aql's backends and verifier sandbox. The loop is
 //! `nafs_harness::agent` (Codex's turn loop with Open Math Harness's stop rule); this module supplies the
-//! model, the sandboxed Python runner and the exact verifier.
+//! models, the sandboxed Python runner and the exact verifier.
+//!
+//! Phase 14: the cascade. The agent's first step can go to System 1 with several candidates in one `n`-choice
+//! request ([`Backend::stream_n`]: the prompt is prefilled once, the choices decode in one batch), each judged by
+//! the verifier; System 2 continues only when none passes. A failed model call is retried with Codex's backoff.
 use crate::backend::{Backend, GenRequest};
 use crate::orchestrator::{outcome_of, Orchestrator};
 use futures::future::BoxFuture;
 use nafs_harness::agent::{
-    self, AgentConfig, AgentEnv, ContextMode, EditFormat, Reply, Turn, Usage, Verdict,
+    self, AgentConfig, AgentEnv, ContextMode, EditFormat, Reply, Stage, Turn, Usage, Verdict,
 };
 use nafs_harness::patch::Workspace;
 use nafs_harness::truncate::format_exec_output;
@@ -17,8 +21,12 @@ use uuid::Uuid;
 
 struct Env<'a> {
     orch: &'a Orchestrator,
+    /// The run's model (`harness.model`).
     model: Arc<Backend>,
     thinking: bool,
+    /// System 1, for the cascade's first step.
+    cheap: Arc<Backend>,
+    cheap_temperature: f32,
     thinking_budget: u32,
     /// Reasoning tokens on the first step (0 = `thinking_budget`).
     first_budget: u32,
@@ -29,35 +37,44 @@ struct Env<'a> {
     cut: bool,
 }
 
-impl AgentEnv for Env<'_> {
-    fn complete(
+impl Env<'_> {
+    /// The request for `turn`: System 1 without reasoning on a cheap step, the run's model otherwise.
+    fn request(
         &mut self,
         messages: Vec<(String, String)>,
         turn: &Turn,
-    ) -> BoxFuture<'_, std::result::Result<Reply, String>> {
+    ) -> (Arc<Backend>, GenRequest, bool) {
         self.calls += 1;
-        let grammar = turn
-            .grammar(self.thinking)
-            .filter(|_| self.model.supports_grammar());
+        let (model, thinking) = match turn.stage {
+            Stage::Cheap => (self.cheap.clone(), false),
+            Stage::Main => (self.model.clone(), self.thinking),
+        };
+        let grammar = turn.grammar(thinking).filter(|_| model.supports_grammar());
         let constrained = grammar.is_some();
         let budget = if turn.step == 1 && self.first_budget > 0 {
             self.first_budget
         } else {
             self.thinking_budget
         };
+        let temperature = match turn.stage {
+            // Candidates must differ from each other: the rescue's temperature (0.7) rather than System 2's.
+            Stage::Cheap => self.cheap_temperature,
+            // A model that keeps reproducing judged files is sampled more diversely (0.3 per repeat, to 1.0).
+            Stage::Main => (self.orch.cfg.deliberation.slow_temperature
+                + 0.3 * turn.repeats as f32)
+                .min(1.0_f32.max(self.orch.cfg.deliberation.slow_temperature)),
+        };
         let req = GenRequest {
             messages: messages
                 .into_iter()
                 .map(|(role, content)| Message { role, content })
                 .collect(),
-            max_tokens: self.max_tokens + if self.thinking { budget } else { 0 },
-            // A model that keeps reproducing judged files is sampled more diversely (0.3 per repeat, to 1.0).
-            temperature: (self.orch.cfg.deliberation.slow_temperature + 0.3 * turn.repeats as f32)
-                .min(1.0_f32.max(self.orch.cfg.deliberation.slow_temperature)),
+            max_tokens: self.max_tokens + if thinking { budget } else { 0 },
+            temperature,
             top_p: 0.95,
             logprobs: false,
-            thinking: Some(self.thinking),
-            thinking_budget: self.thinking.then_some(budget),
+            thinking: Some(thinking),
+            thinking_budget: thinking.then_some(budget),
             seed: Some(self.calls),
             cancel: None,
             response_format: None,
@@ -69,34 +86,101 @@ impl AgentEnv for Env<'_> {
                 .then_some(agent::action_end as fn(&str) -> Option<usize>),
             grammar,
         };
-        let model = self.model.clone();
+        (model, req, constrained)
+    }
+}
+
+fn reply_of(out: crate::backend::GenOutput, constrained: bool) -> Reply {
+    Reply {
+        usage: Usage {
+            prompt_tokens: out.server_prompt_n,
+            cached_tokens: out.server_cache_n,
+            prefill_ms: out.server_prefill_ms,
+            decode_ms: out.server_decode_ms,
+            completion_tokens: out.completion_tokens,
+            reasoning_tokens: out.reasoning_tokens,
+            finish_reason: out.finish_reason.clone(),
+            constrained,
+        },
+        text: out.content,
+    }
+}
+
+/// The run's cap holds inside a call too: dropping the stream stops generation on the server (the Phase 10
+/// live run overran a 900 s cap by one 1,041 s call).
+async fn capped<T>(
+    deadline: Option<Instant>,
+    call: impl std::future::Future<Output = nafs_types::Result<T>>,
+) -> std::result::Result<T, String> {
+    match deadline {
+        Some(d) => tokio::time::timeout_at(d.into(), call).await.map_err(|_| {
+            "the run's wall-clock cap was reached during the model call".to_string()
+        })?,
+        None => call.await,
+    }
+    .map_err(|e| e.to_string())
+}
+
+impl AgentEnv for Env<'_> {
+    fn complete(
+        &mut self,
+        messages: Vec<(String, String)>,
+        turn: &Turn,
+    ) -> BoxFuture<'_, std::result::Result<Reply, String>> {
+        let (model, req, constrained) = self.request(messages, turn);
         let deadline = turn.deadline;
         Box::pin(async move {
             let mut sink = |_: &str, _: bool| {};
-            let call = model.stream(&req, &mut sink);
-            // The run's cap holds inside a call too: dropping the stream stops generation on the server
-            // (the Phase 10 live run overran a 900 s cap by one 1,041 s call).
-            let out = match deadline {
-                Some(d) => tokio::time::timeout_at(d.into(), call).await.map_err(|_| {
-                    "the run's wall-clock cap was reached during the model call".to_string()
-                })?,
-                None => call.await,
-            }
-            .map_err(|e| e.to_string())?;
-            Ok(Reply {
-                usage: Usage {
-                    prompt_tokens: out.server_prompt_n,
-                    cached_tokens: out.server_cache_n,
-                    prefill_ms: out.server_prefill_ms,
-                    decode_ms: out.server_decode_ms,
-                    completion_tokens: out.completion_tokens,
-                    reasoning_tokens: out.reasoning_tokens,
-                    finish_reason: out.finish_reason.clone(),
-                    constrained,
-                },
-                text: out.content,
-            })
+            let out = capped(deadline, model.stream(&req, &mut sink)).await?;
+            Ok(reply_of(out, constrained))
         })
+    }
+
+    /// `n` candidates in one request. The width never exceeds the server's free slots (a wider request would
+    /// queue behind itself); every choice that ended is returned in index order, and the call fails only when
+    /// none did.
+    fn complete_n(
+        &mut self,
+        messages: Vec<(String, String)>,
+        turn: &Turn,
+        n: usize,
+    ) -> BoxFuture<'_, std::result::Result<Vec<Reply>, String>> {
+        if n <= 1 {
+            let one = self.complete(messages, turn);
+            return Box::pin(async move { Ok(vec![one.await?]) });
+        }
+        let (model, req, constrained) = self.request(messages, turn);
+        let deadline = turn.deadline;
+        Box::pin(async move {
+            let n = n.min(model.free_slots()).max(1);
+            if n == 1 {
+                let mut sink = |_: &str, _: bool| {};
+                let out = capped(deadline, model.stream(&req, &mut sink)).await?;
+                return Ok(vec![reply_of(out, constrained)]);
+            }
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+            let driver = model.stream_n(&req, n, tx);
+            let r = capped(deadline, driver).await;
+            let mut outs: Vec<Option<Reply>> = (0..n).map(|_| None).collect();
+            while let Ok((i, out)) = rx.try_recv() {
+                if let (Some(slot), Ok(o)) = (outs.get_mut(i), out) {
+                    *slot = Some(reply_of(o, constrained));
+                }
+            }
+            let replies: Vec<Reply> = outs.into_iter().flatten().collect();
+            match (replies.is_empty(), r) {
+                (true, Err(e)) => Err(e),
+                (true, Ok(_)) => Err("no candidate ended".into()),
+                _ => Ok(replies),
+            }
+        })
+    }
+
+    fn backoff(&mut self, attempt: u32) -> BoxFuture<'_, ()> {
+        // Codex: 200 ms initial delay, factor 2, jitter 0.9-1.1 (`async-utils/src/backoff.rs`).
+        let ms =
+            (200u64 << attempt.saturating_sub(1).min(4)) as f64 * (0.9 + 0.2 * fastrand::f64());
+        Box::pin(async move { tokio::time::sleep(Duration::from_millis(ms as u64)).await })
     }
 
     fn run(&mut self, ws: &Workspace, file: &str) -> BoxFuture<'_, String> {
@@ -218,6 +302,9 @@ impl Orchestrator {
         {
             return Err("first_step_thinking_budget must be 0 or in [64, 4096]".into());
         }
+        if req.cascade_samples.is_some_and(|s| !(1..=4).contains(&s)) {
+            return Err("cascade_samples must be in [1, 4]".into());
+        }
         Ok(())
     }
 
@@ -245,6 +332,13 @@ impl Orchestrator {
         } else {
             (pair.s2.clone(), true)
         };
+        // The cascade only makes sense in front of System 2: a run asked for on System 1 is already cheap.
+        let cascade = model != "system1" && req.cascade.unwrap_or(h.cascade);
+        let cascade_samples = if cascade {
+            req.cascade_samples.unwrap_or(h.cascade_samples).clamp(1, 4) as usize
+        } else {
+            0
+        };
         let context = match req.context.as_deref() {
             Some("reset") => ContextMode::Reset,
             Some(_) => ContextMode::Append,
@@ -261,6 +355,8 @@ impl Orchestrator {
             orch: self,
             model: backend.clone(),
             thinking,
+            cheap: pair.s1.clone(),
+            cheap_temperature: h.cascade_temperature,
             thinking_budget: req.thinking_budget.unwrap_or(h.thinking_budget),
             first_budget: req
                 .first_step_thinking_budget
@@ -280,6 +376,8 @@ impl Orchestrator {
             edit_format,
             whole_max_lines: h.whole_max_lines,
             unstick: req.unstick.unwrap_or(h.unstick),
+            cascade_samples,
+            retries: h.retries,
             deadline: Some(t0 + Duration::from_secs(h.wall_clock_s)),
             ..AgentConfig::default()
         };
@@ -290,6 +388,15 @@ impl Orchestrator {
             .and_then(|v| v.as_str().map(String::from))
             .unwrap_or_default();
         metrics::counter!("nafs_code_agent_runs_total", "status" => status.clone()).increment(1);
+        if cascade_samples > 0 {
+            let first = out.steps.first();
+            let result = match first.and_then(|s| s.verdict.as_ref()) {
+                Some(v) if v.passed => "verified",
+                Some(_) => "continued",
+                None => "none",
+            };
+            metrics::counter!("nafs_code_agent_cascade_total", "result" => result).increment(1);
+        }
         let usages = || out.steps.iter().filter_map(|s| s.usage.as_ref());
         let prefill_tokens = usages()
             .filter_map(|u| u.prompt_tokens)
@@ -337,6 +444,12 @@ impl Orchestrator {
                         constrained: u.constrained,
                     }),
                     compacted: s.compacted,
+                    model: match s.stage {
+                        Stage::Cheap => "system1".into(),
+                        Stage::Main => model.clone(),
+                    },
+                    samples: s.samples,
+                    retries: s.retries,
                 })
                 .collect(),
             model_calls: out.model_calls,
@@ -358,6 +471,8 @@ impl Orchestrator {
             cached_tokens,
             decoded_tokens,
             diff: out.diff,
+            cascade: cascade_samples > 0,
+            cascade_samples: cascade_samples as u32,
         })
     }
 }

@@ -89,6 +89,28 @@ pub struct HarnessCfg {
     /// attempt, the full budget after a failure (decision 006, round 3: same tasks verified in half the time).
     #[serde(default = "d_agent_first_think")]
     pub first_step_thinking_budget: u32,
+    /// Phase 14: the first step goes to System 1 with `cascade_samples` candidates in one request, each judged
+    /// by the verifier; System 2 continues from the best only when none passes. Off when `model` is system1.
+    #[serde(default = "d_true")]
+    pub cascade: bool,
+    /// Candidates of the cascade's first step (1..=4, one `n`-choice request on System 1).
+    #[serde(default = "d_agent_cascade_samples")]
+    pub cascade_samples: u32,
+    /// Sampling temperature of the cascade candidates (they must differ from each other).
+    #[serde(default = "d_agent_cascade_temp")]
+    pub cascade_temperature: f32,
+    /// Retries of a model call that fails for a reason other than the run's cap (Codex's backoff).
+    #[serde(default = "d_agent_retries")]
+    pub retries: u32,
+}
+fn d_agent_cascade_samples() -> u32 {
+    4
+}
+fn d_agent_cascade_temp() -> f32 {
+    0.7
+}
+fn d_agent_retries() -> u32 {
+    2
 }
 fn d_agent_first_think() -> u32 {
     256
@@ -139,6 +161,10 @@ impl Default for HarnessCfg {
             whole_max_lines: d_agent_whole_lines(),
             unstick: true,
             first_step_thinking_budget: d_agent_first_think(),
+            cascade: true,
+            cascade_samples: d_agent_cascade_samples(),
+            cascade_temperature: d_agent_cascade_temp(),
+            retries: d_agent_retries(),
         }
     }
 }

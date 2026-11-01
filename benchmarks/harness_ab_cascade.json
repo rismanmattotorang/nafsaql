@@ -1,0 +1,1253 @@
+{
+ "runs": [
+  {
+   "model": "system2",
+   "task": "fix_palindrome_case",
+   "arm": "s2",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 14.3,
+   "finished": "2026-11-01T11:09:04",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 92.5,
+   "prefill_tokens": 1,
+   "cached_tokens": 341,
+   "decoded_tokens": 304,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 92445,
+     "usage": {
+      "prompt_tokens": 1,
+      "cached_tokens": 341,
+      "prefill_ms": 179.415,
+      "decode_ms": 92177.691,
+      "completion_tokens": 304,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def is_palindrome(s):\n    # Process the string: lowercase and remove non-alphanumeric characters\n    cleaned = ''.join(filter(str.isalnum, s.lower()))\n    return cleaned == cleaned[::-1]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_palindrome_case",
+   "arm": "cascade",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 6.5,
+   "finished": "2026-11-01T11:10:43",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 98.8,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 193,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 98666,
+     "usage": {
+      "completion_tokens": 193,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 1 passed the hidden tests; this is candidate 2.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def is_palindrome(s):\n    cleaned = ''.join(c.lower() for c in s if c.isalnum())\n    return cleaned == cleaned[::-1]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_second_largest",
+   "arm": "cascade",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 13.3,
+   "finished": "2026-11-01T11:15:32",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 3,
+   "compactions": 0,
+   "wall_s": 289.2,
+   "prefill_tokens": 335,
+   "cached_tokens": 207,
+   "decoded_tokens": 744,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 1,
+   "actions": [
+    "write",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.7,
+     "ms": 16241,
+     "usage": {
+      "completion_tokens": 190,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 0 passed the hidden tests; this is candidate 1.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n2 of 4 tests passed.\ntest 2: assert second_largest([5, 5, 4]) == 4 -> AssertionError: got 5\ntest 4: assert second_largest(["
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 272860,
+     "usage": {
+      "prompt_tokens": 335,
+      "cached_tokens": 207,
+      "prefill_ms": 60637.141,
+      "decode_ms": 208739.292,
+      "completion_tokens": 554,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def second_largest(xs):\n    distinct = sorted(set(xs), reverse=True)\n    if len(distinct) < 2:\n        return None\n    return distinct[1]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_second_largest",
+   "arm": "s2",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 7.0,
+   "finished": "2026-11-01T11:17:11",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 98.6,
+   "prefill_tokens": 2,
+   "cached_tokens": 371,
+   "decoded_tokens": 295,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 98518,
+     "usage": {
+      "prompt_tokens": 2,
+      "cached_tokens": 371,
+      "prefill_ms": 183.326,
+      "decode_ms": 76681.723,
+      "completion_tokens": 295,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def second_largest(xs):\n    distinct = sorted(set(xs))\n    if len(distinct) < 2:\n        return None\n    return distinct[-2]\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_rle",
+   "arm": "s2",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 9.7,
+   "finished": "2026-11-01T11:18:45",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 94.0,
+   "prefill_tokens": 58,
+   "cached_tokens": 207,
+   "decoded_tokens": 359,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 93996,
+     "usage": {
+      "prompt_tokens": 58,
+      "cached_tokens": 207,
+      "prefill_ms": 4919.987,
+      "decode_ms": 88361.714,
+      "completion_tokens": 359,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def rle(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    current_char = s[0]\n    for char in s[1:]:\n        if char == current_char:\n            count += 1\n        else:\n            result.append(str(count))\n            result.append(current_char)\n            current_char = char\n            count = 1\n    result.append(str(count))\n    result.append(current_char)\n    return ''.join(result)\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_rle",
+   "arm": "cascade",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 5.2,
+   "finished": "2026-11-01T11:20:27",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 101.2,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 426,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 101162,
+     "usage": {
+      "completion_tokens": 426,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 1 passed the hidden tests; this is candidate 1.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def rle(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    prev_char = s[0]\n    for char in s[1:]:\n        if char == prev_char:\n            count += 1\n        else:\n            result.append(f\"{count}{prev_char}\")\n            prev_char = char\n            count = 1\n    result.append(f\"{count}{prev_char}\")\n    return \"\".join(result)\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_fizzbuzz",
+   "arm": "cascade",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 14.0,
+   "finished": "2026-11-01T11:29:22",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 3,
+   "compactions": 0,
+   "wall_s": 535.1,
+   "prefill_tokens": 544,
+   "cached_tokens": 207,
+   "decoded_tokens": 1021,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 1,
+   "actions": [
+    "write",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.6,
+     "ms": 21875,
+     "usage": {
+      "completion_tokens": 412,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 0 passed the hidden tests; this is candidate 1.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n1 of 4 tests passed.\ntest 1: assert fizzbuzz(5) == ['1', '2', 'Fizz', '4', 'Buzz'] -> AssertionError: got ['FizzBuzz', '1',"
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 513087,
+     "usage": {
+      "prompt_tokens": 544,
+      "cached_tokens": 207,
+      "prefill_ms": 23861.491,
+      "decode_ms": 480871.507,
+      "completion_tokens": 609,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def fizzbuzz(n):\n    out = []\n    for i in range(1, n+1):\n        if i % 3 == 0 and i % 5 == 0:\n            out.append('FizzBuzz')\n        elif i % 3 == 0:\n            out.append('Fizz')\n        elif i % 5 == 0:\n            out.append('Buzz')\n        else:\n            out.append(str(i))\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_fizzbuzz",
+   "arm": "s2",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 16.3,
+   "finished": "2026-11-01T11:39:05",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 582.7,
+   "prefill_tokens": 2,
+   "cached_tokens": 469,
+   "decoded_tokens": 354,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 582556,
+     "usage": {
+      "prompt_tokens": 2,
+      "cached_tokens": 469,
+      "prefill_ms": 5645.769,
+      "decode_ms": 574726.323,
+      "completion_tokens": 354,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def fizzbuzz(n):\n    out = []\n    for i in range(1, n + 1):\n        if i % 3 == 0 and i % 5 == 0:\n            out.append('FizzBuzz')\n        elif i % 3 == 0:\n            out.append('Fizz')\n        elif i % 5 == 0:\n            out.append('Buzz')\n        else:\n            out.append(str(i))\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_word_count",
+   "arm": "s2",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 7.3,
+   "finished": "2026-11-01T11:44:28",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 3,
+   "compactions": 0,
+   "wall_s": 322.4,
+   "prefill_tokens": 383,
+   "cached_tokens": 652,
+   "decoded_tokens": 896,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 2,
+   "actions": [
+    "write",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.8,
+     "ms": 96718,
+     "usage": {
+      "prompt_tokens": 240,
+      "cached_tokens": 207,
+      "prefill_ms": 12910.951,
+      "decode_ms": 83184.137,
+      "completion_tokens": 313,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n3 of 4 tests passed.\ntest 2: assert word_count('Hi, hi!') == {'hi': 2} -> AssertionError: got {'Hi': 1, 'hi': 1}\n</verifier_evidence>\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 225635,
+     "usage": {
+      "prompt_tokens": 143,
+      "cached_tokens": 445,
+      "prefill_ms": 5194.322,
+      "decode_ms": 220298.151,
+      "completion_tokens": 583,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def word_count(text):\n    words = [word.strip('.,!?').lower() for word in text.split()]\n    counts = {}\n    for w in words:\n        if w:  # Skip empty strings after stripping\n            counts[w] = counts.get(w, 0) + 1\n    return counts\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_word_count",
+   "arm": "cascade",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 6.2,
+   "finished": "2026-11-01T11:48:03",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 4,
+   "compactions": 0,
+   "wall_s": 215.5,
+   "prefill_tokens": 262,
+   "cached_tokens": 445,
+   "decoded_tokens": 896,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 1,
+   "actions": [
+    "write",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.6,
+     "ms": 50834,
+     "usage": {
+      "completion_tokens": 313,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 0 passed the hidden tests; this is candidate 1.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n1 of 4 tests passed.\ntest 2: assert word_count('Hi, hi!') == {'hi': 2} -> AssertionError: got {'Hi': 1, 'hi': 1}\ntest 3: as"
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 164614,
+     "usage": {
+      "prompt_tokens": 262,
+      "cached_tokens": 445,
+      "prefill_ms": 8818.478,
+      "decode_ms": 155529.263,
+      "completion_tokens": 583,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def word_count(text):\n    counts = {}\n    for w in text.split():\n        # Remove leading/trailing punctuation and convert to lowercase\n        w = ''.join(c for c in w if c.isalnum()).lower()\n        counts[w] = counts.get(w, 0) + 1\n    return counts\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_binary_search",
+   "arm": "cascade",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 5.7,
+   "finished": "2026-11-01T11:48:46",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 3,
+   "compactions": 0,
+   "wall_s": 43.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 458,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 22342,
+     "usage": {
+      "completion_tokens": 458,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 1 passed the hidden tests; this is candidate 2.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def index_of(xs, x):\n    lo, hi = 0, len(xs)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if xs[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo if lo < len(xs) and xs[lo] == x else -1\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_binary_search",
+   "arm": "s2",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 5.2,
+   "finished": "2026-11-01T11:50:05",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 78.3,
+   "prefill_tokens": 145,
+   "cached_tokens": 207,
+   "decoded_tokens": 347,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 58097,
+     "usage": {
+      "prompt_tokens": 145,
+      "cached_tokens": 207,
+      "prefill_ms": 4231.455,
+      "decode_ms": 53669.743,
+      "completion_tokens": 347,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def index_of(xs, x):\n    lo, hi = 0, len(xs)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if xs[mid] < x:\n            lo = mid + 1\n        else:\n            hi = mid\n    if lo < len(xs) and xs[lo] == x:\n        return lo\n    return -1\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_flatten",
+   "arm": "s2",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 5.6,
+   "finished": "2026-11-01T11:50:45",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 40.5,
+   "prefill_tokens": 70,
+   "cached_tokens": 208,
+   "decoded_tokens": 302,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 40506,
+     "usage": {
+      "prompt_tokens": 70,
+      "cached_tokens": 208,
+      "prefill_ms": 1948.359,
+      "decode_ms": 37825.741,
+      "completion_tokens": 302,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def flatten(xs):\n    result = []\n    for x in xs:\n        if isinstance(x, list):\n            result.extend(flatten(x))\n        else:\n            result.append(x)\n    return result\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_flatten",
+   "arm": "cascade",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 5.8,
+   "finished": "2026-11-01T11:50:55",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 9.6,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 254,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 9596,
+     "usage": {
+      "completion_tokens": 254,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 1 passed the hidden tests; this is candidate 1.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def flatten(xs):\n    result = []\n    def recurse(lst):\n        for item in lst:\n            if isinstance(item, list):\n                recurse(item)\n            else:\n                result.append(item)\n    recurse(xs)\n    return result\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_roman",
+   "arm": "cascade",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 6.5,
+   "finished": "2026-11-01T11:51:20",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 3,
+   "compactions": 0,
+   "wall_s": 25.2,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 590,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 25108,
+     "usage": {
+      "completion_tokens": 590,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 1 passed the hidden tests; this is candidate 2.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def to_roman(n):\n    vals = [(1000, 'M'), (900, 'CM'), (500, 'D'), (400, 'CD'), (100, 'C'), (90, 'XC'), (50, 'L'), (40, 'XL'), (10, 'X'), (9, 'IX'), (5, 'V'), (4, 'IV'), (1, 'I')]\n    out = ''\n    for v, s in vals:\n        while n >= v:\n            out += s\n            n -= v\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_roman",
+   "arm": "s2",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 9.8,
+   "finished": "2026-11-01T11:55:56",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "wall_s": 275.7,
+   "prefill_tokens": 321,
+   "cached_tokens": 207,
+   "decoded_tokens": 396,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 275624,
+     "usage": {
+      "prompt_tokens": 321,
+      "cached_tokens": 207,
+      "prefill_ms": 11851.322,
+      "decode_ms": 263442.071,
+      "completion_tokens": 396,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def to_roman(n):\n    vals = [(1000, 'M'), (900, 'CM'), (500, 'D'), (400, 'CD'), (100, 'C'), (90, 'XC'), (50, 'L'), (40, 'XL'), (10, 'X'), (9, 'IX'), (5, 'V'), (4, 'IV'), (1, 'I')]\n    out = ''\n    for v, s in vals:\n        while n >= v:\n            out += s\n            n -= v\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_merge_intervals",
+   "arm": "s2",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 9.5,
+   "finished": "2026-11-01T12:01:38",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 3,
+   "compactions": 0,
+   "wall_s": 342.4,
+   "prefill_tokens": 410,
+   "cached_tokens": 664,
+   "decoded_tokens": 904,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 2,
+   "actions": [
+    "write",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.82,
+     "ms": 171335,
+     "usage": {
+      "prompt_tokens": 252,
+      "cached_tokens": 207,
+      "prefill_ms": 9349.222,
+      "decode_ms": 161771.256,
+      "completion_tokens": 323,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n4 of 5 tests passed.\ntest 3: assert merge([[5, 6], [1, 2]]) == [[1, 2], [5, 6]] -> AssertionError: got [[5, 6]]\n</verifier_evidence>\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 171024,
+     "usage": {
+      "prompt_tokens": 158,
+      "cached_tokens": 457,
+      "prefill_ms": 8295.837,
+      "decode_ms": 162531.656,
+      "completion_tokens": 581,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def merge(intervals):\n    out = []\n    for s, e in sorted(intervals):\n        if out and s <= out[-1][1]:\n            out[-1][1] = max(out[-1][1], e)\n        else:\n            out.append([s, e])\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "fix_merge_intervals",
+   "arm": "cascade",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 8.3,
+   "finished": "2026-11-01T12:03:49",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 4,
+   "compactions": 0,
+   "wall_s": 131.3,
+   "prefill_tokens": 272,
+   "cached_tokens": 457,
+   "decoded_tokens": 906,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 1,
+   "actions": [
+    "write",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.66,
+     "ms": 19374,
+     "usage": {
+      "completion_tokens": 316,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 0 passed the hidden tests; this is candidate 1.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n2 of 5 tests passed.\ntest 2: assert merge([[1, 4], [4, 5]]) == [[1, 5]] -> AssertionError: got [[1, 4], [4, 5]]\ntest 3: ass"
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 111805,
+     "usage": {
+      "prompt_tokens": 272,
+      "cached_tokens": 457,
+      "prefill_ms": 14521.402,
+      "decode_ms": 94606.472,
+      "completion_tokens": 590,
+      "reasoning_tokens": 511,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def merge(intervals):\n    intervals.sort(key=lambda x: x[0])\n    out = []\n    for s, e in intervals:\n        if out and s <= out[-1][1]:\n            out[-1][1] = max(out[-1][1], e)\n        else:\n            out.append([s, e])\n    return out\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_caesar",
+   "arm": "cascade",
+   "order": 0,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 7.9,
+   "finished": "2026-11-01T12:04:07",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 17.8,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 470,
+   "cascade": true,
+   "cascade_samples": 4,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 17839,
+     "usage": {
+      "completion_tokens": 470,
+      "reasoning_tokens": 0,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system1",
+     "samples": 4,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nQuick model: 4 candidates in one request, 1 passed the hidden tests; this is candidate 1.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def caesar(s, k):\n    result = []\n    for char in s:\n        if char.isalpha():\n            # Find the position of the character in the alphabet\n            base = ord('A') if char.isupper() else ord('a')\n            # Calculate the new position\n            new_pos = (ord(char) - base + k) % 26 + base\n            # Convert back to a character\n            result.append(chr(new_pos))\n        else:\n            result.append(char)\n    return ''.join(result)\n"
+   }
+  },
+  {
+   "model": "system2",
+   "task": "write_caesar",
+   "arm": "s2",
+   "order": 1,
+   "label": "SHARED HOST: owner's Smiley llama-server and desktop apps on the same 4 cores (load 7-12); wall times are not speed claims, pairs are",
+   "load_1m_after": 7.1,
+   "finished": "2026-11-01T12:05:07",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "wall_s": 59.9,
+   "prefill_tokens": 65,
+   "cached_tokens": 208,
+   "decoded_tokens": 377,
+   "cascade": false,
+   "cascade_samples": 0,
+   "s1_steps": 0,
+   "s2_steps": 1,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 59923,
+     "usage": {
+      "prompt_tokens": 65,
+      "cached_tokens": 208,
+      "prefill_ms": 1922.814,
+      "decode_ms": 57668.863,
+      "completion_tokens": 377,
+      "reasoning_tokens": 255,
+      "finish_reason": "stop",
+      "constrained": true
+     },
+     "compacted": false,
+     "model": "system2",
+     "samples": 1,
+     "retries": 0,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed."
+    }
+   ],
+   "files": {
+    "solution.py": "def caesar(s, k):\n    result = []\n    for char in s:\n        if 'A' <= char <= 'Z':\n            shifted = (ord(char) - ord('A') + k) % 26\n            result.append(chr(ord('A') + shifted))\n        elif 'a' <= char <= 'z':\n            shifted = (ord(char) - ord('a') + k) % 26\n            result.append(chr(ord('a') + shifted))\n        else:\n            result.append(char)\n    return ''.join(result)\n"
+   }
+  }
+ ],
+ "arms": {
+  "phase10": {
+   "context": "reset",
+   "constrain": false,
+   "stream_cut": false,
+   "edit_format": "any"
+  },
+  "phase11": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto"
+  },
+  "phase11_any": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "any"
+  },
+  "phase11_u": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "unstick": true
+  },
+  "phase11_nou": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "unstick": false
+  },
+  "phase11_b512": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512
+  },
+  "phase11_b256": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 256
+  },
+  "phase11_r3": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512,
+   "first_step_thinking_budget": 0
+  },
+  "phase11_adapt": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512,
+   "first_step_thinking_budget": 256
+  },
+  "s2": {
+   "cascade": false
+  },
+  "cascade": {
+   "cascade": true,
+   "cascade_samples": 4
+  }
+ }
+}

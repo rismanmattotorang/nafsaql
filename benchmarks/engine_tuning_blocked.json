@@ -1,0 +1,1000 @@
+{
+ "runs": [
+  {
+   "test": "pp512@d0",
+   "avg_ts": 71.254578,
+   "stddev_ts": 13.382555,
+   "samples_ns": [
+    6374484873,
+    9161808232,
+    6601395955
+   ],
+   "model": "system1",
+   "config": "base",
+   "flags": "",
+   "load_before": 4.09,
+   "wall_s": 50.4,
+   "at": "07:01:25"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 12.162198,
+   "stddev_ts": 5.178519,
+   "samples_ns": [
+    3956221913,
+    4573894738,
+    10131242552
+   ],
+   "model": "system1",
+   "config": "base",
+   "flags": "",
+   "load_before": 4.09,
+   "wall_s": 50.4,
+   "at": "07:01:25"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 12.789483,
+   "stddev_ts": 0.187209,
+   "samples_ns": [
+    5090035124,
+    4958605751,
+    4965856733
+   ],
+   "model": "system1",
+   "config": "base",
+   "flags": "",
+   "load_before": 6.81,
+   "wall_s": 27.2,
+   "at": "07:01:52"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 100.772672,
+   "stddev_ts": 0.682778,
+   "samples_ns": [
+    5043808176,
+    5111651177,
+    5087233861
+   ],
+   "model": "system1",
+   "config": "fa_off",
+   "flags": "-fa off",
+   "load_before": 8.83,
+   "wall_s": 32.6,
+   "at": "07:02:25"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 17.985063,
+   "stddev_ts": 0.316035,
+   "samples_ns": [
+    3488344067,
+    3586281666,
+    3603077688
+   ],
+   "model": "system1",
+   "config": "fa_off",
+   "flags": "-fa off",
+   "load_before": 8.83,
+   "wall_s": 32.6,
+   "at": "07:02:25"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 16.78255,
+   "stddev_ts": 0.715354,
+   "samples_ns": [
+    3671839161,
+    3996360347,
+    3786283357
+   ],
+   "model": "system1",
+   "config": "fa_off",
+   "flags": "-fa off",
+   "load_before": 9.08,
+   "wall_s": 25.7,
+   "at": "07:02:51"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 100.874215,
+   "stddev_ts": 4.95903,
+   "samples_ns": [
+    4960704061,
+    5379366538,
+    4912072141
+   ],
+   "model": "system1",
+   "config": "fa_on",
+   "flags": "-fa on",
+   "load_before": 9.62,
+   "wall_s": 35.0,
+   "at": "07:03:26"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 14.783411,
+   "stddev_ts": 2.878782,
+   "samples_ns": [
+    3571150490,
+    4518419106,
+    5218274509
+   ],
+   "model": "system1",
+   "config": "fa_on",
+   "flags": "-fa on",
+   "load_before": 9.62,
+   "wall_s": 35.0,
+   "at": "07:03:26"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 12.363036,
+   "stddev_ts": 3.212724,
+   "samples_ns": [
+    7125110937,
+    4162293562,
+    5027236060
+   ],
+   "model": "system1",
+   "config": "fa_on",
+   "flags": "-fa on",
+   "load_before": 8.94,
+   "wall_s": 34.3,
+   "at": "07:04:00"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 65.947413,
+   "stddev_ts": 8.759589,
+   "samples_ns": [
+    7581944617,
+    9061171654,
+    6936865284
+   ],
+   "model": "system1",
+   "config": "ub256",
+   "flags": "-ub 256",
+   "load_before": 12.12,
+   "wall_s": 48.2,
+   "at": "07:04:48"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 12.394592,
+   "stddev_ts": 2.350339,
+   "samples_ns": [
+    5399373158,
+    6176311983,
+    4275680305
+   ],
+   "model": "system1",
+   "config": "ub256",
+   "flags": "-ub 256",
+   "load_before": 12.12,
+   "wall_s": 48.2,
+   "at": "07:04:48"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 10.233585,
+   "stddev_ts": 3.585762,
+   "samples_ns": [
+    4562807613,
+    6547103308,
+    9276722715
+   ],
+   "model": "system1",
+   "config": "ub256",
+   "flags": "-ub 256",
+   "load_before": 9.34,
+   "wall_s": 36.6,
+   "at": "07:05:25"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 105.116605,
+   "stddev_ts": 3.683683,
+   "samples_ns": [
+    4954737386,
+    4682112508,
+    4987238750
+   ],
+   "model": "system1",
+   "config": "ub1024",
+   "flags": "-ub 1024",
+   "load_before": 9.35,
+   "wall_s": 31.6,
+   "at": "07:05:56"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 19.542227,
+   "stddev_ts": 0.950684,
+   "samples_ns": [
+    3430633526,
+    3294681555,
+    3114963409
+   ],
+   "model": "system1",
+   "config": "ub1024",
+   "flags": "-ub 1024",
+   "load_before": 9.35,
+   "wall_s": 31.6,
+   "at": "07:05:56"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 13.751868,
+   "stddev_ts": 1.186543,
+   "samples_ns": [
+    5114722079,
+    4616007712,
+    4301679377
+   ],
+   "model": "system1",
+   "config": "ub1024",
+   "flags": "-ub 1024",
+   "load_before": 8.57,
+   "wall_s": 26.2,
+   "at": "07:06:23"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 68.461994,
+   "stddev_ts": 4.544297,
+   "samples_ns": [
+    7224672406,
+    8098634017,
+    7181209882
+   ],
+   "model": "system1",
+   "config": "ub128",
+   "flags": "-ub 128",
+   "load_before": 7.21,
+   "wall_s": 48.2,
+   "at": "07:07:11"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 12.407775,
+   "stddev_ts": 5.24131,
+   "samples_ns": [
+    10065573070,
+    4105643051,
+    4189381328
+   ],
+   "model": "system1",
+   "config": "ub128",
+   "flags": "-ub 128",
+   "load_before": 7.21,
+   "wall_s": 48.2,
+   "at": "07:07:11"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 13.884915,
+   "stddev_ts": 2.317861,
+   "samples_ns": [
+    5669655177,
+    4376992671,
+    4064867934
+   ],
+   "model": "system1",
+   "config": "ub128",
+   "flags": "-ub 128",
+   "load_before": 11.27,
+   "wall_s": 26.5,
+   "at": "07:07:37"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 92.700124,
+   "stddev_ts": 6.413967,
+   "samples_ns": [
+    5813479086,
+    5688400298,
+    5118901718
+   ],
+   "model": "system1",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.44,
+   "wall_s": 67.0,
+   "at": "07:08:44"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 18.688462,
+   "stddev_ts": 0.618035,
+   "samples_ns": [
+    3560050748,
+    3369691922,
+    3351613806
+   ],
+   "model": "system1",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.44,
+   "wall_s": 67.0,
+   "at": "07:08:44"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 89.0361,
+   "stddev_ts": 1.444876,
+   "samples_ns": [
+    5776545205,
+    5648760624,
+    5829134208
+   ],
+   "model": "system1",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.44,
+   "wall_s": 67.0,
+   "at": "07:08:44"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 18.272288,
+   "stddev_ts": 1.82158,
+   "samples_ns": [
+    3366597170,
+    3951224339,
+    3263797544
+   ],
+   "model": "system1",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.44,
+   "wall_s": 67.0,
+   "at": "07:08:44"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 13.762865,
+   "stddev_ts": 0.347849,
+   "samples_ns": [
+    4774576469,
+    4539348142,
+    4642618631
+   ],
+   "model": "system1",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 10.03,
+   "wall_s": 40.7,
+   "at": "07:09:25"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 12.835937,
+   "stddev_ts": 0.398446,
+   "samples_ns": [
+    5169347891,
+    4877639417,
+    4920791730
+   ],
+   "model": "system1",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 10.03,
+   "wall_s": 40.7,
+   "at": "07:09:25"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 103.702185,
+   "stddev_ts": 1.993085,
+   "samples_ns": [
+    4872413820,
+    4894457388,
+    5048460950
+   ],
+   "model": "system1",
+   "config": "poll0",
+   "flags": "--poll 0",
+   "load_before": 7.86,
+   "wall_s": 32.2,
+   "at": "07:09:57"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 17.668073,
+   "stddev_ts": 0.539042,
+   "samples_ns": [
+    3504010442,
+    3652328900,
+    3717393036
+   ],
+   "model": "system1",
+   "config": "poll0",
+   "flags": "--poll 0",
+   "load_before": 7.86,
+   "wall_s": 32.2,
+   "at": "07:09:57"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 13.784119,
+   "stddev_ts": 0.24369,
+   "samples_ns": [
+    4574593291,
+    4735409855,
+    4621991412
+   ],
+   "model": "system1",
+   "config": "poll0",
+   "flags": "--poll 0",
+   "load_before": 7.91,
+   "wall_s": 26.4,
+   "at": "07:10:24"
+  },
+  {
+   "error": "llama_bench: error: failed to set process priority\ncmn  set_process_: failed to set process priority 2 : Inappropriate ioctl for device (25)\n",
+   "model": "system1",
+   "config": "prio2",
+   "flags": "--prio 2",
+   "load_before": 7.52,
+   "wall_s": 0.0,
+   "at": "07:10:24"
+  },
+  {
+   "error": "llama_bench: error: failed to set process priority\ncmn  set_process_: failed to set process priority 2 : Inappropriate ioctl for device (25)\n",
+   "model": "system1",
+   "config": "prio2",
+   "flags": "--prio 2",
+   "load_before": 7.52,
+   "wall_s": 0.0,
+   "at": "07:10:24"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 103.758614,
+   "stddev_ts": 13.489387,
+   "samples_ns": [
+    5797717376,
+    4664916526,
+    4522577521
+   ],
+   "model": "system1",
+   "config": "mlock",
+   "flags": "-lm mlock",
+   "load_before": 7.52,
+   "wall_s": 31.0,
+   "at": "07:10:55"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 20.28587,
+   "stddev_ts": 0.46841,
+   "samples_ns": [
+    3233881690,
+    3145642643,
+    3088572446
+   ],
+   "model": "system1",
+   "config": "mlock",
+   "flags": "-lm mlock",
+   "load_before": 7.52,
+   "wall_s": 31.0,
+   "at": "07:10:55"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 12.271096,
+   "stddev_ts": 0.452832,
+   "samples_ns": [
+    5020147391,
+    5401818111,
+    5238689355
+   ],
+   "model": "system1",
+   "config": "mlock",
+   "flags": "-lm mlock",
+   "load_before": 7.23,
+   "wall_s": 29.0,
+   "at": "07:11:24"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 31.056829,
+   "stddev_ts": 4.18926,
+   "samples_ns": [
+    14418634093,
+    16804872267,
+    18828010080
+   ],
+   "model": "system2",
+   "config": "base",
+   "flags": "",
+   "load_before": 7.29,
+   "wall_s": 118.6,
+   "at": "07:13:22"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 5.918945,
+   "stddev_ts": 3.226466,
+   "samples_ns": [
+    27964250343,
+    7565751934,
+    9131083969
+   ],
+   "model": "system2",
+   "config": "base",
+   "flags": "",
+   "load_before": 7.29,
+   "wall_s": 118.6,
+   "at": "07:13:22"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 5.407958,
+   "stddev_ts": 0.495399,
+   "samples_ns": [
+    13036721161,
+    11819620256,
+    10847569850
+   ],
+   "model": "system2",
+   "config": "base",
+   "flags": "",
+   "load_before": 10.29,
+   "wall_s": 68.1,
+   "at": "07:14:30"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 31.474695,
+   "stddev_ts": 2.644483,
+   "samples_ns": [
+    14845017391,
+    17327691137,
+    16849688473
+   ],
+   "model": "system2",
+   "config": "fa_off",
+   "flags": "-fa off",
+   "load_before": 8.39,
+   "wall_s": 89.1,
+   "at": "07:16:00"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 8.712686,
+   "stddev_ts": 0.161966,
+   "samples_ns": [
+    7253623648,
+    7505779733,
+    7282558515
+   ],
+   "model": "system2",
+   "config": "fa_off",
+   "flags": "-fa off",
+   "load_before": 8.39,
+   "wall_s": 89.1,
+   "at": "07:16:00"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 6.779739,
+   "stddev_ts": 1.039491,
+   "samples_ns": [
+    8513709834,
+    8850705270,
+    11447237732
+   ],
+   "model": "system2",
+   "config": "fa_off",
+   "flags": "-fa off",
+   "load_before": 10.59,
+   "wall_s": 59.0,
+   "at": "07:16:59"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 39.242359,
+   "stddev_ts": 4.442694,
+   "samples_ns": [
+    13999347694,
+    13919459713,
+    11539092143
+   ],
+   "model": "system2",
+   "config": "fa_on",
+   "flags": "-fa on",
+   "load_before": 12.08,
+   "wall_s": 77.4,
+   "at": "07:18:16"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 9.274328,
+   "stddev_ts": 0.199357,
+   "samples_ns": [
+    6849794165,
+    6786848020,
+    7072110005
+   ],
+   "model": "system2",
+   "config": "fa_on",
+   "flags": "-fa on",
+   "load_before": 12.08,
+   "wall_s": 77.4,
+   "at": "07:18:16"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 4.904115,
+   "stddev_ts": 0.052466,
+   "samples_ns": [
+    13128179028,
+    13134525572,
+    12891055971
+   ],
+   "model": "system2",
+   "config": "fa_on",
+   "flags": "-fa on",
+   "load_before": 9.65,
+   "wall_s": 74.7,
+   "at": "07:19:31"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 39.039515,
+   "stddev_ts": 1.273608,
+   "samples_ns": [
+    13334666044,
+    13397558644,
+    12639957832
+   ],
+   "model": "system2",
+   "config": "ub256",
+   "flags": "-ub 256",
+   "load_before": 10.2,
+   "wall_s": 82.2,
+   "at": "07:20:53"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 7.583272,
+   "stddev_ts": 1.261642,
+   "samples_ns": [
+    7539598077,
+    7882595321,
+    10419812249
+   ],
+   "model": "system2",
+   "config": "ub256",
+   "flags": "-ub 256",
+   "load_before": 10.2,
+   "wall_s": 82.2,
+   "at": "07:20:53"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 4.719716,
+   "stddev_ts": 1.08589,
+   "samples_ns": [
+    18043129488,
+    13003938036,
+    11246804625
+   ],
+   "model": "system2",
+   "config": "ub256",
+   "flags": "-ub 256",
+   "load_before": 9.29,
+   "wall_s": 80.1,
+   "at": "07:22:13"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 37.868652,
+   "stddev_ts": 1.30186,
+   "samples_ns": [
+    13958285083,
+    13041130201,
+    13593582844
+   ],
+   "model": "system2",
+   "config": "ub1024",
+   "flags": "-ub 1024",
+   "load_before": 12.89,
+   "wall_s": 91.4,
+   "at": "07:23:44"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 6.152751,
+   "stddev_ts": 2.097518,
+   "samples_ns": [
+    7786157180,
+    10301683551,
+    15896832794
+   ],
+   "model": "system2",
+   "config": "ub1024",
+   "flags": "-ub 1024",
+   "load_before": 12.89,
+   "wall_s": 91.4,
+   "at": "07:23:44"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 4.007553,
+   "stddev_ts": 1.233912,
+   "samples_ns": [
+    18862520604,
+    11790577517,
+    19989846749
+   ],
+   "model": "system2",
+   "config": "ub1024",
+   "flags": "-ub 1024",
+   "load_before": 10.38,
+   "wall_s": 88.2,
+   "at": "07:25:13"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 18.390054,
+   "stddev_ts": 0.725457,
+   "samples_ns": [
+    27363770069,
+    27090248018,
+    29158005817
+   ],
+   "model": "system2",
+   "config": "ub128",
+   "flags": "-ub 128",
+   "load_before": 12.1,
+   "wall_s": 222.0,
+   "at": "07:28:54"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 1.995702,
+   "stddev_ts": 0.886372,
+   "samples_ns": [
+    33521992261,
+    55375008511,
+    21901634715
+   ],
+   "model": "system2",
+   "config": "ub128",
+   "flags": "-ub 128",
+   "load_before": 12.1,
+   "wall_s": 222.0,
+   "at": "07:28:54"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 3.652633,
+   "stddev_ts": 0.694062,
+   "samples_ns": [
+    21786431684,
+    14802352336,
+    17312958723
+   ],
+   "model": "system2",
+   "config": "ub128",
+   "flags": "-ub 128",
+   "load_before": 10.56,
+   "wall_s": 119.5,
+   "at": "07:30:54"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 27.295172,
+   "stddev_ts": 4.424435,
+   "samples_ns": [
+    17263835749,
+    17045551713,
+    23072434848
+   ],
+   "model": "system2",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.45,
+   "wall_s": 233.3,
+   "at": "07:34:47"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 6.018666,
+   "stddev_ts": 1.521191,
+   "samples_ns": [
+    13536071603,
+    11363593005,
+    8316150792
+   ],
+   "model": "system2",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.45,
+   "wall_s": 233.3,
+   "at": "07:34:47"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 24.182816,
+   "stddev_ts": 1.828779,
+   "samples_ns": [
+    22941136388,
+    19712568605,
+    21107148252
+   ],
+   "model": "system2",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.45,
+   "wall_s": 233.3,
+   "at": "07:34:47"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 4.793271,
+   "stddev_ts": 0.934198,
+   "samples_ns": [
+    11297645147,
+    13040347092,
+    16810830753
+   ],
+   "model": "system2",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 11.45,
+   "wall_s": 233.3,
+   "at": "07:34:47"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 2.229053,
+   "stddev_ts": 1.588553,
+   "samples_ns": [
+    32394917087,
+    81794183914,
+    16288767599
+   ],
+   "model": "system2",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 9.44,
+   "wall_s": 219.0,
+   "at": "07:38:26"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 4.83846,
+   "stddev_ts": 0.603548,
+   "samples_ns": [
+    14791770374,
+    11627815160,
+    13661764137
+   ],
+   "model": "system2",
+   "config": "t3",
+   "flags": "-t 3",
+   "load_before": 9.44,
+   "wall_s": 219.0,
+   "at": "07:38:26"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 17.501383,
+   "stddev_ts": 1.558863,
+   "samples_ns": [
+    26559049368,
+    30359095850,
+    31292873138
+   ],
+   "model": "system2",
+   "config": "poll0",
+   "flags": "--poll 0",
+   "load_before": 8.91,
+   "wall_s": 228.1,
+   "at": "07:42:14"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 2.20154,
+   "stddev_ts": 0.890173,
+   "samples_ns": [
+    53732861476,
+    22299948336,
+    25161365034
+   ],
+   "model": "system2",
+   "config": "poll0",
+   "flags": "--poll 0",
+   "load_before": 8.91,
+   "wall_s": 228.1,
+   "at": "07:42:14"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 5.07997,
+   "stddev_ts": 1.370153,
+   "samples_ns": [
+    18054351559,
+    10357650729,
+    11602502645
+   ],
+   "model": "system2",
+   "config": "poll0",
+   "flags": "--poll 0",
+   "load_before": 13.87,
+   "wall_s": 93.9,
+   "at": "07:43:48"
+  },
+  {
+   "error": "llama_bench: error: failed to set process priority\ncmn  set_process_: failed to set process priority 2 : Inappropriate ioctl for device (25)\n",
+   "model": "system2",
+   "config": "prio2",
+   "flags": "--prio 2",
+   "load_before": 11.54,
+   "wall_s": 0.0,
+   "at": "07:43:48"
+  },
+  {
+   "error": "llama_bench: error: failed to set process priority\ncmn  set_process_: failed to set process priority 2 : Inappropriate ioctl for device (25)\n",
+   "model": "system2",
+   "config": "prio2",
+   "flags": "--prio 2",
+   "load_before": 11.54,
+   "wall_s": 0.0,
+   "at": "07:43:48"
+  },
+  {
+   "test": "pp512@d0",
+   "avg_ts": 33.940499,
+   "stddev_ts": 5.373117,
+   "samples_ns": [
+    13479963714,
+    18388791480,
+    14223742373
+   ],
+   "model": "system2",
+   "config": "mlock",
+   "flags": "-lm mlock",
+   "load_before": 11.54,
+   "wall_s": 113.3,
+   "at": "07:45:42"
+  },
+  {
+   "test": "tg64@d0",
+   "avg_ts": 3.8842,
+   "stddev_ts": 0.347162,
+   "samples_ns": [
+    17175802989,
+    14945371486,
+    17562325034
+   ],
+   "model": "system2",
+   "config": "mlock",
+   "flags": "-lm mlock",
+   "load_before": 11.54,
+   "wall_s": 113.3,
+   "at": "07:45:42"
+  },
+  {
+   "test": "tg64@d1024",
+   "avg_ts": 4.858869,
+   "stddev_ts": 1.042449,
+   "samples_ns": [
+    13224682380,
+    16726457934,
+    10827456352
+   ],
+   "model": "system2",
+   "config": "mlock",
+   "flags": "-lm mlock",
+   "load_before": 10.0,
+   "wall_s": 76.5,
+   "at": "07:46:58"
+  }
+ ]
+}

@@ -601,6 +601,12 @@ pub struct CodeAgentRequest {
     /// Override of `harness.first_step_thinking_budget` (0 = off, else 64..=4096).
     #[serde(default)]
     pub first_step_thinking_budget: Option<u32>,
+    /// Phase 14 override of `harness.cascade`: the first step on System 1 with several candidates, System 2 after.
+    #[serde(default)]
+    pub cascade: Option<bool>,
+    /// Override of `harness.cascade_samples` (1..=4).
+    #[serde(default)]
+    pub cascade_samples: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -622,6 +628,18 @@ pub struct CodeAgentStep {
     /// The transcript was compacted before this step's call.
     #[serde(default)]
     pub compacted: bool,
+    /// The model this step went to ("system1" on a cascade step).
+    #[serde(default)]
+    pub model: String,
+    /// Candidates judged on this step (1 outside a cascade step).
+    #[serde(default = "one")]
+    pub samples: u32,
+    /// Model calls retried before this step's reply arrived.
+    #[serde(default)]
+    pub retries: u32,
+}
+fn one() -> u32 {
+    1
 }
 
 /// One model call of the code agent, as the server reported it (Phase 11).
@@ -687,4 +705,9 @@ pub struct CodeAgentReply {
     /// The run's net change as a unified diff (returned files against the starting ones).
     #[serde(default)]
     pub diff: String,
+    /// Phase 14: the first step went to System 1 with `cascade_samples` candidates.
+    #[serde(default)]
+    pub cascade: bool,
+    #[serde(default)]
+    pub cascade_samples: u32,
 }
