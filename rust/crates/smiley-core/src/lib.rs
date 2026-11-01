@@ -10,10 +10,13 @@
 //! adapter in `src-tauri/src/smileycore.rs` is the only file that knows both sides.
 
 // nafs-aql: the workspace builds with `-D warnings`; these are upstream idioms, kept as they are.
+// `chunks_exact_to_as_chunks` exists only in newer clippy (CI's stable is ahead of older local toolchains).
 #![allow(
+    unknown_lints,
     clippy::needless_range_loop,
     clippy::manual_is_multiple_of,
-    clippy::unnecessary_map_or
+    clippy::unnecessary_map_or,
+    clippy::chunks_exact_to_as_chunks
 )]
 
 pub mod dspark;
