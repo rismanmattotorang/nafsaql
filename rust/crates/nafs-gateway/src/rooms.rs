@@ -27,6 +27,7 @@ use axum::response::Response;
 use axum::Json;
 use futures::{SinkExt, StreamExt};
 use nafs_core::orchestrator::Emitter;
+use nafs_types::LockExt;
 use nafs_types::{ChatRequest, Message, NafsError, ReasoningMode, StreamEvent};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -38,6 +39,8 @@ use uuid::Uuid;
 
 /// Assistant turns that may wait behind the current one in a room (review M7).
 pub const ROOM_QUEUE_CAP: usize = 3;
+/// Frames queued for one connection that only it should receive (pong, rate-limit and queue errors).
+const PRIVATE_FRAMES: usize = 32;
 /// Members one room accepts at a time.
 pub const ROOM_MEMBER_CAP: usize = 64;
 /// Longest message, in characters; longer ones are refused, not truncated.
@@ -107,16 +110,11 @@ impl RoomHub {
         }
     }
     fn names(&self) -> Vec<String> {
-        self.users
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(_, n)| n.clone())
-            .collect()
+        self.users.locked().iter().map(|(_, n)| n.clone()).collect()
     }
     /// Register a member under a name that is unique in the room; `None` if the room is full.
     fn join(&self, wanted: &str) -> Option<(u64, String, Vec<String>)> {
-        let mut u = self.users.lock().unwrap();
+        let mut u = self.users.locked();
         if u.len() >= ROOM_MEMBER_CAP {
             return None;
         }
@@ -129,12 +127,12 @@ impl RoomHub {
         Some((id, name, all))
     }
     fn leave(&self, conn: u64) -> Vec<String> {
-        let mut u = self.users.lock().unwrap();
+        let mut u = self.users.locked();
         u.retain(|(id, _)| *id != conn);
         u.iter().map(|(_, n)| n.clone()).collect()
     }
     fn assistant(&self) -> Value {
-        let w = self.working_for.lock().unwrap().clone();
+        let w = self.working_for.locked().clone();
         json!({"busy": w.is_some(), "working_for": w, "queued": self.queued.load(Ordering::SeqCst)})
     }
     fn send(&self, v: Value) {
@@ -147,7 +145,7 @@ impl RoomHub {
     /// Record a question and tell the room about it, as one step: a member who joins concurrently either
     /// receives this frame or finds the question in its snapshot, never both and never neither.
     fn enqueue(&self, p: PendingTurn) {
-        let mut l = self.live.lock().unwrap();
+        let mut l = self.live.locked();
         let frame = json!({"type": "user_message", "user": p.user,
             "payload": {"content": p.content, "id": p.id, "ts": p.ts}});
         l.pending.push(p);
@@ -155,12 +153,12 @@ impl RoomHub {
     }
     /// The running turn begins; `base` is the number of messages stored before it.
     fn start_turn(&self, base: i64) {
-        self.live.lock().unwrap().base = Some(base);
+        self.live.locked().base = Some(base);
     }
     /// A turn is over (answered, failed or skipped): drop its question from the snapshot and, in the same
     /// step, send the closing frame, so the snapshot and the stream hand over cleanly.
     fn finish_turn(&self, id: &str, closing: Option<String>) {
-        let mut l = self.live.lock().unwrap();
+        let mut l = self.live.locked();
         l.pending.retain(|p| p.id != id);
         l.base = None;
         if let Some(f) = closing {
@@ -173,7 +171,7 @@ impl RoomHub {
         &self,
         count: impl FnOnce() -> i64,
     ) -> (broadcast::Receiver<String>, Vec<PendingTurn>, i64) {
-        let l = self.live.lock().unwrap();
+        let l = self.live.locked();
         let rx = self.tx.subscribe();
         let cursor = l.base.unwrap_or_else(count);
         (rx, l.pending.clone(), cursor)
@@ -221,8 +219,7 @@ pub fn unique_name(taken: &[String], wanted: &str) -> String {
 
 pub(crate) fn hub(s: &AppState, id: Uuid) -> Arc<RoomHub> {
     s.rooms
-        .lock()
-        .unwrap()
+        .locked()
         .entry(id)
         .or_insert_with(|| Arc::new(RoomHub::new()))
         .clone()
@@ -230,7 +227,7 @@ pub(crate) fn hub(s: &AppState, id: Uuid) -> Arc<RoomHub> {
 
 /// A room as the API shows it: the stored fields plus who is here now and what the assistant is doing.
 fn room_json(s: &AppState, room: &nafs_memory::Room) -> Value {
-    let h = s.rooms.lock().unwrap().get(&room.room_id).cloned();
+    let h = s.rooms.locked().get(&room.room_id).cloned();
     let users = h.as_ref().map(|h| h.names()).unwrap_or_default();
     let a = h
         .as_ref()
@@ -312,14 +309,22 @@ pub async fn delete_room(
         .ok();
     let report = s.store.delete_room(id);
     drop(guard);
-    let report = report?;
+    let report = match report {
+        Ok(r) => r,
+        Err(e) => {
+            // Nothing was deleted: the room must stay usable instead of being left cancelled and tombstoned.
+            h.deleted.store(false, Ordering::SeqCst);
+            h.cancel.store(false, Ordering::SeqCst);
+            return Err(e.into());
+        }
+    };
     tracing::info!(room = %id, name = %room.name, members, messages = report.messages, replies = report.replies, "room deleted");
     // The tombstone only has to outlive a connection or turn that raced the deletion. After that the database
     // answers 404 before a hub could be recreated, so the hub (and its broadcast buffer) can go.
     let sweep = s.clone();
     tokio::spawn(async move {
         tokio::time::sleep(TOMBSTONE_TTL).await;
-        sweep.rooms.lock().unwrap().remove(&id);
+        sweep.rooms.locked().remove(&id);
     });
     Ok(Json(json!({
         "deleted": true,
@@ -383,6 +388,12 @@ async fn room_session(s: AppState, room: nafs_memory::Room, wanted: String, sock
             .await;
         return;
     };
+    // The room may have been deleted between the lookup and the subscription: that frame was missed.
+    if h.is_deleted() {
+        h.leave(conn);
+        let _ = sink.send(WsMessage::Text(ROOM_DELETED_FRAME.into())).await;
+        return;
+    }
     let welcome = json!({"type": "welcome", "payload": {
         "you": user,
         "room": {"room_id": room.room_id, "name": room.name},
@@ -398,7 +409,9 @@ async fn room_session(s: AppState, room: nafs_memory::Room, wanted: String, sock
         return;
     }
     // Frames meant only for this connection (rate-limit and queue errors, pong).
-    let (ptx, mut prx) = mpsc::unbounded_channel::<String>();
+    // Bounded: a client that stops reading must not make the server queue replies to it without limit (a full
+    // queue drops the frame; they are all advisory).
+    let (ptx, mut prx) = mpsc::channel::<String>(PRIVATE_FRAMES);
     let mut fwd = tokio::spawn(async move {
         let mut beat = tokio::time::interval_at(
             tokio::time::Instant::now() + Duration::from_secs(HEARTBEAT_S),
@@ -443,7 +456,7 @@ async fn room_session(s: AppState, room: nafs_memory::Room, wanted: String, sock
         };
         match frame["type"].as_str() {
             Some("ping") => {
-                let _ = ptx.send(json!({"type": "pong"}).to_string());
+                let _ = ptx.try_send(json!({"type": "pong"}).to_string());
                 continue;
             }
             Some("typing") => {
@@ -466,7 +479,7 @@ async fn room_session(s: AppState, room: nafs_memory::Room, wanted: String, sock
         }
         let chars = content.chars().count();
         if chars > MESSAGE_MAX_CHARS {
-            let _ = ptx.send(private_err(
+            let _ = ptx.try_send(private_err(
                 "E_TOO_LONG",
                 &format!(
                     "Messages are limited to {MESSAGE_MAX_CHARS} characters; yours has {chars}."
@@ -481,19 +494,24 @@ async fn room_session(s: AppState, room: nafs_memory::Room, wanted: String, sock
         tokens = (tokens + last.elapsed().as_secs_f64() / WS_REFILL_S).min(WS_BURST);
         last = Instant::now();
         if tokens < 1.0 {
-            let _ = ptx.send(private_err(
+            let _ = ptx.try_send(private_err(
                 "E_RATE_LIMITED",
                 "You are sending messages too quickly; wait a few seconds.",
             ));
             continue;
         }
-        if h.queued.load(Ordering::SeqCst) >= ROOM_QUEUE_CAP {
-            let _ = ptx.send(private_err("E_QUEUE_FULL", "The assistant already has several questions queued in this room; try again shortly."));
+        // Reserve a queue slot atomically: a separate load and add let concurrent members overshoot the cap.
+        if h.queued
+            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
+                (n < ROOM_QUEUE_CAP).then_some(n + 1)
+            })
+            .is_err()
+        {
+            let _ = ptx.try_send(private_err("E_QUEUE_FULL", "The assistant already has several questions queued in this room; try again shortly."));
             continue;
         }
         tokens -= 1.0;
         let msg_id = Uuid::new_v4().to_string();
-        h.queued.fetch_add(1, Ordering::SeqCst);
         h.enqueue(PendingTurn {
             id: msg_id.clone(),
             user: user.clone(),
@@ -547,7 +565,7 @@ async fn run_turn(
         h.send_queue();
         return;
     }
-    *h.working_for.lock().unwrap() = Some(user.clone());
+    *h.working_for.locked() = Some(user.clone());
     h.start_turn(s.store.message_count(conv).unwrap_or(0));
     h.send_queue();
     let (tx, mut rx) = mpsc::unbounded_channel::<StreamEvent>();
@@ -609,7 +627,7 @@ async fn run_turn(
     let _ = fwd.await;
     // Idempotent: a turn that ended without a done event (error, cancel) leaves the snapshot here.
     h.finish_turn(&msg_id, None);
-    *h.working_for.lock().unwrap() = None;
+    *h.working_for.locked() = None;
     if h.is_deleted() {
         // The room went away while this turn ran: whatever it saved for the room goes too.
         let _ = s.store.purge_conversation_data(conv, true);
@@ -683,7 +701,7 @@ mod tests {
             json!({"busy": false, "working_for": null, "queued": 0})
         );
         h.queued.fetch_add(2, Ordering::SeqCst);
-        *h.working_for.lock().unwrap() = Some("Ann".into());
+        *h.working_for.locked() = Some("Ann".into());
         assert_eq!(
             h.assistant(),
             json!({"busy": true, "working_for": "Ann", "queued": 2})
@@ -766,7 +784,7 @@ mod tests {
                 std::thread::spawn(move || {
                     while stored.load(Ordering::SeqCst) < 2 * TURNS as i64 {
                         let snap = h.subscribe(|| stored.load(Ordering::SeqCst));
-                        joined.lock().unwrap().push(snap);
+                        joined.locked().push(snap);
                         std::thread::sleep(std::time::Duration::from_micros(30));
                     }
                 })
@@ -776,7 +794,7 @@ mod tests {
         for j in joiners {
             j.join().unwrap();
         }
-        let members = std::mem::take(&mut *joined.lock().unwrap());
+        let members = std::mem::take(&mut *joined.locked());
         assert!(members.len() > 10, "joiners ran: {}", members.len());
         for (mut rx, pending, cursor) in members {
             // The turns the member gets from the stored messages, from `pending`, and from live frames.

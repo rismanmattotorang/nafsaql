@@ -711,3 +711,32 @@ pub struct CodeAgentReply {
     #[serde(default)]
     pub cascade_samples: u32,
 }
+
+/// Lock acquisition that survives poisoning. A panic while a std lock was held poisons it, and `lock().unwrap()`
+/// would then panic in every later request; these recover the guard instead (every critical section in this
+/// workspace leaves its data valid or is a single statement), so one failed request cannot take the service down.
+pub trait LockExt<T> {
+    fn locked(&self) -> std::sync::MutexGuard<'_, T>;
+}
+impl<T> LockExt<T> for std::sync::Mutex<T> {
+    fn locked(&self) -> std::sync::MutexGuard<'_, T> {
+        self.lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
+
+/// The same for `RwLock`.
+pub trait RwLockExt<T> {
+    fn read_locked(&self) -> std::sync::RwLockReadGuard<'_, T>;
+    fn write_locked(&self) -> std::sync::RwLockWriteGuard<'_, T>;
+}
+impl<T> RwLockExt<T> for std::sync::RwLock<T> {
+    fn read_locked(&self) -> std::sync::RwLockReadGuard<'_, T> {
+        self.read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+    fn write_locked(&self) -> std::sync::RwLockWriteGuard<'_, T> {
+        self.write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}

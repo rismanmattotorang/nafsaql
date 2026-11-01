@@ -1,5 +1,6 @@
 //! nafs-verify: the Verifier Hub. Exact verifiers accept at threshold 1.0 (Theorem 1); a sandbox
 //! failure (timeout, crash, limit) is a rejection with evidence, never a pass (spec 4.4).
+use nafs_types::RwLockExt;
 use nafs_types::{Rates, VerificationInputs, VerifierResult};
 use regex::Regex;
 use std::collections::HashMap;
@@ -97,16 +98,16 @@ impl VerifierHub {
     pub fn load_rates(&self, path: &str) {
         if let Ok(s) = std::fs::read_to_string(path) {
             if let Ok(m) = serde_json::from_str::<HashMap<String, Rates>>(&s) {
-                *self.rates.write().unwrap() = m;
+                *self.rates.write_locked() = m;
             }
         }
     }
     pub fn set_rates(&self, m: HashMap<String, Rates>) {
-        *self.rates.write().unwrap() = m;
+        *self.rates.write_locked() = m;
     }
     pub fn with_rates(&self, mut r: VerifierResult) -> VerifierResult {
         if r.rates.is_none() {
-            r.rates = self.rates.read().unwrap().get(&r.verifier).cloned();
+            r.rates = self.rates.read_locked().get(&r.verifier).cloned();
         }
         r
     }

@@ -19,6 +19,7 @@
 //! The policy picks the N with the largest U, and widens only when U(N) beats U(1) by `min_gain`. With the measured
 //! costs it keeps N = 1 when p is high (a second stream costs more than it saves) and goes to 4 when p is low (the
 //! escalated, hard tasks, where sequential retries are the dominant waste: 52 % of model time in the 100-prompt run).
+use nafs_types::LockExt;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -81,15 +82,14 @@ impl SuccessEstimator {
         let prior = self.prior.get(domain).copied().unwrap_or(0.5);
         let (s, n) = self
             .counts
-            .lock()
-            .unwrap()
+            .locked()
             .get(domain)
             .copied()
             .unwrap_or((0.0, 0.0));
         ((prior * self.weight + s) / (self.weight + n).max(1e-9)).clamp(0.01, 0.99)
     }
     pub fn record(&self, domain: &str, passed: bool) {
-        let mut c = self.counts.lock().unwrap();
+        let mut c = self.counts.locked();
         let e = c.entry(domain.to_string()).or_insert((0.0, 0.0));
         e.0 += f64::from(u8::from(passed));
         e.1 += 1.0;

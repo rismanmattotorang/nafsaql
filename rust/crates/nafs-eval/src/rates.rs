@@ -3,6 +3,7 @@
 use crate::load_tasks;
 use nafs_core::orchestrator::Orchestrator;
 use nafs_types::Rates;
+use nafs_types::RwLockExt;
 use nafs_verify::mutation::{self, clopper_pearson};
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
@@ -133,7 +134,7 @@ pub async fn measure(
     // Start from the published rates so a partial measurement (judge only, other datasets) updates
     // only what it measured.
     let mut rates: BTreeMap<String, Rates> =
-        orch.hub.rates.read().unwrap().clone().into_iter().collect();
+        orch.hub.rates.read_locked().clone().into_iter().collect();
     let measured: BTreeMap<String, Rates> =
         serde_json::from_value(out["rates"].clone()).unwrap_or_default();
     rates.extend(measured);

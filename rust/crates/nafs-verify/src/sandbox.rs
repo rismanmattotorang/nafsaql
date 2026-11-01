@@ -9,6 +9,7 @@
 //! - Own process group (setsid), killed as a whole on exit, timeout, memory or output overrun.
 //! - CPU and file-size rlimits; memory enforced by RSS polling (macOS ignores RLIMIT_AS).
 //! - Output is streamed into bounded tail buffers; never more than a few KB is kept in memory.
+use nafs_types::LockExt;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -590,10 +591,10 @@ async fn run_in(
                 Ok(0) | Err(_) => break,
                 Ok(n) => {
                     let total = {
-                        let mut t = tail.lock().unwrap();
+                        let mut t = tail.locked();
                         t.push(&buf[..n]);
                         t.total
-                    } + other.lock().unwrap().total;
+                    } + other.locked().total;
                     if total > hard {
                         over.store(true, Ordering::SeqCst);
                     }
@@ -627,7 +628,7 @@ async fn run_in(
                     else if over.load(Ordering::SeqCst) { Some(format!("output limit of {} bytes exceeded", hard)) }
                     else if pid > 0 && rss_bytes(pid).map(|b| b > mem_limit).unwrap_or(false) { Some(format!("memory limit of {} MB exceeded", limits.memory_mb)) }
                     else { None };
-                if let Some(r) = reason { *killed.lock().unwrap() = Some(r); if pid > 0 { kill_group(pid); } let _ = child.kill().await; break None; }
+                if let Some(r) = reason { *killed.locked() = Some(r); if pid > 0 { kill_group(pid); } let _ = child.kill().await; break None; }
             }
         }
     };
@@ -637,9 +638,9 @@ async fn run_in(
     for h in [so, se].into_iter().flatten() {
         let _ = tokio::time::timeout(Duration::from_secs(2), h).await;
     }
-    let killed = killed.lock().unwrap().clone();
-    let stdout = out_tail.lock().unwrap().text();
-    let stderr = err_tail.lock().unwrap().text();
+    let killed = killed.locked().clone();
+    let stdout = out_tail.locked().text();
+    let stderr = err_tail.locked().text();
     Ok(SandboxOutput {
         exit_ok: status.map(|s| s.success()).unwrap_or(false) && killed.is_none(),
         stdout,

@@ -4,6 +4,7 @@
 //! beyond the toolchain directory.
 use crate::sandbox::{self, SandboxLimits};
 use nafs_harness::lean::{self as protocol, RunError};
+use nafs_types::RwLockExt;
 use nafs_types::{LeanTask, VerifierResult};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -122,7 +123,7 @@ impl LeanVerifier {
                 .clone()
                 .or_else(|| protocol::theorem_name(&task.statement))
                 .ok_or("the theorem has no name")?;
-            let cached = this.pristine.read().unwrap().get(&task.statement).cloned();
+            let cached = this.pristine.read_locked().get(&task.statement).cloned();
             let pristine = match cached {
                 Some(p) => p,
                 None => {
@@ -136,8 +137,7 @@ impl LeanVerifier {
                         )
                     })?;
                     this.pristine
-                        .write()
-                        .unwrap()
+                        .write_locked()
                         .insert(task.statement.clone(), p.clone());
                     p
                 }

@@ -6,11 +6,25 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::Write;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use uuid::Uuid;
 
 fn st(e: impl std::fmt::Display) -> NafsError {
     NafsError::Storage(e.to_string())
+}
+
+/// Free-text notes from clients are stored clipped (a request may carry up to the 2 MB body limit).
+const NOTE_MAX_CHARS: usize = 1000;
+fn clip(note: Option<&str>) -> Option<String> {
+    note.map(|n| n.chars().take(NOTE_MAX_CHARS).collect())
+}
+
+/// The serde name of a unit enum variant (`"fast"`, `"verified"`), or "" for a value that is not a string.
+fn enum_name<T: Serialize>(v: &T) -> String {
+    serde_json::to_value(v)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_string))
+        .unwrap_or_default()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -125,6 +139,15 @@ pub struct Store {
 }
 
 impl Store {
+    /// The connection. A panic while a guard was held must not turn every later request into a panic too: the
+    /// guard is recovered (statements are atomic in SQLite and multi-statement updates run in a transaction).
+    fn db(&self) -> MutexGuard<'_, Connection> {
+        self.conn.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+    fn trace_file(&self) -> MutexGuard<'_, Option<std::fs::File>> {
+        self.trace.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+
     pub fn open(db_path: &Path, trace_path: &Path) -> Result<Self> {
         if let Some(p) = db_path.parent() {
             std::fs::create_dir_all(p).map_err(st)?;
@@ -133,6 +156,8 @@ impl Store {
             std::fs::create_dir_all(p).map_err(st)?;
         }
         let conn = Connection::open(db_path).map_err(st)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))
+            .map_err(st)?;
         conn.execute_batch(r#"
             PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
             CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, title TEXT NOT NULL, room_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
@@ -155,6 +180,12 @@ impl Store {
             CREATE TABLE IF NOT EXISTS memory_index (reply_id TEXT PRIMARY KEY, conversation_id TEXT, created_at TEXT NOT NULL, domain TEXT, question TEXT NOT NULL, answer TEXT NOT NULL, verifier TEXT);
             CREATE TABLE IF NOT EXISTS preferences (id TEXT PRIMARY KEY, created_at TEXT NOT NULL, domain TEXT, prompt TEXT NOT NULL, fast_reply_id TEXT NOT NULL, slow_reply_id TEXT NOT NULL,
                 preferred TEXT NOT NULL, fast_wall_ms INTEGER, slow_wall_ms INTEGER, note TEXT);
+            CREATE INDEX IF NOT EXISTS idx_replies_conv ON replies(conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_decisions_created ON decisions(created_at);
+            CREATE INDEX IF NOT EXISTS idx_audits_decision ON audits(decision_id);
+            CREATE INDEX IF NOT EXISTS idx_memory_conv ON memory_index(conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_prefs_fast ON preferences(fast_reply_id);
+            CREATE INDEX IF NOT EXISTS idx_prefs_slow ON preferences(slow_reply_id);
         "#).map_err(st)?;
         // Migration: per-conversation training opt-out (SR-004).
         let has_opt: bool = conn
@@ -174,6 +205,14 @@ impl Store {
             .append(true)
             .open(trace_path)
             .map_err(st)?;
+        // Conversations and the trace are private to the service user (the files are created with the umask).
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            for p in [db_path, trace_path] {
+                let _ = std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600));
+            }
+        }
         Ok(Self {
             conn: Mutex::new(conn),
             trace: Mutex::new(Some(trace)),
@@ -187,7 +226,7 @@ impl Store {
         room_id: Option<Uuid>,
     ) -> Result<Uuid> {
         let now = Utc::now().to_rfc3339();
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         if let Some(id) = id {
             let exists: Option<String> = c
                 .query_row(
@@ -221,19 +260,20 @@ impl Store {
         reply_id: Option<Uuid>,
     ) -> Result<()> {
         let now = Utc::now().to_rfc3339();
-        let c = self.conn.lock().unwrap();
-        c.execute("INSERT INTO messages (conversation_id,role,content,reply_id,created_at) VALUES (?1,?2,?3,?4,?5)",
+        let c = self.db();
+        let tx = c.unchecked_transaction().map_err(st)?;
+        tx.execute("INSERT INTO messages (conversation_id,role,content,reply_id,created_at) VALUES (?1,?2,?3,?4,?5)",
             params![conv.to_string(), role, content, reply_id.map(|r| r.to_string()), now]).map_err(st)?;
-        c.execute(
+        tx.execute(
             "UPDATE conversations SET updated_at=?2 WHERE id=?1",
             params![conv.to_string(), now],
         )
         .map_err(st)?;
-        Ok(())
+        tx.commit().map_err(st)
     }
 
     pub fn history(&self, conv: Uuid) -> Result<Vec<Message>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare("SELECT role, content FROM messages WHERE conversation_id=?1 ORDER BY id")
             .map_err(st)?;
@@ -249,7 +289,7 @@ impl Store {
     }
 
     pub fn list_conversations(&self, limit: i64) -> Result<Vec<ConversationSummary>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare("SELECT c.id, c.title, c.room_id, c.updated_at, (SELECT COUNT(*) FROM messages m WHERE m.conversation_id=c.id) FROM conversations c WHERE c.room_id IS NULL ORDER BY c.updated_at DESC LIMIT ?1").map_err(st)?;
         let rows = s
             .query_map(params![limit], |r| {
@@ -268,7 +308,7 @@ impl Store {
     }
 
     pub fn get_conversation(&self, id: Uuid) -> Result<Conversation> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let (title, room, opt): (String, Option<String>, i64) = c
             .query_row(
                 "SELECT title, room_id, training_opt_out FROM conversations WHERE id=?1",
@@ -304,9 +344,7 @@ impl Store {
     }
 
     pub fn rename_conversation(&self, id: Uuid, title: &str) -> Result<()> {
-        self.conn
-            .lock()
-            .unwrap()
+        self.db()
             .execute(
                 "UPDATE conversations SET title=?2 WHERE id=?1",
                 params![id.to_string(), title],
@@ -314,42 +352,48 @@ impl Store {
             .map_err(st)?;
         Ok(())
     }
+    /// Delete a conversation and everything that holds its content (replies, decisions, audits, feedback,
+    /// reviews, preference trials, retrieval memory). A room's conversation is deleted with the room.
     pub fn delete_conversation(&self, id: Uuid) -> Result<()> {
-        self.conn
-            .lock()
-            .unwrap()
-            .execute(
-                "DELETE FROM conversations WHERE id=?1",
+        let in_room: bool = self
+            .db()
+            .query_row(
+                "SELECT room_id IS NOT NULL FROM conversations WHERE id=?1",
                 params![id.to_string()],
+                |r| r.get(0),
             )
-            .map_err(st)?;
-        Ok(())
+            .unwrap_or(false);
+        if in_room {
+            return Err(NafsError::BadRequest(
+                "this conversation belongs to a room: delete the room instead".into(),
+            ));
+        }
+        self.purge_conversation_data(id, true).map(|_| ())
     }
 
     /// `ephemeral` column: 0 persisted, 1 ephemeral (API, Both trials), 2 lab traffic (evaluation, load tests).
     pub fn save_reply(&self, reply: &ChatReply, ephemeral: bool, lab: bool) -> Result<()> {
         let tag: i64 = if lab { 2 } else { ephemeral as i64 };
         let json = serde_json::to_string(reply).map_err(st)?;
-        let c = self.conn.lock().unwrap();
-        c.execute("INSERT OR REPLACE INTO replies (id,conversation_id,created_at,domain,mode,assurance,escalated,wall_ms,ttft_ms,rule,backend,audit,ephemeral,json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
-            params![reply.reply_id.to_string(), reply.conversation_id.map(|x| x.to_string()), Utc::now().to_rfc3339(), reply.domain.as_str(),
-                serde_json::to_value(reply.reasoning_mode).unwrap().as_str().unwrap_or("").to_string(), serde_json::to_value(reply.assurance).unwrap().as_str().unwrap_or("").to_string(),
-                reply.decision.escalate as i64, reply.usage.wall_ms as i64, reply.usage.ttft_ms.map(|x| x as i64), serde_json::to_value(reply.decision.rule).unwrap().as_str().unwrap_or("").to_string(),
+        let decision = serde_json::to_string(&reply.decision).map_err(st)?;
+        let now = Utc::now().to_rfc3339();
+        let c = self.db();
+        let tx = c.unchecked_transaction().map_err(st)?;
+        tx.execute("INSERT OR REPLACE INTO replies (id,conversation_id,created_at,domain,mode,assurance,escalated,wall_ms,ttft_ms,rule,backend,audit,ephemeral,json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+            params![reply.reply_id.to_string(), reply.conversation_id.map(|x| x.to_string()), now, reply.domain.as_str(),
+                enum_name(&reply.reasoning_mode), enum_name(&reply.assurance),
+                reply.decision.escalate as i64, reply.usage.wall_ms as i64, reply.usage.ttft_ms.map(|x| x as i64), enum_name(&reply.decision.rule),
                 reply.decision.backend, reply.decision.audit as i64, tag, json]).map_err(st)?;
-        c.execute(
+        tx.execute(
             "INSERT OR REPLACE INTO decisions (id,created_at,json) VALUES (?1,?2,?3)",
-            params![
-                reply.decision.decision_id.to_string(),
-                Utc::now().to_rfc3339(),
-                serde_json::to_string(&reply.decision).map_err(st)?
-            ],
+            params![reply.decision.decision_id.to_string(), now, decision],
         )
         .map_err(st)?;
-        Ok(())
+        tx.commit().map_err(st)
     }
 
     pub fn get_decision(&self, id: Uuid) -> Result<DecisionRecord> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let j: String = c
             .query_row(
                 "SELECT json FROM decisions WHERE id=?1",
@@ -364,7 +408,7 @@ impl Store {
 
     /// Per-domain aggregates for the self-model and the dashboard (FR-041). Unaudited domains are "unmeasured".
     pub fn reply_stats(&self) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare("SELECT domain, COUNT(*), SUM(escalated), SUM(assurance='verified'), SUM(assurance='consensus'), SUM(assurance='abstained'), AVG(wall_ms), AVG(ttft_ms), SUM(audit), SUM(ephemeral > 0) FROM replies GROUP BY domain ORDER BY COUNT(*) DESC").map_err(st)?;
         let rows = s.query_map([], |r| {
             let n: i64 = r.get(1)?; let slow: i64 = r.get::<_, Option<i64>>(2)?.unwrap_or(0);
@@ -376,7 +420,7 @@ impl Store {
     }
 
     pub fn recent_replies(&self, limit: i64) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare("SELECT created_at, domain, mode, assurance, wall_ms, ttft_ms, rule, backend FROM replies ORDER BY created_at DESC LIMIT ?1").map_err(st)?;
         let rows = s.query_map(params![limit], |r| Ok(serde_json::json!({"created_at": r.get::<_, String>(0)?, "domain": r.get::<_, Option<String>>(1)?, "mode": r.get::<_, Option<String>>(2)?,
             "assurance": r.get::<_, Option<String>>(3)?, "wall_ms": r.get::<_, Option<i64>>(4)?, "ttft_ms": r.get::<_, Option<i64>>(5)?, "rule": r.get::<_, Option<String>>(6)?, "backend": r.get::<_, Option<String>>(7)?}))).map_err(st)?;
@@ -393,7 +437,7 @@ impl Store {
         let id = Uuid::new_v4();
         let conv = Uuid::new_v4();
         let now = Utc::now().to_rfc3339();
-        let mut c = self.conn.lock().unwrap();
+        let mut c = self.db();
         let names: Vec<String> = {
             let mut s = c.prepare("SELECT name FROM rooms").map_err(st)?;
             let rows = s.query_map([], |r| r.get::<_, String>(0)).map_err(st)?;
@@ -433,7 +477,7 @@ impl Store {
         if name.is_empty() {
             return Err(NafsError::BadRequest("room name required".into()));
         }
-        let mut c = self.conn.lock().unwrap();
+        let mut c = self.db();
         let rows: Vec<(String, String)> = {
             let mut s = c.prepare("SELECT id, name FROM rooms").map_err(st)?;
             let it = s
@@ -470,9 +514,7 @@ impl Store {
     }
     /// Messages stored for a conversation (a room's history cursor).
     pub fn message_count(&self, conv: Uuid) -> Result<i64> {
-        self.conn
-            .lock()
-            .unwrap()
+        self.db()
             .query_row(
                 "SELECT COUNT(*) FROM messages WHERE conversation_id=?1",
                 params![conv.to_string()],
@@ -482,7 +524,7 @@ impl Store {
     }
     /// All rooms, most recently active first.
     pub fn list_rooms(&self) -> Result<Vec<Room>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare(&format!("{ROOM_SELECT} ORDER BY 7 DESC, r.created_at DESC"))
             .map_err(st)?;
@@ -490,7 +532,7 @@ impl Store {
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(st)
     }
     pub fn get_room(&self, id: Uuid) -> Result<Room> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         c.query_row(
             &format!("{ROOM_SELECT} WHERE r.id = ?1"),
             params![id.to_string()],
@@ -505,7 +547,7 @@ impl Store {
     /// transaction. The trace file keeps no message content and is append-only, so it is left as it is.
     pub fn delete_room(&self, id: Uuid) -> Result<RoomPurge> {
         let room = self.get_room(id)?;
-        let mut c = self.conn.lock().unwrap();
+        let mut c = self.db();
         let tx = c.transaction().map_err(st)?;
         let report = Self::purge_tx(&tx, room.conversation_id, true)?;
         let gone = tx
@@ -524,7 +566,7 @@ impl Store {
         conv: Uuid,
         with_conversation: bool,
     ) -> Result<RoomPurge> {
-        let mut c = self.conn.lock().unwrap();
+        let mut c = self.db();
         let tx = c.transaction().map_err(st)?;
         let report = Self::purge_tx(&tx, conv, with_conversation)?;
         tx.commit().map_err(st)?;
@@ -598,12 +640,12 @@ impl Store {
     }
 
     pub fn save_run(&self, kind: &str, id: Uuid, status: &str, json: &Value) -> Result<()> {
-        self.conn.lock().unwrap().execute("INSERT INTO runs (id,kind,created_at,status,json) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(id) DO UPDATE SET status=?4, json=?5",
+        self.db().execute("INSERT INTO runs (id,kind,created_at,status,json) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(id) DO UPDATE SET status=?4, json=?5",
             params![id.to_string(), kind, Utc::now().to_rfc3339(), status, json.to_string()]).map_err(st)?;
         Ok(())
     }
     pub fn get_run(&self, id: Uuid) -> Result<Value> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let j: String = c
             .query_row(
                 "SELECT json FROM runs WHERE id=?1",
@@ -616,7 +658,7 @@ impl Store {
         serde_json::from_str(&j).map_err(st)
     }
     pub fn list_runs(&self, kind: &str, limit: i64) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare("SELECT json FROM runs WHERE kind=?1 ORDER BY created_at DESC LIMIT ?2")
             .map_err(st)?;
@@ -644,7 +686,7 @@ impl Store {
         features: &Value,
     ) -> Result<Uuid> {
         let id = Uuid::new_v4();
-        self.conn.lock().unwrap().execute(
+        self.db().execute(
             "INSERT INTO audits (id,decision_id,created_at,status,domain,request_json,kept_answer,kept_assurance,e1_hat,features_json) VALUES (?1,?2,?3,'pending',?4,?5,?6,?7,?8,?9)",
             params![id.to_string(), decision_id.to_string(), Utc::now().to_rfc3339(), domain, request.to_string(), kept_answer, kept_assurance, e1_hat as f64, features.to_string()],
         ).map_err(st)?;
@@ -652,7 +694,7 @@ impl Store {
     }
     /// Oldest pending audit: (id, request JSON, kept answer).
     pub fn next_pending_audit(&self) -> Result<Option<(Uuid, Value, String)>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let row: Option<(String, String, String)> = c
             .query_row("SELECT id, request_json, kept_answer FROM audits WHERE status='pending' ORDER BY created_at LIMIT 1", [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
             .optional()
@@ -678,14 +720,14 @@ impl Store {
         wall_ms: u64,
         error: Option<&str>,
     ) -> Result<()> {
-        self.conn.lock().unwrap().execute(
+        self.db().execute(
             "UPDATE audits SET status=?2, slow_answer=?3, kept_correct=?4, slow_correct=?5, agreement=?6, judge_v=?7, wall_ms=?8, completed_at=?9, error=?10 WHERE id=?1",
             params![id.to_string(), status, slow_answer, kept_correct, slow_correct, agreement.map(|x| x as f64), judge_v.map(|x| x as f64), wall_ms as i64, Utc::now().to_rfc3339(), error],
         ).map_err(st)?;
         Ok(())
     }
     pub fn list_audits(&self, limit: i64) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare("SELECT id, decision_id, created_at, status, domain, kept_assurance, e1_hat, kept_correct, slow_correct, agreement, judge_v, wall_ms, completed_at, error, substr(kept_answer,1,300), substr(coalesce(slow_answer,''),1,300) FROM audits ORDER BY created_at DESC LIMIT ?1").map_err(st)?;
         let rows = s.query_map(params![limit], |r| Ok(serde_json::json!({
             "audit_id": r.get::<_, String>(0)?, "decision_id": r.get::<_, String>(1)?, "created_at": r.get::<_, String>(2)?, "status": r.get::<_, String>(3)?,
@@ -696,7 +738,7 @@ impl Store {
         rows.collect::<std::result::Result<Vec<_>, _>>().map_err(st)
     }
     pub fn audit_counts(&self) -> Result<Value> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare("SELECT status, COUNT(*) FROM audits GROUP BY status")
             .map_err(st)?;
@@ -714,7 +756,7 @@ impl Store {
     /// Per-domain capability table (FR-041) with the audit-weighted estimator of Prop. 5:
     /// p2 = g * p2|esc + (1-g) * p2|audit, SE <= 0.5 sqrt((g + (1-g)/eps) / n). Unknown values are null, never 0.
     pub fn self_model(&self, eps: f64, min_audits: i64, backend: &str) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         // Live (non-evaluation) traffic of one model pair, keyed by backend (the adapter hash is "none"
         // until Phase 3); evaluation runs have their own labelled reports.
         let mut s = c
@@ -835,7 +877,7 @@ impl Store {
     /// plus completed audits with an exact label for the kept draft. Returns (features JSON, draft_wrong).
     /// Returns (decision id, features JSON, draft_wrong).
     pub fn labelled_gate_samples(&self, limit: i64) -> Result<Vec<(String, Value, bool)>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut out = vec![];
         let mut s = c
             .prepare("SELECT id, json FROM decisions ORDER BY created_at DESC LIMIT ?1")
@@ -879,7 +921,7 @@ impl Store {
     }
     /// Requests currently stored as running (used to mark interrupted runs on startup).
     pub fn mark_interrupted_runs(&self) -> Result<Vec<(String, Uuid)>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare("SELECT kind, id FROM runs WHERE status='running'")
             .map_err(st)?;
@@ -902,7 +944,7 @@ impl Store {
         include_lab: bool,
     ) -> Result<Vec<(String, u64, Vec<nafs_types::StageTiming>)>> {
         let cutoff = (Utc::now() - chrono::Duration::hours(hours)).to_rfc3339();
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare("SELECT mode, wall_ms, json FROM replies WHERE created_at >= ?1 AND (?2 OR ephemeral < 2) ORDER BY created_at DESC LIMIT 5000")
             .map_err(st)?;
@@ -930,7 +972,7 @@ impl Store {
     /// Live replies (lab traffic excluded) created in the last `minutes`: (mode, wall_ms, escalated, verifier passed, verifier exact).
     pub fn recent_window(&self, minutes: i64) -> Result<Vec<RecentRow>> {
         let cutoff = (Utc::now() - chrono::Duration::minutes(minutes)).to_rfc3339();
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare("SELECT mode, wall_ms, escalated, json FROM replies WHERE created_at >= ?1 AND ephemeral < 2")
             .map_err(st)?;
@@ -971,7 +1013,7 @@ impl Store {
         answer: &str,
         verifier: &str,
     ) -> Result<()> {
-        self.conn.lock().unwrap().execute(
+        self.db().execute(
             "INSERT OR REPLACE INTO memory_index (reply_id, conversation_id, created_at, domain, question, answer, verifier) VALUES (?1,?2,?3,?4,?5,?6,?7)",
             params![reply_id.to_string(), conv.to_string(), Utc::now().to_rfc3339(), domain, question, answer, verifier],
         ).map_err(st)?;
@@ -985,7 +1027,7 @@ impl Store {
         k: usize,
         exclude_conv: Option<Uuid>,
     ) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare("SELECT m.reply_id, m.conversation_id, m.created_at, m.domain, m.question, m.answer, m.verifier FROM memory_index m LEFT JOIN conversations cv ON cv.id = m.conversation_id WHERE COALESCE(cv.training_opt_out, 0) = 0").map_err(st)?;
         let docs: Vec<MemoryDoc> = s
             .query_map([], |r| {
@@ -1089,7 +1131,7 @@ impl Store {
                 "preferred must be fast, slow, tie or both_bad".into(),
             ));
         }
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let wall = |id: Uuid| -> Result<Option<i64>> {
             c.query_row(
                 "SELECT wall_ms FROM replies WHERE id=?1",
@@ -1106,13 +1148,13 @@ impl Store {
         let id = Uuid::new_v4();
         c.execute(
             "INSERT INTO preferences (id,created_at,domain,prompt,fast_reply_id,slow_reply_id,preferred,fast_wall_ms,slow_wall_ms,note) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-            params![id.to_string(), Utc::now().to_rfc3339(), domain, prompt, fast_reply.to_string(), slow_reply.to_string(), preferred, fw, sw, note],
+            params![id.to_string(), Utc::now().to_rfc3339(), domain, prompt, fast_reply.to_string(), slow_reply.to_string(), preferred, fw, sw, clip(note)],
         ).map_err(st)?;
         Ok(id)
     }
     /// Per-domain preference counts and the mean extra latency the slow path cost.
     pub fn preference_stats(&self) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare("SELECT COALESCE(domain,'other'), COUNT(*), SUM(preferred='slow'), SUM(preferred='fast'), SUM(preferred='tie'), SUM(preferred='both_bad'), AVG(slow_wall_ms - fast_wall_ms) FROM preferences GROUP BY 1 ORDER BY 2 DESC").map_err(st)?;
         let rows = s.query_map([], |r| Ok(serde_json::json!({"domain": r.get::<_, String>(0)?, "n": r.get::<_, i64>(1)?, "slow": r.get::<_, i64>(2)?, "fast": r.get::<_, i64>(3)?,
             "tie": r.get::<_, i64>(4)?, "both_bad": r.get::<_, i64>(5)?, "mean_extra_ms": r.get::<_, Option<f64>>(6)?}))).map_err(st)?;
@@ -1122,7 +1164,7 @@ impl Store {
     /// Labelled gate observations in time order for drift monitoring (FR-042): (timestamp, domain,
     /// e1_hat, draft_wrong) from decisions whose draft an exact verifier checked, plus exact-labelled audits.
     pub fn labelled_series(&self) -> Result<Vec<(String, String, f64, bool)>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut out = vec![];
         let mut s = c
             .prepare("SELECT created_at, json FROM decisions ORDER BY created_at")
@@ -1172,7 +1214,7 @@ impl Store {
     // ---------------- Human feedback, review and privacy (FR-033, SR-004, Phase 3) ----------------
 
     pub fn add_feedback(&self, reply_id: Uuid, rating: i64, note: Option<&str>) -> Result<()> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let exists: Option<String> = c
             .query_row(
                 "SELECT id FROM replies WHERE id=?1",
@@ -1190,7 +1232,7 @@ impl Store {
                 reply_id.to_string(),
                 Utc::now().to_rfc3339(),
                 rating.signum(),
-                note
+                clip(note)
             ],
         )
         .map_err(st)?;
@@ -1204,9 +1246,22 @@ impl Store {
         reviewer: &str,
         note: Option<&str>,
     ) -> Result<()> {
-        self.conn.lock().unwrap().execute(
+        let c = self.db();
+        let exists = c
+            .query_row(
+                "SELECT 1 FROM replies WHERE id=?1",
+                params![reply_id.to_string()],
+                |_| Ok(()),
+            )
+            .optional()
+            .map_err(st)?
+            .is_some();
+        if !exists {
+            return Err(NafsError::NotFound(format!("reply {reply_id}")));
+        }
+        c.execute(
             "INSERT INTO reviews (reply_id, decision, reviewer, note, created_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(reply_id) DO UPDATE SET decision=?2, reviewer=?3, note=?4, created_at=?5",
-            params![reply_id.to_string(), if approved { "approved" } else { "rejected" }, reviewer, note, Utc::now().to_rfc3339()],
+            params![reply_id.to_string(), if approved { "approved" } else { "rejected" }, reviewer, clip(note), Utc::now().to_rfc3339()],
         ).map_err(st)?;
         Ok(())
     }
@@ -1227,7 +1282,7 @@ impl Store {
     }
     /// Consensus replies awaiting human review, with the question that produced them.
     pub fn review_queue(&self, limit: i64) -> Result<Vec<Value>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare(
             "SELECT r.id, r.created_at, r.domain, r.mode, (SELECT u.content FROM messages u WHERE u.conversation_id = m.conversation_id AND u.role='user' AND u.id < m.id ORDER BY u.id DESC LIMIT 1), m.content
              FROM replies r JOIN messages m ON m.reply_id = r.id JOIN conversations cv ON cv.id = m.conversation_id
@@ -1243,7 +1298,7 @@ impl Store {
     }
     /// What the distillation dataset builder would see (TR-002, FR-033, SR-004), per domain.
     pub fn tazkiya_summary(&self) -> Result<Value> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c.prepare(
             "SELECT r.domain,
                     SUM(r.assurance='verified' AND r.mode='slow'),
@@ -1286,7 +1341,7 @@ impl Store {
     }
     /// Per-domain human ratings on live traffic (a soft signal, never a calibration label).
     pub fn feedback_by_domain(&self) -> Result<std::collections::BTreeMap<String, (i64, i64)>> {
-        let c = self.conn.lock().unwrap();
+        let c = self.db();
         let mut s = c
             .prepare("SELECT r.domain, SUM(f.rating>0), SUM(f.rating<0) FROM feedback f JOIN replies r ON r.id=f.reply_id GROUP BY r.domain")
             .map_err(st)?;
@@ -1303,8 +1358,11 @@ impl Store {
     /// SR-004: bounded retention. Deletes conversations (and their messages) not updated for `days`,
     /// plus evaluation replies older than that. Returns the number of conversations removed.
     pub fn purge_older_than(&self, days: u32) -> Result<usize> {
-        let cutoff = (Utc::now() - chrono::Duration::days(days as i64)).to_rfc3339();
-        let c = self.conn.lock().unwrap();
+        // Clamped so that an absurd value cannot overflow the date arithmetic.
+        let cutoff =
+            (Utc::now() - chrono::Duration::days(i64::from(days.min(36_500)))).to_rfc3339();
+        let mut conn = self.db();
+        let c = conn.transaction().map_err(st)?;
         let n = c
             .execute(
                 "DELETE FROM conversations WHERE updated_at < ?1 AND room_id IS NULL",
@@ -1327,12 +1385,13 @@ impl Store {
             )
             .map_err(st)?;
         }
+        c.commit().map_err(st)?;
         Ok(n)
     }
 
     /// Append-only, fsync'd JSONL trace (IF-010).
     pub fn write_trace(&self, rec: &TraceRecord) -> Result<()> {
-        let mut g = self.trace.lock().unwrap();
+        let mut g = self.trace_file();
         if let Some(f) = g.as_mut() {
             let line = serde_json::to_string(rec).map_err(st)?;
             f.write_all(line.as_bytes()).map_err(st)?;
@@ -1511,6 +1570,46 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(d);
     }
+    #[test]
+    fn deleting_a_conversation_removes_its_ledger_rows_and_refuses_a_rooms_conversation() {
+        let (st, d) = tmp_store();
+        let chat = st.ensure_conversation(None, "a chat", None).unwrap();
+        let rid = fake_reply(&st, chat, "verified", "slow");
+        st.db().execute("INSERT INTO memory_index (reply_id,conversation_id,created_at,question,answer) VALUES (?1,?2,'t','q','a')", params![rid.to_string(), chat.to_string()]).unwrap();
+        st.db()
+            .execute(
+                "INSERT INTO feedback (reply_id,created_at,rating) VALUES (?1,'t',1)",
+                params![rid.to_string()],
+            )
+            .unwrap();
+        let count = |table: &str| -> i64 {
+            st.db()
+                .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(
+            (count("replies"), count("memory_index"), count("feedback")),
+            (1, 1, 1)
+        );
+        st.delete_conversation(chat).unwrap();
+        assert_eq!(
+            (
+                count("conversations"),
+                count("messages"),
+                count("replies"),
+                count("memory_index"),
+                count("feedback")
+            ),
+            (0, 0, 0, 0, 0),
+            "nothing of the conversation survives its deletion"
+        );
+        // A room's conversation goes with the room, never alone (that would orphan the room).
+        let room = st.create_room("kept", "A").unwrap();
+        assert!(st.delete_conversation(room.conversation_id).is_err());
+        assert_eq!(count("conversations"), 1);
+        std::fs::remove_dir_all(d).ok();
+    }
+
     #[test]
     fn deleting_a_room_removes_its_content_everywhere_and_nothing_else() {
         let (st, d) = tmp_store();

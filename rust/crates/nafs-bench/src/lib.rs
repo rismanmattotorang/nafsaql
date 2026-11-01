@@ -1,5 +1,6 @@
 //! nafs-bench: closed-loop load generation for the performance console (FR-052, ER-007).
 use nafs_core::orchestrator::{Emitter, Orchestrator};
+use nafs_types::LockExt;
 use nafs_types::{ChatRequest, Message, ReasoningMode, StreamEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -227,7 +228,7 @@ pub async fn run(
                     },
                 };
                 let snapshot = {
-                    let mut g = samples.lock().unwrap();
+                    let mut g = samples.locked();
                     g.push(s);
                     g.clone()
                 };
@@ -238,7 +239,7 @@ pub async fn run(
     for h in handles {
         let _ = h.await;
     }
-    let snapshot = samples.lock().unwrap().clone();
+    let snapshot = samples.locked().clone();
     summarize(&req, &snapshot, t0.elapsed(), true)
 }
 

@@ -14,5 +14,6 @@ description = "Smiley Core — a CPU inference engine that reports the bytes it 
 # would re-introduce the materialise-a-dequantised-buffer pattern that principle P1
 # of the spec exists to forbid, and rayon would make thread count and barrier count
 # unpredictable when both are quantities this engine measures and reports.
+publish = false
 [dependencies]
 memmap2 = { workspace = true }

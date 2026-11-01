@@ -14,6 +14,7 @@ use nafs_memory::Store;
 use nafs_types::{
     ChatRequest, CodeAgentReply, CodeAgentRequest, NafsError, StreamEvent, VerificationInputs,
 };
+use nafs_types::{LockExt, RwLockExt};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
@@ -280,7 +281,7 @@ async fn serve_asset(State(s): State<AppState>, name: &'static str) -> Response 
                 (header::REFERRER_POLICY, "no-referrer"),
                 (
                     header::CONTENT_SECURITY_POLICY,
-                    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'",
+                    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
                 ),
             ],
             body,
@@ -366,11 +367,23 @@ async fn auth(State(s): State<AppState>, headers: HeaderMap, req: Request, next:
         .and_then(|h| h.to_str().ok())
         .and_then(|h| h.strip_prefix("Bearer "))
         .map(String::from);
-    let from_query = req.uri().query().and_then(|q| {
-        q.split('&')
-            .find_map(|kv| kv.strip_prefix("token=").map(percent_decode))
-    });
-    let Some(tok) = from_header.or(from_query).filter(|t| s.tokens.contains(t)) else {
+    // A token in the URL ends up in proxy access logs and browser history, so it is accepted only where a
+    // browser cannot set a header: the WebSocket handshake.
+    let from_query = req
+        .uri()
+        .path()
+        .starts_with("/ws/")
+        .then(|| req.uri().query())
+        .flatten()
+        .and_then(|q| {
+            q.split('&')
+                .find_map(|kv| kv.strip_prefix("token=").map(percent_decode))
+        });
+    let Some(tok) = from_header
+        .or(from_query)
+        .filter(|t| token_known(&s.tokens, t))
+    else {
+        tracing::warn!(path = %req.uri().path(), "rejected a request with a missing or unknown token");
         return ApiError(NafsError::Unauthorized).into_response();
     };
     if !rate_ok(&s, &tok) {
@@ -378,8 +391,18 @@ async fn auth(State(s): State<AppState>, headers: HeaderMap, req: Request, next:
     }
     next.run(req).await
 }
+/// Constant-time comparison of the presented token with every configured one (no early exit on the first
+/// differing byte, nor on the first match).
+fn token_known(tokens: &[String], presented: &str) -> bool {
+    let eq = |a: &[u8], b: &[u8]| {
+        a.len() == b.len() && a.iter().zip(b).fold(0u8, |d, (x, y)| d | (x ^ y)) == 0
+    };
+    tokens.iter().fold(false, |found, t| {
+        found | eq(t.as_bytes(), presented.as_bytes())
+    })
+}
 fn rate_ok(s: &AppState, key: &str) -> bool {
-    let mut rl = s.rate.lock().unwrap();
+    let mut rl = s.rate.locked();
     let e = rl.entry(key.to_string()).or_insert((Instant::now(), 0));
     if e.0.elapsed() > Duration::from_secs(60) {
         *e = (Instant::now(), 0);
@@ -424,7 +447,7 @@ pub(crate) async fn run_with_cap(
         }
     };
     if let Some(ok) = ok {
-        let mut o = s.outcomes.lock().unwrap();
+        let mut o = s.outcomes.locked();
         o.push_back((Instant::now(), ok));
         while o.len() > 5000 {
             o.pop_front();
@@ -690,50 +713,52 @@ async fn drift(State(s): State<AppState>, Query(q): Query<DriftQ>) -> ApiResult<
     Ok(Json(json!({"params": p, "domains": out,
         "note": "Two-sided CUSUM on standardised series against a reference window, with a shuffled-order negative control (FR-042). Calibration error is (draft wrong) - e1_hat; accuracy is the fast-path pass rate."})))
 }
-async fn gates_dashboard(State(s): State<AppState>) -> ApiResult<Json<Value>> {
-    let eval_runs: Vec<Value> = s
-        .store
+/// The stored evaluation runs with their items (the dashboards recompute from them).
+fn eval_runs_full(s: &AppState) -> nafs_types::Result<Vec<Value>> {
+    Ok(s.store
         .list_runs("eval", 500)?
         .into_iter()
         .filter_map(|r| r["run_id"].as_str().and_then(|id| Uuid::parse_str(id).ok()))
         .filter_map(|id| s.store.get_run(id).ok())
-        .collect();
-    let orch = s.orch.clone();
-    let eval_runs: Vec<Value> = tokio::task::spawn_blocking(move || {
-        eval_runs
+        .collect())
+}
+async fn gates_dashboard(State(s): State<AppState>) -> ApiResult<Json<Value>> {
+    // Blocking work (one SQLite read per run, then bootstrap resampling) off the async workers.
+    blocking(move || -> ApiResult<Value> {
+        let eval_runs: Vec<Value> = eval_runs_full(&s)?
             .iter()
             .map(|r| {
                 if r["status"] != "running" {
-                    nafs_eval::rebuild(r, &orch).unwrap_or_else(|| r.clone())
+                    nafs_eval::rebuild(r, &s.orch).unwrap_or_else(|| r.clone())
                 } else {
                     r.clone()
                 }
             })
-            .collect()
+            .collect();
+        let read = |p: &str| {
+            std::fs::read_to_string(p)
+                .ok()
+                .and_then(|x| serde_json::from_str::<Value>(&x).ok())
+        };
+        let cal = s.orch.calibration();
+        let ev = crate::gates::Evidence {
+            eval_runs,
+            bench_runs: s.store.list_runs("bench", 200)?,
+            acceptance: read("benchmarks/mvp_acceptance.json"),
+            h7: read("benchmarks/reference-machine/h7_result.json"),
+            registry: read(&s.cfg.storage.registry_file),
+            calibration_promoted: s.orch.promoted(),
+            calibration_n: cal.n,
+            calibration_ece: cal.ece,
+            security: read("docs/security/security_review.json"),
+            deploy: read("deploy/verified.json"),
+            profile_c: read("benchmarks/profile_c_decision.json"),
+            scholar: read("docs/release/scholar_review.json"),
+        };
+        Ok(crate::gates::evaluate(&ev))
     })
-    .await
-    .map_err(|e| NafsError::Internal(e.to_string()))?;
-    let read = |p: &str| {
-        std::fs::read_to_string(p)
-            .ok()
-            .and_then(|x| serde_json::from_str::<Value>(&x).ok())
-    };
-    let cal = s.orch.calibration();
-    let ev = crate::gates::Evidence {
-        eval_runs,
-        bench_runs: s.store.list_runs("bench", 200)?,
-        acceptance: read("benchmarks/mvp_acceptance.json"),
-        h7: read("benchmarks/reference-machine/h7_result.json"),
-        registry: read(&s.cfg.storage.registry_file),
-        calibration_promoted: s.orch.promoted(),
-        calibration_n: cal.n,
-        calibration_ece: cal.ece,
-        security: read("docs/security/security_review.json"),
-        deploy: read("deploy/verified.json"),
-        profile_c: read("benchmarks/profile_c_decision.json"),
-        scholar: read("docs/release/scholar_review.json"),
-    };
-    Ok(Json(crate::gates::evaluate(&ev)))
+    .await?
+    .map(Json)
 }
 async fn start_protocol(
     State(s): State<AppState>,
@@ -751,27 +776,15 @@ async fn start_protocol(
     let id = Uuid::new_v4();
     let base = json!({"run_id": id, "kind": "protocol", "status": "running", "request": req, "created_at": chrono::Utc::now()});
     s.store.save_run("bench", id, "running", &base)?;
-    let cancel = register_cancel(&s, id);
-    let s2 = s.clone();
+    let (mut guard, cancel) = RunGuard::start(&s, "bench", "protocol", id);
+    let progress = progress_saver(&s, "bench", "protocol", id, Duration::from_millis(1500));
     tokio::spawn(async move {
-        let s3 = s2.clone();
-        let last = Arc::new(Mutex::new(Instant::now() - Duration::from_secs(5)));
-        let mut v = nafs_bench::protocol(s2.orch.clone(), req, cancel, move |snap| {
-            let mut l = last.lock().unwrap();
-            if l.elapsed() < Duration::from_millis(1500) {
-                return;
-            }
-            *l = Instant::now();
-            let mut v = snap.clone();
-            v["run_id"] = json!(id);
-            let _ = s3.store.save_run("bench", id, "running", &v);
-        })
-        .await;
+        let mut v = nafs_bench::protocol(guard.s.orch.clone(), req, cancel, progress).await;
         v["run_id"] = json!(id);
         v["created_at"] = json!(chrono::Utc::now());
         let st = v["status"].as_str().unwrap_or("done").to_string();
-        let _ = s2.store.save_run("bench", id, &st, &v);
-        s2.cancels.lock().unwrap().remove(&id);
+        let _ = guard.s.store.save_run("bench", id, &st, &v);
+        guard.finish();
     });
     Ok((StatusCode::ACCEPTED, Json(base)))
 }
@@ -787,9 +800,7 @@ async fn export_run(
 ) -> ApiResult<Response> {
     let run = s.store.get_run(id)?;
     let orch = s.orch.clone();
-    let r = tokio::task::spawn_blocking(move || nafs_eval::rebuild(&run, &orch).unwrap_or(run))
-        .await
-        .map_err(|e| NafsError::Internal(e.to_string()))?;
+    let r = blocking(move || nafs_eval::rebuild(&run, &orch).unwrap_or(run)).await?;
     let short = id.to_string()[..8].to_string();
     Ok(match q.format.as_deref().unwrap_or("md") {
         "csv" => (
@@ -837,7 +848,7 @@ fn evaluate_alerts(s: &AppState) -> NafsResult<Value> {
     let rows = s.store.recent_window(a.window_min)?;
     let window = Duration::from_secs((a.window_min.max(1) as u64) * 60);
     let (n_out, n_err) = {
-        let o = s.outcomes.lock().unwrap();
+        let o = s.outcomes.locked();
         let recent: Vec<&(Instant, bool)> =
             o.iter().filter(|(t, _)| t.elapsed() <= window).collect();
         (recent.len(), recent.iter().filter(|(_, ok)| !*ok).count())
@@ -863,8 +874,7 @@ fn evaluate_alerts(s: &AppState) -> NafsResult<Value> {
     let drift = nafs_core::drift::cusum(&calib, Default::default());
     let drill = s
         .drill_until
-        .lock()
-        .unwrap()
+        .locked()
         .map(|t| t > Instant::now())
         .unwrap_or(false);
     let rule = |id: &str,
@@ -951,11 +961,7 @@ async fn perf_stages(
 
 async fn alerts(State(s): State<AppState>) -> ApiResult<Json<Value>> {
     let s2 = s.clone();
-    Ok(Json(
-        tokio::task::spawn_blocking(move || evaluate_alerts(&s2))
-            .await
-            .map_err(|e| NafsError::Internal(e.to_string()))??,
-    ))
+    Ok(Json(blocking(move || evaluate_alerts(&s2)).await??))
 }
 #[derive(Deserialize, Default)]
 struct DrillReq {
@@ -970,12 +976,10 @@ async fn alert_drill(
         .and_then(|b| b.0.seconds)
         .unwrap_or(120)
         .clamp(10, 3600);
-    *s.drill_until.lock().unwrap() = Some(Instant::now() + Duration::from_secs(secs));
+    *s.drill_until.locked() = Some(Instant::now() + Duration::from_secs(secs));
     tracing::warn!("alert drill started for {secs} s: every alert rule reports firing");
     let s2 = s.clone();
-    let v = tokio::task::spawn_blocking(move || evaluate_alerts(&s2))
-        .await
-        .map_err(|e| NafsError::Internal(e.to_string()))??;
+    let v = blocking(move || evaluate_alerts(&s2)).await??;
     Ok(Json(json!({"drill_seconds": secs, "alerts": v})))
 }
 
@@ -989,28 +993,102 @@ async fn lab_insights(
     State(s): State<AppState>,
     Query(q): Query<InsightQ>,
 ) -> ApiResult<Json<Value>> {
-    let runs: Vec<Value> = s
-        .store
-        .list_runs("eval", 500)?
-        .into_iter()
-        .filter_map(|r| r["run_id"].as_str().and_then(|id| Uuid::parse_str(id).ok()))
-        .filter_map(|id| s.store.get_run(id).ok())
-        .collect();
-    let prefs = s.store.preference_stats()?;
-    let orch = s.orch.clone();
     let lam = q.lambda;
-    let v = tokio::task::spawn_blocking(move || nafs_eval::insights(&runs, &orch, lam, &prefs))
+    blocking(move || -> ApiResult<Value> {
+        let runs = eval_runs_full(&s)?;
+        let prefs = s.store.preference_stats()?;
+        Ok(nafs_eval::insights(&runs, &s.orch, lam, &prefs))
+    })
+    .await?
+    .map(Json)
+}
+
+/// Run blocking work (SQLite, bootstrap resampling, sandboxed processes) off the async workers.
+async fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> ApiResult<T> {
+    tokio::task::spawn_blocking(f)
         .await
-        .map_err(|e| NafsError::Internal(e.to_string()))?;
-    Ok(Json(v))
+        .map_err(|e| NafsError::Internal(e.to_string()).into())
 }
 
 // ---------------- Bench, eval and verifier runs (IF-009) ----------------
-fn register_cancel(s: &AppState, id: Uuid) -> Arc<AtomicBool> {
-    let c = Arc::new(AtomicBool::new(false));
-    s.cancels.lock().unwrap().insert(id, c.clone());
-    c
+/// Bookkeeping of a background run. Creating it registers the run's cancel flag; dropping it (the task ended, or
+/// unwound from a panic) removes the flag, and a run that never recorded a final status is marked failed instead of
+/// staying "running" until the next restart.
+struct RunGuard {
+    s: AppState,
+    table: &'static str,
+    kind: &'static str,
+    id: Uuid,
+    finished: bool,
 }
+impl RunGuard {
+    fn start(
+        s: &AppState,
+        table: &'static str,
+        kind: &'static str,
+        id: Uuid,
+    ) -> (Self, Arc<AtomicBool>) {
+        let cancel = Arc::new(AtomicBool::new(false));
+        s.cancels.locked().insert(id, cancel.clone());
+        let guard = RunGuard {
+            s: s.clone(),
+            table,
+            kind,
+            id,
+            finished: false,
+        };
+        (guard, cancel)
+    }
+    /// The final status has been stored.
+    fn finish(&mut self) {
+        self.finished = true;
+    }
+}
+impl Drop for RunGuard {
+    fn drop(&mut self) {
+        self.s.cancels.locked().remove(&self.id);
+        if !self.finished {
+            tracing::error!(run = %self.id, kind = self.kind, "background run stopped without a result");
+            let v = json!({"run_id": self.id, "kind": self.kind, "status": "failed", "error": "the run stopped unexpectedly", "finished_at": chrono::Utc::now()});
+            let _ = self.s.store.save_run(self.table, self.id, "failed", &v);
+        }
+    }
+}
+
+/// A progress callback that stores a snapshot of the run at most once per `min_gap` (clonable: the bench protocol
+/// hands it to several levels).
+fn progress_saver(
+    s: &AppState,
+    table: &'static str,
+    kind: &'static str,
+    id: Uuid,
+    min_gap: Duration,
+) -> impl Fn(&Value) + Send + Sync + Clone + 'static {
+    let state = Arc::new((
+        s.clone(),
+        Mutex::new(
+            Instant::now()
+                .checked_sub(min_gap)
+                .unwrap_or_else(Instant::now),
+        ),
+    ));
+    move |snapshot: &Value| {
+        let (s, last) = &*state;
+        let mut last = last.locked();
+        if last.elapsed() < min_gap {
+            return;
+        }
+        *last = Instant::now();
+        let mut v = snapshot.clone();
+        v["run_id"] = json!(id);
+        v["kind"] = json!(kind);
+        let _ = s.store.save_run(table, id, "running", &v);
+    }
+}
+
+/// Limits of one bench run (the run holds both backends while it lasts).
+const MAX_BENCH_SECONDS: u64 = 86_400;
+const MAX_BENCH_REQUESTS: usize = 100_000;
 
 async fn start_bench(
     State(s): State<AppState>,
@@ -1019,32 +1097,28 @@ async fn start_bench(
     if req.duration_s.is_none() && req.requests.is_none() {
         return Err(NafsError::BadRequest("set duration_s or requests".into()).into());
     }
+    // `Instant + Duration` panics on an absurd duration, and a run with no practical end holds the backends.
+    if req
+        .duration_s
+        .is_some_and(|d| d == 0 || d > MAX_BENCH_SECONDS)
+        || req
+            .requests
+            .is_some_and(|n| n == 0 || n > MAX_BENCH_REQUESTS)
+    {
+        return Err(NafsError::BadRequest(format!(
+            "duration_s must be 1..={MAX_BENCH_SECONDS} and requests 1..={MAX_BENCH_REQUESTS}"
+        ))
+        .into());
+    }
     let id = Uuid::new_v4();
     let base = json!({"run_id": id, "kind": "bench", "status": "running", "request": req, "created_at": chrono::Utc::now()});
     s.store.save_run("bench", id, "running", &base)?;
-    let cancel = register_cancel(&s, id);
-    let (s2, last) = (
-        s.clone(),
-        Arc::new(Mutex::new(Instant::now() - Duration::from_secs(5))),
-    );
+    let (mut guard, cancel) = RunGuard::start(&s, "bench", "bench", id);
+    let progress = progress_saver(&s, "bench", "bench", id, Duration::from_millis(800));
     tokio::spawn(async move {
-        let s3 = s2.clone();
-        let last2 = last.clone();
-        let c2 = cancel.clone();
-        let fin = nafs_bench::run(s2.orch.clone(), req, cancel, move |v| {
-            let mut l = last2.lock().unwrap();
-            if l.elapsed() < Duration::from_millis(800) {
-                return;
-            }
-            *l = Instant::now();
-            let mut v = v.clone();
-            v["run_id"] = json!(id);
-            v["kind"] = json!("bench");
-            let _ = s3.store.save_run("bench", id, "running", &v);
-        })
-        .await;
-        let mut v = fin;
-        let status = if c2.load(Ordering::Relaxed) {
+        let flag = cancel.clone();
+        let mut v = nafs_bench::run(guard.s.orch.clone(), req, cancel, progress).await;
+        let status = if flag.load(Ordering::Relaxed) {
             "cancelled"
         } else {
             "done"
@@ -1053,8 +1127,8 @@ async fn start_bench(
         v["kind"] = json!("bench");
         v["status"] = json!(status);
         v["finished_at"] = json!(chrono::Utc::now());
-        let _ = s2.store.save_run("bench", id, status, &v);
-        s2.cancels.lock().unwrap().remove(&id);
+        let _ = guard.s.store.save_run("bench", id, status, &v);
+        guard.finish();
     });
     Ok((StatusCode::ACCEPTED, Json(base)))
 }
@@ -1096,16 +1170,14 @@ async fn get_run(State(s): State<AppState>, Path(id): Path<Uuid>) -> ApiResult<J
     if run["kind"] == "eval" && run["status"] != "running" && run.get("items").is_some() {
         let orch = s.orch.clone();
         let r2 = run.clone();
-        if let Ok(Some(v)) =
-            tokio::task::spawn_blocking(move || nafs_eval::rebuild(&r2, &orch)).await
-        {
+        if let Ok(Some(v)) = blocking(move || nafs_eval::rebuild(&r2, &orch)).await {
             return Ok(Json(v));
         }
     }
     Ok(Json(run))
 }
 async fn cancel_run(State(s): State<AppState>, Path(id): Path<Uuid>) -> ApiResult<StatusCode> {
-    match s.cancels.lock().unwrap().get(&id) {
+    match s.cancels.locked().get(&id) {
         Some(c) => {
             c.store(true, Ordering::Relaxed);
             Ok(StatusCode::ACCEPTED)
@@ -1166,20 +1238,14 @@ fn spawn_eval(
     req: nafs_eval::EvalRunRequest,
     prior: Vec<nafs_eval::ItemResult>,
 ) {
-    let cancel = register_cancel(s, id);
-    let s2 = s.clone();
+    let (mut guard, cancel) = RunGuard::start(s, "eval", "eval", id);
+    let progress = progress_saver(s, "eval", "eval", id, Duration::ZERO);
     tokio::spawn(async move {
-        let s3 = s2.clone();
         let res = nafs_eval::run_with_prior(
-            s2.orch.clone(),
+            guard.s.orch.clone(),
             req.clone(),
             cancel,
-            move |v| {
-                let mut v = v.clone();
-                v["run_id"] = json!(id);
-                v["kind"] = json!("eval");
-                let _ = s3.store.save_run("eval", id, "running", &v);
-            },
+            move |v| progress(v),
             prior,
         )
         .await;
@@ -1194,10 +1260,11 @@ fn spawn_eval(
                 json!({"run_id": id, "kind": "eval", "status": "failed", "error": e.to_string(), "request": req})
             }
         };
-        let _ = s2
+        let _ = guard
+            .s
             .store
             .save_run("eval", id, v["status"].as_str().unwrap_or("done"), &v);
-        s2.cancels.lock().unwrap().remove(&id);
+        guard.finish();
     });
 }
 
@@ -1246,7 +1313,7 @@ async fn calibrate(
     let samples = nafs_eval::calibration_samples(&run)?;
     let opts = body.map(|b| b.0).unwrap_or_default();
     let orch = s.orch.clone();
-    let v = tokio::task::spawn_blocking(move || {
+    let v = blocking(move || {
         if opts.include_ledger {
             orch.recalibrate_from_ledger(samples)
         } else {
@@ -1254,8 +1321,7 @@ async fn calibrate(
             orch.fit_and_maybe_promote(&xs, &ys, Some(id.to_string()))
         }
     })
-    .await
-    .map_err(|e| NafsError::Internal(e.to_string()))??;
+    .await??;
     Ok(Json(v))
 }
 
@@ -1266,32 +1332,27 @@ async fn start_rates(
     let id = Uuid::new_v4();
     let base = json!({"run_id": id, "kind": "rates", "status": "running", "request": req, "created_at": chrono::Utc::now(), "progress": {"done": 0, "total": 0}});
     s.store.save_run("rates", id, "running", &base)?;
-    let cancel = register_cancel(&s, id);
-    let s2 = s.clone();
+    let (mut guard, cancel) = RunGuard::start(&s, "rates", "rates", id);
+    let progress = progress_saver(&s, "rates", "rates", id, Duration::ZERO);
     tokio::spawn(async move {
-        let s3 = s2.clone();
-        let res = nafs_eval::rates::measure(s2.orch.clone(), req.clone(), cancel, move |v| {
-            let mut v = v.clone();
-            v["run_id"] = json!(id);
-            v["kind"] = json!("rates");
-            let _ = s3.store.save_run("rates", id, "running", &v);
-        })
-        .await;
+        let res =
+            nafs_eval::rates::measure(guard.s.orch.clone(), req.clone(), cancel, progress).await;
         let mut v = res.unwrap_or_else(
             |e| json!({"status": "failed", "error": e.to_string(), "request": req}),
         );
         v["run_id"] = json!(id);
         v["kind"] = json!("rates");
         v["finished_at"] = json!(chrono::Utc::now());
-        let _ = s2
+        let _ = guard
+            .s
             .store
             .save_run("rates", id, v["status"].as_str().unwrap_or("done"), &v);
-        s2.cancels.lock().unwrap().remove(&id);
+        guard.finish();
     });
     Ok((StatusCode::ACCEPTED, Json(base)))
 }
 async fn get_rates(State(s): State<AppState>) -> Json<Value> {
-    let r = s.orch.hub.rates.read().unwrap().clone();
+    let r = s.orch.hub.rates.read_locked().clone();
     Json(
         json!({"rates": r, "note": if r.is_empty() { "Not measured yet: start a measurement run (FR-032)." } else { "Mutation-measured (r, phi) per verifier, attached to every verdict." }}),
     )
@@ -1455,9 +1516,7 @@ async fn recalibrate(
         extra.extend(nafs_eval::calibration_samples(&r)?);
     }
     let orch = s.orch.clone();
-    let v = tokio::task::spawn_blocking(move || orch.recalibrate_from_ledger(extra))
-        .await
-        .map_err(|e| NafsError::Internal(e.to_string()))??;
+    let v = blocking(move || orch.recalibrate_from_ledger(extra)).await??;
     Ok(Json(v))
 }
 async fn derive_params(State(s): State<AppState>, Json(b): Json<RunIds>) -> ApiResult<Json<Value>> {
@@ -1537,7 +1596,7 @@ async fn system(State(s): State<AppState>) -> Json<Value> {
         "gate": {"k_samples": c.gate.k_samples, "lambda_default": c.gate.lambda_default, "cost_unit_s": c.gate.cost_unit_s, "loss_wrong": c.gate.loss_wrong,
                  "fixed": c.gate.fixed, "audit_fraction": c.gate.audit_fraction, "state": gate_view(&s)},
         "judge": c.judge, "audit": {"config": c.audit, "counts": s.store.audit_counts().unwrap_or(Value::Null)},
-        "verifier_rates": s.orch.hub.rates.read().unwrap().clone(),
+        "verifier_rates": s.orch.hub.rates.read_locked().clone(),
         "deliberation": c.deliberation, "server": {"bind": c.server.bind, "request_wall_clock_cap_s": c.server.request_wall_clock_cap_s, "max_prompt_tokens": c.server.max_prompt_tokens},
     }))
 }
