@@ -1,5 +1,5 @@
 {
- "measured_at": "2026-11-01T13:22:50Z",
+ "measured_at": "2026-11-01T14:12:35Z",
  "base": "http://127.0.0.1:8080",
  "slow": false,
  "passed": 59,
@@ -8,27 +8,27 @@
   {
    "check": "create: name is trimmed and collapsed, 201",
    "pass": true,
-   "detail": "201 T-c22184 Alpha"
+   "detail": "201 T-3ab06b Alpha"
   },
   {
    "check": "create: the room starts empty",
    "pass": true,
-   "detail": "{'busy': False, 'conversation_id': '7fd992bc-fb39-49f1-9e39-c991e3e08dac', 'created_at': '2026-11-01T13:22:28.294943+00:00', 'last_activity': '2026-11-01T13:22:28.294943+00:00', 'members': 0, 'name': 'T-c22184 Alpha', 'profile': 'A', 'questions': 0, 'queued': 0, 'room_id': 'ea61b237-3bca-4062-9d5f-3"
+   "detail": "{'busy': False, 'conversation_id': 'dfe3fa04-1cd7-4860-b20f-25603b7292f7', 'created_at': '2026-11-01T14:12:14.235350+00:00', 'last_activity': '2026-11-01T14:12:14.235350+00:00', 'members': 0, 'name': 'T-3ab06b Alpha', 'profile': 'A', 'questions': 0, 'queued': 0, 'room_id': 'cab5e44c-4d76-49d9-a9f2-3"
   },
   {
-   "check": "create: duplicate 't-c22184 alpha' is a 409 conflict",
+   "check": "create: duplicate 't-3ab06b alpha' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-c22184 alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-3ab06b alpha' already exists\"}"
   },
   {
-   "check": "create: duplicate 'T-c22184    ALPHA' is a 409 conflict",
+   "check": "create: duplicate 'T-3ab06b    ALPHA' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-c22184 ALPHA' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-3ab06b ALPHA' already exists\"}"
   },
   {
-   "check": "create: duplicate ' T-c22184 Alpha ' is a 409 conflict",
+   "check": "create: duplicate ' T-3ab06b Alpha ' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-c22184 Alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-3ab06b Alpha' already exists\"}"
   },
   {
    "check": "create: empty name is a 400",
@@ -58,7 +58,7 @@
   {
    "check": "create: markup is stored as plain text",
    "pass": true,
-   "detail": "T-c22184 <img src=x onerror=alert(1)>"
+   "detail": "T-3ab06b <img src=x onerror=alert(1)>"
   },
   {
    "check": "list: every created room is listed, newest activity first",
@@ -88,7 +88,7 @@
   {
    "check": "rename: onto another room's name (any case) is a 409",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-c22184 alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-3ab06b alpha' already exists\"}"
   },
   {
    "check": "rename: changing only the case of its own name is allowed",
@@ -113,7 +113,7 @@
   {
    "check": "ws: welcome carries the name, the room, the members and the limits",
    "pass": true,
-   "detail": "{'assistant': {'busy': False, 'queued': 0, 'working_for': None}, 'cursor': 0, 'limits': {'burst': 4.0, 'message_chars': 8000, 'queue': 3}, 'pending': [], 'room': {'name': 'T-c22184 Alpha', 'room_id': 'ea61b237-3bca-4062-9d5f-33113400b288'}, 'users': ['Ann'], 'you': 'Ann'}"
+   "detail": "{'assistant': {'busy': False, 'queued': 0, 'working_for': None}, 'cursor': 0, 'limits': {'burst': 4.0, 'message_chars': 8000, 'queue': 3}, 'pending': [], 'room': {'name': 'T-3ab06b Alpha', 'room_id': 'cab5e44c-4d76-49d9-a9f2-3d4c28e35d2a'}, 'users': ['Ann'], 'you': 'Ann'}"
   },
   {
    "check": "ws: the member then sees its own presence frame",
@@ -228,7 +228,7 @@
   {
    "check": "ws: a rename reaches every member",
    "pass": true,
-   "detail": "{'payload': {'name': 'T-c22184 Alpha Renamed'}, 'type': 'room_renamed'}"
+   "detail": "{'payload': {'name': 'T-3ab06b Alpha Renamed'}, 'type': 'room_renamed'}"
   },
   {
    "check": "ws: a departure is announced with the remaining members",
@@ -238,7 +238,7 @@
   {
    "check": "delete: 200 with a report of what was removed",
    "pass": true,
-   "detail": "{'deleted': True, 'disconnected': 2, 'name': 'T-c22184 Alpha Renamed', 'removed': {'memory_entries': 0, 'messages': 4, 'replies': 2}, 'room_id': 'ea61b237-3bca-4062-9d5f-33113400b288'}"
+   "detail": "{'deleted': True, 'disconnected': 2, 'name': 'T-3ab06b Alpha Renamed', 'removed': {'memory_entries': 0, 'messages': 4, 'replies': 2}, 'room_id': 'cab5e44c-4d76-49d9-a9f2-3d4c28e35d2a'}"
   },
   {
    "check": "delete: members are told first, then disconnected with code 4004",
@@ -258,7 +258,7 @@
   {
    "check": "delete: its decision record is gone",
    "pass": true,
-   "detail": "9b750cf9-73ea-4abf-85bc-f28392dab133"
+   "detail": "e1f09d0d-9fc4-4d6c-9254-698578fe86e1"
   },
   {
    "check": "delete: deleting again is a 404",

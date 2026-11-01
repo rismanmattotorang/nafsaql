@@ -403,6 +403,19 @@ fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Msg>) {
 /// Requests that may be queued behind the running one (the gateway sends at most one per model at a time).
 const MAX_WAITING: usize = 8;
 
+/// Reserve one slot of `cap` on a counter: false when it is full. A compare-exchange loop rather than
+/// `fetch_update`, which newer toolchains deprecate (renamed `try_update`) and older ones lack.
+fn try_reserve(counter: &AtomicUsize, cap: usize) -> bool {
+    let mut n = counter.load(Ordering::SeqCst);
+    while n < cap {
+        match counter.compare_exchange_weak(n, n + 1, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => return true,
+            Err(now) => n = now,
+        }
+    }
+    false
+}
+
 /// Counts a request as processing (the `requests_processing` metric) until dropped.
 struct BusyGuard(Arc<App>);
 impl Drop for BusyGuard {
@@ -418,13 +431,7 @@ async fn chat(State(app): State<Arc<App>>, Json(body): Json<Value>) -> Response 
     };
     // One session decodes one request at a time; the others wait. A bounded wait queue keeps a burst of (possibly
     // abandoned) long prompts from piling up blocking threads and CPU-hours of prefill.
-    if app
-        .busy
-        .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
-            (n < MAX_WAITING).then_some(n + 1)
-        })
-        .is_err()
-    {
+    if !try_reserve(&app.busy, MAX_WAITING) {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(json!({"error": {"message": "too many requests are waiting for this model", "type": "overloaded_error", "code": 503}})),

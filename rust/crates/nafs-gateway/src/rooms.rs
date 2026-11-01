@@ -369,6 +369,19 @@ fn text(v: Value) -> WsMessage {
     WsMessage::Text(v.to_string().into())
 }
 
+/// Reserve one slot of `cap` on a counter: false when it is full. A compare-exchange loop rather than
+/// `fetch_update`, which newer toolchains deprecate (renamed `try_update`) and older ones lack.
+fn try_reserve(counter: &AtomicUsize, cap: usize) -> bool {
+    let mut n = counter.load(Ordering::SeqCst);
+    while n < cap {
+        match counter.compare_exchange_weak(n, n + 1, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => return true,
+            Err(now) => n = now,
+        }
+    }
+    false
+}
+
 fn private_err(code: &str, message: &str) -> String {
     json!({"type": "error", "payload": {"code": code, "message": message}}).to_string()
 }
@@ -501,12 +514,7 @@ async fn room_session(s: AppState, room: nafs_memory::Room, wanted: String, sock
             continue;
         }
         // Reserve a queue slot atomically: a separate load and add let concurrent members overshoot the cap.
-        if h.queued
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| {
-                (n < ROOM_QUEUE_CAP).then_some(n + 1)
-            })
-            .is_err()
-        {
+        if !try_reserve(&h.queued, ROOM_QUEUE_CAP) {
             let _ = ptx.try_send(private_err("E_QUEUE_FULL", "The assistant already has several questions queued in this room; try again shortly."));
             continue;
         }
