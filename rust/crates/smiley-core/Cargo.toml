@@ -1,5 +1,5 @@
-# Vendored from the owner's Smiley project (~/Downloads/Smiley, revision 7cb6028, `smiley/engine` -> third_party/smiley-core,
-# Apache-2.0) on 2026-11-01 so that the workspace builds without the third_party checkout. Modified for Nafs-Aql:
+# Vendored from the owner's Smiley project (~/Downloads/Smiley, revision 7cb6028, `smiley/src-tauri/crates/smiley-core`,
+# Apache-2.0) on 2026-11-01 so that the workspace builds without any outside checkout. Modified for Nafs-Aql:
 # `SessionCfg::assistant_prefix` (a continuation prefix, used for the reasoning budget) and `Emitted::logprob`
 # (the sampled token's log-probability, for the gate). See README.md in this directory.
 [package]

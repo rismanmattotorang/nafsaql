@@ -1,7 +1,7 @@
 # Smiley Core as the third inference backend (Phase 15)
 
 Date 2026-11-01. The owner asked to integrate Smiley Core, the Rust CPU inference engine of their Smiley project
-(`third_party/smiley-core`, mirrored from `~/Downloads/Smiley/smiley/engine`, revision 7cb6028, Apache-2.0), into Nafs-Aql as a
+(`smiley/src-tauri/crates/smiley-core` in `~/Downloads/Smiley`, revision 7cb6028, Apache-2.0), into Nafs-Aql as a
 third backend beside llama.cpp and vLLM, reusing the code rather than re-implementing it. Decision record:
 [009](../decisions/009-smiley-backend.md). Report: section "Phase 15".
 
@@ -22,7 +22,7 @@ architecture, the Qwen3 template).
 
 | Piece | Where | What |
 |---|---|---|
-| The engine | `rust/crates/smiley-core` (vendored; `third_party/` is not in version control) | upstream source plus two marked additions: `SessionCfg::assistant_prefix` and `Emitted::logprob` (`README.md` there) |
+| The engine | `rust/crates/smiley-core` (vendored into the workspace, so it builds with no outside checkout) | upstream source plus two marked additions: `SessionCfg::assistant_prefix` and `Emitted::logprob` (`README.md` there) |
 | The server | `rust/crates/nafs-smiley-server` | one model per process behind the OpenAI chat API the gateway speaks: `POST /v1/chat/completions` (streamed or not, `usage`, llama-style `timings` plus a `smiley` block with the bytes moved), `GET /v1/models`, `/health`, `/metrics` |
 | The backend | `config/nafs-aql.toml` `[backends.smiley]`, `kind = "smiley"` | the gateway's `Backend` needs no new code path: a kind that is not `llama` gets the standard chat path (no grammar, no raw continuation), as vLLM does; `max_in_flight = 1` per model |
 | Serving | `scripts/serve_smiley.sh`, `make up` | System 1 on :8201, System 2 on :8202; the default backend (decision 009); `POST /v1/system/backend {"name": "llama"}` or `make up-llama` switches the gateway to llama.cpp (warm-first, decision 008) |

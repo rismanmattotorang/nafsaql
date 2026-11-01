@@ -5,8 +5,8 @@ Date 2026-11-01. Status: **adopted, and made the default backend after measuring
 
 ## Context
 
-The owner asked to integrate Smiley Core, the Rust CPU inference engine of their Smiley project (`third_party/smiley-core`,
-revision 7cb6028, Apache-2.0), as a third backend beside llama.cpp and vLLM, reusing its code. The gateway already speaks one
+The owner asked to integrate Smiley Core, the Rust CPU inference engine of their Smiley project (`smiley/src-tauri/crates/smiley-core` in
+`~/Downloads/Smiley`, revision 7cb6028, Apache-2.0), as a third backend beside llama.cpp and vLLM, reusing its code. The gateway already speaks one
 OpenAI-compatible API to two kinds of server, so the integration is a server around the engine plus a configured pair.
 
 ## Decision

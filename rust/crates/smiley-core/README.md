@@ -1,7 +1,7 @@
 # smiley-core (vendored)
 
-Smiley Core is the owner's own CPU inference engine from the Smiley project (`~/Downloads/Smiley/smiley/engine`, mirrored at
-`third_party/smiley-core`; revision 7cb6028 of 2026-11-01; Apache-2.0). It is a Rust library with one dependency (`memmap2`)
+Smiley Core is the owner's own CPU inference engine from the Smiley project (`~/Downloads/Smiley`, crate
+`smiley/src-tauri/crates/smiley-core`; revision 7cb6028 of 2026-11-01; Apache-2.0). It is a Rust library with one dependency (`memmap2`)
 that runs GGUF models of the `llama`, `qwen2` and `qwen3` architectures with F32, F16, Q5_0, Q8_0, Q4_K and Q6_K tensors,
 and reports the bytes it moved per token beside the tokens per second.
 

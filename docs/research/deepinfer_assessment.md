@@ -1,6 +1,6 @@
 # DeepInfer: can Nafs-Aql use it on CPU?
 
-Assessment of `third_party/DeepInfer` (github.com/deepseek-ai/DeepInfer, commit `9bd9cf2`, Apache-2.0), 2026-10-21. Read against the measured limits of the reference machine (Intel Core i3-8100, 4 cores, AVX2 only, 32 GB DDR4-2400, no GPU) and the pinned llama.cpp `797de63`. No benchmark was run for this note: the host was busy with evaluation run `553a4eff`, and a timing taken beside it would be noise.
+Assessment of DeepInfer (github.com/deepseek-ai/DeepInfer, commit `9bd9cf2`, Apache-2.0; the reference checkout was removed from `third_party/` on 2026-11-01, re-clone at that commit to re-read it), 2026-10-21. Read against the measured limits of the reference machine (Intel Core i3-8100, 4 cores, AVX2 only, 32 GB DDR4-2400, no GPU) and the pinned llama.cpp `797de63`. No benchmark was run for this note: the host was busy with evaluation run `553a4eff`, and a timing taken beside it would be noise.
 
 ## Verdict
 
