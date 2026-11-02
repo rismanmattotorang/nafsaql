@@ -330,6 +330,8 @@ $('#moreBtn').onclick = () => {
   modal(`<h3 style="margin-top:0">Insights</h3><nav class="more-list">${links}</nav>`);
   $$('.more-link').forEach(a => a.addEventListener('click', () => $('#modal').close()));
 };
+// Engine names as the service reports them (`backend` in /healthz).
+const ENGINE_NAMES = { llama: 'llama.cpp', vllm: 'vLLM', smiley: 'Smiley Core' };
 const pillOpen = () => advanced() ? (location.hash = '#/system') : modal(`<h3 style="margin-top:0">Service status</h3><p class="small">${esc($('#backendPill').title)}</p>`);
 $('#backendPill').onclick = pillOpen; $('#backendPill').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pillOpen(); } };
 $('.brand').style.cursor = 'pointer'; $('.brand').onclick = designNotes;
@@ -341,7 +343,7 @@ async function refreshStatus() {
     pill.querySelector('.dot').className = 'dot ' + (s1 && s2 ? 'ok' : s1 ? 'warn' : 'bad');
     pill.querySelector('.txt').textContent = s1 && s2 ? 'Ready' : s1 ? 'Quick answers only' : 'Unavailable';
     pill.title = s1 && s2 ? 'Everything is working.' : s1 ? 'Careful answers are unavailable right now; quick answers still work.' : 'The assistant is not available right now. Please try again shortly.';
-    if (advanced()) pill.title += ` Models: ${s.backend === 'vllm' ? 'vLLM' : 'llama.cpp'} · quick ${s.backends.system1} · careful ${s.backends.system2}.`;
+    if (advanced()) pill.title += ` Models: ${ENGINE_NAMES[s.backend] || s.backend} · quick ${s.backends.system1} · careful ${s.backends.system2}.`;
   } catch { pill.querySelector('.dot').className = 'dot bad'; pill.querySelector('.txt').textContent = 'Offline'; pill.title = 'Cannot reach the service. It may be restarting; this page reconnects on its own.'; }
 }
 setInterval(refreshStatus, 10000); refreshStatus();
@@ -1394,7 +1396,7 @@ routes.system = { title: 'Status', sub: 'models, settings and health', adv: true
     const hb = (x) => `<div class="row small"><span class="dot ${x.ok ? 'ok' : 'bad'}"></span><b>${x.role === 'system1' ? 'Quick model' : 'Thorough model'}</b><span class="muted">${esc(x.hf_id)}</span><span class="sp"></span><span class="small">${x.ok ? 'ready' : 'not reachable'}</span></div>
       <div class="tiny faint" style="margin:2px 0 8px 18px">${x.in_flight} of ${x.max_in_flight} answer slots busy · ${esc(x.url)}</div>`;
     $('#sysTop').innerHTML = s.backends.map(b => `<div class="card"><div class="card-h"><h3 title="${esc(b.label)}">${b.kind === 'vllm' ? 'Alternative model server' : b.kind === 'smiley' ? 'Smiley Core engine (this computer)' : 'Model server on this computer'}</h3>${b.active ? '<span class="badge b-verified">in use</span>' : b.system1.ok && b.system2.ok ? `<button class="btn sm ghost" data-use="${esc(b.name)}">Switch to this</button>` : '<button class="btn sm ghost" disabled title="Its models are not running; start them first (command below)">Not running</button>'}</div><div class="card-b">${hb(b.system1)}${hb(b.system2)}
-      <div class="tiny muted">${b.kind === 'vllm' ? 'Alternative model server in a virtual machine. Start it with <code>make up-vllm</code>.' : b.kind === 'smiley' ? 'The project\'s own Rust engine, one stream per model. Start it with <code>scripts/serve_smiley.sh start</code>.' : 'Model server running directly on this computer. Start it with <code>make up</code>.'}</div></div></div>`).join('');
+      <div class="tiny muted">${b.kind === 'vllm' ? 'Alternative model server in a virtual machine. Start it with <code>make up-vllm</code>.' : b.kind === 'smiley' ? 'The project\'s own Rust engine, one stream per model. Start it with <code>make up</code> (or <code>scripts/serve_smiley.sh start</code>).' : 'Model server running directly on this computer. Start it with <code>make up-llama</code>.'}</div></div></div>`).join('');
     $$('[data-use]').forEach(b => b.onclick = async () => { try { await api.post('/v1/system/backend', { name: b.dataset.use }); toast('Switched model server'); } catch (e) { toast(e.message, 6000); } refreshStatus(); load(); });
     const g = s.gate, st = g.state, cal = st.calibration;
     const MODE_NAME = { fixed: 'simple rule', calibrated: 'learned rule', budget: 'fixed share' };

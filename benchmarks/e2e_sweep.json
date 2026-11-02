@@ -1,5 +1,5 @@
 {
- "measured_at": "2026-11-01T14:14:15Z",
+ "measured_at": "2026-11-02T12:00:11Z",
  "base": "http://127.0.0.1:8080",
  "passed": 65,
  "failed": 0,
@@ -12,7 +12,7 @@
   {
    "check": "GET /metrics",
    "pass": true,
-   "detail": "200 text/plain 2286 B"
+   "detail": "200 text/plain 122 B"
   },
   {
    "check": "GET /openapi.json",
@@ -22,7 +22,7 @@
   {
    "check": "GET /v1/alerts",
    "pass": true,
-   "detail": "200 application/json 1007 B"
+   "detail": "200 application/json 1034 B"
   },
   {
    "check": "GET /v1/audits",
@@ -42,12 +42,12 @@
   {
    "check": "GET /v1/conversations",
    "pass": true,
-   "detail": "200 application/json 14422 B"
+   "detail": "200 application/json 14829 B"
   },
   {
    "check": "GET /v1/drift",
    "pass": true,
-   "detail": "200 application/json 13431 B"
+   "detail": "200 application/json 13447 B"
   },
   {
    "check": "GET /v1/eval/datasets",
@@ -87,7 +87,7 @@
   {
    "check": "GET /v1/perf/stages",
    "pass": true,
-   "detail": "200 application/json 2065 B"
+   "detail": "200 application/json 1784 B"
   },
   {
    "check": "GET /v1/preferences",
@@ -112,12 +112,12 @@
   {
    "check": "GET /v1/system/activity",
    "pass": true,
-   "detail": "200 application/json 34713 B"
+   "detail": "200 application/json 34659 B"
   },
   {
    "check": "GET /v1/tazkiya",
    "pass": true,
-   "detail": "200 application/json 1242 B"
+   "detail": "200 application/json 1243 B"
   },
   {
    "check": "GET /v1/tazkiya/review",
@@ -147,7 +147,7 @@
   {
    "check": "chat: unverified math stages add up to the wall time",
    "pass": true,
-   "detail": "counted 8927 ms of 8929 ms; 0 sample_after stage(s)"
+   "detail": "counted 2589 ms of 8302 ms; 0 sample_after stage(s)"
   },
   {
    "check": "rooms: create normalises the name (201)",
@@ -207,7 +207,7 @@
   {
    "check": "perf: latency breakdown (P7-T01)",
    "pass": true,
-   "detail": "108 replies"
+   "detail": "43 replies"
   },
   {
    "check": "system: switching to a stopped backend is refused",
