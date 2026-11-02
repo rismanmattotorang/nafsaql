@@ -8,7 +8,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BIN=${SMILEY_BIN:-rust/target/release/nafs-smiley-server}
-THREADS=${THREADS:-4}
+# 3, not 4: on this shared host decode (memory-bound) is 4-8 % faster with 3 threads (6 of 6 interleaved pairs, benchmarks/engine_profile.json),
+# prefill 16-17 % slower, and a core stays free for the verifier sandbox and the gateway. A quiet host may prefer 4: THREADS=4.
+THREADS=${THREADS:-3}
 RUN=run; mkdir -p "$RUN" logs
 start_one() { # name port model ctx extra...
   local name=$1 port=$2 model=$3 ctx=$4; shift 4

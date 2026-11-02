@@ -24,6 +24,7 @@ pub mod gguf;
 pub mod kv;
 pub mod model;
 pub mod pool;
+pub mod prefix;
 pub mod quant;
 pub mod safetensors;
 pub mod session;

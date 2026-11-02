@@ -1,0 +1,654 @@
+{
+ "started": "2026-11-02T21:41:39",
+ "load_at_start": 7.1,
+ "runs": [
+  {
+   "prompt": "What is 17 + 26? Answer with the number.",
+   "rescue": 4,
+   "escalated": true,
+   "draft_end_s": 1.622589111328125,
+   "decision_s": 1.701634168624878,
+   "s2_first_s": 2.935694932937622,
+   "draft_to_decision_s": 0.07904505729675293,
+   "decision_to_s2_first_s": 1.2340607643127441,
+   "s1_busy_after_decision_s": 0.0,
+   "s1_busy_max_after_decision": 0.0,
+   "total_s": 288.16672706604004,
+   "mode": "slow",
+   "assurance": "abstained",
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 1688,
+     "queue_ms": 0,
+     "prefill_ms": 470.612504,
+     "prompt_n": 24,
+     "cache_n": 100
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 2,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 38381,
+     "queue_ms": 1,
+     "prefill_ms": 9387.929628999998,
+     "prompt_n": 151,
+     "cache_n": 221
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 149626,
+     "queue_ms": 0,
+     "prefill_ms": 17673.515315,
+     "prompt_n": 258,
+     "cache_n": 368
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 98429,
+     "queue_ms": 0,
+     "prefill_ms": 49958.858211,
+     "prompt_n": 729,
+     "cache_n": 839
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    }
+   ],
+   "phases": [
+    [
+     0.009482145309448242,
+     "A",
+     "System 1 drafting"
+    ],
+    [
+     1.701673984527588,
+     "L",
+     "The draft failed an exact verifier, so it is never kept (FR-012)."
+    ],
+    [
+     1.70743989944458,
+     "M",
+     "System 2 deliberating (attempt 1 of 3, budget 128 tokens)"
+    ],
+    [
+     40.09310293197632,
+     "M",
+     "System 2 deliberating (attempt 2 of 3, budget 128 tokens)"
+    ],
+    [
+     189.7236349582672,
+     "M",
+     "System 2 deliberating (attempt 3 of 3, budget 128 tokens)"
+    ]
+   ]
+  },
+  {
+   "prompt": "What is 17 + 26? Answer with the number.",
+   "rescue": 0,
+   "escalated": true,
+   "draft_end_s": 1.4251289367675781,
+   "decision_s": 1.5095341205596924,
+   "s2_first_s": 1.9859418869018555,
+   "draft_to_decision_s": 0.08440518379211426,
+   "decision_to_s2_first_s": 0.4764077663421631,
+   "s1_busy_after_decision_s": 0.0,
+   "s1_busy_max_after_decision": 0.0,
+   "total_s": 221.14131808280945,
+   "mode": "slow",
+   "assurance": "abstained",
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 1508,
+     "queue_ms": 0,
+     "prefill_ms": 81.239886,
+     "prompt_n": 1,
+     "cache_n": 123
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 34637,
+     "queue_ms": 0,
+     "prefill_ms": 357.25056900000004,
+     "prompt_n": 2,
+     "cache_n": 370
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 135218,
+     "queue_ms": 0,
+     "prefill_ms": 377.221553,
+     "prompt_n": 2,
+     "cache_n": 624
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 49756,
+     "queue_ms": 0,
+     "prefill_ms": 411.238955,
+     "prompt_n": 2,
+     "cache_n": 1566
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    }
+   ],
+   "phases": [
+    [
+     0.0014488697052001953,
+     "A",
+     "System 1 drafting"
+    ],
+    [
+     1.5095560550689697,
+     "L",
+     "The draft failed an exact verifier, so it is never kept (FR-012)."
+    ],
+    [
+     1.5095720291137695,
+     "M",
+     "System 2 deliberating (attempt 1 of 3, budget 128 tokens)"
+    ],
+    [
+     36.148274183273315,
+     "M",
+     "System 2 deliberating (attempt 2 of 3, budget 128 tokens)"
+    ],
+    [
+     171.3711678981781,
+     "M",
+     "System 2 deliberating (attempt 3 of 3, budget 128 tokens)"
+    ]
+   ]
+  },
+  {
+   "prompt": "How many minutes are there in 3 hours? A",
+   "rescue": 0,
+   "escalated": true,
+   "draft_end_s": 5.012351989746094,
+   "decision_s": 5.097851037979126,
+   "s2_first_s": 6.507380962371826,
+   "draft_to_decision_s": 0.08549904823303223,
+   "decision_to_s2_first_s": 1.4095299243927002,
+   "s1_busy_after_decision_s": 0.0,
+   "s1_busy_max_after_decision": 0.0,
+   "total_s": 173.6978030204773,
+   "mode": "slow",
+   "assurance": "abstained",
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 5094,
+     "queue_ms": 0,
+     "prefill_ms": 491.81798799999996,
+     "prompt_n": 24,
+     "cache_n": 100
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 45777,
+     "queue_ms": 0,
+     "prefill_ms": 9710.643934000002,
+     "prompt_n": 150,
+     "cache_n": 221
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 61726,
+     "queue_ms": 0,
+     "prefill_ms": 17896.149431,
+     "prompt_n": 270,
+     "cache_n": 380
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 61080,
+     "queue_ms": 0,
+     "prefill_ms": 20331.333496,
+     "prompt_n": 301,
+     "cache_n": 411
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    }
+   ],
+   "phases": [
+    [
+     0.003932952880859375,
+     "A",
+     "System 1 drafting"
+    ],
+    [
+     5.09787392616272,
+     "L",
+     "The draft failed an exact verifier, so it is never kept (FR-012)."
+    ],
+    [
+     5.097891092300415,
+     "M",
+     "System 2 deliberating (attempt 1 of 3, budget 128 tokens)"
+    ],
+    [
+     50.87657690048218,
+     "M",
+     "System 2 deliberating (attempt 2 of 3, budget 128 tokens)"
+    ],
+    [
+     112.60527396202087,
+     "M",
+     "System 2 deliberating (attempt 3 of 3, budget 128 tokens)"
+    ]
+   ]
+  },
+  {
+   "prompt": "How many minutes are there in 3 hours? A",
+   "rescue": 4,
+   "escalated": true,
+   "draft_end_s": 4.946969747543335,
+   "decision_s": 5.050320863723755,
+   "s2_first_s": 5.536687850952148,
+   "draft_to_decision_s": 0.10335111618041992,
+   "decision_to_s2_first_s": 0.48636698722839355,
+   "s1_busy_after_decision_s": 0.0,
+   "s1_busy_max_after_decision": 0.0,
+   "total_s": 126.83882999420166,
+   "mode": "slow",
+   "assurance": "abstained",
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 5048,
+     "queue_ms": 0,
+     "prefill_ms": 83.133407,
+     "prompt_n": 1,
+     "cache_n": 123
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 36751,
+     "queue_ms": 0,
+     "prefill_ms": 435.372425,
+     "prompt_n": 2,
+     "cache_n": 369
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 43702,
+     "queue_ms": 0,
+     "prefill_ms": 395.274997,
+     "prompt_n": 2,
+     "cache_n": 648
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 41322,
+     "queue_ms": 0,
+     "prefill_ms": 401.27249700000004,
+     "prompt_n": 2,
+     "cache_n": 710
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    }
+   ],
+   "phases": [
+    [
+     0.0013937950134277344,
+     "A",
+     "System 1 drafting"
+    ],
+    [
+     5.0503458976745605,
+     "L",
+     "The draft failed an exact verifier, so it is never kept (FR-012)."
+    ],
+    [
+     5.05036187171936,
+     "M",
+     "System 2 deliberating (attempt 1 of 3, budget 128 tokens)"
+    ],
+    [
+     41.803386926651,
+     "M",
+     "System 2 deliberating (attempt 2 of 3, budget 128 tokens)"
+    ],
+    [
+     85.50692391395569,
+     "M",
+     "System 2 deliberating (attempt 3 of 3, budget 128 tokens)"
+    ]
+   ]
+  },
+  {
+   "prompt": "What is 12 times 12? Answer with the num",
+   "rescue": 4,
+   "escalated": true,
+   "draft_end_s": 2.0413832664489746,
+   "decision_s": 2.1238720417022705,
+   "s2_first_s": 3.409558057785034,
+   "draft_to_decision_s": 0.0824887752532959,
+   "decision_to_s2_first_s": 1.2856860160827637,
+   "s1_busy_after_decision_s": 0.0,
+   "s1_busy_max_after_decision": 0.0,
+   "total_s": 162.69481706619263,
+   "mode": "slow",
+   "assurance": "abstained",
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 2124,
+     "queue_ms": 0,
+     "prefill_ms": 549.336602,
+     "prompt_n": 24,
+     "cache_n": 100
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 39313,
+     "queue_ms": 0,
+     "prefill_ms": 9726.618438,
+     "prompt_n": 150,
+     "cache_n": 221
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 56867,
+     "queue_ms": 0,
+     "prefill_ms": 15215.677679,
+     "prompt_n": 239,
+     "cache_n": 349
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 64391,
+     "queue_ms": 0,
+     "prefill_ms": 19350.265207,
+     "prompt_n": 295,
+     "cache_n": 405
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    }
+   ],
+   "phases": [
+    [
+     0.0015301704406738281,
+     "A",
+     "System 1 drafting"
+    ],
+    [
+     2.1238930225372314,
+     "L",
+     "The draft failed an exact verifier, so it is never kept (FR-012)."
+    ],
+    [
+     2.1239092350006104,
+     "M",
+     "System 2 deliberating (attempt 1 of 3, budget 128 tokens)"
+    ],
+    [
+     41.42810606956482,
+     "M",
+     "System 2 deliberating (attempt 2 of 3, budget 128 tokens)"
+    ],
+    [
+     98.29590201377869,
+     "M",
+     "System 2 deliberating (attempt 3 of 3, budget 128 tokens)"
+    ]
+   ]
+  },
+  {
+   "prompt": "What is 12 times 12? Answer with the num",
+   "rescue": 0,
+   "escalated": true,
+   "draft_end_s": 1.6698622703552246,
+   "decision_s": 1.760235071182251,
+   "s2_first_s": 2.1478521823883057,
+   "draft_to_decision_s": 0.09037280082702637,
+   "decision_to_s2_first_s": 0.3876171112060547,
+   "s1_busy_after_decision_s": 0.0,
+   "s1_busy_max_after_decision": 0.0,
+   "total_s": 120.03941702842712,
+   "mode": "slow",
+   "assurance": "abstained",
+   "stages": [
+    {
+     "stage": "draft",
+     "ms": 1758,
+     "queue_ms": 0,
+     "prefill_ms": 83.960774,
+     "prompt_n": 1,
+     "cache_n": 123
+    },
+    {
+     "stage": "verify_draft",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 30064,
+     "queue_ms": 0,
+     "prefill_ms": 361.94106999999997,
+     "prompt_n": 2,
+     "cache_n": 369
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 42302,
+     "queue_ms": 0,
+     "prefill_ms": 517.116274,
+     "prompt_n": 2,
+     "cache_n": 586
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    },
+    {
+     "stage": "deliberate",
+     "ms": 45904,
+     "queue_ms": 0,
+     "prefill_ms": 398.315919,
+     "prompt_n": 2,
+     "cache_n": 698
+    },
+    {
+     "stage": "verify",
+     "ms": 0,
+     "queue_ms": null,
+     "prefill_ms": null,
+     "prompt_n": null,
+     "cache_n": null
+    }
+   ],
+   "phases": [
+    [
+     0.0012919902801513672,
+     "A",
+     "System 1 drafting"
+    ],
+    [
+     1.7602570056915283,
+     "L",
+     "The draft failed an exact verifier, so it is never kept (FR-012)."
+    ],
+    [
+     1.7602729797363281,
+     "M",
+     "System 2 deliberating (attempt 1 of 3, budget 128 tokens)"
+    ],
+    [
+     31.825387954711914,
+     "M",
+     "System 2 deliberating (attempt 2 of 3, budget 128 tokens)"
+    ],
+    [
+     74.12851214408875,
+     "M",
+     "System 2 deliberating (attempt 3 of 3, budget 128 tokens)"
+    ]
+   ]
+  }
+ ]
+}

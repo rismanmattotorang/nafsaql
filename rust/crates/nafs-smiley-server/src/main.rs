@@ -58,6 +58,10 @@ struct Args {
     /// Prompt-lookup speculation on greedy requests (off: Nafs-Aql samples at a temperature, where it never applies).
     #[arg(long, default_value_t = false)]
     speculate: bool,
+    /// Memory (MB) for snapshots of finished conversations' caches, so a prompt that shares a long beginning with an
+    /// earlier one (not only the last) is not prefilled again; 0 = off. Not used with a DSpark drafter.
+    #[arg(long = "prefix-cache-mb", default_value_t = 768)]
+    prefix_cache_mb: usize,
 }
 
 struct App {
@@ -97,13 +101,14 @@ async fn main() {
         ..Default::default()
     };
     let t0 = Instant::now();
-    let sess = match Session::open(&a.model, cfg) {
+    let mut sess = match Session::open(&a.model, cfg) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("cannot open {}: {e}", a.model.display());
             std::process::exit(2);
         }
     };
+    sess.enable_prefix_store(a.prefix_cache_mb << 20);
     let tk = &sess.model.tk;
     let app = Arc::new(App {
         think_open: tk.id_of("<think>"),
@@ -267,6 +272,8 @@ enum Msg {
 #[derive(Default)]
 struct Run {
     in_think: bool,
+    /// The model wrote the opening think tag itself (it is not part of `reasoning`).
+    saw_open: bool,
     reasoning: String,
     content_tokens: u64,
     reasoning_tokens: u64,
@@ -276,6 +283,32 @@ struct Run {
     prompt_ms: f64,
     predicted_ms: f64,
     bytes: u64,
+    /// Where the time went, in ms: matmul, output head, attention, other, sampling, drafting.
+    decode_phases_ms: [f64; 6],
+    prefill_phases_ms: [f64; 6],
+    /// (entries, bytes, restores, positions not prefilled) of the session's prefix store, when it is on.
+    prefix_store: Option<(usize, usize, u64, u64)>,
+}
+
+/// The engine's phase split of one pass, in milliseconds, in the order of [`Run::decode_phases_ms`].
+fn phases_ms(p: &smiley_core::telem::Phases) -> [f64; 6] {
+    [
+        p.matmul_s, p.head_s, p.attn_s, p.other_s, p.sample_s, p.draft_s,
+    ]
+    .map(|s| s * 1e3)
+}
+
+/// What the assistant has written when the reasoning budget is hit: the text that was generated, token for token, with
+/// the think span closed. The model wrote `<think>` and then a reasoning that starts with its own newline; a second
+/// newline here made the first reasoning token a different one, so the cache stopped matching at that position and every
+/// reasoning token was prefilled again (measured: 108 tokens and 2.2 s at a budget of 200 on the 1.7B model, 5 and 0.2 s
+/// after). A model that never wrote the opening tag gets it, with its newline.
+fn continuation_prefix(saw_open: bool, reasoning: &str, closing: &str) -> String {
+    if saw_open {
+        format!("<think>{reasoning}{closing}")
+    } else {
+        format!("<think>\n{reasoning}{closing}")
+    }
 }
 
 /// One pass of the session over the turn, streaming deltas; `phase2` continues after the reasoning budget.
@@ -296,6 +329,7 @@ fn one_pass(
         }
         if Some(e.id) == think.0 && !phase2 {
             run.in_think = true;
+            run.saw_open = true;
             return;
         }
         if Some(e.id) == think.1 {
@@ -330,6 +364,21 @@ fn one_pass(
     run.prompt_ms += telem.prefill_s * 1e3;
     run.predicted_ms += telem.decode_steps_s * 1e3;
     run.bytes += telem.bytes_total();
+    run.prefix_store = sess.prefix_store_stats();
+    for (acc, x) in run
+        .decode_phases_ms
+        .iter_mut()
+        .zip(phases_ms(&telem.decode_phases))
+    {
+        *acc += x;
+    }
+    for (acc, x) in run
+        .prefill_phases_ms
+        .iter_mut()
+        .zip(phases_ms(&telem.prefill_phases))
+    {
+        *acc += x;
+    }
     Ok(())
 }
 
@@ -371,7 +420,8 @@ fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Msg>) {
         let _ = tx.send(Msg::Delta(closing.to_string(), true, 0.0));
         sess.reset();
         sess.seed_history(p.pairs.clone());
-        sess.cfg.assistant_prefix = Some(format!("<think>\n{}{closing}", run.reasoning));
+        sess.cfg.assistant_prefix =
+            Some(continuation_prefix(run.saw_open, &run.reasoning, closing));
         sess.cfg.max_tokens = p
             .max_tokens
             .saturating_sub(run.reasoning_tokens as usize)
@@ -396,7 +446,9 @@ fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Msg>) {
         usage: json!({"prompt_tokens": prompt_n + cache_n, "completion_tokens": predicted_n, "total_tokens": prompt_n + cache_n + predicted_n}),
         timings: json!({"prompt_n": prompt_n, "cache_n": cache_n, "prompt_ms": run.prompt_ms, "predicted_n": predicted_n, "predicted_ms": run.predicted_ms,
             "predicted_per_second": if run.predicted_ms > 0.0 { predicted_n as f64 / run.predicted_ms * 1e3 } else { 0.0 },
-            "smiley": {"bytes_moved": bytes, "bytes_per_token": bytes.checked_div(predicted_n).unwrap_or(0), "simd": app.simd, "budget_forced": run.budget_hit}}),
+            "smiley": {"bytes_moved": bytes, "bytes_per_token": bytes.checked_div(predicted_n).unwrap_or(0), "simd": app.simd, "budget_forced": run.budget_hit,
+                "prefix_store": run.prefix_store.map(|(n, b, h, saved)| json!({"entries": n, "mb": b >> 20, "restores": h, "positions_saved": saved})),
+                "phases_ms": {"names": ["matmul", "head", "attention", "other", "sampling", "drafting"], "decode": run.decode_phases_ms, "prefill": run.prefill_phases_ms}}}),
     });
 }
 
@@ -522,4 +574,25 @@ fn async_stream(
     })
     // `[DONE]` after the last chunk, as llama-server and vLLM send it.
     .chain(tokio_stream::once(Ok(Event::default().data("[DONE]"))))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::continuation_prefix;
+
+    #[test]
+    fn the_continuation_repeats_what_was_generated_without_an_extra_newline() {
+        let closing = "\n</think>\n\n";
+        // The model wrote <think>, then "\nOkay, ...": the prefix is those two pieces, not <think>\n + "\nOkay".
+        assert_eq!(
+            continuation_prefix(true, "\nOkay, let me think", closing),
+            "<think>\nOkay, let me think\n</think>\n\n"
+        );
+        assert!(!continuation_prefix(true, "\nOkay", closing).contains("<think>\n\n"));
+        // A model that never wrote the opening tag gets one.
+        assert_eq!(
+            continuation_prefix(false, "Okay", closing),
+            "<think>\nOkay\n</think>\n\n"
+        );
+    }
 }

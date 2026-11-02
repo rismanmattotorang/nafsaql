@@ -17,6 +17,8 @@ Both llama-servers' /metrics are polled every 100 ms for `llamacpp:requests_proc
 import argparse, json, os, threading, time, urllib.request
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+PORTS = (8001, 8002)  # the engines' ports (--ports; Smiley Core serves 8201 and 8202)
+OUTNAME = "handoff_latency.json"
 PROMPTS = [("What is 17 + 26? Answer with the number.", "99"), ("How many minutes are there in 3 hours? Answer with the number.", "7"),
            ("What is 12 times 12? Answer with the number.", "5"), ("A dozen eggs plus half a dozen is how many eggs? Answer with the number.", "2")]
 
@@ -34,7 +36,7 @@ def busy(port):
 
 def poller(stop, samples, t0):
     while not stop.is_set():
-        samples.append((time.time() - t0, busy(8001), busy(8002)))
+        samples.append((time.time() - t0, busy(PORTS[0]), busy(PORTS[1])))
         stop.wait(0.1)
 
 
@@ -90,7 +92,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8080")
     ap.add_argument("--reps", type=int, default=4)
+    ap.add_argument("--ports", default="8001,8002", help="System 1 and System 2 ports whose /metrics are polled (Smiley Core: 8201,8202)")
+    ap.add_argument("--out", default="handoff_latency.json", help="file name under benchmarks/")
     a = ap.parse_args()
+    global PORTS, OUTNAME
+    PORTS = tuple(int(x) for x in a.ports.split(","))
+    OUTNAME = a.out
     out = {"started": time.strftime("%Y-%m-%dT%H:%M:%S"), "load_at_start": round(os.getloadavg()[0], 2), "runs": []}
     arms = [4, 0]
     for i in range(a.reps):
@@ -100,7 +107,7 @@ def main():
             out["runs"].append(r)
             print(f"rescue={arm} esc={r['escalated']} draft->decision {r['draft_to_decision_s'] and round(r['draft_to_decision_s'], 2)} s  "
                   f"decision->S2 first {r['decision_to_s2_first_s'] and round(r['decision_to_s2_first_s'], 2)} s  S1 busy after {round(r['s1_busy_after_decision_s'], 2)} s  total {round(r['total_s'] or 0, 1)} s", flush=True)
-            json.dump(out, open(os.path.join(ROOT, "benchmarks/handoff_latency.json"), "w"), indent=1)
+            json.dump(out, open(os.path.join(ROOT, "benchmarks/" + OUTNAME), "w"), indent=1)
     print("done")
 
 

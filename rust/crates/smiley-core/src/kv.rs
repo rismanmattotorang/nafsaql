@@ -69,6 +69,33 @@ fn vector_path() -> bool {
         && is_x86_feature_detected!("f16c")
 }
 
+// nafs-aql: the first `len` positions of a cache, packed (no gaps between the per-head regions).
+pub struct KvSnapshot {
+    prec: KvPrec,
+    n_layer: usize,
+    n_kv_head: usize,
+    head_dim: usize,
+    len: usize,
+    k: Vec<u8>,
+    v: Vec<u8>,
+    ks: Vec<f32>,
+    vs: Vec<f32>,
+}
+
+impl KvSnapshot {
+    /// Positions held.
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+    /// Bytes this snapshot occupies in memory.
+    pub fn bytes(&self) -> usize {
+        self.k.len() + self.v.len() + (self.ks.len() + self.vs.len()) * 4
+    }
+}
+
 pub struct KvCache {
     prec: KvPrec,
     n_layer: usize,
@@ -206,6 +233,64 @@ impl KvCache {
 
     pub fn advance(&mut self, to: usize) {
         self.len = to;
+    }
+
+    // nafs-aql: a copy of the first `len` positions, to be put back later (the session's prefix store).
+    pub fn snapshot(&self, len: usize) -> KvSnapshot {
+        let len = len.min(self.len);
+        let vectors = self.n_layer * self.n_kv_head;
+        let elem = self.head_dim * self.prec.elem();
+        let mut snap = KvSnapshot {
+            prec: self.prec,
+            n_layer: self.n_layer,
+            n_kv_head: self.n_kv_head,
+            head_dim: self.head_dim,
+            len,
+            k: Vec::with_capacity(vectors * len * elem),
+            v: Vec::with_capacity(vectors * len * elem),
+            ks: Vec::new(),
+            vs: Vec::new(),
+        };
+        for vec in 0..vectors {
+            let at = vec * self.max_ctx * elem;
+            snap.k.extend_from_slice(&self.k[at..at + len * elem]);
+            snap.v.extend_from_slice(&self.v[at..at + len * elem]);
+            if self.prec == KvPrec::I8 {
+                let sc = vec * self.max_ctx;
+                snap.ks.extend_from_slice(&self.ks[sc..sc + len]);
+                snap.vs.extend_from_slice(&self.vs[sc..sc + len]);
+            }
+        }
+        snap
+    }
+
+    // nafs-aql: put the first `len` positions of `snap` back and make them the filled length. False, and no
+    // change, when the snapshot comes from a cache of another shape or holds fewer than `len` positions.
+    pub fn restore(&mut self, snap: &KvSnapshot, len: usize) -> bool {
+        if snap.prec != self.prec
+            || snap.n_layer != self.n_layer
+            || snap.n_kv_head != self.n_kv_head
+            || snap.head_dim != self.head_dim
+            || len > snap.len
+            || len > self.max_ctx
+        {
+            return false;
+        }
+        let vectors = self.n_layer * self.n_kv_head;
+        let elem = self.head_dim * self.prec.elem();
+        for vec in 0..vectors {
+            let dst = vec * self.max_ctx * elem;
+            let src = vec * snap.len * elem;
+            self.k[dst..dst + len * elem].copy_from_slice(&snap.k[src..src + len * elem]);
+            self.v[dst..dst + len * elem].copy_from_slice(&snap.v[src..src + len * elem]);
+            if self.prec == KvPrec::I8 {
+                let (d, sc) = (vec * self.max_ctx, vec * snap.len);
+                self.ks[d..d + len].copy_from_slice(&snap.ks[sc..sc + len]);
+                self.vs[d..d + len].copy_from_slice(&snap.vs[sc..sc + len]);
+            }
+        }
+        self.len = len;
+        true
     }
 
     /// `q · k[pos]`, decoding the stored key in the loop rather than into a buffer —
@@ -426,6 +511,47 @@ mod tests {
         (0..n)
             .map(|i| ((i as f32) / n as f32 - 0.5) * scale)
             .collect()
+    }
+
+    // nafs-aql: a snapshot restores exactly the positions it was taken at, into the same or a fresh cache.
+    #[test]
+    fn a_snapshot_restores_its_positions_into_a_fresh_cache() {
+        for prec in [KvPrec::F16, KvPrec::I8] {
+            let hd = 32;
+            let mut a = KvCache::new(prec, 3, 2, hd, 16);
+            for pos in 0..6 {
+                for layer in 0..3 {
+                    for head in 0..2 {
+                        let k = ramp(hd, 1.0 + (layer * 2 + head + pos) as f32);
+                        let v = ramp(hd, 0.5 + pos as f32);
+                        a.put(layer, head, pos, &k, &v);
+                    }
+                }
+            }
+            a.advance(6);
+            let snap = a.snapshot(4);
+            assert_eq!(snap.len(), 4);
+            let mut b = KvCache::new(prec, 3, 2, hd, 16);
+            assert!(b.restore(&snap, 3), "{prec:?}");
+            assert_eq!(b.len, 3);
+            let q = ramp(hd, 2.0);
+            for layer in 0..3 {
+                for head in 0..2 {
+                    for pos in 0..3 {
+                        assert_eq!(
+                            a.dot_k(layer, head, pos, &q),
+                            b.dot_k(layer, head, pos, &q),
+                            "{prec:?} l{layer} h{head} p{pos}"
+                        );
+                    }
+                }
+            }
+            // A snapshot of another shape, or asked for more than it holds, is refused and changes nothing.
+            assert!(!b.restore(&snap, 5));
+            assert_eq!(b.len, 3);
+            let mut other = KvCache::new(prec, 3, 4, hd, 16);
+            assert!(!other.restore(&snap, 2));
+        }
     }
 
     #[test]

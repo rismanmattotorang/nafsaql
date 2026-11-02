@@ -1,0 +1,66 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 17 -- Smiley Core's speed, the model switch and the harness's cost
+% ---------------------------------------------------------------------------
+\section{Phase 17: Smiley Core's Speed, the Model Switch and the Harness's Cost}
+\label{sec:phase17}
+
+Phase~17 (2 November 2026) assesses Smiley Core, the switch from System~1 to System~2, and whether the harness of Phase~16 costs speed. The
+research note is \texttt{docs/research/smiley\_engine\_perf.md} and the decision \texttt{docs/decisions/011-engine-switching-costs.md}. All numbers are
+from the shared reference machine with the arms interleaved.
+
+\subsection{How close the engine is to the machine}
+
+A multi-threaded streaming read (AVX2, 1\,GiB) reaches 12.9, 17.2, 18.4 and 19.5\,GB/s with one to four threads: the fourth core adds 6\,\%.
+Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094\,MB on System~1, 2,503\,MB on System~2).
+The engine's own phase split, now reported by the server, puts 86--97\,\% of decode in the matmuls and the output head; sampling is
+0.1--0.3\,\% and attention 1--3\,\% at these context lengths, so neither is worth optimising. The serial share (norms, rotary embedding,
+residuals, activation quantisation) grows from 2\,\% at one thread to 5\,\% at four.
+
+\textbf{Three threads beat four for decode in all six interleaved pairs} (+4\,\% on System~1, +8\,\% on System~2 at the median) while cold prefill, which is
+compute-bound, is 16--17\,\% slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the
+slowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier
+sandbox and the gateway; a quiet host may prefer four. The engine's own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes
+as the reference, no prefetch loses 11\,\% in two of three rounds and 512 loses 3\,\%, while 2048 and 4096 differ by about $+2$\,\% at the median, inside this
+host's noise; parking instead of spinning loses 2\,\%.
+
+\subsection{What the literature offers}
+
+Decode saturating memory with few threads is well supported and is confirmed above. Prompt-lookup and suffix decoding~\cite{oliaro2024suffixdecoding}
+draft tokens by matching recent output against the prompt and past outputs and report large gains where output copies input, such as code editing; the engine's
+speculation is greedy-only while \Sys{} samples at 0.3--0.7, so using it needs speculative sampling (accept a deterministic draft token with probability
+$p(d)$, otherwise sample the residual), which is lossless but is engine work with a bounded payoff because System~2's time is reasoning text that does not copy
+the prompt. Prefix caching of the kind SGLang's RadixAttention~\cite{zheng2023sglang} describes keeps the cache of earlier prompts and reuses the longest shared
+beginning; it applies directly and was built.
+
+\subsection{Switching}
+
+\textbf{System~1 to System~2.} Over six escalated requests the gate's own time was 0.08--0.12\,s, the decision to System~2's first reasoning token 0.4--1.4\,s
+(median 0.85\,s), and System~1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload;
+llama.cpp took a median 1.5\,s in Phase~14.
+
+\textbf{Between kinds of request on one model.} The session held a single cache, so a prompt benefited only when it followed a conversation with the same
+beginning. Alternating a chat prompt and the code agent's prompt prefilled the agent prompt in full each time: 266 tokens in 5.8\,s on System~1 and 262 tokens in
+14\,s on System~2, where llama.cpp's four slots answered in 0.1--0.2\,s. A \emph{prefix store} in the engine keeps the cache of each finished conversation as a
+snapshot (114--147\,KB per position, 768\,MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt.
+Alternating or rotating three kinds of request now costs one token and 0.1\,s on System~1 and 0.2\,s on System~2, as on llama.cpp, and the answers are
+byte-identical (equal hashes) with the store on and off for both models. It also makes the gateway's warm-first backend switch effective: it primes 13 prefixes, of which a
+one-prefix session could keep only the last.
+
+\textbf{The reasoning budget's continuation.} At the budget the server closes the reasoning and continues the turn with the reasoning so far as the assistant's prefix. The
+prefix was \texttt{<think>}, a newline, then the reasoning, which already begins with the newline the model wrote; the first reasoning token became two newlines
+instead of one, the cache stopped matching there, and \emph{every reasoning token was prefilled again}. The prefix now repeats the generated text exactly, the
+match covers the whole conversation, and the continuation prefills 5 tokens in 0.2\,s instead of 108 tokens and 2.2\,s at a budget of 200 (7--30\,s on System~2 at
+128--512 reasoning tokens). On six escalated requests the cold prefill fell from 700--1,160 tokens (45--78\,s) to 350--390 (22--24\,s) and the mean time per request
+from 182\,s to 133\,s; the runs were not interleaved with the old build, but the prefill token counts are deterministic.
+
+\subsection{The harness's cost}
+
+The guards of Phase~16 cost nothing in the interleaved A/B over ten tasks, and the compile check takes 37\,ms per edit against steps of 5 to 230\,s; the agent's scripted
+loop (86 tests) runs in 0.03\,s in total. The agent loop is instead a beneficiary of this phase: its steps share a long beginning (the append-only transcript), which the
+prefix store keeps and restores.
+
+\subsection{Summary}
+
+The engine is within 60--95\,\% of the machine's bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth
+decode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14\,s down to 0.1 and 0.2\,s for a switch of request kind) and the continuation's re-prefill of its own
+reasoning (now exact). Speculative sampling is named as the next engine item.

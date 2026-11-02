@@ -154,6 +154,9 @@ pub struct Session {
     kept: Vec<u32>,
     /// Positions the last turn took from the cache instead of prefilling them.
     prefix_reused: usize,
+    // nafs-aql: snapshots of finished conversations, so a prompt that shares a long beginning with one of them (not
+    // only with the last) does not recompute it. Off until `enable_prefix_store`.
+    prefixes: Option<crate::prefix::PrefixStore>,
 }
 
 /// Plain steps to take after drafting is measured to lose, before probing again.
@@ -448,6 +451,7 @@ impl Session {
             pending_start: 0,
             kept: Vec::new(),
             prefix_reused: 0,
+            prefixes: None,
         })
     }
 
@@ -531,6 +535,28 @@ impl Session {
             .take(limit)
             .take_while(|(a, b)| a == b)
             .count();
+        // nafs-aql: keep the conversation that just ended, then prefer the stored one that shares the longest beginning
+        // with this prompt over the one the cache holds now when it saves more than a few positions. The drafter has
+        // its own cache, which is not stored: with one attached the store is not used.
+        if self.dspark.is_none() {
+            if let Some(store) = self.prefixes.as_mut() {
+                if kept.len() >= crate::prefix::MIN_PREFIX && !store.covers(&kept) {
+                    let snap = self.kv.snapshot(kept.len());
+                    let n = snap.len();
+                    store.insert(kept[..n].to_vec(), snap);
+                }
+                let cap = toks.len().saturating_sub(1);
+                if let Some((snap, lcp)) = store.best(toks, cap) {
+                    if lcp > l + 8 && self.kv.restore(snap, lcp) {
+                        store.note_hit(lcp - l);
+                        self.ctx.clear();
+                        self.ctx.extend_from_slice(&toks[..lcp]);
+                        self.suffix.clear();
+                        return lcp;
+                    }
+                }
+            }
+        }
         self.kv.truncate(l);
         if let Some(d) = &mut self.dspark {
             d.truncate(l);
@@ -539,6 +565,19 @@ impl Session {
         self.ctx.extend_from_slice(&kept[..l]);
         self.suffix.clear();
         l
+    }
+
+    // nafs-aql: keep up to `budget_bytes` of finished conversations' caches (0 = off). Ignored with a drafter attached.
+    pub fn enable_prefix_store(&mut self, budget_bytes: usize) {
+        self.prefixes = (budget_bytes > 0 && self.dspark.is_none())
+            .then(|| crate::prefix::PrefixStore::new(budget_bytes));
+    }
+
+    // nafs-aql: (entries, bytes, restores, positions not prefilled), or None when the store is off.
+    pub fn prefix_store_stats(&self) -> Option<(usize, usize, u64, u64)> {
+        self.prefixes
+            .as_ref()
+            .map(|p| (p.entries(), p.bytes(), p.hits, p.positions_saved))
     }
 
     /// Exchanges currently held in the conversation.
