@@ -1,0 +1,110 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 16 -- the code agent against modern harnesses
+% ---------------------------------------------------------------------------
+\section{Phase 16: The Code Agent Against Modern Harnesses}
+\label{sec:phase16}
+
+Phase~16 (2 November 2026) asks what the current agent harnesses and papers do that \Sys{}'s code agent does not, which of those
+differences matter on four CPU cores with 1.7B and 4B models, and which can be closed and measured here. The research note is
+\texttt{docs/research/harness\_gaps.md} and the decision is \texttt{docs/decisions/010-harness-gaps.md}.
+
+\subsection{What modern harnesses do}
+
+The sources fall into two groups. Four were read in full: the SWE-agent paper~\cite{yang2024sweagent}, the Agentless
+paper~\cite{xia2024agentless}, the JetBrains study of observation masking~\cite{lindenbauer2025complexity}, and Anthropic's article on
+context engineering~\cite{anthropic2025context}. The rest was read through search results (documentation pages, the DeepSeek-V3.2
+report~\cite{deepseek2025v32}, Gemini CLI's documentation~\cite{geminicli2026docs}, the SWE-Search and SWE-Gym
+papers~\cite{antoniades2025sweSearch,pan2024swegym}); a number from a vendor's own announcement is a vendor number.
+
+\begin{itemize}
+  \item \textbf{An edit-time guardrail} (SWE-agent's agent--computer interface). After every edit the file is checked, a failing edit
+    is reverted, and the agent sees the error and the lines around it. On SWE-bench Lite with GPT-4 Turbo the resolve rate was 18.0\,\%
+    with the check, 15.0\,\% without it and 10.3\,\% with no edit command at all~\cite{yang2024sweagent}.
+  \item \textbf{Context management.} Compaction, dropping old tool results, notes kept outside the window and sub-agents that
+    return a condensed result~\cite{anthropic2025context}; masking the observations older than ten turns halves the cost with the
+    solve rate of LLM summarization across five model configurations~\cite{lindenbauer2025complexity}.
+  \item \textbf{Selection by a verifier.} Majority voting resolved 25.67\,\% of SWE-bench Lite, regression tests added 27.00\,\% and
+    reproduction tests 32.00\,\%~\cite{xia2024agentless}; trained critics rerank trajectories~\cite{pan2024swegym}; search backtracks to a
+    better node~\cite{antoniades2025sweSearch}.
+  \item \textbf{Checkpoints and project instructions.} Gemini CLI snapshots the project before file-modifying actions and reads a
+    hierarchy of \texttt{GEMINI.md} files; Codex and Claude Code read \texttt{AGENTS.md} and \texttt{CLAUDE.md}.
+  \item \textbf{Stall detection.} Loop guards key on the tool name, its arguments and its result; repetition warns, repetition with
+    stagnant results stops. This is engineering practice; no study was found.
+  \item \textbf{Reasoning persistence.} DeepSeek-V3.2 keeps its reasoning across the tool calls of one turn and drops it when a new user
+    message arrives~\cite{deepseek2025v32}.
+\end{itemize}
+
+\subsection{The gaps}
+
+\Sys{} already had an append-only transcript that keeps the server's prompt cache valid, compaction written by the harness, a patch
+grammar, Codex's patch parser, an \emph{exact} verifier after every change (a stronger selection signal than a critic model or
+generated tests), the cascade, retries and a wall-clock cap. Four gaps were real and are closed. A file that did not compile went to the
+verifier like any other, costing a sandbox run and a whole step, and the same \texttt{IndentationError} came back step after step. A step
+that made the tests do worse was kept as the base of the next one. Only an identical \emph{workspace} was noticed as a loop, so the same
+failure from different code, or a reply with no action, repeated until the step budget (one run spent the whole 900\,s cap that way).
+And the agent took the task text only.
+
+Others are named and not closed, with the reason. Self-generated reproduction tests need a bug that fails them on the unpatched code; a new
+function has no such oracle, and a test written by a 1.7B model would raise the \emph{label} without raising the trust. Reasoning persistence
+is not adopted now: the Qwen3-Thinking template (read from the model file) keeps an assistant turn's reasoning only after the last user
+query, and the harness sends observations as ordinary user messages, so each step is a new query; keeping the reasoning would mean sending
+tool responses in the template's form and about 25\,s of prefill per kept 500-token span at the measured 20 tokens/s, and is the next
+experiment. Sub-agents, plan mode and hooks have no counterpart at the scale of one function in a flat workspace, where the cascade is the
+sub-agent idea and the sandbox is a hook that cannot be skipped. Observation masking changes nothing inside a ten-turn window, and the runs
+are at most twelve steps.
+
+\subsection{What was built}
+
+\begin{enumerate}
+  \item \textbf{A compile check before the verifier} (\texttt{harness.lint}). After a patch or a whole-file write every edited Python file is
+    compiled in the sandbox (never executed). A file that does not compile is \emph{not applied}: the files stay, and the model is shown the
+    error and the five lines around it with the offending one marked. No verifier run is spent, and a cascade candidate that does not
+    compile is not judged. A failure of the sandbox itself passes the edit on to the verifier.
+  \item \textbf{Rollback to the best version} (\texttt{harness.rollback}). A change judged below the best version so far is dropped, the
+    files are restored to that version, and the model is told what was tried; the failed attempt stays in the transcript.
+  \item \textbf{A stall guard} (\texttt{harness.stuck\_after}, default 4). A failed step's signature is the hidden tests' evidence, or the
+    action and its first line of feedback when the files were not judged. The second consecutive identical failure carries a nudge to change
+    approach; the $k$-th ends the run with status \texttt{stuck} and the best files.
+  \item \textbf{Caller guidelines} (\texttt{guidance}, 2,000 characters), shown with the task and again after a compaction.
+\end{enumerate}
+
+Each is a request field and a configuration key, on by default, and reported in the reply (\texttt{lint\_rejections}, \texttt{rollbacks},
+the step's \texttt{rolled\_back}, the status \texttt{stuck}). Five unit tests drive the loop with a scripted host, and an integration test
+runs the compile check through the real sandbox.
+
+\subsection{Measurements}
+
+All runs were on the shared host (the owner's other workloads at load 5--15) with Smiley Core, over the same ten tasks (eight repairs and writes of one
+function with hidden tests), the arms interleaved and their order alternated per task: guards off (\texttt{lint}, \texttt{rollback},
+\texttt{stuck\_after}\,=\,0) against the production defaults.
+
+\begin{center}
+\begin{tabular}{llrrr}
+\hline
+Set & Arm & Verified & Model calls & Wall time \\
+\hline
+System 2, 6 steps & off & 10/10 & 17 & 747\,s \\
+ & on & 10/10 & 17 & 772\,s \\
+System 1, 8 steps, round 1 & off & 4/10 & 58 & 307\,s \\
+ & on & 4/10 & 58 & 297\,s \\
+System 1, 8 steps, round 2 & off & 5/10 & 47 & 350\,s \\
+ & on & 5/10 & 47 & 347\,s \\
+\hline
+\end{tabular}
+\end{center}
+
+The guards cost nothing: the verified counts and model calls are identical, the decoded tokens are equal except for one System 1 task whose
+sampling differed (2,418 against 2,362 in the first round), and the wall times agree within the host's noise. The compile check costs 37\,ms per edit (35\,ms of it Python's start-up) against steps of 5 to 230\,s. They also changed no
+outcome here: neither model produced a file that does not compile, and rollback restored nothing, so the benefit lies in the failure modes
+the research names, which this set rarely produces. Those are pinned by tests and were seen once in practice, as a Smiley Core run that
+spent its whole 900\,s cap on repeated \texttt{IndentationError}s. The A/B did expose a defect in the first version of the stall guard:
+System 1 asked six times in a row to run a file that does not exist, and the guard skipped \texttt{run} steps. It now counts them, hashes
+only the stable lines of the feedback, and the message lists the files that exist. The same ten System 1 tasks verified four times in the
+first round and five in the second in both arms, so a one-task difference is sampling noise.
+
+\subsection{Summary}
+
+The research found one capability the code agent lacked that matters at this scale, the edit-time guardrail, and three smaller ones
+(checkpoint and restore, stall detection, project instructions); all four are built, on by default, tested, and measured to cost nothing.
+Self-generated tests, reasoning persistence and sub-agents are named as gaps with the reason they were not closed. The verifier-based
+selection that other systems approximate with critic models is the one place \Sys{} is ahead: its verifier is exact.

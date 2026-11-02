@@ -31,6 +31,7 @@ use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 /// What the agent needs from its host. Everything that touches a model, a process or a verifier is here, so
@@ -69,6 +70,12 @@ pub trait AgentEnv: Send {
     fn run(&mut self, ws: &Workspace, file: &str) -> BoxFuture<'_, String>;
     /// The exact verifier on the workspace.
     fn verify(&mut self, ws: &Workspace) -> BoxFuture<'_, Verdict>;
+    /// An edit-time check of `file` (SWE-agent's lint guardrail): a report when the file cannot even be compiled
+    /// (syntax, indentation), None when it can, or when the host has no checker. An edit that fails it is not
+    /// applied and costs no verifier run.
+    fn lint(&mut self, _ws: &Workspace, _file: &str) -> BoxFuture<'_, Option<String>> {
+        Box::pin(async { None })
+    }
 }
 
 /// Which model a turn goes to.
@@ -236,6 +243,18 @@ pub struct AgentConfig {
     /// Retries of a model call that fails for a reason other than the run's cap (Codex retries a sampling
     /// request up to `stream_max_retries` times with backoff).
     pub retries: u32,
+    /// Phase 16: check every edited `.py` file with [`AgentEnv::lint`] before the verifier runs, and refuse an edit
+    /// that does not compile (the files stay as they were and the model is shown the offending lines).
+    pub lint: bool,
+    /// Phase 16: when a change scores lower than the best version so far, restore that version (the model is told
+    /// what was tried and why it was dropped) instead of building on the worse files.
+    pub rollback: bool,
+    /// Phase 16: stop with [`Status::Stuck`] after this many consecutive steps that fail the same way (0 = never);
+    /// the second such step already carries a nudge to change approach.
+    pub stuck_after: u32,
+    /// Phase 16: the caller's conventions for this workspace (AGENTS.md, CLAUDE.md and GEMINI.md play this
+    /// part in Codex, Claude Code and Gemini CLI), shown to the model with the task.
+    pub guidance: Option<String>,
     pub deadline: Option<Instant>,
 }
 
@@ -244,6 +263,10 @@ impl Default for AgentConfig {
         AgentConfig {
             cascade_samples: 0,
             retries: 2,
+            lint: true,
+            rollback: true,
+            stuck_after: 4,
+            guidance: None,
             max_steps: 8,
             context: ContextMode::Append,
             keep_exchanges: 4,
@@ -461,6 +484,8 @@ pub struct Step {
     pub samples: u32,
     /// Model calls retried before this step's reply arrived.
     pub retries: u32,
+    /// The change scored below the best version so far and the files were restored to that version.
+    pub rolled_back: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -470,6 +495,8 @@ pub enum Status {
     Exhausted,
     Deadline,
     ModelError,
+    /// The same failure on `stuck_after` consecutive steps: the run stopped instead of spending its budget.
+    Stuck,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -483,6 +510,10 @@ pub struct AgentOutcome {
     /// Verifier runs (a workspace already judged is not run again).
     pub verifier_calls: u32,
     pub compactions: u32,
+    /// Edits refused by the compile check (they cost no verifier run).
+    pub lint_rejections: u32,
+    /// Changes dropped because they scored below the best version so far.
+    pub rollbacks: u32,
     /// The run's net change: the returned workspace against the starting one.
     pub diff: String,
 }
@@ -540,6 +571,10 @@ pub async fn run_agent(
     let mut repeats = 0u32;
     let mut compact_next = false;
     let mut status = Status::Exhausted;
+    // Atomics rather than Cells: the future that holds them must be Send.
+    let lint_rejections = AtomicU32::new(0);
+    let rollbacks = AtomicU32::new(0);
+    let mut stall = Stall::default();
     let finish =
         |status, workspace: Workspace, verdict, steps, calls, judge: &Judge, compactions| {
             let diff = crate::diff::unified_diff(&start, &workspace);
@@ -551,6 +586,8 @@ pub async fn run_agent(
                 model_calls: calls,
                 verifier_calls: judge.calls,
                 compactions,
+                lint_rejections: lint_rejections.load(Ordering::Relaxed),
+                rollbacks: rollbacks.load(Ordering::Relaxed),
                 diff,
             }
         };
@@ -649,6 +686,7 @@ pub async fn run_agent(
                     stage: turn.stage,
                     samples: 0,
                     retries,
+                    rolled_back: false,
                 });
                 status = if over {
                     Status::Deadline
@@ -669,8 +707,15 @@ pub async fn run_agent(
             for r in &replies {
                 let action = parse_allowed(&r.text, &turn.allowed);
                 let mut w = ws.clone();
-                let (kind, obs, changed, files) =
-                    apply_action(env, &action, &mut w, cfg, append, false).await;
+                let applied = apply_action(env, &action, &mut w, cfg, append, false).await;
+                lint_rejections.fetch_add(u32::from(applied.rejected), Ordering::Relaxed);
+                let Applied {
+                    kind,
+                    observation: obs,
+                    changed,
+                    files,
+                    ..
+                } = applied;
                 let verdict = if changed {
                     let (v, seen_at) = judge.judge(env, &w, step).await;
                     passed += v.passed as u32;
@@ -715,13 +760,21 @@ pub async fn run_agent(
             let reply = replies.into_iter().next().expect("one reply");
             let action = parse_allowed(&reply.text, &turn.allowed);
             let mut w = std::mem::take(&mut ws);
-            let (kind, obs, changed, files) =
-                apply_action(env, &action, &mut w, cfg, append, true).await;
-            (reply, w, kind, obs, changed, files)
+            let applied = apply_action(env, &action, &mut w, cfg, append, true).await;
+            lint_rejections.fetch_add(u32::from(applied.rejected), Ordering::Relaxed);
+            (
+                reply,
+                w,
+                applied.kind,
+                applied.observation,
+                applied.changed,
+                applied.files,
+            )
         };
         std::mem::swap(&mut ws, &mut ws_next);
         observation = truncate_middle(&observation, cfg.max_observation_bytes);
         let mut verdict = None;
+        let mut rolled_back = false;
         if changed {
             // The exact verifier decides after every change: a passing workspace ends the run at once.
             let (v, seen_at) = match judged.take() {
@@ -744,10 +797,27 @@ pub async fn run_agent(
                 "\nHidden tests: {}.",
                 if v.passed { "passed" } else { "failed" }
             ));
-            if best.as_ref().is_none_or(|(_, b)| v.score >= b.score) {
-                best = Some((ws.clone(), v.clone()));
+            let best_score = best.as_ref().map(|(_, b)| b.score);
+            if cfg.rollback && !v.passed && best_score.is_some_and(|b| b > v.score) {
+                // Checkpoint and restore (Gemini CLI checkpoints before edits; SWE-Search backtracks to the better
+                // node): a change that made the tests do worse is dropped, and the model builds on the best
+                // version. The failed attempt stays in the transcript, so it is not repeated.
+                if let Some((best_ws, best_v)) = best.clone() {
+                    observation.push_str(&format!(
+                        "\nThese changes scored {:.2}, below the best version so far ({:.2}): the files were restored to that version. Do not repeat this change.",
+                        v.score, best_v.score
+                    ));
+                    ws = best_ws;
+                    last = Some(best_v);
+                    rollbacks.fetch_add(1, Ordering::Relaxed);
+                    rolled_back = true;
+                }
+            } else {
+                if best_score.is_none_or(|b| v.score >= b) {
+                    best = Some((ws.clone(), v.clone()));
+                }
+                last = Some(v.clone());
             }
-            last = Some(v.clone());
             verdict = Some(v);
         }
         let failed = verdict.as_ref().is_some_and(|v| !v.passed);
@@ -775,6 +845,17 @@ pub async fn run_agent(
                 });
             }
         }
+        // A model that fails the same way again and again is not going to stop: the second time it is told so,
+        // and after `stuck_after` consecutive repeats the run ends (nudge, then terminate, as agent loop guards do)
+        // instead of spending the rest of the budget (on this CPU a System 2 step is minutes).
+        let repeated =
+            failure_signature(kind, &verdict, &observation).map_or(0, |sig| stall.note(sig));
+        if repeated >= 2 {
+            observation.push_str(
+                "\nThe same failure as the previous step. Do not repeat that edit: try a different approach.",
+            );
+        }
+        let stuck = cfg.stuck_after > 0 && repeated >= cfg.stuck_after;
         attempts.push(Attempt {
             step,
             kind: kind.into(),
@@ -798,10 +879,15 @@ pub async fn run_agent(
             stage: turn.stage,
             samples,
             retries,
+            rolled_back,
         });
         if verdict.as_ref().is_some_and(|v| v.passed) {
             let c = transcript.compactions;
             return finish(Status::Verified, ws, verdict, steps, calls, &judge, c);
+        }
+        if stuck {
+            status = Status::Stuck;
+            break;
         }
         if append {
             transcript.push(
@@ -825,8 +911,48 @@ pub async fn run_agent(
     finish(status, workspace, verdict, steps, calls, &judge, c)
 }
 
-/// Apply one action to `ws`: (kind, what the model is shown, whether the files changed, the files changed).
-/// A `run` is executed only when `execute_run` (a cascade candidate is judged by its files alone).
+/// What applying one action did.
+struct Applied {
+    /// "patch", "write", "run", "submit", "none", or "rejected" (an edit the compile check refused).
+    kind: &'static str,
+    /// What the model is shown.
+    observation: String,
+    /// Whether the files changed (so the verifier must judge them).
+    changed: bool,
+    /// The files the action wrote.
+    files: Vec<String>,
+    /// The edit was refused by the compile check.
+    rejected: bool,
+}
+
+impl Applied {
+    fn new(kind: &'static str, observation: impl Into<String>, changed: bool) -> Self {
+        Applied {
+            kind,
+            observation: observation.into(),
+            changed,
+            files: vec![],
+            rejected: false,
+        }
+    }
+}
+
+/// The report shown for an edit that does not compile (SWE-agent's lint guardrail: the edit is discarded and the
+/// agent sees what is wrong with the file it proposed).
+fn rejection(kind: &'static str, file: &str, report: &str) -> Applied {
+    Applied {
+        kind: "rejected",
+        observation: format!(
+            "The {kind} was not applied: {file} would not compile.\n{report}\nThe files are unchanged. Reply with a corrected action."
+        ),
+        changed: false,
+        files: vec![],
+        rejected: true,
+    }
+}
+
+/// Apply one action to `ws`. A `run` is executed only when `execute_run` (a cascade candidate is judged by its
+/// files alone). An edit whose Python files do not compile is refused and `ws` is left as it was.
 async fn apply_action(
     env: &mut dyn AgentEnv,
     action: &Action,
@@ -834,44 +960,121 @@ async fn apply_action(
     cfg: &AgentConfig,
     append: bool,
     execute_run: bool,
-) -> (&'static str, String, bool, Vec<String>) {
-    let mut changed_files: Vec<String> = vec![];
-    let (kind, observation, changed) = match action {
+) -> Applied {
+    let before =
+        (cfg.lint && matches!(action, Action::Patch(_) | Action::WholeFile(_))).then(|| ws.clone());
+    let applied = match action {
         Action::Patch(p) => match patch::apply_patch(ws, p) {
             Ok(s) => {
-                changed_files.extend(s.added.iter().chain(&s.modified).cloned());
-                ("patch", s.to_model_text(), true)
+                let mut a = Applied::new("patch", s.to_model_text(), true);
+                a.files.extend(s.added.iter().chain(&s.modified).cloned());
+                a
             }
-            Err(e) => ("patch", format!("The patch was not applied: {e}"), false),
+            Err(e) => Applied::new("patch", format!("The patch was not applied: {e}"), false),
         },
         Action::WholeFile(code) => {
             ws.insert(cfg.main_file.clone(), code.clone());
-            ("write", format!("Success. Replaced {}.", cfg.main_file), true)
+            let mut a = Applied::new(
+                "write",
+                format!("Success. Replaced {}.", cfg.main_file),
+                true,
+            );
+            a.files.push(cfg.main_file.clone());
+            a
         }
         Action::Run(file) => {
             let file = file.trim_start_matches("./");
             if !execute_run {
-                ("run", "A candidate that only runs a file changes nothing.".into(), false)
+                Applied::new(
+                    "run",
+                    "A candidate that only runs a file changes nothing.",
+                    false,
+                )
             } else if ws.contains_key(file) {
-                ("run", env.run(ws, file).await, false)
+                Applied::new("run", env.run(ws, file).await, false)
             } else {
-                ("run", format!("No such file in the workspace: {file}"), false)
+                let have = ws.keys().cloned().collect::<Vec<_>>().join(", ");
+                Applied::new(
+                    "run",
+                    format!("No such file in the workspace: {file}. The files are: {have}."),
+                    false,
+                )
             }
         }
-        Action::Submit => ("submit", String::new(), !append),
-        Action::Disallowed(why) => ("none", (*why).to_string(), false),
-        Action::None => (
+        Action::Submit => Applied::new("submit", String::new(), !append),
+        Action::Disallowed(why) => Applied::new("none", *why, false),
+        Action::None => Applied::new(
             "none",
             if append {
                 "No action found. Reply with exactly one action: a patch, a ```python block with the whole solution.py, or a ```run block."
             } else {
                 "No action found. Reply with exactly one action: a patch, a ```python block with the whole solution.py, a ```run block, or SUBMIT."
-            }
-            .into(),
+            },
             false,
         ),
     };
-    (kind, observation, changed, changed_files)
+    if let (Some(before), true) = (before, applied.changed) {
+        for f in applied.files.clone().iter().filter(|f| f.ends_with(".py")) {
+            if let Some(report) = env.lint(ws, f).await {
+                *ws = before;
+                return rejection(applied.kind, f, &report);
+            }
+        }
+    }
+    applied
+}
+
+/// Consecutive steps that failed the same way (see [`failure_signature`]).
+#[derive(Default)]
+struct Stall {
+    sig: Option<u64>,
+    same: u32,
+}
+
+impl Stall {
+    /// Record a failed step's signature; how many consecutive steps now share it.
+    fn note(&mut self, sig: u64) -> u32 {
+        if self.sig == Some(sig) {
+            self.same += 1;
+        } else {
+            self.sig = Some(sig);
+            self.same = 1;
+        }
+        self.same
+    }
+}
+
+/// What a step that got nowhere looked like, for the stall guard: the hidden tests' evidence when the files were
+/// judged (whatever edit produced them), otherwise the action and the first lines of its feedback (a refused edit,
+/// a patch that did not apply, a reply with no action, a `run` that printed the same thing again). None for a step
+/// that is not an attempt (a pass, a SUBMIT). Measured on System 1: it asked to run a file that does not exist six
+/// times in a row, which a guard that skipped `run` steps never saw.
+fn failure_signature(kind: &str, verdict: &Option<Verdict>, observation: &str) -> Option<u64> {
+    let text = match verdict {
+        Some(v) if !v.passed => v.evidence.clone().unwrap_or_default(),
+        Some(_) => return None,
+        None if kind == "submit" => return None,
+        None => {
+            // The lines that say what happened; the step counter and timings differ every time and are left out.
+            let stable = observation
+                .lines()
+                .filter(|l| {
+                    !["Steps left", "One step left", "Wall time", "Quick model"]
+                        .iter()
+                        .any(|p| l.starts_with(p))
+                })
+                .take(6)
+                .collect::<Vec<_>>()
+                .join(" ");
+            format!("{kind}:{stable}")
+        }
+    };
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .hash(&mut h);
+    Some(h.finish())
 }
 
 /// Whether a turn over `ws` offers a patch: always on `Any`, never on `Whole`, and on `Auto` only for a main file
@@ -901,13 +1104,28 @@ fn task_message(
         attempts,
         cfg.max_observation_bytes,
     );
-    // Say what this turn offers: a model that is not told writes a patch (the system prompt lists patches first).
-    match message.strip_suffix("Reply with one action.") {
-        Some(head) if !patch_offered(cfg, ws) => format!(
-            "{head}Reply with one action: the whole new solution.py in one ```python block, or a ```run block."
-        ),
-        _ => message,
-    }
+    // The caller's conventions go with the task, and what this turn offers is said before the reply is asked for
+    // (a model that is not told writes a patch: the system prompt lists patches first).
+    let Some(head) = message.strip_suffix("Reply with one action.") else {
+        return message;
+    };
+    let guidance = cfg
+        .guidance
+        .as_deref()
+        .filter(|g| !g.trim().is_empty())
+        .map(|g| {
+            format!(
+                "Guidelines from the caller (follow them):\n{}\n\n",
+                g.trim()
+            )
+        })
+        .unwrap_or_default();
+    let ask = if patch_offered(cfg, ws) {
+        "Reply with one action."
+    } else {
+        "Reply with one action: the whole new solution.py in one ```python block, or a ```run block."
+    };
+    format!("{head}{guidance}{ask}")
 }
 
 /// The Phase 10 per-step message (Reset mode), unchanged.
@@ -999,6 +1217,13 @@ mod tests {
         fn run(&mut self, ws: &Workspace, file: &str) -> BoxFuture<'_, String> {
             let out = format!("ran {file} ({} files)", ws.len());
             Box::pin(async move { out })
+        }
+        fn lint(&mut self, ws: &Workspace, file: &str) -> BoxFuture<'_, Option<String>> {
+            // A stand-in for the compile check: a file that contains the marker "does not compile".
+            let broken = ws.get(file).is_some_and(|c| c.contains("@@BROKEN@@"));
+            Box::pin(async move {
+                broken.then(|| "IndentationError: unexpected indent (line 2)".to_string())
+            })
         }
         fn verify(&mut self, ws: &Workspace) -> BoxFuture<'_, Verdict> {
             self.verifies += 1;
@@ -1302,6 +1527,177 @@ mod tests {
         assert!(out.steps[0].observation.contains("A patch is not accepted"));
         assert_eq!(out.steps[1].action, "write");
         assert!(out.workspace["solution.py"].contains("a + b"));
+    }
+
+    fn whole(body: &str) -> String {
+        format!("```python\n{body}```")
+    }
+
+    /// SWE-agent's lint guardrail: an edit whose file does not compile is refused before the verifier, the files
+    /// stay as they were, and the model is shown what is wrong.
+    #[tokio::test]
+    async fn an_edit_that_does_not_compile_is_refused_before_the_verifier() {
+        let broken = whole("def add(a, b):\n    @@BROKEN@@\n");
+        let good = whole("def add(a, b):\n    return a + b\n");
+        let mut env = Script::new(&[&broken, &good]);
+        let cfg = AgentConfig {
+            constrain: false,
+            ..AgentConfig::default()
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        assert_eq!(out.status, Status::Verified);
+        assert_eq!(out.steps[0].action, "rejected");
+        assert!(out.steps[0].observation.contains("would not compile"));
+        assert!(out.steps[0].observation.contains("IndentationError"));
+        assert!(out.steps[0].verdict.is_none());
+        assert_eq!(out.lint_rejections, 1);
+        // The starting files were judged once and the good edit once: the refused edit cost no verifier run.
+        assert_eq!(env.verifies, 2);
+        assert!(out.workspace["solution.py"].contains("a + b"));
+        // Off, the same edit reaches the verifier.
+        let mut env = Script::new(&[&broken, &good]);
+        let off = AgentConfig { lint: false, ..cfg };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &off).await;
+        assert_eq!((out.lint_rejections, env.verifies), (0, 3));
+    }
+
+    /// A change that scores below the best version so far is dropped: the model builds on the best files.
+    #[tokio::test]
+    async fn a_change_that_scores_lower_is_rolled_back_to_the_best_version() {
+        let better = whole("def add(a, b):\n    return a\n"); // 0.5, above the start (0.05)
+        let worse = whole("def add(a, b):\n    return 0\n"); // 0.05, below the best
+        let good = whole("def add(a, b):\n    return a + b\n");
+        let mut env = Script::new(&[&better, &worse, &good]);
+        let cfg = AgentConfig {
+            constrain: false,
+            ..AgentConfig::default()
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        assert_eq!(out.status, Status::Verified);
+        assert_eq!(out.rollbacks, 1);
+        assert!(!out.steps[0].rolled_back && out.steps[1].rolled_back);
+        assert!(
+            out.steps[1]
+                .observation
+                .contains("restored to that version")
+        );
+        // The next model call is shown the restored files, not the worse ones.
+        let shown = &env.seen[2].last().unwrap().1;
+        assert!(
+            shown.contains("return a\n") && !shown.contains("return 0"),
+            "{shown}"
+        );
+        let off = AgentConfig {
+            rollback: false,
+            ..cfg
+        };
+        let mut env = Script::new(&[&better, &worse, &good]);
+        assert_eq!(
+            run_agent(&mut env, "Write add(a, b).", ws(), &off)
+                .await
+                .rollbacks,
+            0
+        );
+    }
+
+    /// Nudge on the second identical failure, stop on the `stuck_after`-th: the budget is not spent on a loop.
+    #[tokio::test]
+    async fn the_same_failure_again_and_again_ends_the_run_as_stuck() {
+        // Different files (so the judge's memo is not hit), the same failing evidence every time.
+        let attempts: Vec<String> = (0..8)
+            .map(|i| whole(&format!("def add(a, b):\n    return {i} * b\n")))
+            .collect();
+        let refs: Vec<&str> = attempts.iter().map(String::as_str).collect();
+        let mut env = Script::new(&refs);
+        let cfg = AgentConfig {
+            constrain: false,
+            rollback: false,
+            stuck_after: 3,
+            max_steps: 8,
+            ..AgentConfig::default()
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        assert_eq!(out.status, Status::Stuck);
+        assert_eq!(
+            out.steps.len(),
+            3,
+            "stopped at the third identical failure, not at the budget"
+        );
+        assert!(!out.steps[0].observation.contains("same failure"));
+        assert!(
+            out.steps[1]
+                .observation
+                .contains("same failure as the previous step")
+        );
+        // Never: the budget decides.
+        let mut env = Script::new(&refs);
+        let never = AgentConfig {
+            stuck_after: 0,
+            ..cfg
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &never).await;
+        assert_eq!((out.status, out.steps.len()), (Status::Exhausted, 8));
+    }
+
+    /// The caller's conventions (AGENTS.md, CLAUDE.md and GEMINI.md in the agents that read them) reach the model
+    /// with the task, ahead of the request for an action.
+    /// A model that keeps asking to run a file that does not exist is told which files do, and the loop ends.
+    #[tokio::test]
+    async fn running_a_missing_file_again_and_again_is_a_stall_too() {
+        let ask = "```run\npython check.py\n```";
+        let mut env = Script::new(&[ask; 8]);
+        let cfg = AgentConfig {
+            constrain: false,
+            stuck_after: 3,
+            max_steps: 8,
+            ..AgentConfig::default()
+        };
+        let out = run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        assert_eq!(out.status, Status::Stuck);
+        assert_eq!(out.steps.len(), 3);
+        assert!(
+            out.steps[0]
+                .observation
+                .contains("The files are: solution.py.")
+        );
+        assert!(
+            out.steps[1]
+                .observation
+                .contains("same failure as the previous step")
+        );
+    }
+
+    #[tokio::test]
+    async fn the_callers_guidelines_are_shown_with_the_task() {
+        let mut env = Script::new(&["no action"]);
+        let cfg = AgentConfig {
+            max_steps: 1,
+            guidance: Some("Use only the standard library.".into()),
+            ..AgentConfig::default()
+        };
+        run_agent(&mut env, "Write add(a, b).", ws(), &cfg).await;
+        let first = &env.seen[0][1].1;
+        assert!(
+            first.contains(
+                "Guidelines from the caller (follow them):\nUse only the standard library."
+            )
+        );
+        assert!(
+            first.trim_end().ends_with("block, or a ```run block."),
+            "{first}"
+        );
+        let mut env = Script::new(&["no action"]);
+        run_agent(
+            &mut env,
+            "Write add(a, b).",
+            ws(),
+            &AgentConfig {
+                max_steps: 1,
+                ..AgentConfig::default()
+            },
+        )
+        .await;
+        assert!(!env.seen[0][1].1.contains("Guidelines"));
     }
 
     #[tokio::test]

@@ -41,6 +41,10 @@ ARMS = {
     # against the Phase 11 default (System 2 from the first step); everything else at the production defaults.
     "s2": {"cascade": False},
     "cascade": {"cascade": True, "cascade_samples": 4},
+    # Phase 16: the guards the research found in modern harnesses, all off (the Phase 15 loop) against all on (the
+    # production defaults): the compile check before the verifier, rollback to the best version, the stall guard.
+    "p15": {"lint": False, "rollback": False, "stuck_after": 0},
+    "p16": {"lint": True, "rollback": True, "stuck_after": 4},
 }
 
 TASKS = [
@@ -113,10 +117,11 @@ def summary(r):
         "prefill_tokens": r.get("prefill_tokens"), "cached_tokens": r.get("cached_tokens"),
         "decoded_tokens": r.get("decoded_tokens"),
         "cascade": r.get("cascade"), "cascade_samples": r.get("cascade_samples"),
+        "lint_rejections": r.get("lint_rejections"), "rollbacks": r.get("rollbacks"),
         "s1_steps": sum(1 for s in steps if s.get("model") == "system1"), "s2_steps": sum(1 for s in steps if s.get("model") == "system2"),
         "actions": [s["action"] for s in steps],
-        "malformed": sum(1 for s in steps if s["action"] == "none" or s["observation"].startswith("The patch was not applied")),
-        "steps": [{**{k: s.get(k) for k in ("step", "action", "passed", "score", "ms", "usage", "compacted", "model", "samples", "retries")}, "observation": s["observation"][:300]} for s in steps],
+        "malformed": sum(1 for s in steps if s["action"] in ("none", "rejected") or s["observation"].startswith("The patch was not applied")),
+        "steps": [{**{k: s.get(k) for k in ("step", "action", "passed", "score", "ms", "usage", "compacted", "model", "samples", "retries", "rolled_back")}, "observation": s["observation"][:300]} for s in steps],
         "files": r.get("files"),
     }
 

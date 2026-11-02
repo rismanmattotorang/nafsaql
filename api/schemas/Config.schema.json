@@ -653,6 +653,15 @@
         },
         "retries": {
           "type": "integer"
+        },
+        "lint": {
+          "type": "boolean"
+        },
+        "rollback": {
+          "type": "boolean"
+        },
+        "stuck_after": {
+          "type": "integer"
         }
       },
       "additionalProperties": false

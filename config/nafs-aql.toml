@@ -200,3 +200,6 @@ cascade = true                         # Phase 14: first step on System 1 with c
 cascade_samples = 4                    # candidates of that first step (1..4; four cost 1.7x one System 1 stream, about a third of one System 2 step)
 cascade_temperature = 0.7              # the candidates must differ from each other (the rescue's temperature)
 retries = 2                            # retries of a model call that fails for a reason other than the run's cap (Codex backoff: 200 ms, doubling)
+lint = true                            # Phase 16: refuse an edit whose Python file does not compile (SWE-agent's lint guardrail); no verifier run is spent on it
+rollback = true                        # Phase 16: a change that scores below the best version so far is dropped and the best files are restored
+stuck_after = 4                        # Phase 16: stop after this many consecutive steps that fail the same way (0 = never); the second one carries a nudge

@@ -607,12 +607,25 @@ pub struct CodeAgentRequest {
     /// Override of `harness.cascade_samples` (1..=4).
     #[serde(default)]
     pub cascade_samples: Option<u32>,
+    /// Phase 16 override of `harness.lint`: refuse an edit whose Python file does not compile.
+    #[serde(default)]
+    pub lint: Option<bool>,
+    /// Phase 16 override of `harness.rollback`: restore the best version when a change scores lower.
+    #[serde(default)]
+    pub rollback: Option<bool>,
+    /// Phase 16 override of `harness.stuck_after` (0 = never, else 2..=12).
+    #[serde(default)]
+    pub stuck_after: Option<u32>,
+    /// Phase 16: the caller's conventions for this workspace (at most 2,000 characters), shown to the model with
+    /// the task, as AGENTS.md, CLAUDE.md and GEMINI.md are in the agents that read them.
+    #[serde(default)]
+    pub guidance: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAgentStep {
     pub step: u32,
-    /// patch, write, run, submit, none or model_error.
+    /// patch, write, run, submit, none, rejected (an edit the compile check refused) or model_error.
     pub action: String,
     /// What the model was shown after the action.
     pub observation: String,
@@ -637,6 +650,9 @@ pub struct CodeAgentStep {
     /// Model calls retried before this step's reply arrived.
     #[serde(default)]
     pub retries: u32,
+    /// Phase 16: the change scored below the best version so far and the files were restored to that version.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub rolled_back: bool,
 }
 fn one() -> u32 {
     1
@@ -666,7 +682,7 @@ pub struct CodeAgentUsage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAgentReply {
     pub run_id: Uuid,
-    /// verified, exhausted, deadline or model_error.
+    /// verified, exhausted, deadline, model_error or stuck (the same failure on `stuck_after` consecutive steps).
     pub status: String,
     /// `verified` only when the exact verifier accepted the returned files; otherwise `unverified`.
     pub assurance: Assurance,
@@ -710,6 +726,12 @@ pub struct CodeAgentReply {
     pub cascade: bool,
     #[serde(default)]
     pub cascade_samples: u32,
+    /// Phase 16: edits refused by the compile check (they cost no verifier run).
+    #[serde(default)]
+    pub lint_rejections: u32,
+    /// Phase 16: changes dropped because they scored below the best version so far.
+    #[serde(default)]
+    pub rollbacks: u32,
 }
 
 /// Lock acquisition that survives poisoning. A panic while a std lock was held poisons it, and `lock().unwrap()`

@@ -102,6 +102,20 @@ pub struct HarnessCfg {
     /// Retries of a model call that fails for a reason other than the run's cap (Codex's backoff).
     #[serde(default = "d_agent_retries")]
     pub retries: u32,
+    /// Phase 16: refuse an edit whose Python file does not compile (SWE-agent's lint guardrail): the files stay,
+    /// the model is shown the offending lines, and no verifier run is spent.
+    #[serde(default = "d_true")]
+    pub lint: bool,
+    /// Phase 16: when a change scores below the best version so far, restore that version.
+    #[serde(default = "d_true")]
+    pub rollback: bool,
+    /// Phase 16: stop after this many consecutive steps that fail the same way (0 = never); the second one
+    /// already carries a nudge to change approach.
+    #[serde(default = "d_agent_stuck_after")]
+    pub stuck_after: u32,
+}
+fn d_agent_stuck_after() -> u32 {
+    4
 }
 fn d_agent_cascade_samples() -> u32 {
     4
@@ -165,6 +179,9 @@ impl Default for HarnessCfg {
             cascade_samples: d_agent_cascade_samples(),
             cascade_temperature: d_agent_cascade_temp(),
             retries: d_agent_retries(),
+            lint: true,
+            rollback: true,
+            stuck_after: d_agent_stuck_after(),
         }
     }
 }

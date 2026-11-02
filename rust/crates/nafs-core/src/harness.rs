@@ -121,6 +121,29 @@ async fn capped<T>(
     .map_err(|e| e.to_string())
 }
 
+/// Compiles `candidate.py` and prints `NAFS_LINT_OK`, or `NAFS_LINT_ERR` with the error and the lines around it
+/// (what SWE-agent's flake8 guardrail shows the agent). It never executes the candidate.
+const LINT_RUNNER: &str = r#"import sys
+try:
+    src = open("candidate.py", encoding="utf-8").read()
+    compile(src, "candidate.py", "exec")
+except SyntaxError as e:
+    lines = src.splitlines()
+    n = e.lineno or 1
+    shown = "\n".join(
+        f"{i + 1:4d}| {lines[i]}" + ("   <-- here" if i + 1 == n else "")
+        for i in range(max(0, n - 3), min(len(lines), n + 2))
+    )
+    print("NAFS_LINT_ERR")
+    print(f"{type(e).__name__}: {e.msg} (line {n})")
+    print(shown)
+except (ValueError, RecursionError, MemoryError) as e:
+    print("NAFS_LINT_ERR")
+    print(f"{type(e).__name__}: {e}")
+else:
+    print("NAFS_LINT_OK")
+"#;
+
 impl AgentEnv for Env<'_> {
     fn complete(
         &mut self,
@@ -216,6 +239,28 @@ impl AgentEnv for Env<'_> {
         })
     }
 
+    /// The compile check, in the sandbox like everything that reads model-written code. Trouble in the sandbox
+    /// itself is not the model's fault: it passes the edit on to the verifier.
+    fn lint(&mut self, ws: &Workspace, file: &str) -> BoxFuture<'_, Option<String>> {
+        let source = ws.get(file).cloned();
+        let limits = self.orch.hub.limits.clone();
+        let file = file.to_string();
+        Box::pin(async move {
+            let source = source?;
+            let files = [
+                ("candidate.py", source.as_str()),
+                ("_nafs_lint.py", LINT_RUNNER),
+            ];
+            let out =
+                nafs_verify::sandbox::run(&files, "_nafs_lint.py", None, &limits.python, &limits)
+                    .await
+                    .ok()?;
+            out.stdout
+                .strip_prefix("NAFS_LINT_ERR\n")
+                .map(|report| report.trim_end().replace("candidate.py", &file))
+        })
+    }
+
     fn verify(&mut self, ws: &Workspace) -> BoxFuture<'_, Verdict> {
         let code = ws.get("solution.py").cloned().unwrap_or_default();
         Box::pin(async move {
@@ -305,6 +350,19 @@ impl Orchestrator {
         if req.cascade_samples.is_some_and(|s| !(1..=4).contains(&s)) {
             return Err("cascade_samples must be in [1, 4]".into());
         }
+        if req
+            .stuck_after
+            .is_some_and(|n| n != 0 && !(2..=12).contains(&n))
+        {
+            return Err("stuck_after must be 0 (never) or in [2, 12]".into());
+        }
+        if req
+            .guidance
+            .as_deref()
+            .is_some_and(|g| g.chars().count() > 2_000)
+        {
+            return Err("guidance must be at most 2,000 characters".into());
+        }
         Ok(())
     }
 
@@ -378,6 +436,10 @@ impl Orchestrator {
             unstick: req.unstick.unwrap_or(h.unstick),
             cascade_samples,
             retries: h.retries,
+            lint: req.lint.unwrap_or(h.lint),
+            rollback: req.rollback.unwrap_or(h.rollback),
+            stuck_after: req.stuck_after.unwrap_or(h.stuck_after),
+            guidance: req.guidance.clone(),
             deadline: Some(t0 + Duration::from_secs(h.wall_clock_s)),
             ..AgentConfig::default()
         };
@@ -409,6 +471,9 @@ impl Orchestrator {
         let decoded_tokens = usages()
             .map(|u| u64::from(u.completion_tokens.max(u.reasoning_tokens)))
             .sum();
+        metrics::counter!("nafs_code_agent_lint_rejections_total")
+            .increment(u64::from(out.lint_rejections));
+        metrics::counter!("nafs_code_agent_rollbacks_total").increment(u64::from(out.rollbacks));
         metrics::counter!("nafs_code_agent_prefill_tokens_total").increment(prefill_tokens);
         metrics::counter!("nafs_code_agent_cached_tokens_total").increment(cached_tokens);
         Ok(CodeAgentReply {
@@ -450,6 +515,7 @@ impl Orchestrator {
                     },
                     samples: s.samples,
                     retries: s.retries,
+                    rolled_back: s.rolled_back,
                 })
                 .collect(),
             model_calls: out.model_calls,
@@ -473,6 +539,8 @@ impl Orchestrator {
             diff: out.diff,
             cascade: cascade_samples > 0,
             cascade_samples: cascade_samples as u32,
+            lint_rejections: out.lint_rejections,
+            rollbacks: out.rollbacks,
         })
     }
 }

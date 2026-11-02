@@ -3020,6 +3020,24 @@ components:
           type: integer
           minimum: 1
           maximum: 4
+        lint:
+          type: boolean
+          description: 'Phase 16 override of `harness.lint`: refuse an edit whose Python file does not compile (the files
+            stay as they were, the model is shown the offending lines, no verifier run is spent)'
+        rollback:
+          type: boolean
+          description: 'Phase 16 override of `harness.rollback`: restore the best version when a change scores lower'
+        stuck_after:
+          type: integer
+          minimum: 0
+          maximum: 12
+          description: 'Phase 16 override of `harness.stuck_after`: stop after this many consecutive steps that fail the
+            same way (0 = never, else 2..12)'
+        guidance:
+          type: string
+          maxLength: 2000
+          description: 'Phase 16: the caller''s conventions for this workspace, shown to the model with the task (the
+            role AGENTS.md, CLAUDE.md and GEMINI.md play in the agents that read them)'
     CodeAgentUsage:
       type: object
       description: One model call as the server reported it (Phase 11)
@@ -3061,6 +3079,7 @@ components:
           - run
           - submit
           - none
+          - rejected
           - model_error
         observation:
           type: string
@@ -3084,6 +3103,10 @@ components:
         retries:
           type: integer
           description: Model calls retried before this step's reply arrived
+        rolled_back:
+          type: boolean
+          description: 'Phase 16: the change scored below the best version so far and the files were restored to that
+            version'
     CodeAgentReply:
       type: object
       required:
@@ -3108,6 +3131,7 @@ components:
           - exhausted
           - deadline
           - model_error
+          - stuck
         assurance:
           type: string
           enum:
@@ -3164,6 +3188,12 @@ components:
           description: 'Phase 14: the first step went to System 1 with `cascade_samples` candidates'
         cascade_samples:
           type: integer
+        lint_rejections:
+          type: integer
+          description: 'Phase 16: edits refused by the compile check (they cost no verifier run)'
+        rollbacks:
+          type: integer
+          description: 'Phase 16: changes dropped because they scored below the best version so far'
     HarnessInfo:
       type: object
       properties:

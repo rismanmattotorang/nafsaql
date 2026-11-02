@@ -70,6 +70,16 @@ fn reply_for(body: &Value) -> (String, String) {
     if all.contains("CASCADETASK") && model == "system2" {
         return ("t".into(), "*** Begin Patch\n*** Update File: solution.py\n@@ def sq(x):\n-    return x + x\n+    return x * x\n*** End Patch".into());
     }
+    // Phase 16: the code agent's first file does not compile (an unexpected indent); once the refusal is in the
+    // transcript it writes a correct one.
+    if all.contains("LINTTASK") {
+        let code = if msgs.len() <= 2 {
+            "def sq(x):\n    return x * x\n      y = 1\n"
+        } else {
+            "def sq(x):\n    return x * x\n"
+        };
+        return ("t".into(), format!("```python\n{code}```"));
+    }
     // FR-093: the code agent first runs the file, then patches it once it has seen the output.
     if all.contains("AGENTTASK") {
         return if msgs.len() <= 2 {
@@ -1291,6 +1301,51 @@ async fn lean_tasks_need_a_configured_toolchain() {
     });
     let e = o.handle(q, Emitter(None)).await.unwrap_err();
     assert!(e.to_string().contains("Lean toolchain"), "{e}");
+}
+
+/// Phase 16: an edit that does not compile is refused by the sandboxed compile check before the verifier runs.
+#[tokio::test]
+async fn code_agent_refuses_an_edit_that_does_not_compile() {
+    let (o, _mock, _d) = setup_with(true, |c| c.harness.cascade = false).await;
+    let req = CodeAgentRequest {
+        task: "LINTTASK: make sq(x) return x squared.".into(),
+        files: [(
+            "solution.py".to_string(),
+            "def sq(x):\n    return x + x\n".to_string(),
+        )]
+        .into_iter()
+        .collect(),
+        verification: VerificationInputs {
+            tests: Some(vec!["assert sq(3) == 9".into(), "assert sq(2) == 4".into()]),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let r = o.run_code_agent(req.clone()).await.unwrap();
+    assert_eq!((r.status.as_str(), r.passed), ("verified", true), "{r:?}");
+    assert_eq!(r.steps[0].action, "rejected", "{r:?}");
+    assert!(
+        r.steps[0].observation.contains("IndentationError"),
+        "{}",
+        r.steps[0].observation
+    );
+    assert!(r.steps[0].observation.contains("<-- here"));
+    assert_eq!((r.lint_rejections, r.model_calls), (1, 2));
+    // The starting files and the good edit were judged; the refused edit cost no verifier run.
+    assert_eq!(r.verifier_calls, 2);
+    // Off, the same edit goes to the verifier and fails there.
+    let off = CodeAgentRequest {
+        lint: Some(false),
+        max_steps: Some(1),
+        ..req
+    };
+    let r = o.run_code_agent(off).await.unwrap();
+    assert_eq!(
+        (r.lint_rejections, r.steps[0].action.as_str()),
+        (0, "write"),
+        "{r:?}"
+    );
+    assert_eq!(r.steps[0].passed, Some(false));
 }
 
 #[tokio::test]
