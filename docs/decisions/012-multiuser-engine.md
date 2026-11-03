@@ -19,7 +19,7 @@ difference.
 | A scheduler with slots, admission control and **chunked prefill**: a step is one chunk of one prompt or one token for every ready user | `smiley-core/src/serve.rs` | 4 slots |
 | A **prefix store shared by all slots**: a finished slot's cache serves the next user who begins the same way | `smiley-core/src/serve.rs` | 768 MB per model |
 | The server owns **one engine thread** instead of a session behind a mutex; `--slots` sets the width | `nafs-smiley-server` | 4 |
-| `[backends.smiley] max_in_flight` | `config/nafs-aql*.toml` | 4 (was 1) |
+| `[backends.smiley] max_in_flight` | `config/nafs-aql*.toml` | **1, unchanged** (see below) |
 
 ## Evidence
 
@@ -34,6 +34,14 @@ Pinned by tests: a batched user's logits are bit-identical to its solo logits; a
 when caches are swapped; a user may arrive mid-flight; a restored prefix changes no answer; a full engine refuses and
 hands the prompt back. Two defects were caught by those tests during the work (a slot whose restored prefix left nothing
 to prefill fed the wrong first token; a finished cache was stored under the wrong token sequence).
+
+## The gateway still sends one request at a time
+
+The gateway reads `max_in_flight` as both the number of concurrent requests and the width of an `n`-choice request (the
+cascade's four candidates, the rescue's samples). This server refuses `n > 1` with a 400, so raising the limit to 4 made
+the code agent fail on its first step; the harness sweep caught it (`model_error`, 52/53) and the setting was put back to
+1 (53/53). The engine's concurrency is available to direct API clients now; it reaches the gateway once the server
+answers `n > 1`, which is a small change on top of this work, since `n` candidates of one prompt are `n` rows of one pass.
 
 ## Not adopted
 

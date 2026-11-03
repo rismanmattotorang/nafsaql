@@ -65,8 +65,12 @@ prefill it again.
 **The server serves from one engine thread** (`nafs-smiley-server`). It used to hold one session behind a mutex, so a
 second request waited for the first to finish. Requests now go to a thread that owns the engine and batches them; it
 sleeps when idle. `--slots` (4 by default) sets how many users share a pass, below the machine's ridge.
-`[backends.smiley]` in the gateway raises `max_in_flight` to 4 to match, which also lets the gateway's own concurrent
-paths — the `n`-choice rescue, the cascade's candidates — reach this backend for the first time.
+`[backends.smiley]` in the gateway stays at `max_in_flight = 1`, and that is a real limit rather than an oversight: the
+gateway reads that number as both the concurrent-request width **and** the width of an `n`-choice request (the cascade's
+four candidates, the rescue's samples), which this server still refuses with a 400. Raising it to 4 was tried and made
+the code agent fail at once (`model_error` on the first step, caught by the harness sweep). The engine's concurrency is
+therefore available to direct API clients today, and reaches the gateway when the server learns to answer `n > 1` — which
+is now a small thing, since `n` candidates of one prompt are exactly `n` rows of one pass.
 
 **What is pinned by tests.** That a user served with others gets *bit-identical* logits and the same text as alone
 (`tests/batch.rs`, `serve::tests`); that a row reads its own cache and follows it when the caches are swapped; that a

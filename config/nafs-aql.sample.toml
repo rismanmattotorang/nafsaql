@@ -35,8 +35,8 @@ label = "Smiley Core (vendored Rust engine, GGUF Q4_K_M; one stream per model)"
 kind = "smiley"
 # Phase 15: the owner's own CPU engine (rust/crates/smiley-core) behind nafs-smiley-server (scripts/serve_smiley.sh). No grammar,
 # no n-choice requests, no raw continuation: the gateway uses its standard path, as for vLLM. One stream per process.
-system1 = { url = "http://127.0.0.1:8201/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "GGUF Q4_K_M (unsloth/Qwen3-1.7B-GGUF)", thinking = false, max_in_flight = 4 }
-system2 = { url = "http://127.0.0.1:8202/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 4 }
+system1 = { url = "http://127.0.0.1:8201/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "GGUF Q4_K_M (unsloth/Qwen3-1.7B-GGUF)", thinking = false, max_in_flight = 1 }
+system2 = { url = "http://127.0.0.1:8202/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 1 }
 
 [backend_retry]                        # IF-007 / IF-008
 max_attempts = 3
