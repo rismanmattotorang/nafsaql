@@ -27,6 +27,7 @@ pub mod pool;
 pub mod prefix;
 pub mod quant;
 pub mod safetensors;
+pub mod serve;
 pub mod session;
 #[cfg(target_arch = "x86_64")]
 pub mod simd;
@@ -61,7 +62,7 @@ pub fn compatibility(path: &std::path::Path) -> Result<(), String> {
     check_compatible(&g)
 }
 
-pub(crate) fn check_compatible(g: &Gguf) -> Result<(), String> {
+pub fn check_compatible(g: &Gguf) -> Result<(), String> {
     let arch = g.str("general.architecture").unwrap_or("unknown");
     if model::Arch::from_name(arch).is_none() {
         return Err(format!(

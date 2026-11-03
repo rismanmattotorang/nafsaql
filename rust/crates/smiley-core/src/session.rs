@@ -264,7 +264,7 @@ fn answer_reserve(cfg: &SessionCfg) -> usize {
 /// softmax is summed over all of it (exactness needs the full normaliser), but only
 /// the most probable candidates are sorted, and the full sort is the fallback when
 /// they do not reach `top_p` — which keeps the distribution exactly the specified one.
-fn sample_row(
+pub(crate) fn sample_row(
     logits: &[f32],
     temperature: f32,
     top_p: f32,
@@ -362,7 +362,7 @@ pub struct Emitted<'a> {
 }
 
 // nafs-aql: the log-probability of token `id` in one row of logits, with the full normaliser.
-fn logprob_of(logits: &[f32], id: u32) -> f32 {
+pub(crate) fn logprob_of(logits: &[f32], id: u32) -> f32 {
     let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
     let sum: f32 = logits.iter().map(|&v| (v - max).exp()).sum();
     logits
@@ -647,19 +647,15 @@ impl Session {
     /// The whole conversation from the start: system, the kept exchanges, then the
     /// new user message. Used after dropping the oldest exchanges.
     fn full_prompt(&self, kept: &[(String, String)], user: &str) -> String {
-        let mut s = self
-            .template
-            .system_block(self.system_text(), &today_llama3());
-        for (u, a) in kept {
-            s.push_str(&self.template.user_turn(u));
-            s.push_str(&self.template.assistant_turn(a));
-        }
-        s.push_str(&self.template.user_turn(user));
-        s.push_str(self.template.assistant_open(self.cfg.thinking));
-        if let Some(p) = &self.cfg.assistant_prefix {
-            s.push_str(p); // nafs-aql
-        }
-        s
+        // nafs-aql: one builder, shared with the batching engine, so both paths produce the same prompt.
+        crate::serve::chat_prompt(
+            self.template,
+            self.system_text(),
+            kept,
+            user,
+            self.cfg.thinking,
+            self.cfg.assistant_prefix.as_deref(),
+        )
     }
 
     /// The tokens to prefill for `user`, and how many old exchanges had to go.

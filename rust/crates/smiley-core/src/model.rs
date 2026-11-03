@@ -371,6 +371,43 @@ struct MatJob<'a> {
     out: OutPtr,
 }
 
+// nafs-aql: where each row of a batch writes and reads its attention cache.
+//
+// Both shapes run the same forward pass, because every matmul in it is the same work whatever a row belongs to:
+// one read of the weights serves the whole batch. `Shared` is one sequence over several positions (prefill, a
+// speculative block). `PerRow` is one position of each of several sequences — several users in one weight pass,
+// which is what makes concurrent serving on a memory-bound machine cost little more than serving one.
+pub enum Caches<'a> {
+    /// Every row writes to one cache, at its own position.
+    Shared(&'a mut KvCache),
+    /// Row `b` writes to cache `b`.
+    PerRow(&'a mut [&'a mut KvCache]),
+}
+
+impl Caches<'_> {
+    #[inline]
+    fn get(&self, b: usize) -> &KvCache {
+        match self {
+            Caches::Shared(kv) => kv,
+            Caches::PerRow(kvs) => kvs[b],
+        }
+    }
+    #[inline]
+    fn get_mut(&mut self, b: usize) -> &mut KvCache {
+        match self {
+            Caches::Shared(kv) => kv,
+            Caches::PerRow(kvs) => kvs[b],
+        }
+    }
+    /// Rows this holds caches for, or None when one cache serves every row.
+    fn rows(&self) -> Option<usize> {
+        match self {
+            Caches::Shared(_) => None,
+            Caches::PerRow(kvs) => Some(kvs.len()),
+        }
+    }
+}
+
 /// Largest batch one matmul call accepts. A stack array of this many scratch floats
 /// holds one row's results; `PREFILL_CHUNK` and `draft_len + 1` are both far below it.
 const MAX_BATCH: usize = 128;
@@ -845,6 +882,7 @@ impl Model {
     // Bundling them into a config struct would hide that `want_logits` is what makes
     // prefill cheap and speculation possible.
     #[allow(clippy::too_many_arguments)]
+    /// One sequence over `tokens`, starting at `start_pos` (prefill, a decode step, a speculative block).
     pub fn forward(
         &self,
         st8: &mut State,
@@ -855,18 +893,61 @@ impl Model {
         want_logits: &[usize],
         stats: &mut StepStats,
     ) -> Result<(), String> {
+        let positions: Vec<usize> = (start_pos..start_pos + tokens.len()).collect();
+        self.forward_rows(
+            st8,
+            &mut Caches::Shared(kv),
+            pool,
+            tokens,
+            &positions,
+            want_logits,
+            stats,
+        )
+    }
+
+    // nafs-aql: the general pass. Row `b` carries `tokens[b]` at `positions[b]` of the sequence whose cache
+    // `caches` gives for `b`; every row shares one read of the weights.
+    #[allow(clippy::too_many_arguments)]
+    pub fn forward_rows(
+        &self,
+        st8: &mut State,
+        caches: &mut Caches,
+        pool: &Pool,
+        tokens: &[u32],
+        positions: &[usize],
+        want_logits: &[usize],
+        stats: &mut StepStats,
+    ) -> Result<(), String> {
         let c = self.cfg;
         let nb = tokens.len();
         if nb == 0 {
             return Ok(());
         }
-        let t_fwd = Instant::now();
-        if start_pos + nb > kv.max_ctx() {
+        // nafs-aql: the batch width is decided per step when users are served together, so an oversized batch is
+        // a request to refuse, not a slice to overrun.
+        if nb > st8.max_batch {
             return Err(format!(
-                "context limit reached: {} positions requested, cache holds {}",
-                start_pos + nb,
-                kv.max_ctx()
+                "batch of {nb} rows exceeds the scratch of {}",
+                st8.max_batch
             ));
+        }
+        if positions.len() != nb || caches.rows().is_some_and(|r| r != nb) {
+            return Err(format!(
+                "batch of {nb} tokens with {} positions and {:?} caches",
+                positions.len(),
+                caches.rows()
+            ));
+        }
+        let t_fwd = Instant::now();
+        for b in 0..nb {
+            let kv = caches.get(b);
+            if positions[b] >= kv.max_ctx() {
+                return Err(format!(
+                    "context limit reached: position {} requested, cache holds {}",
+                    positions[b],
+                    kv.max_ctx()
+                ));
+            }
         }
         for (i, &t) in tokens.iter().enumerate() {
             if t as usize >= c.n_vocab {
@@ -929,7 +1010,7 @@ impl Model {
             }
 
             for b in 0..nb {
-                let pos = start_pos + b;
+                let pos = positions[b];
                 self.rope(&st8.rope, &mut st8.q[b * qd..(b + 1) * qd], c.n_head, pos);
                 self.rope(
                     &st8.rope,
@@ -937,6 +1018,7 @@ impl Model {
                     c.n_kv_head,
                     pos,
                 );
+                let kv = caches.get_mut(b);
                 for h in 0..c.n_kv_head {
                     let ks = b * kvd + h * c.head_dim;
                     kv.put(
@@ -947,14 +1029,13 @@ impl Model {
                         &st8.v[ks..ks + c.head_dim],
                     );
                 }
+                // This position is now readable, so a later row of the batch can attend to an earlier one of the
+                // same sequence — which is what makes prefill and speculative verification a single call.
+                kv.advance(pos + 1);
             }
-            // Every position in this batch is now readable, so a later row of the
-            // batch can attend to an earlier one — which is what makes prefill and
-            // speculative verification a single call rather than a loop.
-            kv.advance(start_pos + nb);
 
             let t_attn = Instant::now();
-            self.attend(st8, kv, pool, li, nb, start_pos, stats);
+            self.attend(st8, caches, pool, li, nb, positions, stats);
             stats.ns_attn += t_attn.elapsed().as_nanos() as u64;
 
             for b in 0..nb {
@@ -1056,18 +1137,18 @@ impl Model {
     fn attend(
         &self,
         st8: &mut State,
-        kv: &KvCache,
+        caches: &Caches,
         pool: &Pool,
         li: usize,
         nb: usize,
-        start_pos: usize,
+        positions: &[usize],
         stats: &mut StepStats,
     ) {
         let c = self.cfg;
         let scale = 1.0 / (c.head_dim as f32).sqrt();
         let tasks = nb * c.n_head;
         // Work in multiply-accumulates: 2 passes over `n_ctx · head_dim` per task.
-        let avg_ctx = start_pos + nb.div_ceil(2);
+        let avg_ctx = positions.iter().sum::<usize>() / nb + 1;
         let work = tasks * avg_ctx * c.head_dim * 2;
         // Below this a fork–join (~20 µs) costs more than it saves.
         let parallel = pool.width() > 1 && work >= 1 << 19;
@@ -1082,7 +1163,8 @@ impl Model {
             let att = unsafe { att.slice(wk * stride, stride) };
             for t in lo..hi {
                 let (b, h) = (t / c.n_head, t % c.n_head);
-                let n_ctx = start_pos + b + 1;
+                let n_ctx = positions[b] + 1;
+                let kv = caches.get(b);
                 let kvh = h / c.gqa();
                 let qo = b * c.q_dim() + h * c.head_dim;
                 kv.scores(li, kvh, n_ctx, &q[qo..qo + c.head_dim], scale, att);
@@ -1112,11 +1194,11 @@ impl Model {
             body(0, 1);
         }
         for b in 0..nb {
-            let n_ctx = (start_pos + b + 1) as u64;
+            let n_ctx = (positions[b] + 1) as u64;
             // Cache traffic for this row, *for this layer*: every position, K and V.
             // `bytes_read_at` covers all layers at once and would count the whole
             // cache 32 times over from inside the layer loop.
-            stats.bytes_kv += kv.bytes_per_position_per_layer() * n_ctx;
+            stats.bytes_kv += caches.get(b).bytes_per_position_per_layer() * n_ctx;
             stats.macs += (c.n_head * c.head_dim) as u64 * n_ctx * 2;
         }
     }

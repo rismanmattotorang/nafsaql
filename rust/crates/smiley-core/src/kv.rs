@@ -139,6 +139,11 @@ impl KvCache {
         }
     }
 
+    // nafs-aql: positions currently filled.
+    pub fn filled(&self) -> usize {
+        self.len
+    }
+
     pub fn prec(&self) -> KvPrec {
         self.prec
     }

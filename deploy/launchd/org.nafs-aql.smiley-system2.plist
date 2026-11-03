@@ -7,7 +7,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key><string>org.nafs-aql.smiley-system2</string>
-  <key>ProgramArguments</key><array><string>/opt/nafs-aql/rust/target/release/nafs-smiley-server</string><string>-m</string><string>models/Qwen3-4B-Thinking-2507-Q4_K_M.gguf</string><string>--alias</string><string>system2</string><string>-t</string><string>3</string><string>-c</string><string>8192</string><string>--host</string><string>127.0.0.1</string><string>--port</string><string>8202</string></array>
+  <key>ProgramArguments</key><array><string>/opt/nafs-aql/rust/target/release/nafs-smiley-server</string><string>-m</string><string>models/Qwen3-4B-Thinking-2507-Q4_K_M.gguf</string><string>--alias</string><string>system2</string><string>-t</string><string>3</string><string>-c</string><string>8192</string><string>--slots</string><string>4</string><string>--host</string><string>127.0.0.1</string><string>--port</string><string>8202</string></array>
   <key>WorkingDirectory</key><string>/opt/nafs-aql</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>

@@ -26,8 +26,11 @@ use axum::{
 };
 use clap::Parser;
 use serde_json::{json, Value};
-use smiley_core::session::{Session, SessionCfg};
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use smiley_core::model::Model;
+use smiley_core::serve::{Emission, Engine, Finish, SlotCfg, SlotId};
+use smiley_core::template::Template;
+use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -62,14 +65,27 @@ struct Args {
     /// earlier one (not only the last) is not prefilled again; 0 = off. Not used with a DSpark drafter.
     #[arg(long = "prefix-cache-mb", default_value_t = 768)]
     prefix_cache_mb: usize,
+    /// Users served at once, each in one row of the same weight pass. Above the machine's roofline ridge
+    /// (about seven rows here) another row adds no throughput and every user waits longer for its own tokens.
+    #[arg(long, default_value_t = smiley_core::serve::DEFAULT_MAX_SLOTS)]
+    slots: usize,
 }
 
 struct App {
-    sess: Mutex<Session>,
+    /// The engine thread's queue: every request is served there, several at a time.
+    jobs: std::sync::mpsc::Sender<EngineMsg>,
+    engine: Arc<EngineShared>,
+    model: Arc<Model>,
+    template: Template,
+    default_system: Option<&'static str>,
+    /// Token ids that end a turn under this model's template.
+    stop: Vec<u32>,
+    max_ctx: usize,
+    max_slots: usize,
     alias: String,
     think_open: Option<u32>,
     think_close: Option<u32>,
-    /// Requests being served or waiting for the session (llama-server's `requests_processing`).
+    /// Requests being served or waiting (llama-server's `requests_processing`).
     busy: AtomicUsize,
     requests: AtomicU64,
     tokens: AtomicU64,
@@ -88,46 +104,82 @@ async fn main() {
     let threads = a
         .threads
         .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get()));
-    let cfg = SessionCfg {
-        max_ctx: a.ctx,
-        kv_prec: if a.kv == "i8" {
-            smiley_core::kv::KvPrec::I8
-        } else {
-            smiley_core::kv::KvPrec::F16
-        },
-        threads,
-        speculate: a.speculate,
-        dspark: a.dspark.clone(),
-        ..Default::default()
-    };
     let t0 = Instant::now();
-    let mut sess = match Session::open(&a.model, cfg) {
-        Ok(s) => s,
+    let gguf = match smiley_core::gguf::Gguf::open(&a.model).and_then(|g| {
+        smiley_core::check_compatible(&g)?;
+        Ok(g)
+    }) {
+        Ok(g) => g,
         Err(e) => {
             eprintln!("cannot open {}: {e}", a.model.display());
             std::process::exit(2);
         }
     };
-    sess.enable_prefix_store(a.prefix_cache_mb << 20);
-    let tk = &sess.model.tk;
+    let template = match Template::detect(&gguf) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("cannot serve {}: {e}", a.model.display());
+            std::process::exit(2);
+        }
+    };
+    let model = match smiley_core::model::keep::open(&a.model) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("cannot open {}: {e}", a.model.display());
+            std::process::exit(2);
+        }
+    };
+    let kv_prec = if a.kv == "i8" {
+        smiley_core::kv::KvPrec::I8
+    } else {
+        smiley_core::kv::KvPrec::F16
+    };
+    let max_ctx = a.ctx.clamp(32, model.cfg.ctx_train);
+    let engine = Engine::new(
+        model.clone(),
+        threads,
+        max_ctx,
+        a.slots,
+        kv_prec,
+        a.prefix_cache_mb << 20,
+    );
+    let cache_mb = engine.cache_bytes_per_slot() >> 20;
+    let (jobs, rx) = std::sync::mpsc::channel::<EngineMsg>();
+    let shared = Arc::new(EngineShared::default());
+    {
+        let shared = shared.clone();
+        std::thread::Builder::new()
+            .name("smiley-engine".into())
+            .spawn(move || engine_thread(engine, rx, shared))
+            .expect("spawn the engine thread");
+    }
     let app = Arc::new(App {
-        think_open: tk.id_of("<think>"),
-        think_close: tk.id_of("</think>"),
+        think_open: model.tk.id_of("<think>"),
+        think_close: model.tk.id_of("</think>"),
+        stop: template.stop_ids(&model.tk),
+        default_system: template.default_system(model.name()),
+        template,
+        max_ctx,
+        max_slots: a.slots,
         alias: a.alias.clone(),
         busy: AtomicUsize::new(0),
         requests: AtomicU64::new(0),
         tokens: AtomicU64::new(0),
         started: Instant::now(),
         simd: smiley_core::simd_name(),
-        sess: Mutex::new(sess),
+        jobs,
+        engine: shared,
+        model,
     });
     tracing::info!(
-        "smiley-core: {} loaded in {:.1} s, {} threads, {}, ctx {}, think tokens {:?}/{:?}",
+        "smiley-core: {} loaded in {:.1} s, {} threads, {}, ctx {}, {} slots ({} MB of cache each), think tokens {:?}/{:?}",
         a.model.display(),
         t0.elapsed().as_secs_f64(),
         threads,
         app.simd,
-        a.ctx,
+        max_ctx,
+        a.slots,
+        cache_mb,
         app.think_open,
         app.think_close
     );
@@ -155,10 +207,14 @@ async fn models(State(s): State<Arc<App>>) -> Json<Value> {
 
 async fn metrics(State(s): State<Arc<App>>) -> String {
     format!(
-        "# Smiley Core server\nllamacpp:requests_processing {}\nsmiley_requests_total {}\nsmiley_tokens_predicted_total {}\nsmiley_uptime_seconds {}\n",
-        s.busy.load(Ordering::SeqCst),
+        "# Smiley Core server\nllamacpp:requests_processing {}\nllamacpp:requests_deferred {}\nsmiley_slots_total {}\nsmiley_requests_total {}\nsmiley_tokens_predicted_total {}\nsmiley_decode_steps_total {}\nsmiley_decode_rows_total {}\nsmiley_uptime_seconds {}\n",
+        s.engine.active.load(Ordering::SeqCst),
+        s.engine.waiting.load(Ordering::SeqCst),
+        s.max_slots,
         s.requests.load(Ordering::SeqCst),
         s.tokens.load(Ordering::SeqCst),
+        s.engine.steps.load(Ordering::SeqCst),
+        s.engine.rows.load(Ordering::SeqCst),
         s.started.elapsed().as_secs()
     )
 }
@@ -268,7 +324,7 @@ enum Msg {
     Err(String),
 }
 
-/// Counters and text of one request across its passes.
+/// What one request produced, for its usage and timings block.
 #[derive(Default)]
 struct Run {
     in_think: bool,
@@ -282,20 +338,8 @@ struct Run {
     cache_n: u64,
     prompt_ms: f64,
     predicted_ms: f64,
-    bytes: u64,
-    /// Where the time went, in ms: matmul, output head, attention, other, sampling, drafting.
-    decode_phases_ms: [f64; 6],
-    prefill_phases_ms: [f64; 6],
-    /// (entries, bytes, restores, positions not prefilled) of the session's prefix store, when it is on.
-    prefix_store: Option<(usize, usize, u64, u64)>,
-}
-
-/// The engine's phase split of one pass, in milliseconds, in the order of [`Run::decode_phases_ms`].
-fn phases_ms(p: &smiley_core::telem::Phases) -> [f64; 6] {
-    [
-        p.matmul_s, p.head_s, p.attn_s, p.other_s, p.sample_s, p.draft_s,
-    ]
-    .map(|s| s * 1e3)
+    /// Decode seconds attributed to this request by the engine (its share of the shared steps).
+    decode_ms: f64,
 }
 
 /// What the assistant has written when the reasoning budget is hit: the text that was generated, token for token, with
@@ -311,148 +355,282 @@ fn continuation_prefix(saw_open: bool, reasoning: &str, closing: &str) -> String
     }
 }
 
-/// One pass of the session over the turn, streaming deltas; `phase2` continues after the reasoning budget.
-#[allow(clippy::too_many_arguments)]
-fn one_pass(
-    sess: &mut Session,
-    p: &Plan,
-    tx: &tokio::sync::mpsc::UnboundedSender<Msg>,
-    cancel: &AtomicBool,
-    think: (Option<u32>, Option<u32>),
-    phase2: bool,
-    run: &mut Run,
-) -> Result<(), String> {
-    let budget = p.budget;
-    let (_, telem) = sess.generate_with(&p.user, Some(cancel), |e| {
-        if cancel.load(Ordering::Relaxed) {
-            return;
-        }
-        if Some(e.id) == think.0 && !phase2 {
-            run.in_think = true;
-            run.saw_open = true;
-            return;
-        }
-        if Some(e.id) == think.1 {
-            run.in_think = false;
-            return;
-        }
-        if run.in_think {
-            run.reasoning_tokens += 1;
-            run.reasoning.push_str(e.text);
-            if tx
-                .send(Msg::Delta(e.text.to_string(), true, e.logprob))
-                .is_err()
-            {
-                cancel.store(true, Ordering::Relaxed);
-            }
-            if budget.is_some_and(|b| run.reasoning_tokens as usize >= b) {
-                run.budget_hit = true;
-                cancel.store(true, Ordering::Relaxed);
-            }
-        } else {
-            run.content_tokens += 1;
-            if tx
-                .send(Msg::Delta(e.text.to_string(), false, e.logprob))
-                .is_err()
-            {
-                cancel.store(true, Ordering::Relaxed);
-            }
-        }
-    })?;
-    run.prompt_n += telem.prompt_tokens as u64;
-    run.cache_n += telem.prefix_reused as u64;
-    run.prompt_ms += telem.prefill_s * 1e3;
-    run.predicted_ms += telem.decode_steps_s * 1e3;
-    run.bytes += telem.bytes_total();
-    run.prefix_store = sess.prefix_store_stats();
-    for (acc, x) in run
-        .decode_phases_ms
-        .iter_mut()
-        .zip(phases_ms(&telem.decode_phases))
-    {
-        *acc += x;
-    }
-    for (acc, x) in run
-        .prefill_phases_ms
-        .iter_mut()
-        .zip(phases_ms(&telem.prefill_phases))
-    {
-        *acc += x;
-    }
-    Ok(())
+/// A request handed to the engine thread, and where its tokens go.
+struct Job {
+    prompt: Vec<u32>,
+    cfg: SlotCfg,
+    out: tokio::sync::mpsc::UnboundedSender<Emission>,
 }
 
-/// Run one request on the session: results go through `tx`. Blocking; call from `spawn_blocking`.
-fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Msg>) {
-    let mut sess = match app.sess.lock() {
-        Ok(s) => s,
-        Err(poisoned) => poisoned.into_inner(),
+enum EngineMsg {
+    Run(Box<Job>),
+    Cancel(SlotId),
+}
+
+/// The engine thread: it owns the model and serves every request, several at a time in one pass over the weights.
+///
+/// One thread rather than a lock each request takes in turn, because the batching only exists if the steps of
+/// different requests meet in the same place. It sleeps when there is nothing to serve.
+fn engine_thread(
+    mut engine: Engine,
+    rx: std::sync::mpsc::Receiver<EngineMsg>,
+    shared: Arc<EngineShared>,
+) {
+    let mut routes: HashMap<SlotId, tokio::sync::mpsc::UnboundedSender<Emission>> = HashMap::new();
+    let mut waiting: VecDeque<Job> = VecDeque::new();
+    let take = |msg,
+                waiting: &mut VecDeque<Job>,
+                engine: &mut Engine,
+                routes: &mut HashMap<_, _>| match msg {
+        EngineMsg::Run(j) => waiting.push_back(*j),
+        EngineMsg::Cancel(id) => {
+            engine.cancel(id);
+            routes.remove(&id);
+        }
     };
-    // The client may have left while this request waited for the session: nobody wants the prefill.
-    if tx.is_closed() {
-        return;
+    loop {
+        loop {
+            match rx.try_recv() {
+                Ok(m) => take(m, &mut waiting, &mut engine, &mut routes),
+                Err(std::sync::mpsc::TryRecvError::Empty) => break,
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
+            }
+        }
+        while engine.has_room() {
+            let Some(j) = waiting.pop_front() else { break };
+            // A caller that has gone is not worth a prefill.
+            if j.out.is_closed() {
+                continue;
+            }
+            match engine.admit(j.prompt, j.cfg) {
+                Ok(id) => {
+                    routes.insert(id, j.out);
+                }
+                Err((_, why)) => {
+                    let _ = j.out.send(Emission {
+                        slot: 0,
+                        token: 0,
+                        text: String::new(),
+                        logprob: 0.0,
+                        finish: Some(Finish::Error(why)),
+                        cost: None,
+                    });
+                }
+            }
+        }
+        shared.active.store(engine.active(), Ordering::SeqCst);
+        shared.waiting.store(waiting.len(), Ordering::SeqCst);
+        if engine.active() == 0 {
+            // Nothing to serve: block until something arrives rather than spin on four cores.
+            match rx.recv() {
+                Ok(m) => take(m, &mut waiting, &mut engine, &mut routes),
+                Err(_) => return,
+            }
+            continue;
+        }
+        for em in engine.step() {
+            let done = em.finish.is_some();
+            let slot = em.slot;
+            if let Some(tx) = routes.get(&slot) {
+                if tx.send(em).is_err() && !done {
+                    // The caller has gone: stop generating for it.
+                    engine.cancel(slot);
+                    routes.remove(&slot);
+                    continue;
+                }
+            }
+            if done {
+                routes.remove(&slot);
+            }
+        }
+        shared.steps.store(engine.decode_steps, Ordering::SeqCst);
+        shared.rows.store(engine.decode_rows, Ordering::SeqCst);
+        let (entries, bytes, hits, saved) = engine.prefix_stats();
+        shared.prefix.store(
+            ((entries as u64) << 48)
+                | ((bytes as u64 >> 20) << 32)
+                | ((hits & 0xffff) << 16)
+                | (saved & 0xffff),
+            Ordering::SeqCst,
+        );
+        *shared.prefix_full.lock().unwrap_or_else(|e| e.into_inner()) =
+            (entries, bytes, hits, saved);
+        *shared.phases.lock().unwrap_or_else(|e| e.into_inner()) = engine.phases_ms();
     }
-    let cancel = AtomicBool::new(false);
-    sess.reset();
-    sess.cfg.system = p.system.clone();
-    sess.cfg.thinking = p.thinking;
-    sess.cfg.temperature = p.temperature;
-    sess.cfg.top_p = p.top_p;
-    sess.cfg.top_k = p.top_k;
-    sess.cfg.min_p = p.min_p;
-    sess.cfg.max_tokens = p.max_tokens;
-    sess.cfg.assistant_prefix = None;
-    sess.reseed(p.seed);
-    sess.seed_history(p.pairs.clone());
-    let think = (app.think_open, app.think_close);
+}
+
+/// Counters the engine thread publishes for `/metrics` and the timings block.
+#[derive(Default)]
+struct EngineShared {
+    active: AtomicUsize,
+    waiting: AtomicUsize,
+    steps: AtomicU64,
+    rows: AtomicU64,
+    prefix: AtomicU64,
+    prefix_full: Mutex<(usize, usize, u64, u64)>,
+    phases: Mutex<[f64; 6]>,
+}
+
+impl EngineShared {
+    fn phases(&self) -> [f64; 6] {
+        *self.phases.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+/// Serve one request: build its prompt, hand it to the engine, and turn the tokens it sends back into the
+/// deltas the caller is streamed. The reasoning budget is enforced here, by replanning the turn with what the
+/// model has written so far — the engine's prefix store then restores that reasoning instead of recomputing it.
+async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Msg>) {
+    let t0 = Instant::now();
     let mut run = Run::default();
-    // Phase 1: the turn as asked. Reasoning tokens are counted against the budget; at the budget the turn is
-    // cancelled and continued in phase 2 with the think span closed.
-    if let Err(e) = one_pass(&mut sess, p, &tx, &cancel, think, false, &mut run) {
-        let _ = tx.send(Msg::Err(e));
-        return;
-    }
-    let client_gone = cancel.load(Ordering::Relaxed) && !run.budget_hit;
-    if run.budget_hit && !client_gone {
-        // Phase 2: the same turn, with the reasoning so far and `</think>` as what the assistant has written.
-        cancel.store(false, Ordering::Relaxed);
-        let closing = "\n</think>\n\n";
-        let _ = tx.send(Msg::Delta(closing.to_string(), true, 0.0));
-        sess.reset();
-        sess.seed_history(p.pairs.clone());
-        sess.cfg.assistant_prefix =
-            Some(continuation_prefix(run.saw_open, &run.reasoning, closing));
-        sess.cfg.max_tokens = p
-            .max_tokens
-            .saturating_sub(run.reasoning_tokens as usize)
-            .max(16);
-        run.in_think = false;
-        if let Err(e) = one_pass(&mut sess, p, &tx, &cancel, think, true, &mut run) {
-            let _ = tx.send(Msg::Err(e));
+    let mut budget_left = p.max_tokens;
+    let mut prefix: Option<String> = None;
+    let mut finish = "stop";
+    // At most two passes: the turn as asked, then the same turn continued with the reasoning closed.
+    for pass in 0..2 {
+        let thinking = p.thinking && pass == 0;
+        let prompt_text = smiley_core::serve::chat_prompt(
+            app.template,
+            p.system.as_deref().or(app.default_system),
+            &p.pairs,
+            &p.user,
+            thinking || prefix.is_some(),
+            prefix.as_deref(),
+        );
+        let prompt = app.model.tk.encode(&prompt_text);
+        if prompt.len() + 1 >= app.max_ctx {
+            let _ = tx.send(Msg::Err(format!(
+                "the prompt is {} tokens; this model is served with {} positions",
+                prompt.len(),
+                app.max_ctx
+            )));
             return;
         }
-        sess.cfg.assistant_prefix = None;
+        let (etx, mut erx) = tokio::sync::mpsc::unbounded_channel::<Emission>();
+        let cfg = SlotCfg {
+            temperature: p.temperature,
+            top_p: p.top_p,
+            top_k: p.top_k,
+            min_p: p.min_p,
+            seed: p.seed,
+            max_tokens: budget_left.max(1),
+            stop: app.stop.clone(),
+            logprobs: p.logprobs,
+        };
+        if app
+            .jobs
+            .send(EngineMsg::Run(Box::new(Job {
+                prompt,
+                cfg,
+                out: etx,
+            })))
+            .is_err()
+        {
+            let _ = tx.send(Msg::Err("the engine is not running".into()));
+            return;
+        }
+        let mut replan = false;
+        let mut slot = 0;
+        while let Some(em) = erx.recv().await {
+            slot = em.slot;
+            if let Some(c) = &em.cost {
+                run.prompt_n += c.prefilled as u64;
+                run.cache_n += (c.prompt_tokens - c.prefilled) as u64;
+                run.prompt_ms += c.prefill_s * 1e3;
+                run.decode_ms += c.decode_s * 1e3;
+            }
+            if let Some(f) = &em.finish {
+                match f {
+                    Finish::Error(e) => {
+                        let _ = tx.send(Msg::Err(e.clone()));
+                        return;
+                    }
+                    Finish::Stop => finish = "stop",
+                    Finish::Length | Finish::Context => finish = "length",
+                }
+                if em.text.is_empty() {
+                    break;
+                }
+            }
+            // The think tags mark the span; they are not part of either text.
+            if Some(em.token) == app.think_open && pass == 0 {
+                run.in_think = true;
+                run.saw_open = true;
+                continue;
+            }
+            if Some(em.token) == app.think_close {
+                run.in_think = false;
+                continue;
+            }
+            if run.in_think {
+                run.reasoning_tokens += 1;
+                run.reasoning.push_str(&em.text);
+                budget_left = budget_left.saturating_sub(1);
+                if tx.send(Msg::Delta(em.text, true, em.logprob)).is_err() {
+                    break;
+                }
+                if p.budget.is_some_and(|b| run.reasoning_tokens as usize >= b) {
+                    run.budget_hit = true;
+                    replan = true;
+                    break;
+                }
+            } else {
+                run.content_tokens += 1;
+                budget_left = budget_left.saturating_sub(1);
+                if tx.send(Msg::Delta(em.text, false, em.logprob)).is_err() {
+                    break;
+                }
+            }
+            if em.finish.is_some() {
+                break;
+            }
+        }
+        if !replan {
+            break;
+        }
+        // Close the reasoning and continue the same turn. The cache of the pass just cancelled holds every
+        // reasoning token, and the engine's prefix store hands it to the continuation.
+        let _ = app.jobs.send(EngineMsg::Cancel(slot));
+        let closing = "\n</think>\n\n";
+        let _ = tx.send(Msg::Delta(closing.to_string(), true, 0.0));
+        prefix = Some(continuation_prefix(run.saw_open, &run.reasoning, closing));
+        run.in_think = false;
+        if budget_left == 0 {
+            finish = "length";
+            break;
+        }
     }
     let predicted_n = run.content_tokens + run.reasoning_tokens;
-    let finish = if !client_gone && predicted_n as usize >= p.max_tokens {
-        "length"
-    } else {
-        "stop"
-    };
     app.tokens.fetch_add(predicted_n, Ordering::SeqCst);
-    let (prompt_n, cache_n, bytes) = (run.prompt_n, run.cache_n, run.bytes);
+    let (entries, bytes, hits, saved) = *app
+        .engine
+        .prefix_full
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let (steps, rows) = (
+        app.engine.steps.load(Ordering::SeqCst),
+        app.engine.rows.load(Ordering::SeqCst),
+    );
+    // The decode time attributed to this request (its share of the steps it was in), not the wall clock: with
+    // other users in the same pass the wall clock includes their tokens too.
+    if run.predicted_ms == 0.0 {
+        run.predicted_ms = run.decode_ms;
+    }
+    let wall_ms = t0.elapsed().as_secs_f64() * 1e3;
     let _ = tx.send(Msg::Done {
         finish,
-        usage: json!({"prompt_tokens": prompt_n + cache_n, "completion_tokens": predicted_n, "total_tokens": prompt_n + cache_n + predicted_n}),
-        timings: json!({"prompt_n": prompt_n, "cache_n": cache_n, "prompt_ms": run.prompt_ms, "predicted_n": predicted_n, "predicted_ms": run.predicted_ms,
+        usage: json!({"prompt_tokens": run.prompt_n + run.cache_n, "completion_tokens": predicted_n, "total_tokens": run.prompt_n + run.cache_n + predicted_n}),
+        timings: json!({"prompt_n": run.prompt_n, "cache_n": run.cache_n, "prompt_ms": run.prompt_ms, "predicted_n": predicted_n, "predicted_ms": run.predicted_ms,
             "predicted_per_second": if run.predicted_ms > 0.0 { predicted_n as f64 / run.predicted_ms * 1e3 } else { 0.0 },
-            "smiley": {"bytes_moved": bytes, "bytes_per_token": bytes.checked_div(predicted_n).unwrap_or(0), "simd": app.simd, "budget_forced": run.budget_hit,
-                "prefix_store": run.prefix_store.map(|(n, b, h, saved)| json!({"entries": n, "mb": b >> 20, "restores": h, "positions_saved": saved})),
-                "phases_ms": {"names": ["matmul", "head", "attention", "other", "sampling", "drafting"], "decode": run.decode_phases_ms, "prefill": run.prefill_phases_ms}}}),
+            "smiley": {"simd": app.simd, "budget_forced": run.budget_hit, "wall_ms": wall_ms,
+                "phases_ms": {"names": ["matmul", "head", "attention", "other", "sampling", "drafting"], "decode": app.engine.phases(), "prefill": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]},
+                "concurrency": {"slots": app.max_slots, "active": app.engine.active.load(Ordering::SeqCst), "waiting": app.engine.waiting.load(Ordering::SeqCst),
+                    "decode_steps": steps, "decode_rows": rows,
+                    "rows_per_step": if steps > 0 { rows as f64 / steps as f64 } else { 0.0 }},
+                "prefix_store": {"entries": entries, "mb": bytes >> 20, "restores": hits, "positions_saved": saved}}}),
     });
 }
 
-/// Requests that may be queued behind the running one (the gateway sends at most one per model at a time).
 const MAX_WAITING: usize = 8;
 
 /// Reserve one slot of `cap` on a counter: false when it is full. A compare-exchange loop rather than
@@ -496,9 +674,9 @@ async fn chat(State(app): State<Arc<App>>, Json(body): Json<Value>) -> Response 
     let app2 = app.clone();
     let p = Arc::new(p);
     let p2 = p.clone();
-    tokio::task::spawn_blocking(move || {
+    tokio::spawn(async move {
         let _busy = busy; // released when the generation ends, also if it panics
-        generate(&app2, &p2, tx);
+        generate(&app2, &p2, tx).await;
     });
     let id = format!("chatcmpl-{}", app.requests.load(Ordering::SeqCst));
     let model = app.alias.clone();
