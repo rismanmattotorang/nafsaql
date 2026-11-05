@@ -34,6 +34,16 @@ fn model_path() -> PathBuf {
         })
 }
 
+/// The model, or None (with a note) when the file is absent, so the suite passes on a machine without it, as `engine.rs` does.
+fn available() -> Option<PathBuf> {
+    let p = model_path();
+    if !p.exists() {
+        eprintln!("\n  SKIPPED: needs the model at {p:?}\n");
+        return None;
+    }
+    Some(p)
+}
+
 fn serial() -> std::sync::MutexGuard<'static, ()> {
     static M: std::sync::Mutex<()> = std::sync::Mutex::new(());
     M.lock().unwrap_or_else(|e| e.into_inner())
@@ -61,7 +71,8 @@ fn tensor_f32(g: &Gguf, name: &str) -> (Vec<f32>, usize, usize) {
 /// in the reconstruction breaks the agreement (so the test can actually fail).
 #[test]
 fn a_lb1_forward_equals_explicit_reconstruction_on_real_weights() {
-    let g = Gguf::open(&model_path()).unwrap();
+    let Some(model) = available() else { return };
+    let g = Gguf::open(&model).unwrap();
     let (w, d_out, d_in) = tensor_f32(&g, "blk.0.attn_q.weight");
     let pool = Pool::new(4);
     let b = build_tensor("blk.0.attn_q.weight", w, d_out, d_in, 64, 2, 1, &pool);
@@ -148,7 +159,8 @@ fn a_lb1_forward_equals_explicit_reconstruction_on_real_weights() {
 /// the residual stage reduces the error further, and refinement never increases it.
 #[test]
 fn a_lb4_dual_svid_beats_random_and_stages_help_on_real_weights() {
-    let g = Gguf::open(&model_path()).unwrap();
+    let Some(model) = available() else { return };
+    let g = Gguf::open(&model).unwrap();
     let (w, d_out, d_in) = tensor_f32(&g, "blk.1.ffn_gate.weight");
     let pool = Pool::new(4);
     let r = 64;
@@ -169,6 +181,7 @@ fn a_lb4_dual_svid_beats_random_and_stages_help_on_real_weights() {
 /// A-LB5: the whole path — convert, sidecar pickup, session, telemetry.
 #[test]
 fn a_lb5_converted_model_chats_and_moves_far_fewer_bytes() {
+    let Some(model) = available() else { return };
     let _s = serial();
     let dir = std::env::temp_dir().join(format!("smiley-lbq-e2e-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
@@ -178,8 +191,8 @@ fn a_lb5_converted_model_chats_and_moves_far_fewer_bytes() {
     let dense_model = dir.join("dense.gguf");
     let _ = std::fs::remove_file(&lb_model);
     let _ = std::fs::remove_file(&dense_model);
-    std::fs::hard_link(model_path(), &lb_model).unwrap();
-    std::fs::hard_link(model_path(), &dense_model).unwrap();
+    std::fs::hard_link(&model, &lb_model).unwrap();
+    std::fs::hard_link(&model, &dense_model).unwrap();
 
     // Generous-but-quick settings: rank 64, both stages. Quality is exploratory
     // without QAT (plan §2) and is not gated here; bytes and correctness are.

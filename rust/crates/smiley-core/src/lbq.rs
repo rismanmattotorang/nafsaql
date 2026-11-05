@@ -135,6 +135,7 @@ pub fn source_stamp(path: &Path) -> Result<(u64, u64), String> {
 
 /// One mask vector per possible bit-byte: lane `i` is `0` when bit `i` is set
 /// (+1, leave the float alone) and `0x8000_0000` when clear (−1, flip its sign).
+#[cfg(target_arch = "x86_64")]
 const fn sign_lut() -> [[u32; 8]; 256] {
     let mut t = [[0u32; 8]; 256];
     let mut b = 0;
@@ -150,6 +151,7 @@ const fn sign_lut() -> [[u32; 8]; 256] {
     }
     t
 }
+#[cfg(target_arch = "x86_64")]
 static SIGN_LUT: [[u32; 8]; 256] = sign_lut();
 
 /// `Σ_i ±x_i` with the sign from bit `i` (LSB-first; 1 ⇒ +, 0 ⇒ −).
