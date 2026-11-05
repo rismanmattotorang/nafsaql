@@ -19,14 +19,17 @@
     clippy::chunks_exact_to_as_chunks
 )]
 
+pub mod attn;
 pub mod dspark;
 pub mod gguf;
 pub mod kv;
+pub mod lbq;
 pub mod model;
 pub mod pool;
 pub mod prefix;
 pub mod quant;
 pub mod safetensors;
+pub mod sample;
 pub mod serve;
 pub mod session;
 #[cfg(target_arch = "x86_64")]
@@ -35,6 +38,7 @@ pub mod suffix;
 pub mod telem;
 pub mod template;
 pub mod tokenizer;
+pub mod vmath;
 
 pub use gguf::{Format, Gguf};
 pub use session::{Session, SessionCfg};

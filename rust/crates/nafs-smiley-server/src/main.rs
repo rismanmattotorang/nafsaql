@@ -69,6 +69,11 @@ struct Args {
     /// (about seven rows here) another row adds no throughput and every user waits longer for its own tokens.
     #[arg(long, default_value_t = smiley_core::serve::DEFAULT_MAX_SLOTS)]
     slots: usize,
+    /// Run the projections a LittleBit sidecar (`<model>.gguf.slb`, built by `lb_convert`) covers from it. Off by
+    /// default: post-training sidecars measured here produce wrong answers (docs/decisions/013), so a stale one
+    /// beside a model must not switch the weights silently. A missing or corrupt sidecar refuses to start.
+    #[arg(long, default_value_t = false)]
+    littlebit: bool,
 }
 
 struct App {
@@ -91,6 +96,8 @@ struct App {
     tokens: AtomicU64,
     started: Instant,
     simd: &'static str,
+    /// "dense" or "littlebit", reported in every response's timings.
+    weights: &'static str,
 }
 
 #[tokio::main]
@@ -122,7 +129,7 @@ async fn main() {
             std::process::exit(2);
         }
     };
-    let model = match smiley_core::model::keep::open(&a.model) {
+    let model = match smiley_core::model::keep::open_with(&a.model, a.littlebit) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("cannot open {}: {e}", a.model.display());
@@ -167,12 +174,21 @@ async fn main() {
         tokens: AtomicU64::new(0),
         started: Instant::now(),
         simd: smiley_core::simd_name(),
+        weights: if model.lb_summary().is_some() {
+            "littlebit"
+        } else {
+            "dense"
+        },
         jobs,
         engine: shared,
         model,
     });
+    let weights = match app.model.lb_summary() {
+        Some((n, bytes)) => format!("LittleBit ({n} projections, {} MB of factors)", bytes >> 20),
+        None => "dense".to_string(),
+    };
     tracing::info!(
-        "smiley-core: {} loaded in {:.1} s, {} threads, {}, ctx {}, {} slots ({} MB of cache each), think tokens {:?}/{:?}",
+        "smiley-core: {} loaded in {:.1} s, {} threads, {}, ctx {}, {} slots ({} MB of cache each), {} weights, think tokens {:?}/{:?}",
         a.model.display(),
         t0.elapsed().as_secs_f64(),
         threads,
@@ -180,6 +196,7 @@ async fn main() {
         max_ctx,
         a.slots,
         cache_mb,
+        weights,
         app.think_open,
         app.think_close
     );
@@ -201,7 +218,7 @@ async fn health() -> Json<Value> {
 
 async fn models(State(s): State<Arc<App>>) -> Json<Value> {
     Json(
-        json!({"object": "list", "data": [{"id": s.alias, "object": "model", "owned_by": "smiley-core"}]}),
+        json!({"object": "list", "data": [{"id": s.alias, "object": "model", "owned_by": "smiley-core", "weights": s.weights}]}),
     )
 }
 
@@ -622,7 +639,7 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
         usage: json!({"prompt_tokens": run.prompt_n + run.cache_n, "completion_tokens": predicted_n, "total_tokens": run.prompt_n + run.cache_n + predicted_n}),
         timings: json!({"prompt_n": run.prompt_n, "cache_n": run.cache_n, "prompt_ms": run.prompt_ms, "predicted_n": predicted_n, "predicted_ms": run.predicted_ms,
             "predicted_per_second": if run.predicted_ms > 0.0 { predicted_n as f64 / run.predicted_ms * 1e3 } else { 0.0 },
-            "smiley": {"simd": app.simd, "budget_forced": run.budget_hit, "wall_ms": wall_ms,
+            "smiley": {"simd": app.simd, "weights": app.weights, "budget_forced": run.budget_hit, "wall_ms": wall_ms,
                 "phases_ms": {"names": ["matmul", "head", "attention", "other", "sampling", "drafting"], "decode": app.engine.phases(), "prefill": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]},
                 "concurrency": {"slots": app.max_slots, "active": app.engine.active.load(Ordering::SeqCst), "waiting": app.engine.waiting.load(Ordering::SeqCst),
                     "decode_steps": steps, "decode_rows": rows,

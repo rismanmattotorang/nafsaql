@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-11-03T02:04:42Z",
+  "reviewed_at": "2026-11-05T00:48:45Z",
   "base": "http://127.0.0.1:8080",
   "tests": [
     {
@@ -135,7 +135,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Memory bomb (3 GB)",
       "pass": true,
-      "detail": "passed=False in 0.8s",
+      "detail": "passed=False in 0.7s",
       "severity_if_failed": "high"
     },
     {

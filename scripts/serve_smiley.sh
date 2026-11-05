@@ -5,7 +5,8 @@
 # Both servers run on the same four cores as the llama-servers; switch the gateway with POST /v1/system/backend
 # {"name": "smiley"} (the System page), which warms the pair first. SLOTS (users served at once, Phase 18),
 # THREADS, S1_MODEL, S2_MODEL, KV (f16|i8),
-# DSPARK (a drafter directory for System 2, greedy requests only) override the defaults.
+# DSPARK (a drafter directory for System 2, greedy requests only) override the defaults. LITTLEBIT=1 runs the
+# projections a <model>.gguf.slb sidecar covers from it (experimental: post-training sidecars are not accurate).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BIN=${SMILEY_BIN:-rust/target/release/nafs-smiley-server}
@@ -18,7 +19,7 @@ start_one() { # name port model ctx extra...
   if [ -f "$RUN/smiley-$name.pid" ] && kill -0 "$(cat "$RUN/smiley-$name.pid")" 2>/dev/null; then echo "smiley $name already running (pid $(cat $RUN/smiley-$name.pid))"; return; fi
   [ -x "$BIN" ] || (cd rust && cargo build --release -p nafs-smiley-server)
   [ -f "$model" ] || { echo "missing $model: run scripts/fetch_models.sh"; exit 1; }
-  nohup "$BIN" -m "$model" --alias "$name" -t "$THREADS" -c "$ctx" --port "$port" --kv "${KV:-f16}" --slots "${SLOTS:-4}" "$@" > "logs/smiley-$name.log" 2>&1 &
+  nohup "$BIN" -m "$model" --alias "$name" -t "$THREADS" -c "$ctx" --port "$port" --kv "${KV:-f16}" --slots "${SLOTS:-4}" ${LITTLEBIT:+--littlebit} "$@" > "logs/smiley-$name.log" 2>&1 &
   echo $! > "$RUN/smiley-$name.pid"; echo "started smiley $name on :$port (pid $!)"
 }
 case "${1:-status}" in

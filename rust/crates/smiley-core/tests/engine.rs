@@ -223,8 +223,101 @@ fn speculation_is_output_neutral() {
          token being predicted",
         100.0 * rate
     );
+    // The second turn reads the first turn's context: a draft accepted past the
+    // end-of-turn token used to leave tokens in it that plain decoding never fed.
+    let (plain2, _) = a
+        .generate("Now list them in reverse order.", |_| {})
+        .expect("generate");
+    let (spec2, _) = b
+        .generate("Now list them in reverse order.", |_| {})
+        .expect("generate");
+    assert_eq!(
+        plain2, spec2,
+        "speculation left a different context for the next turn"
+    );
     eprintln!(
         "A6: identical output, {}/{} drafts accepted",
+        tl.accepted(),
+        tl.drafted()
+    );
+}
+
+/// At the context limit a draft is shortened, never the turn: the speculative answer
+/// runs exactly as far as the plain one (both stop when the cache is full).
+#[test]
+fn speculation_is_output_neutral_at_the_context_limit() {
+    let _serial = serial();
+    let prompt = "Repeat this list exactly, unchanged: Aqua, Glycerin, Niacinamide, \
+                  Sodium Hyaluronate, Tocopherol, Panthenol.";
+    // The prompt is ~60 tokens with the template and the full answer ~30 (89 in
+    // all); 80 positions end the turn on the limit, mid-copy, with drafts in flight.
+    let cfg = |spec: bool| SessionCfg {
+        max_ctx: 80,
+        max_tokens: 200,
+        speculate: spec,
+        ..Default::default()
+    };
+    let Some(mut a) = open(cfg(false)) else {
+        return;
+    };
+    let (plain, tp) = a.generate(prompt, |_| {}).expect("generate");
+    let mut b = open(cfg(true)).unwrap();
+    let (spec, ts) = b.generate(prompt, |_| {}).expect("generate");
+    assert_eq!(
+        plain, spec,
+        "speculation changed the output at the context limit"
+    );
+    assert_eq!(tp.ctx_used, ts.ctx_used);
+    assert_eq!(
+        tp.ctx_used, 80,
+        "the plain turn did not use the whole context"
+    );
+    assert!(
+        ts.drafted() > 0,
+        "nothing was drafted, so the limit path was not exercised"
+    );
+}
+
+/// **A6 when sampling.** With position-keyed randomness (`sample.rs`), speculation
+/// is exact at a non-zero temperature too: the sampled reply is the same sequence
+/// with or without it — and it does engage, where it used to be switched off.
+#[test]
+fn sampled_speculation_is_output_neutral() {
+    let _serial = serial();
+    let prompt = "Repeat this list exactly, unchanged: Aqua, Glycerin, Niacinamide, \
+                  Sodium Hyaluronate, Tocopherol, Panthenol.";
+    let cfg = |spec: bool| SessionCfg {
+        max_tokens: 48,
+        speculate: spec,
+        temperature: 0.8,
+        top_p: 0.95,
+        seed: 1234,
+        ..Default::default()
+    };
+    let Some(mut a) = open(cfg(false)) else {
+        return;
+    };
+    let (plain, _) = a.generate(prompt, |_| {}).expect("generate");
+    let mut b = open(cfg(true)).unwrap();
+    let (spec, tl) = b.generate(prompt, |_| {}).expect("generate");
+    assert_eq!(plain, spec, "speculation altered a sampled reply");
+    assert!(
+        tl.drafted() > 0,
+        "speculation did not engage at temperature 0.8"
+    );
+    // A second turn draws fresh randomness (the turn is in the key) and stays exact.
+    let (plain2, _) = a
+        .generate("Now list them in reverse order.", |_| {})
+        .expect("generate");
+    let (spec2, _) = b
+        .generate("Now list them in reverse order.", |_| {})
+        .expect("generate");
+    assert_eq!(
+        plain2, spec2,
+        "speculation altered the second sampled reply"
+    );
+    eprintln!(
+        "A6 sampled: identical output, {}/{} drafts accepted",
         tl.accepted(),
         tl.drafted()
     );

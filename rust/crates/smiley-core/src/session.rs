@@ -19,17 +19,19 @@
 //! falls to near zero and the mechanism costs one extra batched forward per step —
 //! which is why `acceptance_rate` is reported rather than assumed.
 //!
-//! Verification is exact: a drafted token is accepted only when it equals the
-//! argmax the model would have produced anyway, so greedy-with-speculation emits
-//! *precisely* the greedy sequence (acceptance criterion A6). Because that guarantee
-//! only holds for argmax, speculation is disabled automatically when the temperature
-//! is non-zero rather than quietly changing the sampling distribution.
+//! Verification is exact: a drafted token is accepted only when it equals the token
+//! the model would have produced at that position anyway, so decoding with
+//! speculation emits *precisely* the sequence decoding without it would (acceptance
+//! criterion A6). At temperature 0 that token is the argmax. At any other
+//! temperature it is a pure function of the logits and a key derived from the
+//! position (`sample.rs`, after uzu), so the same guarantee holds when sampling and
+//! speculation stays on — it used to be switched off for every non-greedy chat.
 
 use crate::dspark::Drafter;
-use crate::gguf::Gguf;
 use crate::kv::{KvCache, KvPrec};
 use crate::model::{Model, State, StepStats};
 use crate::pool::Pool;
+use crate::sample;
 use crate::suffix::{Cell, SuffixIndex};
 use crate::telem::{Machine, TokenTelem, TurnTelem};
 use crate::template::{today_llama3, Template};
@@ -46,7 +48,7 @@ const PREFILL_CHUNK: usize = 64;
 pub struct SessionCfg {
     pub max_ctx: usize,
     pub kv_prec: KvPrec,
-    /// 0 means greedy. Speculation is only enabled at 0 (see module docs).
+    /// 0 means greedy. Speculation is exact at any temperature (see module docs).
     pub temperature: f32,
     pub top_p: f32,
     // nafs-aql: keep only the `top_k` most probable tokens (0 = all) and those with at least `min_p` times the
@@ -78,6 +80,9 @@ pub struct SessionCfg {
     // is off). A continuation: the server closes a reasoning span at its budget by replanning
     // the turn with the reasoning so far plus `</think>` here, and the cache prefix is reused.
     pub assistant_prefix: Option<String>,
+    /// Run the projections a LittleBit sidecar (`<model>.slb`) covers from it. Off
+    /// loads the model dense even when a sidecar is present.
+    pub littlebit: bool,
 }
 
 impl Default for SessionCfg {
@@ -100,6 +105,7 @@ impl Default for SessionCfg {
             dspark: None,
             dspark_max: 3,
             assistant_prefix: None,
+            littlebit: true,
         }
     }
 }
@@ -115,7 +121,10 @@ pub struct Session {
     pub machine: Machine,
     /// Every token fed to the model so far. Also the corpus prompt-lookup searches.
     ctx: Vec<u32>,
-    rng: u64,
+    /// The sampling seed, and the turn counter mixed into every position's key, so a
+    /// regenerated reply draws fresh randomness while each draw stays reproducible.
+    seed: u64,
+    turn: u64,
     started: bool,
     /// The chat template the file declares, and every token id that ends a turn
     /// under it (plus the tokenizer's own eos).
@@ -134,7 +143,7 @@ pub struct Session {
     /// and the rest re-encoded when the context fills, instead of failing the turn.
     history: Vec<(String, String)>,
     /// Scratch for nucleus sampling, reused so a sampled token allocates nothing.
-    cand: Vec<(u32, f32)>,
+    samp: sample::Scratch,
     /// The attached DSpark drafter, fed the target's tapped hidden states.
     pub dspark: Option<Drafter>,
     /// Measured verify cost per batch width, for choosing how much to verify.
@@ -256,102 +265,6 @@ fn answer_reserve(cfg: &SessionCfg) -> usize {
     cfg.max_tokens.min(cfg.max_ctx / 4).max(16)
 }
 
-/// Argmax, or temperature + nucleus sampling, over one row of logits.
-///
-/// A free function over borrowed logits: the method version needed `&mut self` for
-/// the generator, so every call copied a 49 152-float row (192 KB) out of the
-/// scratch first. Nucleus sampling no longer sorts the whole vocabulary either: the
-/// softmax is summed over all of it (exactness needs the full normaliser), but only
-/// the most probable candidates are sorted, and the full sort is the fallback when
-/// they do not reach `top_p` — which keeps the distribution exactly the specified one.
-pub(crate) fn sample_row(
-    logits: &[f32],
-    temperature: f32,
-    top_p: f32,
-    top_k: usize,
-    min_p: f32,
-    rng: &mut u64,
-    cand: &mut Vec<(u32, f32)>,
-) -> u32 {
-    if temperature <= 0.0 {
-        let mut best = 0usize;
-        let mut bv = f32::NEG_INFINITY;
-        for (i, &v) in logits.iter().enumerate() {
-            if v > bv {
-                bv = v;
-                best = i;
-            }
-        }
-        return best as u32;
-    }
-    let t = temperature;
-    let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    cand.clear();
-    let mut sum = 0.0f32;
-    for (i, &v) in logits.iter().enumerate() {
-        let e = ((v - max) / t).exp();
-        sum += e;
-        cand.push((i as u32, e));
-    }
-    // Most of the mass is almost always in the first few hundred tokens: partition
-    // those to the front and sort only them. When they do not reach `top_p`, sort
-    // everything — rare, and it keeps the nucleus exactly the specified one.
-    const FAST_K: usize = 512;
-    let desc = |a: &(u32, f32), b: &(u32, f32)| b.1.total_cmp(&a.1);
-    let mut k = FAST_K.min(cand.len());
-    if k < cand.len() {
-        cand.select_nth_unstable_by(k - 1, desc);
-    }
-    cand[..k].sort_unstable_by(desc);
-    if cand[..k].iter().map(|e| e.1).sum::<f32>() / sum < top_p && k < cand.len() {
-        cand.sort_unstable_by(desc);
-        k = cand.len();
-    }
-    // nafs-aql: top-k first (llama.cpp's sampler order: top-k, top-p, min-p); the nucleus is then taken over
-    // the renormalised survivors. Only the sorted head is cut, so k above FAST_K means no cut.
-    let mut prefix = &cand[..k];
-    if top_k > 0 && top_k < prefix.len() {
-        prefix = &prefix[..top_k];
-        sum = prefix.iter().map(|e| e.1).sum();
-    }
-    // Nucleus: the smallest prefix whose mass reaches top_p.
-    let mut cum = 0.0f32;
-    let mut keep = prefix.len();
-    for (i, e) in prefix.iter().enumerate() {
-        cum += e.1 / sum;
-        if cum >= top_p {
-            keep = i + 1;
-            break;
-        }
-    }
-    // nafs-aql: min-p on the probabilities at temperature 1, as llama.cpp (it applies temperature last):
-    // logit - max >= ln(min_p)  <=>  e >= min_p^(1/t) * e_max for e = exp((logit - max) / t).
-    if min_p > 0.0 {
-        let floor = min_p.powf(1.0 / t) * prefix[0].1;
-        keep = prefix[..keep]
-            .iter()
-            .take_while(|e| e.1 >= floor)
-            .count()
-            .max(1);
-    }
-    let p = &prefix[..keep];
-    let total: f32 = p.iter().map(|e| e.1).sum();
-    let mut x = *rng;
-    x ^= x << 13;
-    x ^= x >> 7;
-    x ^= x << 17;
-    *rng = x;
-    let r = (x >> 11) as f32 / (1u64 << 53) as f32 * total;
-    let mut acc = 0.0f32;
-    for e in p {
-        acc += e.1;
-        if r <= acc {
-            return e.0;
-        }
-    }
-    p.last().map(|e| e.0).unwrap_or(0)
-}
-
 /// What the caller learns about each emitted token.
 pub struct Emitted<'a> {
     pub id: u32,
@@ -372,8 +285,10 @@ pub(crate) fn logprob_of(logits: &[f32], id: u32) -> f32 {
 
 impl Session {
     pub fn open(path: &Path, cfg: SessionCfg) -> Result<Session, String> {
-        crate::check_compatible(&Gguf::open(path)?)?;
-        let model = crate::model::keep::open(path)?;
+        // `keep::open_with` checks compatibility on the one parse it does (and not at
+        // all when the kept model is reused): the vocabulary and merges are ~100K
+        // strings, and parsing them twice per session open was pure waste.
+        let model = crate::model::keep::open_with(path, cfg.littlebit)?;
         let c = model.cfg;
 
         let max_ctx = cfg.max_ctx.clamp(32, c.ctx_train);
@@ -393,6 +308,12 @@ impl Session {
         let logit_rows = cfg.draft_len.max(dspark_k) + 1;
         let max_batch = PREFILL_CHUNK.max(logit_rows);
         let kv = KvCache::new(cfg.kv_prec, c.n_layer, c.n_kv_head, c.head_dim, max_ctx);
+        // The int8 rotation is measured per family: see `KvCache::without_rotation`.
+        let kv = if c.arch == crate::model::Arch::Qwen2 {
+            kv.without_rotation()
+        } else {
+            kv
+        };
         let mut st = State::new(
             &c,
             max_batch,
@@ -401,6 +322,10 @@ impl Session {
             threads,
             model.rope_factors.as_deref(),
         );
+        {
+            let (lx, lt) = model.lb_scratch(max_batch);
+            st.set_lb_scratch(lx, lt);
+        }
         // Probe with the same width the engine will actually run at: a bandwidth
         // figure measured single-threaded is not the denominator a four-thread
         // decode step should be judged against.
@@ -431,7 +356,8 @@ impl Session {
             },
             machine,
             ctx: Vec::new(),
-            rng: seed,
+            seed,
+            turn: 0,
             started: false,
             template,
             stops,
@@ -441,7 +367,7 @@ impl Session {
             spec_misses: 0,
             steps: 0,
             history: Vec::new(),
-            cand: Vec::new(),
+            samp: sample::Scratch::default(),
             dspark,
             vcost: VerifyCost::default(),
             park: 0,
@@ -584,7 +510,7 @@ impl Session {
     // nafs-aql: re-seed the sampler for the next turn (`seed` is otherwise read once at open).
     pub fn reseed(&mut self, seed: u64) {
         self.cfg.seed = seed;
-        self.rng = seed.max(1).wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
+        self.seed = if seed == 0 { self.seed } else { seed };
     }
 
     pub fn exchanges(&self) -> usize {
@@ -790,6 +716,7 @@ impl Session {
     ) -> Result<(String, TurnTelem), String> {
         let n_vocab = self.model.cfg.n_vocab;
         let turn_start = Instant::now();
+        self.turn += 1;
         let mut telem = TurnTelem {
             ctx_max: self.cfg.max_ctx,
             ..Default::default()
@@ -801,6 +728,7 @@ impl Session {
         let (ptoks, dropped) = self.plan_prompt(user)?;
         telem.dropped_exchanges = dropped;
         telem.prefix_reused = self.prefix_reused;
+        let started_before = self.started;
         self.started = true;
         telem.prompt_tokens = ptoks.len();
 
@@ -811,11 +739,15 @@ impl Session {
             if stopped(cancel) {
                 // Nothing of this turn is in the conversation yet; roll the cache back
                 // to where the turn started so the next message sees a clean context.
+                // `started` must roll back too — otherwise the next turn's prompt skips
+                // the system block (it only runs once per `started == false`), starting
+                // mid-conversation with no BOS token even though `ctx` is still empty.
                 self.kv.truncate(self.ctx.len());
                 let keep = self.ctx.len();
                 if let Some(d) = &mut self.dspark {
                     d.truncate(keep);
                 }
+                self.started = started_before;
                 telem.cancelled = true;
                 telem.prefill_s = t0.elapsed().as_secs_f64();
                 telem.wall_s = turn_start.elapsed().as_secs_f64();
@@ -861,25 +793,25 @@ impl Session {
         let mut out = String::new();
         let mut utf8 = Utf8Stream::default();
         let ts = Instant::now();
+        // The first output token lands at position `ctx.len()`.
         let mut next = {
-            let Session {
-                st, cfg, rng, cand, ..
-            } = self;
-            sample_row(
+            let key = sample::position_key(self.seed, self.turn, self.ctx.len());
+            let Session { st, cfg, samp, .. } = self;
+            sample::sample_filtered(
                 &st.logits[..n_vocab],
                 cfg.temperature,
                 cfg.top_p,
                 cfg.top_k,
                 cfg.min_p,
-                rng,
-                cand,
+                key,
+                samp,
             )
         };
         telem.prefill_phases.sample_s += ts.elapsed().as_secs_f64();
         telem.prefill_s = t0.elapsed().as_secs_f64();
         let trace = std::env::var_os("SMILEY_CORE_TRACE").is_some();
-        let speculating =
-            (self.cfg.speculate || self.dspark.is_some()) && self.cfg.temperature <= 0.0;
+        // Lossless at every temperature: see the module docs and `sample.rs`.
+        let speculating = self.cfg.speculate || self.dspark.is_some();
         let fixed_k: Option<usize> = std::env::var("SMILEY_DSPARK_K")
             .ok()
             .and_then(|v| v.parse().ok());
@@ -930,16 +862,38 @@ impl Session {
             if drafting {
                 self.flush_pending();
             }
-            let drafted = if drafting {
+            let mut drafted = if drafting {
                 let kmax = self.cfg.dspark_max;
+                // Draft `i` lands at position `ctx.len() + 1 + i`: draw it with that
+                // position's key, as the target will (see `Drafter::draft_with`).
+                let (temp, top_p, top_k, min_p, seed, turn, base) = (
+                    self.cfg.temperature,
+                    self.cfg.top_p,
+                    self.cfg.top_k,
+                    self.cfg.min_p,
+                    self.seed,
+                    self.turn,
+                    self.ctx.len(),
+                );
                 let Session {
                     dspark,
                     pool,
                     vcost,
+                    samp,
                     ..
                 } = self;
                 let d = dspark.as_mut().unwrap();
-                let (toks, conf) = d.draft(next, kmax, pool);
+                let (toks, conf) = d.draft_with(next, kmax, pool, |i, row| {
+                    sample::sample_filtered(
+                        row,
+                        temp,
+                        top_p,
+                        top_k,
+                        min_p,
+                        sample::position_key(seed, turn, base + 1 + i),
+                        samp,
+                    )
+                });
                 let k = match fixed_k {
                     Some(k) => k.min(toks.len()),
                     None if conf.len() == toks.len() && !conf.is_empty() => {
@@ -959,13 +913,22 @@ impl Session {
             };
             telem.decode_phases.draft_s += td.elapsed().as_secs_f64();
             self.steps += 1;
+            // `forward` accepts a batch that ends exactly at the context limit. Near
+            // it, the draft is shortened — never the turn: ending the turn because
+            // `1 + k` would not fit, when a shorter draft (or a plain step) would,
+            // made a speculative answer shorter than the plain one (A6).
+            let start = self.ctx.len();
+            let room = self.cfg.max_ctx.saturating_sub(start);
+            if room == 0 {
+                break;
+            }
+            if drafted.len() >= room {
+                drafted.truncate(room - 1);
+                self.draft_cells.truncate(drafted.len());
+            }
             let mut batch = Vec::with_capacity(drafted.len() + 1);
             batch.push(next);
             batch.extend_from_slice(&drafted);
-            let start = self.ctx.len();
-            if start + batch.len() >= self.cfg.max_ctx {
-                break;
-            }
             let want: Vec<usize> = (0..batch.len()).collect();
             let tv = Instant::now();
             {
@@ -989,18 +952,19 @@ impl Session {
             let mut emitted = Vec::with_capacity(batch.len());
             let mut accepted = 0usize;
             for j in 0..batch.len() {
+                // Row `j` predicts the token at position `start + j + 1` — the same
+                // key sequential decoding would have used there.
                 let pick = {
-                    let Session {
-                        st, cfg, rng, cand, ..
-                    } = self;
-                    sample_row(
+                    let key = sample::position_key(self.seed, self.turn, start + j + 1);
+                    let Session { st, cfg, samp, .. } = self;
+                    sample::sample_filtered(
                         st.logits_row(j, n_vocab),
                         cfg.temperature,
                         cfg.top_p,
                         cfg.top_k,
                         cfg.min_p,
-                        rng,
-                        cand,
+                        key,
+                        samp,
                     )
                 };
                 if trace {
@@ -1035,8 +999,32 @@ impl Session {
             // Positions to keep: `next` at `start`, plus each accepted draft. The
             // rejected tail was written to the cache before verification and must not
             // remain visible to the next step.
+            //
+            // Nor may an accepted draft *past the end of the turn*. Sequential decoding
+            // feeds every emitted token except the turn's last — the end-of-turn token,
+            // or the one that reaches `max_tokens` — so a verification pass that accepted
+            // the end-of-turn token and kept going (the suffix drafter proposes it
+            // readily: ChatML's `<|im_end|>` closes the system turn too) used to commit
+            // tokens nobody saw, and the next turn answered a different conversation
+            // than decoding without speculation would have. `commit` stops there.
+            let commit = {
+                let mut cut = accepted;
+                let mut s = step;
+                for (i, &id) in emitted.iter().enumerate().take(accepted + 1) {
+                    if ends(id) {
+                        cut = cut.min(i);
+                        break;
+                    }
+                    s += 1;
+                    if s >= self.cfg.max_tokens as u32 {
+                        cut = cut.min(i);
+                        break;
+                    }
+                }
+                cut
+            };
             self.ctx.push(next);
-            for &d in drafted.iter().take(accepted) {
+            for &d in drafted.iter().take(commit) {
                 self.ctx.push(d);
             }
             self.kv.truncate(self.ctx.len());
@@ -1049,7 +1037,7 @@ impl Session {
                     self.pending_start = start;
                 }
                 self.pending_taps
-                    .extend_from_slice(&self.st.tap[..(1 + accepted) * w]);
+                    .extend_from_slice(&self.st.tap[..(1 + commit) * w]);
                 if drafting {
                     let tc = Instant::now();
                     self.flush_pending();
@@ -1213,31 +1201,6 @@ fn dump_draft(anchor: u32, toks: &[u32], conf: &[f32], k: usize) {
 
 #[cfg(test)]
 mod tests {
-
-    // nafs-aql: top-k and min-p cut the tail before sampling.
-    #[test]
-    fn top_k_and_min_p_cut_the_tail() {
-        // Four tokens at temperature 1: probabilities proportional to e^3, e^2, e^1, e^0 (token 0 is likeliest).
-        let logits = [3.0f32, 2.0, 1.0, 0.0];
-        let mut cand = Vec::new();
-        let mut draw = |top_k, min_p, top_p, seed: u64| {
-            // Seeds are scrambled as `Session::reseed` does: xorshift from a tiny seed starts with tiny draws.
-            let mut rng = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1;
-            super::sample_row(&logits, 1.0, top_p, top_k, min_p, &mut rng, &mut cand)
-        };
-        // top-k 1 is greedy whatever the seed.
-        assert!((1..200u64).all(|s| draw(1, 0.0, 1.0, s) == 0));
-        // top-k 2 never returns the two least likely tokens, and does return both of the others.
-        let picks: Vec<u32> = (1..400u64).map(|s| draw(2, 0.0, 1.0, s)).collect();
-        assert!(picks.iter().all(|&t| t < 2));
-        assert!(picks.contains(&0) && picks.contains(&1));
-        // min-p 0.3 drops tokens below 0.3 x the best probability: e^-1 = 0.37 stays, e^-2 = 0.14 goes.
-        let picks: Vec<u32> = (1..400u64).map(|s| draw(0, 0.3, 1.0, s)).collect();
-        assert!(picks.iter().all(|&t| t < 2));
-        // Off by default: with no cut every token can be drawn.
-        let picks: Vec<u32> = (1..2000u64).map(|s| draw(0, 0.0, 1.0, s)).collect();
-        assert!((0..4).all(|t| picks.contains(&t)));
-    }
 
     #[test]
     fn choose_k_prices_expected_tokens_against_verify_cost() {

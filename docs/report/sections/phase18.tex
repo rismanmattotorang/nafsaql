@@ -1,0 +1,52 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 18 -- Smiley Core serves several users in one weight pass
+% ---------------------------------------------------------------------------
+\section{Phase 18: Several Users in One Pass over the Weights}
+\label{sec:phase18}
+
+Phase~18 (3 November 2026) turns Smiley Core, the default engine since Phase~15, from a one-stream engine into one that serves several users at
+once. The decision record is \texttt{docs/decisions/012-multiuser-engine.md} and the research note \texttt{docs/research/smiley\_multiuser.md}. The
+measurements are from the shared reference machine, each engine alone, two rounds, long answers.
+
+\subsection{Why it pays on four cores}
+
+A decode step reads every weight once, so serving $n$ users one after another reads the model $n$ times where one pass would read it once. On this
+machine decode is bound by memory (19.5\,GB/s measured) and not by arithmetic (about 460\,GFLOP/s), and Q4\_K needs 0.56 bytes per weight, so the
+roofline ridge sits near seven rows: up to about seven users, another row costs almost no extra time. The design follows vLLM's serving
+core~\cite{kwon2023pagedattention} in what applies at this size: a scheduler that admits requests into slots and mixes work per step, chunked prefill
+so a long prompt does not stall the others, and a prefix cache shared by every slot.
+
+\subsection{What was built}
+
+The forward pass now takes a position and a cache \emph{per row}, so rows belonging to different users share one read of the weights while each
+attends only to its own history. Attention runs one row at a time per user, so a user's logits are bit-identical to a solo run's; nothing is
+approximated to gain the sharing. A slot scheduler runs either one chunk of one prompt or one token for every ready user in a step, never both. A
+prefix store shared by all slots lets a finished request's cache serve the next user who begins the same way (the system prompt every request of a
+deployment sends, the transcript a code agent extends). The server owns one engine thread instead of a session behind a mutex.
+
+\subsection{Measured}
+
+\begin{table}[h]
+\centering
+\caption{Decode throughput (tokens per second, all users together), each engine alone on the machine.}
+\label{tab:phase18}
+\begin{tabular}{lrrr}
+\toprule
+Users & 1 & 2 & 4 \\
+\midrule
+Smiley Core & 14.2 & 20.2 & 24.9 \\
+llama.cpp (slots) & 14.4 & 14.4 & 32.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+At one user the engines are level; at two Smiley Core is $1.40\times$ ahead; at four llama.cpp is ahead ($1.30\times$). The engine primitive alone
+gives $1.56\times$, $2.57\times$ and $2.27\times$ at 2, 4 and 8 rows, the knee the roofline predicts. \textbf{Every user's text was identical to what
+they would have been given alone, at every concurrency} (4 of 4 at four users); llama.cpp's was not (0 of 4). Two defects were caught by the tests during the work: a slot whose restored prefix left nothing to prefill fed the wrong first token,
+and a finished cache was stored under the wrong token sequence.
+
+\subsection{What is not claimed}
+
+The gateway still sends one request at a time: it reads \texttt{max\_in\_flight} as the width of an $n$-choice request as well, and this server refuses
+$n>1$, so the concurrency is available to the engine and not yet used by the gateway. Parity with vLLM is not claimed; vLLM does not run on this
+machine.

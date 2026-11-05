@@ -264,9 +264,10 @@ impl Pool {
 
     /// Run `f(worker, n)` on every worker and return once all have finished.
     ///
-    /// A panic inside `f` on the calling thread unwinds after the workers finish; a
-    /// panic on a spawned worker would leave `remaining` undecremented, so jobs are
-    /// expected not to panic (they are kernels over validated bounds).
+    /// A panic in any share — the caller's or a worker's — is re-raised on the
+    /// caller only after every worker has finished with `f`: `f` and whatever it
+    /// borrows live on the caller's stack, so unwinding earlier would free them under
+    /// the workers (and leave `remaining` counting into the next job).
     pub fn run<F: Fn(usize, usize) + Sync>(&self, f: F) {
         if self.n == 1 {
             f(0, 1);
@@ -288,7 +289,7 @@ impl Pool {
             }
         }
         // The caller takes share 0 rather than blocking immediately.
-        f(0, self.n);
+        let mine = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(0, self.n)));
         // Spin for the stragglers: the remaining work is microseconds, and sleeping
         // here would hand the wake-up latency straight back.
         let (t0, mut spins) = (Instant::now(), 0u32);
@@ -309,7 +310,11 @@ impl Pool {
             }
         }
         let _ = spins;
-        if self.inner.poisoned.swap(false, Ordering::AcqRel) {
+        let poisoned = self.inner.poisoned.swap(false, Ordering::AcqRel);
+        if let Err(p) = mine {
+            std::panic::resume_unwind(p);
+        }
+        if poisoned {
             panic!("a pool worker panicked while running a job");
         }
     }
@@ -341,6 +346,35 @@ pub fn share(total: usize, w: usize, n: usize) -> (usize, usize) {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_caller_panic_waits_for_the_workers_and_the_pool_survives() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let pool = Pool::new(4);
+        let touched = AtomicUsize::new(0);
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            pool.run(|w, _| {
+                if w == 0 {
+                    panic!("caller share");
+                }
+                // Workers outlive the caller's panic; their captured state must too.
+                std::thread::sleep(std::time::Duration::from_millis(5));
+                touched.fetch_add(1, Ordering::SeqCst);
+            })
+        }));
+        assert!(r.is_err(), "the caller's panic was swallowed");
+        assert_eq!(
+            touched.load(Ordering::SeqCst),
+            3,
+            "run returned before the workers finished"
+        );
+        // The next job starts from a clean count.
+        let n = AtomicUsize::new(0);
+        pool.run(|_, _| {
+            n.fetch_add(1, Ordering::SeqCst);
+        });
+        assert_eq!(n.load(Ordering::SeqCst), 4);
+    }
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 

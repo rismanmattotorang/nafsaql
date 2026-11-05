@@ -109,6 +109,39 @@ fn dspark_is_lossless_and_accepted() {
     assert_eq!(a, b, "second turn diverged");
 }
 
+/// Sampling at temperature 0.7: DSpark stays lossless (position-keyed randomness),
+/// and — because the drafter draws with the target's keys — it is still accepted.
+#[test]
+fn dspark_is_lossless_and_accepted_when_sampling() {
+    let _g = serial();
+    let p =
+        "Write a Python function that merges two sorted lists, with a docstring and two examples.";
+    let open = |drafter: bool| {
+        session(drafter, 80).map(|mut s| {
+            s.cfg.temperature = 0.7;
+            s.cfg.top_p = 0.9;
+            s
+        })
+    };
+    let Some(mut plain) = open(false) else { return };
+    let Some(mut fast) = open(true) else { return };
+    let (a, _) = plain.generate(p, |_| {}).unwrap();
+    let (b, tl) = fast.generate(p, |_| {}).unwrap();
+    assert_eq!(a, b, "DSpark changed a sampled reply");
+    let per_pass = tl.n_decode() as f64 / tl.passes.max(1) as f64;
+    eprintln!(
+        "sampled: {} rounds, {:.2} tokens per pass, accepted {:?}",
+        tl.dspark_rounds,
+        per_pass,
+        tl.acceptance_rate()
+    );
+    assert!(
+        tl.dspark_rounds > 0,
+        "the drafter never drafted while sampling"
+    );
+    assert!(per_pass > 1.4, "only {per_pass:.2} tokens per pass while sampling — the draft is not coupled to the target's noise");
+}
+
 #[test]
 fn a_drafter_for_another_target_is_refused() {
     let _g = serial();

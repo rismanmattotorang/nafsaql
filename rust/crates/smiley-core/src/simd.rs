@@ -164,6 +164,58 @@ fn unpack_q4k_scales(q: &[u8]) -> [u8; 16] {
     out
 }
 
+/// The eight Q4_K scales as broadcast 16-bit vectors — `_mm256_set1_epi16(sc[k])`
+/// for `k = 0..8` — from one widening load and one byte shuffle each, instead of a
+/// byte extract, a GPR→vector move and a broadcast (two port-5 µops) per scale.
+#[inline(always)]
+unsafe fn q4k_scale_vecs(sm: &[u8; 16]) -> [__m256i; 8] {
+    // Lanes 0..8 hold the scales, 8..16 the mins; duplicate the scale half.
+    let s16 = _mm256_cvtepu8_epi16(_mm_loadu_si128(sm.as_ptr() as *const __m128i));
+    let sc = _mm256_permute4x64_epi64::<0x44>(s16);
+    // The controls are a static table, loaded: built with `_mm256_setr_epi8` from
+    // loop-computed bytes they were assembled byte by byte on every super-block
+    // (measured: the Q4_K kernel ran 7× slower).
+    let ctl = BCAST16.as_ptr() as *const __m256i;
+    // nafs-aql: spelled out, not `std::array::from_fn`. Whether LLVM inlines `from_fn` into the kernel depends on
+    // how much unrelated code the crate holds; when it does not, every super-block pays a call and an array
+    // returned through memory (the Q4_K kernel ran 7x slower once the batching engine was added to the crate).
+    let t = |k: usize| _mm256_shuffle_epi8(sc, _mm256_loadu_si256(ctl.add(k)));
+    [t(0), t(1), t(2), t(3), t(4), t(5), t(6), t(7)]
+}
+
+/// `pshufb` controls that broadcast 16-bit lane `k` of each 128-bit half to the
+/// whole half, `k = 0..8`.
+static BCAST16: [[u8; 32]; 8] = {
+    let mut t = [[0u8; 32]; 8];
+    let mut k = 0;
+    while k < 8 {
+        let mut i = 0;
+        while i < 32 {
+            t[k][i] = (2 * k + i % 2) as u8;
+            i += 1;
+        }
+        k += 1;
+    }
+    t
+};
+
+/// Q6_K's controls: index `c·4 + g` broadcasts 16-bit lane `2g` to the low half and
+/// lane `2g + 1` to the high half (both halves of the source hold the same 8 lanes).
+static Q6K_SPLIT16: [[u8; 32]; 4] = {
+    let mut t = [[0u8; 32]; 4];
+    let mut g = 0;
+    while g < 4 {
+        let mut i = 0;
+        while i < 32 {
+            let lane = if i < 16 { 2 * g } else { 2 * g + 1 };
+            t[g][i] = (2 * lane + i % 2) as u8;
+            i += 1;
+        }
+        g += 1;
+    }
+    t
+};
+
 /// The eight Q4_K mins as sixteen 16-bit lanes, each repeated for the two 16-weight
 /// runs of its 32-weight sub-block, so one `madd_epi16` against an activation's sixteen
 /// run sums yields the min term as eight i32 partial sums with no `hadd`.
@@ -314,6 +366,16 @@ unsafe fn f16_at(b: &[u8], at: usize) -> f32 {
     _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(h as i32)))
 }
 
+/// `f16_at` for a scale with two more bytes of the same block after it: one 32-bit
+/// load (`vmovd`) straight into the vector unit instead of two byte loads, a merge
+/// and `vpinsrw` (a port-5 µop). Lane 0 is the same conversion of the same bits.
+#[inline(always)]
+unsafe fn f16_at4(p: *const u8) -> f32 {
+    _mm_cvtss_f32(_mm_cvtph_ps(_mm_cvtsi32_si128(
+        (p as *const i32).read_unaligned(),
+    )))
+}
+
 /// How far ahead of the block being decoded the kernels ask for weight bytes.
 ///
 /// Decode streams every weight once per token, and the L2 streamer that would fetch
@@ -368,21 +430,30 @@ unsafe fn tile_q8_0<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]
 #[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn tile_q5_0<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]) {
     let pf = prefetch_distance();
-    let lownib = _mm_set1_epi8(0x0F);
+    let lownib = _mm256_set1_epi8(0x0F);
+    // Low lane keeps the bytes, high lane shifts each 64-bit half right by 4: after
+    // the mask that is `qs & 0xF` in lanes 0..16 and `(qs >> 4) & 0xF` in 16..32 —
+    // the `_mm256_set_m128i(hi, lo)` pair, from one broadcast load and no port-5
+    // lane insert.
+    let nib_shift = _mm256_set_epi64x(4, 4, 0, 0);
+    let nblk = w.len() / 22;
+    for a in &acts[..T] {
+        assert!(a.d.len() >= nblk && a.q.len() >= nblk * 32 && a.lane_sums.len() >= nblk * 8);
+    }
     let mut acc = [_mm256_setzero_ps(); T];
     for (b, blk) in w.chunks_exact(22).enumerate() {
         prefetch_ahead(blk.as_ptr(), pf, 1);
-        let qh = u32::from_le_bytes([blk[2], blk[3], blk[4], blk[5]]);
-        let qs = _mm_loadu_si128(blk.as_ptr().add(6) as *const __m128i);
-        let lo = _mm_and_si128(qs, lownib);
-        let hi = _mm_and_si128(_mm_srli_epi16(qs, 4), lownib);
-        let codes = _mm256_or_si256(_mm256_set_m128i(hi, lo), q5_high_bits(qh));
-        let dw = f16_at(blk, 0);
+        let qh = (blk.as_ptr().add(2) as *const u32).read_unaligned();
+        let qs =
+            _mm256_broadcastsi128_si256(_mm_loadu_si128(blk.as_ptr().add(6) as *const __m128i));
+        let nib = _mm256_and_si256(_mm256_srlv_epi64(qs, nib_shift), lownib);
+        let codes = _mm256_or_si256(nib, q5_high_bits(u32::from_le(qh)));
+        let dw = f16_at4(blk.as_ptr());
         for t in 0..T {
             let a = &acts[t];
             // Codes are [0,31] with offset 16, removed exactly inside the lanes.
             let v = madd_offset_ps::<4>(codes, acts32(a, b), a.lane_sums.as_ptr().add(b * 8));
-            acc[t] = _mm256_fmadd_ps(v, _mm256_set1_ps(dw * a.d[b]), acc[t]);
+            acc[t] = _mm256_fmadd_ps(v, _mm256_set1_ps(dw * *a.d.get_unchecked(b)), acc[t]);
         }
     }
     for t in 0..T {
@@ -405,8 +476,8 @@ unsafe fn tile_q4_k<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]
         let dminv = _mm256_set1_ps(f16_at(blk, 2));
         let qs = blk.as_ptr().add(16);
         let sm = unpack_q4k_scales(&blk[4..16]);
-        let (sc, mn) = (&sm[0..8], &sm[8..16]);
-        let mins16 = q4k_mins16(mn);
+        let scv = q4k_scale_vecs(&sm);
+        let mins16 = q4k_mins16(&sm[8..16]);
         let mut sumi = [_mm256_setzero_si256(); T];
         // Each 32 bytes of codes hold two sub-blocks: the low nibbles are sub-block
         // 2j, the high nibbles 2j+1. Both dot products are scaled by their 6-bit
@@ -416,8 +487,7 @@ unsafe fn tile_q4_k<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]
             let raw = _mm256_loadu_si256(qs.add(j * 32) as *const __m256i);
             let q4l = _mm256_and_si256(raw, lownib);
             let q4h = _mm256_and_si256(_mm256_srli_epi16(raw, 4), lownib);
-            let scl = _mm256_set1_epi16(sc[2 * j] as i16);
-            let sch = _mm256_set1_epi16(sc[2 * j + 1] as i16);
+            let (scl, sch) = (scv[2 * j], scv[2 * j + 1]);
             for t in 0..T {
                 let base = acts[t].qk.as_ptr().add(sb * 256 + j * 64);
                 let q8l = _mm256_loadu_si256(base as *const __m256i);
@@ -446,6 +516,24 @@ unsafe fn tile_q4_k<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]
     }
 }
 
+/// The eight run-scale vectors of a Q6_K super-block, index `c·4 + g`: 16-bit lanes
+/// 0..8 hold scale `c·8 + 2g`, lanes 8..16 scale `c·8 + 2g + 1` — the values
+/// `_mm256_set_m128i(_mm_set1_epi16(..), _mm_set1_epi16(..))` produced, built with
+/// one byte shuffle each instead of five port-5 µops through the integer registers
+/// (which made the Q6_K kernel port-5 bound). `sc16` is the 16 scales as i16 lanes.
+#[inline(always)]
+unsafe fn q6k_scales(sc16: __m256i) -> [__m256i; 8] {
+    // Both 128-bit halves of `half[c]` hold scales c·8 .. c·8+8 (16 bytes).
+    let half = [
+        _mm256_permute4x64_epi64::<0x44>(sc16),
+        _mm256_permute4x64_epi64::<0xEE>(sc16),
+    ];
+    let ctl = Q6K_SPLIT16.as_ptr() as *const __m256i;
+    // nafs-aql: spelled out for the same reason as `q4k_scale_vecs`.
+    let t = |i: usize| _mm256_shuffle_epi8(half[i / 4], _mm256_loadu_si256(ctl.add(i % 4)));
+    [t(0), t(1), t(2), t(3), t(4), t(5), t(6), t(7)]
+}
+
 #[target_feature(enable = "avx2,fma,f16c")]
 unsafe fn tile_q6_k<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]) {
     let pf = prefetch_distance();
@@ -459,14 +547,13 @@ unsafe fn tile_q6_k<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]
     for (sb, blk) in w.chunks_exact(210).enumerate() {
         prefetch_ahead(blk.as_ptr(), pf, 4);
         let d = f16_at(blk, 208);
-        let sc_all: &[i8] = std::slice::from_raw_parts(blk.as_ptr().add(192) as *const i8, 16);
         // The 16 run scales as 16-bit lanes, for the offset term below.
         let sc16 = _mm256_cvtepi8_epi16(_mm_loadu_si128(blk.as_ptr().add(192) as *const __m128i));
+        let scales = q6k_scales(sc16);
         let mut sumi = [_mm256_setzero_si256(); T];
         for c in 0..2 {
             let ql = blk.as_ptr().add(c * 64);
             let qh = _mm256_loadu_si256(blk.as_ptr().add(128 + c * 32) as *const __m256i);
-            let sc = &sc_all[c * 8..c * 8 + 8];
             let ql0 = _mm256_loadu_si256(ql as *const __m256i);
             let ql1 = _mm256_loadu_si256(ql.add(32) as *const __m256i);
             for g in 0..4 {
@@ -484,10 +571,7 @@ unsafe fn tile_q6_k<const T: usize>(w: &[u8], acts: &[QuantAct], out: &mut [f32]
                 let codes = _mm256_or_si256(low, _mm256_slli_epi16(hbits, 4));
                 // Lanes 0..8 of the 16-bit products cover the first 16 weights,
                 // lanes 8..16 the next 16; each run has its own scale.
-                let scale = _mm256_set_m128i(
-                    _mm_set1_epi16(sc[2 * g + 1] as i16),
-                    _mm_set1_epi16(sc[2 * g] as i16),
-                );
+                let scale = scales[c * 4 + g];
                 let o = sb * 256 + c * 128 + g * 32;
                 for t in 0..T {
                     let q8 = _mm256_loadu_si256(acts[t].qk.as_ptr().add(o) as *const __m256i);
@@ -615,18 +699,14 @@ unsafe fn wide_q4_k(w: &[u8], acts: &[QuantAct], out: &mut [f32]) {
 #[inline(always)]
 unsafe fn q6k_acts<const T: usize>(
     codes: &[__m256i; 8],
-    sc_all: &[i8],
+    scales: &[__m256i; 8],
     acts: &[QuantAct],
     sb: usize,
     sumi: &mut [__m256i; 4],
 ) {
     for c in 0..2 {
-        let sc = &sc_all[c * 8..c * 8 + 8];
         for g in 0..4 {
-            let scale = _mm256_set_m128i(
-                _mm_set1_epi16(sc[2 * g + 1] as i16),
-                _mm_set1_epi16(sc[2 * g] as i16),
-            );
+            let scale = scales[c * 4 + g];
             let o = sb * 256 + c * 128 + g * 32;
             for t in 0..T {
                 let q8 = _mm256_loadu_si256(acts[t].qk.as_ptr().add(o) as *const __m256i);
@@ -649,8 +729,9 @@ unsafe fn wide_q6_k(w: &[u8], acts: &[QuantAct], out: &mut [f32]) {
     for (sb, blk) in w.chunks_exact(210).enumerate() {
         prefetch_ahead(blk.as_ptr(), pf, 4);
         let d = f16_at(blk, 208);
-        let sc_all: &[i8] = std::slice::from_raw_parts(blk.as_ptr().add(192) as *const i8, 16);
         let sc16 = _mm256_cvtepi8_epi16(_mm_loadu_si128(blk.as_ptr().add(192) as *const __m128i));
+        // Built once per super-block, not once per tile of activations.
+        let scales = q6k_scales(sc16);
         let mut codes = [_mm256_setzero_si256(); 8];
         for c in 0..2 {
             let ql = blk.as_ptr().add(c * 64);
@@ -677,10 +758,10 @@ unsafe fn wide_q6_k(w: &[u8], acts: &[QuantAct], out: &mut [f32]) {
             let tw = (n - t).min(TILE);
             let mut sumi = [_mm256_setzero_si256(); 4];
             match tw {
-                4 => q6k_acts::<4>(&codes, sc_all, &acts[t..], sb, &mut sumi),
-                3 => q6k_acts::<3>(&codes, sc_all, &acts[t..], sb, &mut sumi),
-                2 => q6k_acts::<2>(&codes, sc_all, &acts[t..], sb, &mut sumi),
-                _ => q6k_acts::<1>(&codes, sc_all, &acts[t..], sb, &mut sumi),
+                4 => q6k_acts::<4>(&codes, &scales, &acts[t..], sb, &mut sumi),
+                3 => q6k_acts::<3>(&codes, &scales, &acts[t..], sb, &mut sumi),
+                2 => q6k_acts::<2>(&codes, &scales, &acts[t..], sb, &mut sumi),
+                _ => q6k_acts::<1>(&codes, &scales, &acts[t..], sb, &mut sumi),
             }
             for u in 0..tw {
                 let a = &acts[t + u];

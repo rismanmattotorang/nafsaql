@@ -667,6 +667,23 @@ impl Drafter {
     /// the tokens and, when the head has one, each one's conditional survival
     /// probability from the confidence head.
     pub fn draft(&mut self, anchor: u32, k: usize, pool: &Pool) -> (Vec<u32>, Vec<f32>) {
+        self.draft_with(anchor, k, pool, |_, row| crate::sample::argmax(row))
+    }
+
+    /// As `draft`, with `pick(i, logits)` choosing draft `i` from its (Markov-biased)
+    /// logits. The session passes the target's own sampler with the key of the
+    /// position draft `i` would land at, so at a non-zero temperature the drafter
+    /// draws with the same noise the target will (uzu couples its drafter to the
+    /// target's per-position seeds the same way): when the two distributions agree
+    /// the race picks the same token, and drafts survive sampling as they survive
+    /// argmax. At temperature 0 the pick is the argmax, exactly as before.
+    pub fn draft_with(
+        &mut self,
+        anchor: u32,
+        k: usize,
+        pool: &Pool,
+        mut pick: impl FnMut(usize, &[f32]) -> u32,
+    ) -> (Vec<u32>, Vec<f32>) {
         let t0 = Instant::now();
         let c = self.cfg.clone();
         let k = k.min(c.block_size - c.logits_start);
@@ -752,11 +769,7 @@ impl Drafter {
                         *sp = key(p).iter().zip(qv).map(|(a, b)| a * b).sum::<f32>() * scale;
                         mx = mx.max(*sp);
                     }
-                    let mut sum = 0.0f32;
-                    for sp in s.iter_mut() {
-                        *sp = (*sp - mx).exp();
-                        sum += *sp;
-                    }
+                    let sum = crate::vmath::exp_shift_sum(&mut s, mx) as f32;
                     acc.fill(0.0);
                     for (p, sp) in s.iter().enumerate() {
                         let w = sp / sum;
@@ -781,9 +794,7 @@ impl Drafter {
             quantise_rows(&xn, h, &mut acts);
             matmul(&l.gate, &acts[..b], &mut g, pool);
             matmul(&l.up, &acts[..b], &mut u, pool);
-            for (gi, ui) in g.iter_mut().zip(&u) {
-                *gi = *gi / (1.0 + (-*gi).exp()) * ui;
-            }
+            crate::vmath::swiglu(&mut g, &u);
             quantise_rows(&g, c.n_ff, &mut acts);
             matmul(&l.down, &acts[..b], &mut tmp_h, pool);
             for (a, o) in x.iter_mut().zip(&tmp_h) {
@@ -821,17 +832,7 @@ impl Drafter {
                     *lg += bb;
                 }
             }
-            let tok = row
-                .iter()
-                .enumerate()
-                .fold((0usize, f32::NEG_INFINITY), |a, (j, &v)| {
-                    if v > a.1 {
-                        (j, v)
-                    } else {
-                        a
-                    }
-                })
-                .0 as u32;
+            let tok = pick(i, row);
             if c.confidence {
                 let hid = if self.conf_on_normed {
                     &xn[(s0 + i) * h..(s0 + i + 1) * h]

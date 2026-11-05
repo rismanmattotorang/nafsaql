@@ -276,6 +276,9 @@ pub struct BackendHealth {
     pub error: Option<String>,
     pub in_flight: usize,
     pub max_in_flight: usize,
+    /// How the engine holds its weights ("dense" or "littlebit"), when the server says (Smiley Core does).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub weights: Option<String>,
 }
 
 pub struct Backend {
@@ -927,6 +930,7 @@ impl Backend {
     pub async fn health(&self) -> BackendHealth {
         let url = format!("{}/models", self.cfg.url.trim_end_matches('/'));
         let t0 = Instant::now();
+        let mut weights = None;
         let (ok, served, error) = match self
             .client
             .get(&url)
@@ -936,6 +940,7 @@ impl Backend {
         {
             Ok(r) if r.status().is_success() => {
                 let v: Value = r.json().await.unwrap_or(Value::Null);
+                weights = v["data"][0]["weights"].as_str().map(String::from);
                 let ids = v["data"]
                     .as_array()
                     .map(|a| {
@@ -973,6 +978,7 @@ impl Backend {
             error,
             in_flight: max - self.sem.available_permits(),
             max_in_flight: max,
+            weights,
         }
     }
 }

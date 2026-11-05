@@ -1,0 +1,75 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 19 -- the engine update and LittleBit
+% ---------------------------------------------------------------------------
+\section{Phase 19: The Engine Update and LittleBit}
+\label{sec:phase19}
+
+Phase~19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner's new one (06c2b88), re-applies Nafs-Aql's additions on it,
+integrates LittleBit~\cite{littlebit2025}, and re-validates the system. The decision record is \texttt{docs/decisions/013-smiley-core-littlebit.md} and
+the research note \texttt{docs/research/smiley\_core\_update.md}.
+
+\subsection{What the new engine brings}
+
+Grouped online-softmax attention, an int8 key--value cache rotated by a Hadamard transform, vectorised math, and sampling whose randomness is keyed by
+position, so a drafted token is accepted exactly when sequential sampling would have emitted it: speculation becomes lossless at any temperature, not
+only under argmax. LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, $\hat W=\mathrm{diag}(h)\,U_{\pm}\,
+\mathrm{diag}(\ell)\,V_{\pm}^{\top}\,\mathrm{diag}(g)$, summed over stages, stored beside the model as a sidecar file.
+
+\subsection{The merge}
+
+Nafs-Aql's vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so
+the update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The
+additions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention
+without touching upstream's attention kernel (one row per user, so the bit-identity property of Phase~18 holds); top-$k$ and min-$p$ on the
+position-keyed sampler, in llama.cpp's order, with upstream's fast path when both are off. All 370 tests of the workspace pass in release mode,
+including the batching bit-identity tests, and formatting and the linter are clean.
+
+\subsection{Two defects the integration exposed}
+
+\emph{A crash.} Served through the batching engine, a LittleBit model crashed on its first request: the single-session path sizes the sidecar's scratch
+buffers and the engine's constructor did not, so the first sidecar matmul wrote through an empty buffer. Fixed, and visible only because the engine
+was exercised with the new format.
+
+\emph{A fourfold slowdown with no kernel change.} After the merge Qwen3-1.7B decoded at 4.4--5.0 tokens per second, against 17--20 for the previous
+commit and 16--18 for upstream's own build, interleaved on the same machine. The dot kernels were byte-identical after formatting, so a code change
+could not be the cause directly. Bisecting by swapping files between a scratch copy of upstream and the crate showed that merely adding the batching
+engine (never called by the benchmark) was enough; a kernel micro-benchmark isolated it to the small-batch dot kernels (Q4\_K, one activation, one
+thread: 679\,ns per row against 96); disassembly showed a call to \texttt{core::array::try\_from\_fn} \emph{inside} the kernel, once per super-block,
+in the slow build only. \texttt{std::array::from\_fn} in two helpers marked \texttt{inline(always)} is inlined or not depending on how much unrelated
+code the crate contains. Spelling the eight-element arrays out restores 96\,ns per row and 15--20 tokens per second. The lesson is general: a kernel
+whose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and \texttt{kbench} is now part of the crate for that.
+
+\begin{table}[h]
+\centering
+\caption{Decode speed of Qwen3-1.7B Q4\_K\_M (tokens per second, median of five interleaved rounds of 96 tokens, three threads, one slot, shared host).}
+\label{tab:phase19speed}
+\begin{tabular}{lr}
+\toprule
+Engine & tok/s \\
+\midrule
+Previous (7cb6028 + Phase 18) & 18.7 \\
+New (06c2b88), after the fix & 19.2 \\
+New, before the fix & 4.4--5.0 \\
+New with a LittleBit sidecar & 20.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{LittleBit: integrated, tested, not useful yet}
+
+Qwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\,MB of factors for 845.7\,MB
+of weights ($4.9\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4\_K itself
+is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \textbf{the dense model answered 9 correctly and the LittleBit
+model 0}; its text is incoherent. Decode was only 5\,\% faster (20.1 against 19.2\,tok/s), because at this size the matmul is not the whole token. Upstream
+reports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The
+integration is therefore opt-in (\texttt{--littlebit}, \texttt{LITTLEBIT=1}); a missing or corrupt sidecar refuses to start, so a stale file beside a
+model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and
+on the Status page. It is ready for trained factors; it is not a result.
+
+\subsection{Is anything else different}
+
+The old and the new engine give the same answers on the exact-answer prompts (9 of 12 on both, the same three misses). One of those misses, a
+time-of-day sum (3:40\,pm plus 2\,h 35\,min answered 5:45\,pm, the correct answer being 6:15\,pm), was first seen in the web interface right after the merge and
+looked like a regression; the comparison shows it is the 1.7B model's own error, which the gate's confidence signal does not catch because both quick
+samples repeat it. Re-validation on the final code: contract tests, 26 of 26 security probes (0 open high-severity findings), 59 of 59 Rooms checks, 65 of 65
+end-to-end checks, 53 of 53 harness checks and 9 of 9 acceptance tests pass.

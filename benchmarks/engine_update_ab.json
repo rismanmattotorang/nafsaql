@@ -1,0 +1,255 @@
+{
+ "what": "Smiley Core 06c2b88 (with the from_fn fix) against the previous vendored engine (d533fe3), Qwen3-1.7B Q4_K_M, 3 threads, 1 slot, greedy, interleaved; shared host (load 5-8)",
+ "decode_tok_s_rounds_96_tokens": {
+  "previous_engine": [
+   18.2,
+   17.1,
+   18.7,
+   20.2,
+   19.7
+  ],
+  "new_engine": [
+   16.2,
+   19.2,
+   20.8,
+   19.2,
+   21.0
+  ],
+  "littlebit_on_new_engine": [
+   19.6,
+   19.6,
+   20.1,
+   23.7,
+   21.5
+  ]
+ },
+ "decode_tok_s_median": {
+  "previous_engine": 18.7,
+  "new_engine": 19.2,
+  "littlebit_on_new_engine": 20.1
+ },
+ "exact_answer_prompts": {
+  "previous_engine": "9/12",
+  "new_engine": "9/12",
+  "same_misses": true
+ },
+ "rows": [
+  {
+   "prompt": "What is 17 * 23? Answer with the number only.",
+   "want": "391",
+   "previous_engine": {
+    "text": "17 * 23 = 391\n\nAnswer: 391",
+    "pass": true,
+    "tok_s": 18.94,
+    "tokens": 18,
+    "wall_s": 1.5
+   },
+   "new_engine": {
+    "text": "17 * 23 = 391",
+    "pass": true,
+    "tok_s": 19.31,
+    "tokens": 11,
+    "wall_s": 0.6
+   }
+  },
+  {
+   "prompt": "What is 144 / 12? Answer with the number only.",
+   "want": "12",
+   "previous_engine": {
+    "text": "144 ÷ 12 = 12\n\nAnswer: 12",
+    "pass": true,
+    "tok_s": 19.48,
+    "tokens": 18,
+    "wall_s": 1.5
+   },
+   "new_engine": {
+    "text": "144 ÷ 12 = 12\n\nAnswer: 12",
+    "pass": true,
+    "tok_s": 19.42,
+    "tokens": 18,
+    "wall_s": 1.0
+   }
+  },
+  {
+   "prompt": "What is 1000 - 387? Answer with the number only.",
+   "want": "613",
+   "previous_engine": {
+    "text": "1000 - 387 = 613",
+    "pass": true,
+    "tok_s": 17.83,
+    "tokens": 14,
+    "wall_s": 1.3
+   },
+   "new_engine": {
+    "text": "613",
+    "pass": true,
+    "tok_s": 15.19,
+    "tokens": 3,
+    "wall_s": 0.3
+   }
+  },
+  {
+   "prompt": "A train leaves at 3:40 pm and the trip takes 2 hours 35 minutes. What time does it arrive? Answer like 4:05 pm.",
+   "want": "6:15",
+   "previous_engine": {
+    "text": "The train leaves at **3:40 pm**, and the trip takes **2 hours 35 minutes**.\n\nLet's add the time:\n\n- 3:40 pm + 2 hours = **5:40 pm",
+    "pass": false,
+    "tok_s": 18.11,
+    "tokens": 48,
+    "wall_s": 3.6
+   },
+   "new_engine": {
+    "text": "The train leaves at **3:40 pm**, and the trip takes **2 hours 35 minutes**.\n\nLet's add the time:\n\n- 3:40 pm + 2 hours = **5:40 pm",
+    "pass": false,
+    "tok_s": 21.18,
+    "tokens": 48,
+    "wall_s": 2.3
+   }
+  },
+  {
+   "prompt": "What is the capital of Indonesia? One word.",
+   "want": "jakarta",
+   "previous_engine": {
+    "text": "Jakarta",
+    "pass": true,
+    "tok_s": 14.77,
+    "tokens": 2,
+    "wall_s": 0.5
+   },
+   "new_engine": {
+    "text": "Jakarta",
+    "pass": true,
+    "tok_s": 15.16,
+    "tokens": 2,
+    "wall_s": 0.2
+   }
+  },
+  {
+   "prompt": "What is the capital of Japan? One word.",
+   "want": "tokyo",
+   "previous_engine": {
+    "text": "Tokyo",
+    "pass": true,
+    "tok_s": 13.61,
+    "tokens": 2,
+    "wall_s": 0.6
+   },
+   "new_engine": {
+    "text": "Tokyo",
+    "pass": true,
+    "tok_s": 15.11,
+    "tokens": 2,
+    "wall_s": 0.2
+   }
+  },
+  {
+   "prompt": "What is 9 squared? Answer with the number only.",
+   "want": "81",
+   "previous_engine": {
+    "text": "81",
+    "pass": true,
+    "tok_s": 14.22,
+    "tokens": 2,
+    "wall_s": 0.6
+   },
+   "new_engine": {
+    "text": "81",
+    "pass": true,
+    "tok_s": 15.24,
+    "tokens": 2,
+    "wall_s": 0.2
+   }
+  },
+  {
+   "prompt": "How many days are in a week? Answer with the number only.",
+   "want": "7",
+   "previous_engine": {
+    "text": "7",
+    "pass": true,
+    "tok_s": 11.01,
+    "tokens": 1,
+    "wall_s": 0.6
+   },
+   "new_engine": {
+    "text": "7",
+    "pass": true,
+    "tok_s": 11.57,
+    "tokens": 1,
+    "wall_s": 0.1
+   }
+  },
+  {
+   "prompt": "What is the chemical symbol for water? Answer with the formula only.",
+   "want": "h2o",
+   "previous_engine": {
+    "text": "H₂O",
+    "pass": false,
+    "tok_s": 16.46,
+    "tokens": 3,
+    "wall_s": 0.7
+   },
+   "new_engine": {
+    "text": "H₂O",
+    "pass": false,
+    "tok_s": 16.28,
+    "tokens": 3,
+    "wall_s": 0.2
+   }
+  },
+  {
+   "prompt": "What is 15% of 200? Answer with the number only.",
+   "want": "30",
+   "previous_engine": {
+    "text": "To find 15% of 200:\n\n$$\n15\\% \\text{ of } 200 = \\frac{15}{100} \\times 200 = 0.",
+    "pass": false,
+    "tok_s": 19.02,
+    "tokens": 48,
+    "wall_s": 3.1
+   },
+   "new_engine": {
+    "text": "To find 15% of 200:\n\n$$\n15\\% \\text{ of } 200 = \\frac{15}{100} \\times 200 = 0.",
+    "pass": false,
+    "tok_s": 20.7,
+    "tokens": 48,
+    "wall_s": 2.4
+   }
+  },
+  {
+   "prompt": "How many minutes are in 3 hours? Answer with the number only.",
+   "want": "180",
+   "previous_engine": {
+    "text": "180 minutes\n\n**Answer:** 180",
+    "pass": true,
+    "tok_s": 19.99,
+    "tokens": 12,
+    "wall_s": 1.1
+   },
+   "new_engine": {
+    "text": "180",
+    "pass": true,
+    "tok_s": 16.85,
+    "tokens": 3,
+    "wall_s": 0.2
+   }
+  },
+  {
+   "prompt": "What is the largest planet in the solar system? One word.",
+   "want": "jupiter",
+   "previous_engine": {
+    "text": "Jupiter",
+    "pass": true,
+    "tok_s": 14.64,
+    "tokens": 2,
+    "wall_s": 0.6
+   },
+   "new_engine": {
+    "text": "Jupiter",
+    "pass": true,
+    "tok_s": 15.28,
+    "tokens": 2,
+    "wall_s": 0.2
+   }
+  }
+ ],
+ "before_fix_new_engine_tok_s": "4.4-5.0 (kbench Q4_K, 1 activation: 679 ns/row; after the fix 96 ns/row)"
+}

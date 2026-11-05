@@ -204,6 +204,15 @@ impl Gguf {
         }
         let n_tensors = c.u64()? as usize;
         let n_kv = c.u64()? as usize;
+        // The counts come from the file. Capacity is a hint, never a promise to a
+        // corrupt header: a failed allocation aborts the process (no unwind for
+        // `catch_unwind` to catch), so cap it by what the file could possibly hold.
+        let plausible = map.len() / 16;
+        if n_tensors > plausible || n_kv > plausible {
+            return Err(format!(
+                "gguf: implausible header ({n_tensors} tensors, {n_kv} metadata keys)"
+            ));
+        }
 
         let mut meta = HashMap::with_capacity(n_kv);
         for _ in 0..n_kv {
@@ -231,6 +240,17 @@ impl Gguf {
                 )
             })?;
             let offset = c.u64()?;
+            // `numel`/`bytes` multiply these freely afterwards; refuse a directory
+            // whose products would wrap instead of trusting wrapped arithmetic.
+            if dims
+                .iter()
+                .try_fold(1u64, |a, &d| a.checked_mul(d))
+                .is_none_or(|n| n > 1 << 48)
+            {
+                return Err(format!(
+                    "gguf: tensor {name} has implausible dimensions {dims:?}"
+                ));
+            }
             let ti = TensorInfo {
                 name: name.clone(),
                 dims,
@@ -269,7 +289,10 @@ impl Gguf {
         // Fail at load rather than at the first dot product: a tensor whose bytes run
         // past the end of the map would otherwise surface as a panic mid-generation.
         for t in g.tensors.values() {
-            let end = g.data_start as u64 + t.offset + t.bytes();
+            let end = (g.data_start as u64)
+                .checked_add(t.offset)
+                .and_then(|e| e.checked_add(t.bytes()))
+                .unwrap_or(u64::MAX);
             if end > g.map.len() as u64 {
                 return Err(format!(
                     "gguf: tensor {} runs to {} but the file is {} bytes — truncated download?",

@@ -130,7 +130,7 @@ struct Slot {
     /// Tokens written to the cache after the prompt (every sampled token is fed back on the next step), so a
     /// finished slot's cache can be described by the token sequence it holds.
     fed_back: Vec<u32>,
-    rng: u64,
+    seed: u64,
     utf8: Utf8Stream,
     /// Prompt tokens, how many of them were prefilled (the rest were restored), and the time that took.
     prompt_tokens: usize,
@@ -191,6 +191,7 @@ pub struct Engine {
     /// Decode steps run, and the rows they carried: their ratio is the batching actually achieved.
     pub decode_steps: u64,
     pub decode_rows: u64,
+    samp: crate::sample::Scratch,
 }
 
 impl Engine {
@@ -208,7 +209,7 @@ impl Engine {
         // The widest batch is a prefill chunk or one row per slot, whichever is larger; every decode row wants
         // logits, a prefill chunk wants none.
         let max_batch = PREFILL_CHUNK.max(max_slots);
-        let state = State::new(
+        let mut state = State::new(
             &c,
             max_batch,
             max_slots,
@@ -216,6 +217,10 @@ impl Engine {
             threads,
             model.rope_factors.as_deref(),
         );
+        // A LittleBit sidecar's projections need scratch for their intermediates; without it the first one
+        // writes through an empty buffer.
+        let (lx, lt) = model.lb_scratch(max_batch);
+        state.set_lb_scratch(lx, lt);
         Engine {
             model,
             pool: Pool::new(threads),
@@ -229,6 +234,7 @@ impl Engine {
             stats: StepStats::default(),
             decode_steps: 0,
             decode_rows: 0,
+            samp: crate::sample::Scratch::default(),
         }
     }
 
@@ -299,8 +305,8 @@ impl Engine {
         self.slots.push(Slot {
             id,
             kv,
-            // The sampler's state is per slot, so a user's tokens do not depend on who else is being served.
-            rng: cfg.seed.max(1).wrapping_mul(0x9E37_79B9_7F4A_7C15) | 1,
+            // The draw is keyed by (seed, position), so a user's tokens do not depend on who else is being served.
+            seed: cfg.seed.max(1),
             cfg,
             prompt_tokens: prompt.len(),
             prefilled: 0,
@@ -457,14 +463,14 @@ impl Engine {
         let mut finished: Vec<SlotId> = vec![];
         for (b, s) in self.slots.iter_mut().enumerate() {
             let logits = self.state.logits_row(b, n_vocab);
-            let id = crate::session::sample_row(
+            let id = crate::sample::sample_filtered(
                 logits,
                 s.cfg.temperature,
                 s.cfg.top_p,
                 s.cfg.top_k,
                 s.cfg.min_p,
-                &mut s.rng,
-                &mut Vec::new(),
+                crate::sample::position_key(s.seed, 0, s.pos + 1),
+                &mut self.samp,
             );
             let logprob = if s.cfg.logprobs {
                 crate::session::logprob_of(logits, id)
