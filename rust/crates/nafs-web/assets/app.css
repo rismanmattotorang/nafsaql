@@ -584,3 +584,17 @@ details.fold-card>summary h3::before{content:"▸ ";color:var(--faint)}details.f
 .kb-n{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:5px;background:var(--surface-3);font-size:11px;font-weight:700}
 .kb-st{flex:1;overflow-wrap:anywhere} .kb-src .kb-ptext{margin:4px 0 6px 26px;font-size:12.5px;color:var(--muted);max-height:12em}
 .kb-note{margin-bottom:10px}
+/* knowledge graph */
+.kb-ghead{margin-bottom:6px} .kb-gtools{margin:8px 0 4px} .kb-gtools input{flex:1;min-width:0}
+.kb-entlist{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.kb-gwrap{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;align-items:start}
+.kb-svg{width:100%;height:380px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2)}
+.kb-edge{stroke:var(--border);stroke-opacity:.9}
+.kb-node{cursor:pointer} .kb-node circle{stroke:var(--surface);stroke-width:1.5} .kb-node text{font-size:11px;fill:var(--text);paint-order:stroke;stroke:var(--surface-2);stroke-width:3px}
+.kb-node:hover circle,.kb-node:focus circle,.kb-node.on circle{stroke:var(--text);stroke-width:2.5} .kb-node:focus{outline:none}
+.kb-entity{max-height:380px;overflow:auto;font-size:13px} .kb-entity h4{margin:0 0 2px}
+.kb-facts{margin:8px 0 0;padding-left:16px;font-size:12.5px} .kb-facts li{margin:4px 0} .kb-facts details{margin:2px 0 0}
+.kb-facts .kb-ptext{max-height:10em;color:var(--muted);font-size:12px}
+.kb-factbox summary{cursor:pointer;list-style:none} .kb-factbox summary::-webkit-details-marker{display:none}
+#kbMode{border-left:1px solid var(--border);padding-left:6px}
+@media (max-width:820px){.kb-gwrap{grid-template-columns:1fr}.kb-svg{height:300px}}

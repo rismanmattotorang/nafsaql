@@ -195,9 +195,11 @@
           "type": "string",
           "enum": [
             "rag",
+            "graph",
             "off"
           ],
-          "default": "rag"
+          "default": "rag",
+          "description": "rag: passages; graph: passages plus relations around the question's entities"
         },
         "k": {
           "type": "integer",

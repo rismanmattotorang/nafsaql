@@ -3426,6 +3426,237 @@
         }
       }
     },
+    "/v1/kb/{kb}/graph": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "getKnowledgeGraph",
+        "summary": "The most mentioned things and their relations, or the two-hop neighbourhood of one (FR-K34), with counts and build progress",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "depth",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "nodes, edges, stats, enabled, progress",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or the graph is turned off, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/kb/{kb}/graph/build": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "buildKnowledgeGraph",
+        "summary": "Read the passages for the knowledge graph in the background (FR-K30); fresh=true starts over",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fresh",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "{queued}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or the graph is turned off, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/kb/{kb}/graph/entities": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "findKnowledgeEntities",
+        "summary": "Things in the graph whose names match the words",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{entities}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or the graph is turned off, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/kb/{kb}/graph/entities/{entity}": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "getKnowledgeEntity",
+        "summary": "One thing's relations and the passage that states each",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entity",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "{facts, passages}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or the graph is turned off, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/kb/{kb}/search": {
       "post": {
         "tags": [
@@ -3710,7 +3941,8 @@
               "extracting",
               "ready",
               "failed"
-            ]
+            ],
+            "description": "extracting = being read for the graph"
           },
           "error": {
             "type": [
@@ -3733,6 +3965,10 @@
           "n_embedded": {
             "type": "integer",
             "description": "passages with a vector"
+          },
+          "n_graphed": {
+            "type": "integer",
+            "description": "passages read for the knowledge graph"
           },
           "parse_ms": {
             "type": [

@@ -745,6 +745,26 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "graph_llm_url": {
+          "type": "string"
+        },
+        "graph_model": {
+          "type": "string"
+        },
+        "graph_max_tokens": {
+          "type": "integer",
+          "minimum": 64
+        },
+        "entity_merge_similarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "graph_facts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
         }
       },
       "additionalProperties": false

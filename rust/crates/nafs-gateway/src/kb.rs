@@ -50,6 +50,12 @@ pub fn from_config(k: &KnowledgeCfg) -> Option<Arc<Kb>> {
             batch: k.embed_batch.max(1),
         }),
         exact_search_below: k.exact_search_below,
+        graph: (!k.graph_llm_url.trim().is_empty()).then(|| nafs_kb::GraphConfig {
+            llm_url: k.graph_llm_url.clone(),
+            model: k.graph_model.clone(),
+            max_tokens: k.graph_max_tokens.max(64),
+            merge_similarity: k.entity_merge_similarity,
+        }),
     }))
 }
 
@@ -81,6 +87,10 @@ pub fn routes(state: AppState) -> Router<AppState> {
         .route("/v1/kb/{kb}/documents/{doc}/chunks", get(list_chunks))
         .route("/v1/kb/{kb}/search", post(search))
         .route("/v1/kb/{kb}/reindex", post(reindex))
+        .route("/v1/kb/{kb}/graph", get(graph_view))
+        .route("/v1/kb/{kb}/graph/build", post(graph_build))
+        .route("/v1/kb/{kb}/graph/entities", get(graph_entities))
+        .route("/v1/kb/{kb}/graph/entities/{entity}", get(graph_entity))
         .layer(tower_http::limit::RequestBodyLimitLayer::new(
             2 * 1024 * 1024,
         ));
@@ -383,17 +393,125 @@ async fn reindex(
     Ok((StatusCode::ACCEPTED, Json(json!({ "queued": queued }))))
 }
 
+/// Start reading the documents of a knowledge base for its graph (FR-K30); long-running, in the background.
+#[derive(Deserialize)]
+struct BuildQuery {
+    /// Forget the graph and read every passage again.
+    #[serde(default)]
+    fresh: bool,
+}
+
+async fn graph_build(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<BuildQuery>,
+) -> KbResult<(StatusCode, Json<Value>)> {
+    let kb = ready(&s).await?;
+    kb.store().get_kb(&id).await?;
+    let queued = kb.build_graph(&id, q.fresh).await?;
+    Ok((StatusCode::ACCEPTED, Json(json!({ "queued": queued }))))
+}
+
+#[derive(Deserialize)]
+struct GraphQuery {
+    entity: Option<String>,
+    #[serde(default = "d_depth")]
+    depth: usize,
+    #[serde(default = "d_nodes")]
+    limit: usize,
+}
+fn d_depth() -> usize {
+    1
+}
+fn d_nodes() -> usize {
+    60
+}
+
+/// FR-K34: the graph around an entity, or the most mentioned entities, with counts and communities.
+async fn graph_view(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<GraphQuery>,
+) -> KbResult<Json<Value>> {
+    let kb = ready(&s).await?;
+    kb.store().get_kb(&id).await?;
+    let mut view = kb
+        .store()
+        .graph_view(&id, q.entity.as_deref(), q.depth, q.limit)
+        .await?;
+    view["stats"] = kb.store().graph_stats(&id).await?;
+    view["enabled"] = json!(kb.graph_enabled());
+    let docs = kb.store().list_documents(&id).await?;
+    let (read, total): (u64, u64) = docs
+        .iter()
+        .fold((0, 0), |a, d| (a.0 + d.n_graphed, a.1 + d.n_chunks));
+    view["progress"] = json!({ "passages_read": read, "passages": total,
+        "building": docs.iter().any(|d| d.status == "extracting" || (d.status == "queued" && d.n_graphed < d.n_chunks)) });
+    Ok(Json(view))
+}
+
+#[derive(Deserialize)]
+struct EntityQuery {
+    #[serde(default)]
+    q: String,
+}
+
+/// Entities whose names match the words, or that are closest in meaning when the embedder runs.
+async fn graph_entities(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Query(q): Query<EntityQuery>,
+) -> KbResult<Json<Value>> {
+    let kb = ready(&s).await?;
+    kb.store().get_kb(&id).await?;
+    let found = kb.store().find_entities(&id, &q.q, None, 20).await?;
+    Ok(Json(json!({ "entities": found })))
+}
+
+/// One entity: its relations, and the passage that states each.
+async fn graph_entity(
+    State(s): State<AppState>,
+    Path((id, entity)): Path<(String, String)>,
+) -> KbResult<Json<Value>> {
+    let kb = ready(&s).await?;
+    kb.store().get_kb(&id).await?;
+    let facts = kb
+        .store()
+        .facts_for(&id, std::slice::from_ref(&entity), 50)
+        .await?;
+    let ev: Vec<String> = facts
+        .iter()
+        .filter_map(|f| {
+            f["evidence"]
+                .as_array()
+                .and_then(|a| a.first())
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .take(20)
+        .collect();
+    let passages = kb.store().hits_by_id(&ev).await?;
+    Ok(Json(json!({ "facts": facts, "passages": passages })))
+}
+
 /// Chat retrieval (FR-K20..K25) for the orchestrator: a hybrid search, then the relevance filter. A passage is kept
 /// when its meaning similarity reaches `rag_min_similarity`; when the search fell back to words (no vectors, or the
 /// embedding server is down), every word match is kept.
 pub struct ChatKnowledge {
     kb: Arc<Kb>,
     min_similarity: f64,
+    graph_facts: usize,
 }
 
 impl ChatKnowledge {
-    pub fn new(kb: Arc<Kb>, min_similarity: f64) -> ChatKnowledge {
-        ChatKnowledge { kb, min_similarity }
+    pub fn new(kb: Arc<Kb>, min_similarity: f64, graph_facts: usize) -> ChatKnowledge {
+        ChatKnowledge {
+            kb,
+            min_similarity,
+            graph_facts: graph_facts.max(1),
+        }
     }
 }
 
@@ -419,6 +537,7 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
         kb: &'a str,
         query: &'a str,
         k: usize,
+        mode: &'a str,
     ) -> nafs_core::knowledge::BoxFuture<'a, Result<nafs_core::knowledge::Retrieved, String>> {
         Box::pin(async move {
             let base = self
@@ -427,13 +546,46 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 .get_kb(kb)
                 .await
                 .map_err(|e| e.to_string())?;
-            // Search deeper than k so the filter has room, then keep the best k that pass.
-            let r = self
-                .kb
-                .search(kb, query, (k * 2).max(8), nafs_kb::SearchMode::Hybrid)
-                .await
-                .map_err(|e| e.to_string())?;
-            let passages = keep_for_chat(r.results, r.mode, self.min_similarity, k)
+            // Graph mode (FR-K22): facts around the question's entities, and passages that mention them first. A
+            // passage the graph brought in (a fact's evidence) has no similarity score and is kept.
+            let (facts, r, graph) = if mode == "graph" && self.kb.graph_enabled() {
+                let (facts, r) = self
+                    .kb
+                    .graph_search(kb, query, (k * 2).max(8))
+                    .await
+                    .map_err(|e| e.to_string())?;
+                (facts, r, true)
+            } else {
+                // Search deeper than k so the filter has room, then keep the best k that pass.
+                let r = self
+                    .kb
+                    .search(kb, query, (k * 2).max(8), nafs_kb::SearchMode::Hybrid)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                (Vec::new(), r, false)
+            };
+            let hits = if graph {
+                r.results
+                    .into_iter()
+                    .filter(|h| h.vector_score.is_none_or(|v| v >= self.min_similarity))
+                    .take(k)
+                    .collect()
+            } else {
+                keep_for_chat(r.results, r.mode, self.min_similarity, k)
+            };
+            let facts: Vec<nafs_core::knowledge::Fact> = facts
+                .iter()
+                .take(self.graph_facts)
+                .filter_map(|f| {
+                    Some(nafs_core::knowledge::Fact {
+                        source: f["source"].as_str()?.to_string(),
+                        predicate: f["predicate"].as_str()?.to_string(),
+                        target: f["target"].as_str()?.to_string(),
+                        weight: f["weight"].as_u64().unwrap_or(1),
+                    })
+                })
+                .collect();
+            let passages = hits
                 .into_iter()
                 .map(|h| nafs_core::knowledge::Passage {
                     chunk_id: h.chunk_id,
@@ -450,10 +602,15 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
             Ok(nafs_core::knowledge::Retrieved {
                 kb_name: base.name,
                 passages,
-                mode: format!("{:?}", r.mode).to_lowercase(),
+                mode: if graph {
+                    "graph".into()
+                } else {
+                    format!("{:?}", r.mode).to_lowercase()
+                },
                 fallback: r.fallback,
                 embed_ms: r.embed_ms,
                 search_ms: r.took_ms,
+                facts,
             })
         })
     }

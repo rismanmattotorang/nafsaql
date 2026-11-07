@@ -663,6 +663,7 @@ pub fn parse_tex(src: &str) -> Parsed {
         s.push_str(&line[..cut]);
         s.push('\n');
     }
+    let s = expand_macros(&s);
     let title = braced_arg(&s, "\\title").map(|t| strip_inline(&t));
     let body = match (s.find("\\begin{document}"), s.find("\\end{document}")) {
         (Some(b), Some(e)) if e > b => s[b + "\\begin{document}".len()..e].to_string(),
@@ -766,6 +767,49 @@ pub fn parse_tex(src: &str) -> Parsed {
         text: out,
         ..Default::default()
     }
+}
+
+/// Expand argument-free macros the file defines itself (`\\newcommand{\\X}{text}`, `\\newcommand\\X{text}`,
+/// `\\def\\X{text}`), so `\\Sone` reads as what it stands for. Macros defined in other files stay as their names.
+fn expand_macros(src: &str) -> String {
+    use std::sync::OnceLock;
+    static DEF: OnceLock<regex::Regex> = OnceLock::new();
+    let def = DEF.get_or_init(|| {
+        regex::Regex::new(
+            r"\\(?:(?:re)?newcommand\*?\s*\{?\\([A-Za-z]+)\}?|def\\([A-Za-z]+))\s*\{([^{}]*)\}",
+        )
+        .expect("valid regex")
+    });
+    let defs: Vec<(String, String)> = def
+        .captures_iter(src)
+        .filter_map(|c| {
+            Some((
+                c.get(1).or(c.get(2))?.as_str().to_string(),
+                c[3].to_string(),
+            ))
+        })
+        .filter(|(_, v)| !v.contains('#'))
+        .collect();
+    if defs.is_empty() {
+        return src.to_string();
+    }
+    let body = def.replace_all(src, "");
+    let mut out = body.into_owned();
+    for (name, value) in defs.iter().rev() {
+        let value = value.replace('~', " ");
+        // `\X{}` and `\X\ ` keep the space that follows; a bare `\X` must end at a word boundary.
+        let re = regex::Regex::new(&format!(r"\\{name}(\{{\}}|\\ |\b|$)")).expect("valid regex");
+        out = re
+            .replace_all(&out, |c: &regex::Captures| {
+                if &c[1] == "\\ " {
+                    format!("{value} ")
+                } else {
+                    value.clone()
+                }
+            })
+            .into_owned();
+    }
+    out
 }
 
 /// The `{...}` argument after `cmd` (optional `*` and `[...]` skipped), braces balanced.
@@ -993,6 +1037,18 @@ M = \mathrm{LN}(R) W
             !t.contains("documentclass") && !t.contains("a comment") && !t.contains("perceiver"),
             "{t}"
         );
+    }
+
+    #[test]
+    fn tex_macros_defined_in_the_file_are_expanded() {
+        let tex = r"\newcommand{\Sone}{System~1}\newcommand\Gw{the gateway}\def\kb{knowledge base}\newcommand{\twice}[1]{#1#1}
+\begin{document}
+\section{Paths}
+The fast path (\Sone) drafts; \Gw\ routes to the \kb{} and \Sone\ answers. \Stwo stays.
+\end{document}";
+        let p = parse(Kind::Tex, tex.as_bytes()).unwrap();
+        assert!(p.text.contains("The fast path (System 1) drafts; the gateway routes to the knowledge base and System 1 answers."), "{}", p.text);
+        assert!(p.text.contains("Stwo stays"), "{}", p.text);
     }
 
     #[test]

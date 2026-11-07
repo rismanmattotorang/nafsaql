@@ -7,6 +7,8 @@
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
 use serde_json::{json, Value};
 
 use crate::chunk::Chunk;
@@ -70,6 +72,33 @@ DEFINE FIELD IF NOT EXISTS embedding ON chunk TYPE option<array<float>>;
 DEFINE INDEX IF NOT EXISTS chunk_kb   ON chunk FIELDS kb;
 DEFINE INDEX IF NOT EXISTS chunk_doc  ON chunk FIELDS doc;
 DEFINE INDEX IF NOT EXISTS chunk_text ON chunk FIELDS text FULLTEXT ANALYZER kb_text BM25;
+DEFINE FIELD IF NOT EXISTS graph_done ON chunk TYPE bool DEFAULT false;
+DEFINE FIELD IF NOT EXISTS n_graphed ON document TYPE int DEFAULT 0;
+DEFINE TABLE IF NOT EXISTS entity SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS kb        ON entity TYPE record<kb>;
+DEFINE FIELD IF NOT EXISTS key       ON entity TYPE string;
+DEFINE FIELD IF NOT EXISTS name      ON entity TYPE string;
+DEFINE FIELD IF NOT EXISTS type      ON entity TYPE string;
+DEFINE FIELD IF NOT EXISTS mentions  ON entity TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS community ON entity TYPE option<int>;
+DEFINE FIELD IF NOT EXISTS embedding ON entity TYPE option<array<float>>;
+DEFINE INDEX IF NOT EXISTS entity_kb   ON entity FIELDS kb;
+DEFINE INDEX IF NOT EXISTS entity_name ON entity FIELDS name FULLTEXT ANALYZER kb_text BM25;
+DEFINE TABLE IF NOT EXISTS mentions TYPE RELATION FROM chunk TO entity SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS kb ON mentions TYPE record<kb>;
+DEFINE INDEX IF NOT EXISTS mentions_kb ON mentions FIELDS kb;
+DEFINE TABLE IF NOT EXISTS related TYPE RELATION FROM entity TO entity SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS kb        ON related TYPE record<kb>;
+DEFINE FIELD IF NOT EXISTS predicate ON related TYPE string;
+DEFINE FIELD IF NOT EXISTS weight    ON related TYPE int DEFAULT 0;
+DEFINE FIELD IF NOT EXISTS evidence  ON related TYPE array<record<chunk>> DEFAULT [];
+DEFINE INDEX IF NOT EXISTS related_kb ON related FIELDS kb;
+DEFINE TABLE IF NOT EXISTS community SCHEMAFULL;
+DEFINE FIELD IF NOT EXISTS kb      ON community TYPE record<kb>;
+DEFINE FIELD IF NOT EXISTS n       ON community TYPE int;
+DEFINE FIELD IF NOT EXISTS size    ON community TYPE int;
+DEFINE FIELD IF NOT EXISTS label   ON community TYPE string;
+DEFINE INDEX IF NOT EXISTS community_kb ON community FIELDS kb;
 "#;
 
 /// A knowledge base with its counts (IF-K01 `KbSummary`).
@@ -113,6 +142,9 @@ pub struct Document {
     /// Passages with a vector (Phase 2); fewer than `n_chunks` while indexing or when the embedder was down.
     #[serde(default)]
     pub n_embedded: u64,
+    /// Passages read for the knowledge graph (Phase 3).
+    #[serde(default)]
+    pub n_graphed: u64,
     #[serde(default)]
     pub parse_ms: Option<u64>,
     pub created_at: String,
@@ -169,7 +201,7 @@ pub struct NewDocument {
 }
 
 const DOC_FIELDS: &str = "record::id(id) AS id, record::id(kb) AS kb, title, filename, kind, bytes, sha256, path, status, \
-    error, pages, n_chunks, n_chars, n_embedded, parse_ms, <string> created_at AS created_at, <string> updated_at AS updated_at";
+    error, pages, n_chunks, n_chars, n_embedded, n_graphed, parse_ms, <string> created_at AS created_at, <string> updated_at AS updated_at";
 
 impl Store {
     pub fn new(cfg: StoreConfig) -> Store {
@@ -386,7 +418,9 @@ impl Store {
     pub async fn delete_kb(&self, id: &str) -> Result<(u64, u64), KbError> {
         let kb = self.get_kb(id).await?;
         self.query(
-            "LET $k = type::record('kb', $id); DELETE chunk WHERE kb = $k; DELETE document WHERE kb = $k; DELETE $k;",
+            "LET $k = type::record('kb', $id); DELETE related WHERE kb = $k; DELETE mentions WHERE kb = $k; \
+             DELETE entity WHERE kb = $k; DELETE community WHERE kb = $k; DELETE chunk WHERE kb = $k; \
+             DELETE document WHERE kb = $k; DELETE $k;",
             json!({ "id": id }),
         )
         .await?;
@@ -488,7 +522,7 @@ impl Store {
             .await?;
         }
         self.query(
-            "UPDATE type::record('document', $doc) SET title = $title, pages = $pages ?? NONE, parse_ms = $ms, n_chunks = $n, \
+            "UPDATE type::record('document', $doc) SET title = $title, pages = $pages ?? NONE, parse_ms = $ms, n_chunks = $n, n_graphed = 0, \
              n_chars = $chars, updated_at = time::now(); UPDATE type::record('kb', $kb) SET updated_at = time::now();",
             json!({ "doc": doc, "kb": kb, "title": title, "pages": pages, "ms": parse_ms, "n": chunks.len(), "chars": n_chars }),
         )
@@ -691,6 +725,384 @@ impl Store {
             h.vector_score = Some(h.score);
         }
         Ok(hits)
+    }
+
+    // ------------------------------------------------------------ graph (Phase 3)
+
+    /// A document's passages not yet read for the graph: (id, heading, text), in order.
+    pub async fn chunks_for_graph(
+        &self,
+        doc: &str,
+    ) -> Result<Vec<(String, String, String)>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(id) AS id, heading, text, ord FROM chunk \
+                 WHERE doc = type::record('document', $doc) AND graph_done = false ORDER BY ord ASC;",
+                json!({ "doc": doc }),
+            )
+            .await?;
+        let rows: Vec<Value> = rows(r.into_iter().next())?;
+        Ok(rows
+            .into_iter()
+            .map(|v| {
+                let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                (s("id"), s("heading"), s("text"))
+            })
+            .collect())
+    }
+
+    /// Which of these entity keys already exist in the knowledge base: key -> (record key, type).
+    pub async fn existing_entities(
+        &self,
+        kb: &str,
+        ids: &[String],
+    ) -> Result<HashMap<String, String>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(id) AS id, type FROM entity WHERE kb = type::record('kb', $kb) AND record::id(id) IN $ids;",
+                json!({ "kb": kb, "ids": ids }),
+            )
+            .await?;
+        let rows: Vec<Value> = rows(r.into_iter().next())?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|v| {
+                Some((
+                    v.get("id")?.as_str()?.to_string(),
+                    v.get("type")?.as_str()?.to_string(),
+                ))
+            })
+            .collect())
+    }
+
+    /// The most similar entity of a type by name vector, if any reaches `min` (entity resolution, FR-K31).
+    pub async fn similar_entity(
+        &self,
+        kb: &str,
+        v: &[f32],
+        kind: &str,
+        min: f64,
+    ) -> Result<Option<(String, f64)>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(id) AS id, vector::similarity::cosine(embedding, $v) AS s FROM entity \
+                 WHERE kb = type::record('kb', $kb) AND type = $kind AND embedding != NONE ORDER BY s DESC LIMIT 1;",
+                json!({ "kb": kb, "v": v, "kind": kind }),
+            )
+            .await?;
+        let rows: Vec<Value> = rows(r.into_iter().next())?;
+        Ok(rows.into_iter().next().and_then(|x| {
+            let s = x.get("s")?.as_f64()?;
+            (s >= min).then(|| {
+                (
+                    x.get("id")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string(),
+                    s,
+                )
+            })
+        }))
+    }
+
+    /// Record one passage's extraction: entities upserted (mention counts grow), `mentions` edges from the passage,
+    /// relations merged by id (weight grows, the passage joins their evidence); the passage is marked read.
+    pub async fn store_extraction(
+        &self,
+        kb: &str,
+        doc: &str,
+        chunk: &str,
+        ents: &[Value],
+        rels: &[Value],
+    ) -> Result<(), KbError> {
+        self.query(
+            "LET $k = type::record('kb', $kb); LET $c = type::record('chunk', $chunk); \
+             FOR $e IN $ents { \
+               LET $id = type::record('entity', $e.id); \
+               UPSERT $id SET kb = $k, key = key ?? $e.key, name = name ?? $e.name, type = type ?? $e.type, \
+                 mentions += 1, embedding = embedding ?? ($e.v ?? NONE); \
+               RELATE $c->mentions->$id SET kb = $k; \
+             }; \
+             FOR $r IN $rels { \
+               INSERT RELATION INTO related { id: type::record('related', $r.id), in: type::record('entity', $r.s), \
+                 out: type::record('entity', $r.t), kb: $k, predicate: $r.p, weight: 1, evidence: [$c] } \
+               ON DUPLICATE KEY UPDATE weight += 1, evidence += $input.evidence; \
+             }; \
+             UPDATE $c SET graph_done = true; \
+             LET $d = type::record('document', $doc); \
+             UPDATE $d SET n_graphed = (SELECT VALUE count() FROM chunk WHERE doc = $d AND graph_done = true GROUP ALL)[0] ?? 0;",
+            json!({ "kb": kb, "doc": doc, "chunk": chunk, "ents": ents, "rels": rels }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// Forget a knowledge base's graph: entities, relations, mentions, communities; every passage unread again.
+    pub async fn reset_graph(&self, kb: &str) -> Result<(), KbError> {
+        self.query(
+            "LET $k = type::record('kb', $kb); DELETE related WHERE kb = $k; DELETE mentions WHERE kb = $k; \
+             DELETE entity WHERE kb = $k; DELETE community WHERE kb = $k; \
+             UPDATE chunk SET graph_done = false WHERE kb = $k; UPDATE document SET n_graphed = 0 WHERE kb = $k;",
+            json!({ "kb": kb }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// Ready documents whose passages are not all read for the graph.
+    pub async fn documents_missing_graph(&self, kb: &str) -> Result<Vec<Document>, KbError> {
+        let r = self
+            .query(
+                &format!("SELECT {DOC_FIELDS} FROM document WHERE kb = type::record('kb', $kb) AND status = 'ready' AND n_graphed < n_chunks ORDER BY created_at ASC;"),
+                json!({ "kb": kb }),
+            )
+            .await?;
+        rows(r.into_iter().next())
+    }
+
+    /// Remove what deleted passages leave behind: evidence pointing at them, relations without evidence, entities no
+    /// passage mentions any more.
+    pub async fn prune_graph(&self, kb: &str) -> Result<(), KbError> {
+        self.query(
+            "LET $k = type::record('kb', $kb); \
+             DELETE mentions WHERE kb = $k AND !record::exists(in); \
+             UPDATE related SET evidence = evidence.filter(|$c| record::exists($c)) WHERE kb = $k; \
+             DELETE related WHERE kb = $k AND array::len(evidence) = 0; \
+             UPDATE entity SET mentions = count(<-mentions) WHERE kb = $k; \
+             DELETE entity WHERE kb = $k AND mentions = 0;",
+            json!({ "kb": kb }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// Entity, relation and community counts of a knowledge base.
+    pub async fn graph_stats(&self, kb: &str) -> Result<Value, KbError> {
+        let r = self
+            .query(
+                "LET $k = type::record('kb', $kb); RETURN { \
+                   entities: (SELECT VALUE count() FROM entity WHERE kb = $k GROUP ALL)[0] ?? 0, \
+                   relations: (SELECT VALUE count() FROM related WHERE kb = $k GROUP ALL)[0] ?? 0, \
+                   communities: (SELECT VALUE count() FROM community WHERE kb = $k GROUP ALL)[0] ?? 0 };",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        Ok(r.into_iter().last().unwrap_or(Value::Null))
+    }
+
+    /// Every relation as (source key, target key, weight), for community detection.
+    pub async fn graph_edges(&self, kb: &str) -> Result<Vec<(String, String, f64)>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(in) AS s, record::id(out) AS t, weight FROM related WHERE kb = type::record('kb', $kb);",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        let rows: Vec<Value> = rows(r.into_iter().next())?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|v| {
+                Some((
+                    v.get("s")?.as_str()?.to_string(),
+                    v.get("t")?.as_str()?.to_string(),
+                    v.get("weight")?.as_f64()?,
+                ))
+            })
+            .collect())
+    }
+
+    /// Entities as (key, name, mentions).
+    pub async fn graph_entities(&self, kb: &str) -> Result<Vec<(String, String, u64)>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(id) AS id, name, mentions FROM entity WHERE kb = type::record('kb', $kb) ORDER BY mentions DESC;",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        let rows: Vec<Value> = rows(r.into_iter().next())?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|v| {
+                Some((
+                    v.get("id")?.as_str()?.to_string(),
+                    v.get("name")?.as_str()?.to_string(),
+                    v.get("mentions")?.as_u64()?,
+                ))
+            })
+            .collect())
+    }
+
+    /// Replace the communities: each entity's community number, and one record per community (size, label).
+    pub async fn set_communities(
+        &self,
+        kb: &str,
+        assign: &[(String, usize)],
+        comms: &[(usize, usize, String)],
+    ) -> Result<(), KbError> {
+        let assign: Vec<Value> = assign
+            .iter()
+            .map(|(id, c)| json!({ "id": id, "c": c }))
+            .collect();
+        let comms: Vec<Value> = comms
+            .iter()
+            .map(|(n, size, label)| json!({ "n": n, "size": size, "label": label }))
+            .collect();
+        self.query(
+            "LET $k = type::record('kb', $kb); DELETE community WHERE kb = $k; \
+             FOR $a IN $assign { UPDATE type::record('entity', $a.id) SET community = $a.c; }; \
+             FOR $c IN $comms { CREATE community CONTENT { kb: $k, n: $c.n, size: $c.size, label: $c.label }; };",
+            json!({ "kb": kb, "assign": assign, "comms": comms }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// Entities whose names match the words (BM25) or, with a vector, are nearest in meaning: (key, name, type, score).
+    pub async fn find_entities(
+        &self,
+        kb: &str,
+        q: &str,
+        v: Option<&[f32]>,
+        k: usize,
+    ) -> Result<Vec<Value>, KbError> {
+        let k = k.clamp(1, 50);
+        let mut out: Vec<Value> = Vec::new();
+        if !q.trim().is_empty() {
+            let r = self
+                .query(
+                    "SELECT record::id(id) AS id, name, type, mentions, community, search::score(1) AS score FROM entity \
+                     WHERE kb = type::record('kb', $kb) AND name @1,OR@ $q ORDER BY score DESC LIMIT $k;",
+                    json!({ "kb": kb, "q": q, "k": k }),
+                )
+                .await?;
+            out = rows(r.into_iter().next())?;
+        }
+        if let Some(v) = v {
+            let r = self
+                .query(
+                    "SELECT record::id(id) AS id, name, type, mentions, community, vector::similarity::cosine(embedding, $v) AS similarity \
+                     FROM entity WHERE kb = type::record('kb', $kb) AND embedding != NONE ORDER BY similarity DESC LIMIT $k;",
+                    json!({ "kb": kb, "v": v, "k": k }),
+                )
+                .await?;
+            for e in rows::<Value>(r.into_iter().next())? {
+                if !out.iter().any(|x| x["id"] == e["id"]) {
+                    out.push(e);
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Relations touching any of the seed entities, strongest first: subject, predicate, object, weight, evidence.
+    pub async fn facts_for(
+        &self,
+        kb: &str,
+        seeds: &[String],
+        limit: usize,
+    ) -> Result<Vec<Value>, KbError> {
+        let r = self
+            .query(
+                "LET $s = $seeds.map(|$x| type::record('entity', $x)); \
+                 SELECT record::id(id) AS id, record::id(in) AS source_id, in.name AS source, predicate, \
+                   record::id(out) AS target_id, out.name AS target, weight, evidence.map(|$c| record::id($c)) AS evidence \
+                 FROM related WHERE kb = type::record('kb', $kb) AND (in IN $s OR out IN $s) ORDER BY weight DESC LIMIT $limit;",
+                json!({ "kb": kb, "seeds": seeds, "limit": limit.clamp(1, 200) }),
+            )
+            .await?;
+        rows(r.into_iter().last())
+    }
+
+    /// Passages that mention any of the entities, most mentions first: chunk key -> entity count.
+    pub async fn chunks_mentioning(
+        &self,
+        kb: &str,
+        entities: &[String],
+    ) -> Result<HashMap<String, usize>, KbError> {
+        let r = self
+            .query(
+                "LET $s = $ents.map(|$x| type::record('entity', $x)); \
+                 SELECT VALUE record::id(in) FROM mentions WHERE kb = type::record('kb', $kb) AND out IN $s;",
+                json!({ "kb": kb, "ents": entities }),
+            )
+            .await?;
+        let mut m = HashMap::new();
+        for v in r
+            .into_iter()
+            .last()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+        {
+            if let Some(id) = v.as_str() {
+                *m.entry(id.to_string()).or_insert(0) += 1;
+            }
+        }
+        Ok(m)
+    }
+
+    /// Passages by key (for evidence not already among the search results).
+    pub async fn hits_by_id(&self, ids: &[String]) -> Result<Vec<Hit>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(id) AS chunk_id, record::id(doc) AS doc_id, doc.title AS doc_title, ord, heading, page, text, \
+                 0.0 AS score FROM $ids.map(|$x| type::record('chunk', $x));",
+                json!({ "ids": ids }),
+            )
+            .await?;
+        rows(r.into_iter().next())
+    }
+
+    /// The graph around one entity (or the best-connected entities when none is given), for the Graph view:
+    /// nodes {id, name, type, mentions, community} and edges {source, target, predicate, weight}.
+    pub async fn graph_view(
+        &self,
+        kb: &str,
+        center: Option<&str>,
+        depth: usize,
+        limit: usize,
+    ) -> Result<Value, KbError> {
+        let limit = limit.clamp(5, 300);
+        let mut ids: Vec<String> = match center {
+            Some(c) => vec![c.to_string()],
+            None => self
+                .graph_entities(kb)
+                .await?
+                .into_iter()
+                .take(limit.min(40))
+                .map(|e| e.0)
+                .collect(),
+        };
+        for _ in 0..depth.clamp(0, 2) {
+            if ids.len() >= limit {
+                break;
+            }
+            let facts = self.facts_for(kb, &ids, limit * 2).await?;
+            for f in facts {
+                for k in ["source_id", "target_id"] {
+                    if let Some(x) = f[k].as_str() {
+                        if ids.len() < limit && !ids.iter().any(|i| i == x) {
+                            ids.push(x.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        let r = self
+            .query(
+                "LET $s = $ids.map(|$x| type::record('entity', $x)); \
+                 SELECT record::id(id) AS id, name, type, mentions, community FROM $s; \
+                 SELECT record::id(in) AS source, record::id(out) AS target, predicate, weight FROM related \
+                   WHERE kb = type::record('kb', $kb) AND in IN $s AND out IN $s;",
+                json!({ "kb": kb, "ids": ids }),
+            )
+            .await?;
+        let mut it = r.into_iter().skip(1);
+        let nodes: Vec<Value> = rows::<Value>(it.next())?
+            .into_iter()
+            .filter(|n| !n["id"].is_null())
+            .collect();
+        let edges: Vec<Value> = rows(it.next())?;
+        Ok(json!({ "nodes": nodes, "edges": edges }))
     }
 
     /// Documents left mid-ingestion by a previous run (re-queued at start).
