@@ -1,0 +1,79 @@
+{
+  "host_load_average": "{ 27.17 25.23 29.63 }",
+  "machine": "Intel Core i3-8100, 4 cores, AVX2, macOS 15.4.1",
+  "rows": [
+    {
+      "documents": 10,
+      "full_forward_ms": 41.7,
+      "module": "nafs-aql (E 1024 -> 2048)",
+      "parameters": 31512576,
+      "per_question_ms": 53.6,
+      "prepare_once_ms": 7.8,
+      "prepared_mb": 0
+    },
+    {
+      "documents": 100,
+      "full_forward_ms": 88.1,
+      "module": "nafs-aql (E 1024 -> 2048)",
+      "parameters": 31512576,
+      "per_question_ms": 48.5,
+      "prepare_once_ms": 10.8,
+      "prepared_mb": 1
+    },
+    {
+      "documents": 1000,
+      "full_forward_ms": 216.9,
+      "module": "nafs-aql (E 1024 -> 2048)",
+      "parameters": 31512576,
+      "per_question_ms": 88.0,
+      "prepare_once_ms": 110.7,
+      "prepared_mb": 19
+    },
+    {
+      "documents": 10000,
+      "full_forward_ms": 1428.7,
+      "module": "nafs-aql (E 1024 -> 2048)",
+      "parameters": 31512576,
+      "per_question_ms": 436.3,
+      "prepare_once_ms": 877.0,
+      "prepared_mb": 195
+    },
+    {
+      "documents": 10,
+      "full_forward_ms": 248.4,
+      "module": "paper (E 2560 -> 4096)",
+      "parameters": 194123776,
+      "per_question_ms": 188.0,
+      "prepare_once_ms": 27.0,
+      "prepared_mb": 0
+    },
+    {
+      "documents": 100,
+      "full_forward_ms": 273.3,
+      "module": "paper (E 2560 -> 4096)",
+      "parameters": 194123776,
+      "per_question_ms": 181.3,
+      "prepare_once_ms": 71.7,
+      "prepared_mb": 4
+    },
+    {
+      "documents": 1000,
+      "full_forward_ms": 825.8,
+      "module": "paper (E 2560 -> 4096)",
+      "parameters": 194123776,
+      "per_question_ms": 247.1,
+      "prepare_once_ms": 474.7,
+      "prepared_mb": 48
+    },
+    {
+      "documents": 10000,
+      "full_forward_ms": 4837.0,
+      "module": "paper (E 2560 -> 4096)",
+      "parameters": 194123776,
+      "per_question_ms": 533.4,
+      "prepare_once_ms": 3092.8,
+      "prepared_mb": 488
+    }
+  ],
+  "what": "memory module forward, f32, Candle 0.11 CPU, batch 1, median of 5 after one warm-up; prepare_once = document keys/values computed once per collection, per_question = forward_prepared"
+}

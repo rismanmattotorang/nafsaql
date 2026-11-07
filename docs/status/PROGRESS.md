@@ -2,7 +2,7 @@
 
 ## Phase 20 (Knowledge): Knowledge Base, GraphRAG and Memorilla (started 2026-11-07)
 
-Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 3 done (0–2 committed as b8da406 on feat/phase20-knowledge-base); next is Phase 4.
+Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 4 done (0–2 in b8da406, 3 in f5dfd63, on feat/phase20-knowledge-base); next is Phase 5.
 
 | When | Unit of work | Evidence |
 |---|---|---|
@@ -25,10 +25,15 @@ Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 3 done (0–2 committ
 | 12:26 | First real build: headings and the prompt's example leaked in; fixed by grounding, heading-free input, generic-word filter; TeX macro expansion; `?fresh=true` | rebuild 12:46: 109 entities, 73 relations |
 | 12:50 | Chat `graph` mode, graph API (4 routes), Graph card and chat mode choice; checked in the browser | screenshots in session |
 
-### Next three actions (Phase 4)
-1. `nafs-memorilla::memory`: the memory module in Candle with `memory.py`'s parameter names (packed in_proj MHA, key padding mask, pre-norm blocks, GELU FFN, projection); `retrieval_init`.
-2. Convert a released checkpoint (`memory.pt` -> safetensors + config.json) with a Python one-off (ask before downloading it, Stage 3 is about 0.8 GB) and a parity test against PyTorch on random inputs (max abs error < 1e-3).
-3. Forward-time benchmark for N = 10 ... 10,000 documents on this CPU (NFR-K08).
+| 13:00 | Phase 3 committed (f5dfd63) | git |
+| 13:10 | `MemoryModule` in Candle; parity fixtures from the unmodified reference (torch 2.2.2 here); 4 parity tests pass (max 1.9e-6) | `tests/parity.rs` |
+| 13:20 | Benchmark: Candle's portable gemm about 7 GFLOP/s on 16-row products; Accelerate on macOS (6–15x); `prepare` / `forward_prepared` | `benchmarks/memorilla_forward.json` |
+| 13:30 | Checkpoint converter checked on a Lightning-style bf16 `memory.pt` (same keys and config) | `training/memorilla/` |
+
+### Next three actions (Phase 5)
+1. Smiley Core: rows with caller-supplied input vectors in `forward_rows` (marked addition), placeholder positions in a session, the prefix-store key including a digest of the vectors; identity test (supplying a token's own embedding row gives identical logits).
+2. `nafs-smiley-server`: `memory_embeds` on `/v1/chat/completions`; the gateway: knowledge mode `memory` (embed the question without the instruction, run the module over the base's prepared documents, send the 16 vectors).
+3. Prepared-document cache per knowledge base in the gateway, invalidated when documents change. A module trained for System 1 comes in Phase 6; until then `memory` mode runs with an untrained module only behind an Advanced switch, or not at all.
 
 ### Open questions
 - Whether the live gateway on :8080 should be restarted to serve the Knowledge page and knowledge in chat (it runs the pre-Phase-20 binary).
