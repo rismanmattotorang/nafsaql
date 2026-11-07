@@ -242,3 +242,35 @@ on balance is Phase 7's measurement.
 **Known limits.** TeX macros defined outside the uploaded file stay as names (`\Sone` reads "Sone"); the file's own
 `\newcommand`/`\def` macros are expanded. Types are coarse (eight words). Community summaries and global search are not
 built (one System 2 call per community).
+
+## 13. Phase 4 results (2026-11-07): the memory module in Candle
+
+`nafs_memorilla::MemoryModule` mirrors `memory.py`: the same parameter names (packed `in_proj_weight`, `ffn_layers.i.0/.3`,
+`encoder.layers.i.*`), so a converted state dict loads as is (`training/memorilla/convert_checkpoint.py`).
+
+**Parity without downloading a checkpoint.** `training/memorilla/make_parity_fixtures.py` runs the unmodified reference
+class (its helper module stubbed, so only torch is needed) with seeded random weights, LayerNorm parameters perturbed, and
+one padded row, for three configurations; the fixtures (1 MB) are in the crate, so CI checks parity without Python.
+Largest difference: 1.9e-6 (default), 9.5e-7 (`retrieval_init`), 7.2e-7 (document self-attention); target 1e-4. The
+parameter formula matches the stored tensors and the paper (194,123,776; 190,190,080 for the 4B decoder). Changing the
+values of padded documents does not change the memory.
+
+**Speed on this CPU (load 31 to 34, shared machine).** Two findings:
+
+1. Candle's portable matmul ran the module's 16-row products at about 7 GFLOP/s here (`examples/matmul_probe.rs`:
+   15–25 ms for 16x1024 by 1024x4096). With Candle's `accelerate` feature (Apple's BLAS, macOS only) the same product
+   takes 1.3–2.7 ms. Parity is unchanged.
+2. Most of the forward pass does not depend on the question: the document encoder, the document norm and every block's
+   keys and values. `prepare` computes them once per collection and `forward_prepared` answers each question from them.
+
+| Module | N documents | full forward | prepare once | per question |
+|---|---|---|---|---|
+| Nafs-Aql (E 1024 -> 2048, 31.5 M) | 10 | 42 ms | 8 ms | 54 ms |
+| | 100 | 88 ms | 11 ms | 49 ms |
+| | 1,000 | 217 ms | 111 ms | 88 ms |
+| | 10,000 | 1,429 ms | 877 ms | 436 ms (195 MB prepared) |
+| Paper (E 2560 -> 4096, 194 M) | 10,000 | 4,837 ms | 3,093 ms | 533 ms (488 MB) |
+
+NFR-K08 (< 50 ms at N = 10,000) is met up to about 100 documents, not at 10,000: the per-question attention over 10,000
+keys and values is the remaining cost. Against the decoder (seconds per answer on this CPU) the module is a small share up
+to a few thousand passages. `benchmarks/memorilla_forward.json`.

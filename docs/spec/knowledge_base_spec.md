@@ -1,6 +1,6 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.2, 2026-11-07. Status: Phases 0–3 implemented; Phases 4–8 specified. Research:
+Version 1.3, 2026-11-07. Status: Phases 0–4 implemented; Phases 5–8 specified. Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -94,7 +94,8 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
 
 ### Memorilla (Phases 4–6)
 - **FR-K40** Memory module in Candle with the parameter names and maths of `memorilla/memory.py`; loads converted
-  safetensors with `config.json`; parity with PyTorch (§8).
+  safetensors with `config.json`; parity with PyTorch (§8). Implemented: `nafs_memorilla::MemoryModule`, with
+  `prepare` (question-independent keys and values, once per collection) and `forward_prepared` (per question).
 - **FR-K41** Dataset builder per knowledge base: reconstruction rows, graph-claim rows, synthetic QA rows (§7), split
   90/10 by question; written in Memorilla's parquet + safetensors layout.
 - **FR-K42** Train (from scratch, `retrieval_init` on) and fine-tune (from a checkpoint) a module for System 1, as a
@@ -114,7 +115,7 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
 | NFR-K05 | `rag` adds < 3 s to the quick path's time to first token at 1,200 context tokens | Phase 2 A/B |
 | NFR-K06 | Ingestion never runs more than one heavy step at a time and yields to chat (lower priority) | Phase 2 |
 | NFR-K07 | A knowledge base of 1,000 documents / 50,000 chunks stays usable (list, search) | Phase 8 |
-| NFR-K08 | Memory module forward < 50 ms for N = 10,000 chunks on this CPU | Phase 4 bench |
+| NFR-K08 | Memory module forward < 50 ms for N = 10,000 chunks on this CPU | Phase 4 bench: per question 49–54 ms up to 100 documents, 88 ms at 1,000, 436 ms at 10,000 (load 34); **not met at 10,000** |
 | NFR-K09 | Training time per example measured and shown before a job starts (estimate for the whole run) | Phase 6 |
 
 ## 5. Security requirements
@@ -230,9 +231,10 @@ for retrieval use `Instruct: Given a question, retrieve passages that answer it\
 queries use no prefix. Candle's implementation of the same model is the reference (cosine >= 0.999 between the two on 32
 fixed texts).
 
-**Memory module (Phase 4).** Candle, f32; inputs `doc_embeds [1,N,1024]`, `question_embeds [1,1024]`; output `[1,16,h_L]`.
-Parity: the released Stage 3 checkpoint (h_e 2560, h_L 4096) converted to safetensors; 4 random inputs with N in {1, 7,
-64, 512}; max abs difference to PyTorch < 1e-3.
+**Memory module (Phase 4, implemented).** Candle, f32, Apple Accelerate for matmuls on macOS; inputs `doc_embeds [B,N,E]`,
+a padding mask, `question_embeds [B,E]`; output `[B,K,h_L]`. Parity: seeded random weights through the unmodified
+reference class, three configurations with a padded row (fixtures in the crate); max abs difference 1.9e-6 (target
+1e-4). The released checkpoint is optional (`convert_checkpoint.py`).
 
 **Memory tokens in Smiley Core (Phase 5).** `Model::forward_rows` gains `inputs: Option<&[Option<&[f32]>]>`: for row `b`,
 `Some(v)` (length `d_model`) replaces the token embedding. `Session` gains `generate_with_embeds` that places 16 vectors at

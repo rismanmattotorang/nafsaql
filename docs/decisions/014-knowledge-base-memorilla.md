@@ -1,6 +1,6 @@
 # Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)
 
-Date 2026-11-07. Status: **adopted; Phases 0–3 implemented, 4–8 planned.** Research note:
+Date 2026-11-07. Status: **adopted; Phases 0–4 implemented, 5–8 planned.** Research note:
 [`docs/research/memorilla_knowledge.md`](../research/memorilla_knowledge.md). Specification:
 [`docs/spec/knowledge_base_spec.md`](../spec/knowledge_base_spec.md). Prompt: [`docs/prompts/MEMORILLA_KB_PROMPT.md`](../prompts/MEMORILLA_KB_PROMPT.md).
 
@@ -48,3 +48,7 @@ served by Smiley Core, implemented with Candle.
 - Phase 3 (2026-11-07): extraction prompt chosen from four measured variants (138 vs 327 output tokens, faithful JSON);
   grounding removed copied and heading entities; 20 fixture passages -> 109 entities, 73 relations, 18/20 schema-valid
   replies; graph mode in chat puts the relations around the question's entities before the passages.
+- Phase 4 (2026-11-07): the Candle memory module matches PyTorch within 1.9e-6 on three configurations (fixtures from the
+  unmodified reference, no checkpoint download). On macOS Candle uses Apple Accelerate (6–15x faster matmuls here), and
+  the question-independent half is computed once per collection: 49–54 ms per question up to 100 documents, 436 ms at
+  10,000 (`benchmarks/memorilla_forward.json`).
