@@ -2333,6 +2333,7 @@ dependencies = [
  "clap",
  "fastrand",
  "futures",
+ "libc",
  "metrics",
  "metrics-exporter-prometheus",
  "nafs-bench",

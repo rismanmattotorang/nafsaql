@@ -80,6 +80,8 @@ pub struct MemoryReadout {
     pub vectors: Vec<Vec<f32>>,
     /// The token the prompt carries at each memory position.
     pub placeholder: String,
+    /// The system prompt the module was trained with (the memory block is appended to it).
+    pub system: String,
     /// Passages the module read.
     pub documents: usize,
     pub prepare_ms: u64,

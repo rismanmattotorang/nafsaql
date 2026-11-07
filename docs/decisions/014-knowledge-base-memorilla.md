@@ -1,6 +1,6 @@
 # Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)
 
-Date 2026-11-07. Status: **adopted; Phases 0–5 implemented, 6–8 planned.** Research note:
+Date 2026-11-07. Status: **adopted; Phases 0–6 implemented, 7–8 planned.** Research note:
 [`docs/research/memorilla_knowledge.md`](../research/memorilla_knowledge.md). Specification:
 [`docs/spec/knowledge_base_spec.md`](../spec/knowledge_base_spec.md). Prompt: [`docs/prompts/MEMORILLA_KB_PROMPT.md`](../prompts/MEMORILLA_KB_PROMPT.md).
 
@@ -55,3 +55,9 @@ served by Smiley Core, implemented with Candle.
 - Phase 5 (2026-11-07): memory tokens reach the quick model through Smiley Core (`admit_with_inputs`, server
   `memory_embeds`, chat `memory` mode); the prefix store is capped at the first supplied vector. Own-embedding identity
   holds on the real model; prepare 56 ms once and read 27 ms per question on 20 passages. Experimental until Phase 6.
+- Phase 6 (2026-11-07): the trainer works end to end (dataset from a base, `memorilla-train`, runs in the gateway and on
+  the Knowledge page). Three defects found and fixed before it could learn: Candle's fused LayerNorm and softmax have no
+  backward and silently stop the gradient; a `VarMap` without hints initialises to zero; SiLU written as x/(1+e^-x)
+  gives NaN gradients (0 x inf). On Qwen3-0.6B 80 questions take the check loss from 3.46 to 0.70. On Qwen3-1.7B a
+  question costs 36–94 s here (shared machine), so a useful module is an overnight run, or a GPU pre-train
+  (`training/memorilla/GPU_RECIPE.md`, about 8–10 H100-hours estimated).

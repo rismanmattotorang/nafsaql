@@ -772,6 +772,15 @@
         "memory_placeholder": {
           "type": "string",
           "minLength": 1
+        },
+        "memory_trainer": {
+          "type": "string"
+        },
+        "memory_decoder": {
+          "type": "string"
+        },
+        "memory_gguf": {
+          "type": "string"
         }
       },
       "additionalProperties": false

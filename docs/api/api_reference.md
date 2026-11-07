@@ -389,6 +389,40 @@ Parameters: `kb` (path, required), `entity` (path, required).
 
 Responses: `200`, `403`, `404`, `503`.
 
+### `GET /v1/kb/{kb}/memory/runs`
+
+Memorilla training runs of a knowledge base (state, loss curve, seconds per question) and its active module (FR-K42)
+
+Parameters: `kb` (path, required).
+
+Responses: `200`, `403`, `404`, `503`.
+
+### `POST /v1/kb/{kb}/memory/runs`
+
+Build the dataset (reconstruction and graph claims) and start training (from scratch) or fine-tuning (from the active module) in a separate process
+
+Parameters: `kb` (path, required).
+
+Request body: `kind`, `epochs`, `max_examples`, `lr` (* = required).
+
+Responses: `202`, `400`, `409`, `403`, `404`, `503`.
+
+### `POST /v1/kb/{kb}/memory/runs/{run}/activate`
+
+Make a run's best checkpoint the module chat's memory mode uses for this knowledge base
+
+Parameters: `kb` (path, required), `run` (path, required).
+
+Responses: `200`, `400`, `403`, `404`, `503`.
+
+### `POST /v1/kb/{kb}/memory/runs/{run}/stop`
+
+End a run after its current step (what it learned is saved)
+
+Parameters: `kb` (path, required), `run` (path, required).
+
+Responses: `200`, `403`, `404`, `503`.
+
 ### `POST /v1/kb/{kb}/reindex`
 
 Give vectors to the passages that lack them (stored before the embedder ran, or while it was down)

@@ -20,6 +20,7 @@ nafs-eval = { path = "../nafs-eval" }
 nafs-bench = { path = "../nafs-bench" }
 nafs-kb = { path = "../nafs-kb" }
 nafs-memorilla = { path = "../nafs-memorilla" }
+libc = { workspace = true }
 tokio = { workspace = true }
 axum = { workspace = true, features = ["multipart"] }
 tower-http = { workspace = true }

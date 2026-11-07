@@ -86,6 +86,11 @@ pub struct KnowledgeCfg {
     pub memory_checkpoint: String,
     /// The token that marks the memory positions in the prompt (one token of the decoder's vocabulary).
     pub memory_placeholder: String,
+    /// Phase 6: the trainer binary, the f32 decoder it trains through, and the GGUF whose tokenizer and template
+    /// make the prompts (System 1's).
+    pub memory_trainer: String,
+    pub memory_decoder: String,
+    pub memory_gguf: String,
 }
 impl Default for KnowledgeCfg {
     fn default() -> Self {
@@ -117,6 +122,9 @@ impl Default for KnowledgeCfg {
             graph_facts: 12,
             memory_checkpoint: String::new(),
             memory_placeholder: "<|fim_pad|>".into(),
+            memory_trainer: "rust/target/release/memorilla-train".into(),
+            memory_decoder: "models/hf/Qwen3-1.7B".into(),
+            memory_gguf: "models/Qwen3-1.7B-Q4_K_M.gguf".into(),
         }
     }
 }

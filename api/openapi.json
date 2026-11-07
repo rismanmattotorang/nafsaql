@@ -3657,6 +3657,248 @@
         }
       }
     },
+    "/v1/kb/{kb}/memory/runs": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "listMemoryRuns",
+        "summary": "Memorilla training runs of a knowledge base (state, loss curve, seconds per question) and its active module (FR-K42)",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "runs, active, trainer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or embeddings are off, the trainer is not built, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "startMemoryRun",
+        "summary": "Build the dataset (reconstruction and graph claims) and start training (from scratch) or fine-tuning (from the active module) in a separate process",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "train",
+                      "finetune"
+                    ]
+                  },
+                  "epochs": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20
+                  },
+                  "max_examples": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "lr": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The run, building its dataset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or embeddings are off, the trainer is not built, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/kb/{kb}/memory/runs/{run}/stop": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "stopMemoryRun",
+        "summary": "End a run after its current step (what it learned is saved)",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "run",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or embeddings are off, the trainer is not built, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/kb/{kb}/memory/runs/{run}/activate": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "activateMemoryRun",
+        "summary": "Make a run's best checkpoint the module chat's memory mode uses for this knowledge base",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "run",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "active: the checkpoint directory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "description": "Knowledge or embeddings are off, the trainer is not built, or SurrealDB is not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/kb/{kb}/search": {
       "post": {
         "tags": [
@@ -3880,6 +4122,11 @@
           },
           "chars": {
             "type": "integer"
+          },
+          "memory": {
+            "type": "boolean",
+            "description": "a Memorilla module can answer this base's questions (its own activated run",
+            "or the configured global checkpoint)": null
           }
         }
       },

@@ -17,7 +17,6 @@ candle-transformers = "0.11.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-[dev-dependencies]
 smiley-core = { path = "../smiley-core" }
 
 # Apple's Accelerate BLAS for Candle's matmuls on macOS: Candle's portable gemm reached about 7 GFLOP/s on the memory

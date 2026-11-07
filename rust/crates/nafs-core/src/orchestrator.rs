@@ -930,10 +930,12 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 match (&retriever, self.active().s1.kind.as_str()) {
                     (Some(r), "smiley") => match r.memory(&kq.kb, &user.content).await {
                         Ok(mr) => {
-                            system.push_str(&crate::knowledge::memory_block(
-                                &mr.placeholder,
-                                mr.vectors.len(),
-                            ));
+                            // The prompt the module was trained with, not the assistant's usual one.
+                            system = format!(
+                                "{}{}",
+                                mr.system,
+                                crate::knowledge::memory_block(&mr.placeholder, mr.vectors.len())
+                            );
                             sources.push(json!({"memory": {"tokens": mr.vectors.len(), "documents": mr.documents, "prepare_ms": mr.prepare_ms, "read_ms": mr.read_ms}, "kb": kq.kb, "kb_name": mr.kb_name}));
                             memory = Some(Arc::new(mr.vectors));
                             req.force_mode = Some(ReasoningMode::Fast);

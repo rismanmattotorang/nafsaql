@@ -180,6 +180,9 @@ entity_merge_similarity = 0.92         # same-type entities with name vectors th
 graph_facts = 12                       # chat, graph mode: facts put in the prompt
 memory_checkpoint = ""                 # Phase 5: Memorilla module trained for System 1 (dir with config.json + weights.safetensors); "" = memory mode off
 memory_placeholder = "<|fim_pad|>"     # the token at the 16 memory positions of the prompt
+memory_trainer = "rust/target/release/memorilla-train"   # Phase 6: cargo build --release -p nafs-memorilla
+memory_decoder = "models/hf/Qwen3-1.7B"       # f32 decoder the module is trained through (System 1's model)
+memory_gguf = "models/Qwen3-1.7B-Q4_K_M.gguf"  # its tokenizer and chat template make the training prompts
 
 [storage]
 sqlite_path = "data/runtime/nafs.sqlite"

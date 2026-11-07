@@ -7,8 +7,10 @@
 //!
 //! Phase 4 adds the **memory module** (`memory`), matching `memorilla/memory.py` (parity fixtures in `tests/`).
 
+pub mod decoder;
 pub mod encoder;
 pub mod memory;
+pub mod train;
 
 pub use encoder::{Encoder, END_OF_TEXT};
 pub use memory::{MemoryConfig, MemoryModule};
