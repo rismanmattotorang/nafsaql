@@ -2,7 +2,7 @@
 
 ## Phase 20 (Knowledge): Knowledge Base, GraphRAG and Memorilla (started 2026-11-07)
 
-Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 4 done (0–2 in b8da406, 3 in f5dfd63, on feat/phase20-knowledge-base); next is Phase 5.
+Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 5 done (0–2 b8da406, 3 f5dfd63, 4 e148c3b, on feat/phase20-knowledge-base); next is Phase 6.
 
 | When | Unit of work | Evidence |
 |---|---|---|
@@ -30,10 +30,15 @@ Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 4 done (0–2 in b8da
 | 13:20 | Benchmark: Candle's portable gemm about 7 GFLOP/s on 16-row products; Accelerate on macOS (6–15x); `prepare` / `forward_prepared` | `benchmarks/memorilla_forward.json` |
 | 13:30 | Checkpoint converter checked on a Lightning-style bf16 `memory.pt` (same keys and config) | `training/memorilla/` |
 
-### Next three actions (Phase 5)
-1. Smiley Core: rows with caller-supplied input vectors in `forward_rows` (marked addition), placeholder positions in a session, the prefix-store key including a digest of the vectors; identity test (supplying a token's own embedding row gives identical logits).
-2. `nafs-smiley-server`: `memory_embeds` on `/v1/chat/completions`; the gateway: knowledge mode `memory` (embed the question without the instruction, run the module over the base's prepared documents, send the 16 vectors).
-3. Prepared-document cache per knowledge base in the gateway, invalidated when documents change. A module trained for System 1 comes in Phase 6; until then `memory` mode runs with an untrained module only behind an Advanced switch, or not at all.
+| 14:20 | Phase 4 committed (e148c3b) | git |
+| 14:45 | Smiley Core: supplied input vectors, `admit_with_inputs`, prefix store capped at the first vector; identity test on the real model | `serve::tests::supplied_input_vectors_are_used_as_given` |
+| 15:00 | Server `memory_embeds`; gateway `memory` mode, `MemoryReader` with per-base prepared cache, config, UI option (Advanced, experimental) | e2e on :8091 with a test S1 on :8211 |
+| 15:10 | Server check: zero vectors ~ no vectors, large vectors derail, count mismatch refused | session log |
+
+### Next three actions (Phase 6)
+1. Dataset builder per knowledge base (reconstruction, graph claims, synthetic QA filtered by System 1), written in Memorilla's parquet + safetensors layout.
+2. Candle trainer through a frozen f32 Qwen3-1.7B (`models/hf/Qwen3-1.7B`) taking input embeddings: answer-only loss, AdamW, warm-up + cosine, clipping; measure seconds per example first and decide the size of a CPU run from it.
+3. Train a `retrieval_init` module on the fixture base, compare memory mode with rag on held-out questions, and write the GPU recipe for Stages 1–2.
 
 ### Open questions
 - Whether the live gateway on :8080 should be restarted to serve the Knowledge page and knowledge in chat (it runs the pre-Phase-20 binary).

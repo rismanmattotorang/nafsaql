@@ -812,7 +812,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
 
     pub async fn handle_with_cancel(
         &self,
-        req: ChatRequest,
+        mut req: ChatRequest,
         em: Emitter,
         external: Option<Arc<AtomicBool>>,
     ) -> Result<ChatReply> {
@@ -909,6 +909,8 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         }
         // FR-K20..K25: passages of a knowledge base, numbered and delimited as data (Phase 20).
         let mut sources: Vec<Value> = vec![];
+        // FR-K23: memory tokens for every quick-model request of this turn (Phase 20).
+        let mut memory: Option<Arc<Vec<Vec<f32>>>> = None;
         if let Some(kq) = req
             .knowledge
             .as_ref()
@@ -922,14 +924,40 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 .unwrap_or_else(|e| e.into_inner())
                 .clone();
             let k = kq.k.unwrap_or(cfg.knowledge.rag_k).clamp(1, 12);
-            match retriever {
-                Some(r) => match r.retrieve(&kq.kb, &user.content, k, kmode).await {
-                    Ok(found) => {
-                        system.push_str(&crate::knowledge::prompt_block(
-                            &found,
-                            cfg.knowledge.rag_max_chars,
-                        ));
-                        sources = found
+            if kmode == "memory" {
+                // FR-K23: Memorilla's memory tokens for the quick model (the module is trained for its embedding space;
+                // the thorough model would see placeholders without vectors, so the request stays on the quick path).
+                match (&retriever, self.active().s1.kind.as_str()) {
+                    (Some(r), "smiley") => match r.memory(&kq.kb, &user.content).await {
+                        Ok(mr) => {
+                            system.push_str(&crate::knowledge::memory_block(
+                                &mr.placeholder,
+                                mr.vectors.len(),
+                            ));
+                            sources.push(json!({"memory": {"tokens": mr.vectors.len(), "documents": mr.documents, "prepare_ms": mr.prepare_ms, "read_ms": mr.read_ms}, "kb": kq.kb, "kb_name": mr.kb_name}));
+                            memory = Some(Arc::new(mr.vectors));
+                            req.force_mode = Some(ReasoningMode::Fast);
+                        }
+                        Err(e) => sources.push(
+                            json!({"note": format!("Memory could not be read: {e}"), "kb": kq.kb}),
+                        ),
+                    },
+                    (Some(_), _) => sources.push(
+                        json!({"note": "Memory tokens need the Smiley Core engine.", "kb": kq.kb}),
+                    ),
+                    (None, _) => sources.push(
+                        json!({"note": "Knowledge is turned off on this server.", "kb": kq.kb}),
+                    ),
+                }
+            } else {
+                match retriever {
+                    Some(r) => match r.retrieve(&kq.kb, &user.content, k, kmode).await {
+                        Ok(found) => {
+                            system.push_str(&crate::knowledge::prompt_block(
+                                &found,
+                                cfg.knowledge.rag_max_chars,
+                            ));
+                            sources = found
                             .passages
                             .iter()
                             .enumerate()
@@ -937,22 +965,24 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                 "doc_title": p.doc_title, "heading": p.heading, "page": p.page, "text": p.text, "score": p.score,
                                 "lexical_score": p.lexical_score, "vector_score": p.vector_score, "mode": found.mode}))
                             .collect();
-                        if !found.facts.is_empty() {
-                            sources.push(json!({"facts": found.facts, "kb": kq.kb, "kb_name": found.kb_name}));
+                            if !found.facts.is_empty() {
+                                sources.push(json!({"facts": found.facts, "kb": kq.kb, "kb_name": found.kb_name}));
+                            }
+                            if found.passages.is_empty() && found.facts.is_empty() {
+                                sources.push(json!({"note": format!("The knowledge base \"{}\" has no passage about this question.", found.kb_name), "kb": kq.kb}));
+                            }
+                            metrics::counter!("nafs_knowledge_passages_total")
+                                .increment(found.passages.len() as u64);
                         }
-                        if found.passages.is_empty() && found.facts.is_empty() {
-                            sources.push(json!({"note": format!("The knowledge base \"{}\" has no passage about this question.", found.kb_name), "kb": kq.kb}));
+                        Err(e) => {
+                            tracing::warn!(kb = %kq.kb, error = %e, "knowledge retrieval failed; answering without it");
+                            sources.push(json!({"note": format!("The knowledge base could not be searched: {e}"), "kb": kq.kb}));
                         }
-                        metrics::counter!("nafs_knowledge_passages_total")
-                            .increment(found.passages.len() as u64);
-                    }
-                    Err(e) => {
-                        tracing::warn!(kb = %kq.kb, error = %e, "knowledge retrieval failed; answering without it");
-                        sources.push(json!({"note": format!("The knowledge base could not be searched: {e}"), "kb": kq.kb}));
-                    }
-                },
-                None => sources
-                    .push(json!({"note": "Knowledge is turned off on this server.", "kb": kq.kb})),
+                    },
+                    None => sources.push(
+                        json!({"note": "Knowledge is turned off on this server.", "kb": kq.kb}),
+                    ),
+                }
             }
             stages.push(StageTiming {
                 stage: "knowledge".into(),
@@ -1051,6 +1081,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 && (early.below_mean.is_some() || early.below_window.is_some()))
             .then_some(early);
             let dreq = GenRequest {
+                memory_embeds: memory.clone(),
                 messages: prompt.clone(),
                 early_stop,
                 max_tokens: req.max_tokens.unwrap_or(cfg.deliberation.draft_max_tokens),
@@ -1064,6 +1095,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             let hard = matches!(dom, Domain::Math | Domain::Code);
             let sreq = GenRequest {
                 early_stop: None,
+                memory_embeds: memory.clone(),
                 grammar: None,
                 stop_after: None,
                 max_tokens: if hard {
@@ -1104,6 +1136,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             let samples_fut = futures::future::join_all((0..k_now).map(|i| {
                 let s = GenRequest {
                     seed: Some(1000 + i as u64),
+                    memory_embeds: memory.clone(),
                     ..sreq.clone()
                 };
                 let b = pair.s1.clone();
@@ -1145,6 +1178,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     samples = futures::future::join_all((0..k).map(|i| {
                         let s = GenRequest {
                             seed: Some(1000 + i as u64),
+                            memory_embeds: memory.clone(),
                             ..sreq.clone()
                         };
                         let b = pair.s1.clone();
@@ -1224,6 +1258,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     label: format!("System 1 drawing {rescue_k} more samples at once (the draft failed its check)"),
                 });
                 let rreq = GenRequest {
+                    memory_embeds: memory.clone(),
                     messages: prompt.clone(),
                     max_tokens: req.max_tokens.unwrap_or(cfg.deliberation.draft_max_tokens),
                     temperature: cfg.gate.rescue_temperature,
@@ -1704,6 +1739,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                             let seed = seed_base + 1 + k as u64;
                             let mut local: Vec<StageTiming> = vec![];
                             let sreq = GenRequest {
+                                memory_embeds: None,
                                 messages: msgs.clone(),
                                 max_tokens: budget
                                     .saturating_add(cfg.deliberation.answer_max_tokens),
@@ -1779,6 +1815,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     let mut driver_done = !n_mode;
                     let mut driver: futures::future::BoxFuture<'_, Result<u32>> = if n_mode {
                         let sreq_n = GenRequest {
+                            memory_embeds: None,
                             messages: msgs.clone(),
                             max_tokens: budget.saturating_add(cfg.deliberation.answer_max_tokens),
                             temperature: cfg.deliberation.slow_temperature,

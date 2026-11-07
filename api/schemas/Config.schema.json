@@ -765,6 +765,13 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 50
+        },
+        "memory_checkpoint": {
+          "type": "string"
+        },
+        "memory_placeholder": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false

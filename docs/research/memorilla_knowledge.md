@@ -274,3 +274,28 @@ values of padded documents does not change the memory.
 NFR-K08 (< 50 ms at N = 10,000) is met up to about 100 documents, not at 10,000: the per-question attention over 10,000
 keys and values is the remaining cost. Against the decoder (seconds per answer on this CPU) the module is a small share up
 to a few thousand passages. `benchmarks/memorilla_forward.json`.
+
+## 14. Phase 5 results (2026-11-07): memory tokens through Smiley Core
+
+**Engine.** Three marked additions in `smiley-core`: `State::inputs` (vectors that replace chosen rows' token embeddings
+in the next `forward_rows`), `Model::token_embedding`, and `Engine::admit_with_inputs` (vectors by prompt position,
+applied during prefill; the positions must precede the prompt's last token). The shared prefix store never restores a
+cache past the first supplied vector and never stores one beyond it, so a cache computed from one question's memory is
+not reused for another's. Test on the real Qwen3-1.7B: supplying each row's own embedding gives exactly the plain
+answer; nothing past the first vector is restored.
+
+**Server.** `memory_embeds: {"vectors": [[f32; d_model]; K], "placeholder"?}` on `/v1/chat/completions`; the vectors go
+to the K positions of the placeholder token (`<|fim_pad|>`, a special token chat never produces) in the prompt, and a
+count mismatch is refused. On the same prompt with 16 placeholders: no vectors and zero vectors give the same answer up to
+spelling, large vectors derail it, 15 vectors for 16 places is refused.
+
+**Gateway.** Knowledge mode `memory`: the question is embedded **without** the retrieval instruction (as Memorilla was
+trained), the module reads the base's prepared passage vectors (cached per base until its update time or vector count
+changes), the system prompt gets Memorilla's `\nMemory<placeholder>x16Memory`, and every quick-model request of the turn
+carries the 16 vectors. The request is held on the quick path: the module lives in System 1's embedding space, and System
+2 would see placeholders with no vectors. Measured on 20 passages: prepare 56 ms once, read 26–28 ms per question.
+
+**Not yet useful.** No module is trained for Qwen3-1.7B. The end-to-end run used an untrained module
+(`examples/memory_init.rs`), whose tokens carry no knowledge: the model answered that it could not tell. `memory` mode is
+therefore offered only in Advanced mode, labelled experimental, and only when `[knowledge] memory_checkpoint` names a
+module. Phase 6 trains one.

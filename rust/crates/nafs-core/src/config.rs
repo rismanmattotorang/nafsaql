@@ -81,6 +81,11 @@ pub struct KnowledgeCfg {
     pub entity_merge_similarity: f64,
     /// Chat in `graph` mode: facts put in the prompt.
     pub graph_facts: usize,
+    /// Memorilla (Phase 5): a memory-module checkpoint (`config.json` + `weights.safetensors`) trained for System 1;
+    /// empty turns `memory` mode off.
+    pub memory_checkpoint: String,
+    /// The token that marks the memory positions in the prompt (one token of the decoder's vocabulary).
+    pub memory_placeholder: String,
 }
 impl Default for KnowledgeCfg {
     fn default() -> Self {
@@ -110,6 +115,8 @@ impl Default for KnowledgeCfg {
             graph_max_tokens: 400,
             entity_merge_similarity: 0.92,
             graph_facts: 12,
+            memory_checkpoint: String::new(),
+            memory_placeholder: "<|fim_pad|>".into(),
         }
     }
 }

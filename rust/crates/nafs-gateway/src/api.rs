@@ -45,6 +45,8 @@ pub struct AppStateInner {
     drill_until: Mutex<Option<Instant>>,
     /// Knowledge Base (Phase 20); `None` when `[knowledge]` is off.
     pub kb: Option<Arc<nafs_kb::Kb>>,
+    /// Whether a Memorilla module is loaded (chat `memory` mode, Phase 5).
+    pub knowledge_memory: bool,
 }
 pub type AppState = Arc<AppStateInner>;
 
@@ -72,15 +74,20 @@ pub fn new_state(
         );
     }
     let kb = crate::kb::from_config(&cfg.knowledge);
+    let mut knowledge_memory = false;
     if let Some(k) = &kb {
-        orch.set_knowledge(Arc::new(crate::kb::ChatKnowledge::new(
+        let ck = crate::kb::ChatKnowledge::new(
             k.clone(),
             cfg.knowledge.rag_min_similarity,
             cfg.knowledge.graph_facts,
-        )));
+            crate::kb::MemoryReader::from_config(&cfg.knowledge),
+        );
+        knowledge_memory = ck.memory_enabled();
+        orch.set_knowledge(Arc::new(ck));
     }
     Arc::new(AppStateInner {
         kb,
+        knowledge_memory,
         cfg,
         orch,
         store,

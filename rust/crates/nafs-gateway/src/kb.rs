@@ -170,6 +170,7 @@ async fn status(State(s): State<AppState>) -> Json<Value> {
         "error": version.as_ref().err().map(|e| e.to_string()).or(schema.err()),
         "url": c.url,
         "queue": kb.queue(),
+        "memory": s.knowledge_memory,
         "embedder": kb.embedder_status().await.map(|(model, reachable)| json!({ "model": model, "reachable": reachable, "url": c.embed_url })),
         "limits": { "max_upload_mb": c.max_upload_mb, "max_files_per_request": c.max_files_per_request },
         "kinds": ["pdf", "docx", "pptx", "tex", "html", "md", "txt"],
@@ -503,15 +504,68 @@ pub struct ChatKnowledge {
     kb: Arc<Kb>,
     min_similarity: f64,
     graph_facts: usize,
+    memory: Option<MemoryReader>,
+}
+
+/// One knowledge base's prepared documents: (stamp of the base when prepared, the preparation, passages read).
+type Prepared = (String, Arc<nafs_memorilla::memory::PreparedDocs>, usize);
+
+/// Memorilla's reader (FR-K23): the module, and per knowledge base its prepared documents, kept until the base's
+/// vectors change (count or last update).
+pub struct MemoryReader {
+    module: Arc<nafs_memorilla::MemoryModule>,
+    placeholder: String,
+    prepared: std::sync::Mutex<std::collections::HashMap<String, Prepared>>,
+}
+
+impl MemoryReader {
+    /// Load the checkpoint named by `[knowledge] memory_checkpoint`; `None` (with a log line) when unset or unusable.
+    pub fn from_config(k: &KnowledgeCfg) -> Option<MemoryReader> {
+        if k.memory_checkpoint.trim().is_empty() {
+            return None;
+        }
+        match nafs_memorilla::MemoryModule::load_cpu(std::path::Path::new(&k.memory_checkpoint)) {
+            Ok(m) if m.cfg.embedding_dim == k.embed_dims => {
+                tracing::info!(checkpoint = %k.memory_checkpoint, params = m.cfg.parameters(), "memory module loaded");
+                Some(MemoryReader {
+                    module: Arc::new(m),
+                    placeholder: k.memory_placeholder.clone(),
+                    prepared: Default::default(),
+                })
+            }
+            Ok(m) => {
+                tracing::warn!(
+                    want = k.embed_dims,
+                    got = m.cfg.embedding_dim,
+                    "memory module reads vectors of another width; memory mode off"
+                );
+                None
+            }
+            Err(e) => {
+                tracing::warn!(checkpoint = %k.memory_checkpoint, error = %e, "memory module not loaded; memory mode off");
+                None
+            }
+        }
+    }
 }
 
 impl ChatKnowledge {
-    pub fn new(kb: Arc<Kb>, min_similarity: f64, graph_facts: usize) -> ChatKnowledge {
+    pub fn new(
+        kb: Arc<Kb>,
+        min_similarity: f64,
+        graph_facts: usize,
+        memory: Option<MemoryReader>,
+    ) -> ChatKnowledge {
         ChatKnowledge {
             kb,
             min_similarity,
             graph_facts: graph_facts.max(1),
+            memory,
         }
+    }
+
+    pub fn memory_enabled(&self) -> bool {
+        self.memory.is_some()
     }
 }
 
@@ -611,6 +665,89 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 embed_ms: r.embed_ms,
                 search_ms: r.took_ms,
                 facts,
+            })
+        })
+    }
+
+    fn memory<'a>(
+        &'a self,
+        kb: &'a str,
+        query: &'a str,
+    ) -> nafs_core::knowledge::BoxFuture<'a, Result<nafs_core::knowledge::MemoryReadout, String>>
+    {
+        Box::pin(async move {
+            let reader = self
+                .memory
+                .as_ref()
+                .ok_or("no memory module is configured ([knowledge] memory_checkpoint)")?;
+            let base = self
+                .kb
+                .store()
+                .get_kb(kb)
+                .await
+                .map_err(|e| e.to_string())?;
+            let dims = self
+                .kb
+                .embed_dims()
+                .ok_or("searching by meaning is turned off")?;
+            // Prepared documents are reused until the base changes (its update time) or its vector count does.
+            let n_vec = self
+                .kb
+                .store()
+                .vector_count(kb)
+                .await
+                .map_err(|e| e.to_string())? as usize;
+            let stamp = format!("{}|{n_vec}", base.updated_at);
+            let cached = reader
+                .prepared
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(kb)
+                .filter(|c| c.0 == stamp)
+                .map(|c| (c.1.clone(), c.2));
+            let t0 = std::time::Instant::now();
+            let (prepared, documents, prepare_ms) = match cached {
+                Some((p, n)) => (p, n, 0),
+                None => {
+                    let (rows, n) = self
+                        .kb
+                        .store()
+                        .vectors_of(kb, dims)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if n == 0 {
+                        return Err("this knowledge base has no meaning index yet".into());
+                    }
+                    let m = reader.module.clone();
+                    let p = tokio::task::spawn_blocking(move || m.prepare_rows(&rows, n))
+                        .await
+                        .map_err(|e| e.to_string())??;
+                    let p = Arc::new(p);
+                    reader
+                        .prepared
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .insert(kb.to_string(), (stamp, p.clone(), n));
+                    (p, n, t0.elapsed().as_millis() as u64)
+                }
+            };
+            let q = self
+                .kb
+                .embed_plain(query)
+                .await
+                .map_err(|e| e.to_string())?;
+            let t1 = std::time::Instant::now();
+            let m = reader.module.clone();
+            let vectors = tokio::task::spawn_blocking(move || m.read_rows(&prepared, &q))
+                .await
+                .map_err(|e| e.to_string())??;
+            Ok(nafs_core::knowledge::MemoryReadout {
+                kb_name: base.name,
+                vectors,
+                placeholder: reader.placeholder.clone(),
+                documents,
+                prepare_ms,
+                read_ms: t1.elapsed().as_millis() as u64,
             })
         })
     }

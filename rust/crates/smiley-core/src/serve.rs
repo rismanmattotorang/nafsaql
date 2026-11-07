@@ -137,6 +137,9 @@ struct Slot {
     prefilled: usize,
     prefill_s: f64,
     decode_s: f64,
+    // nafs-aql: input vectors for prompt positions (Memorilla's memory tokens), sorted by position. The cache
+    // beyond the first of them depends on the vectors, so prefixes are neither restored nor kept past it.
+    inputs: Vec<(usize, Vec<f32>)>,
 }
 
 impl Slot {
@@ -259,6 +262,31 @@ impl Engine {
 
     /// Take a request, or give it back when every slot is busy or the prompt cannot fit.
     pub fn admit(&mut self, prompt: Vec<u32>, cfg: SlotCfg) -> Result<SlotId, (Vec<u32>, String)> {
+        self.admit_with_inputs(prompt, cfg, Vec::new())
+    }
+
+    // nafs-aql: a request whose prompt positions in `inputs` take supplied vectors instead of their tokens'
+    // embeddings (Memorilla, Phase 20). The positions must lie before the prompt's last token, which is decoded,
+    // not prefilled.
+    pub fn admit_with_inputs(
+        &mut self,
+        prompt: Vec<u32>,
+        cfg: SlotCfg,
+        mut inputs: Vec<(usize, Vec<f32>)>,
+    ) -> Result<SlotId, (Vec<u32>, String)> {
+        inputs.sort_by_key(|x| x.0);
+        let d = self.model.cfg.d_model;
+        if let Some((p, v)) = inputs
+            .iter()
+            .find(|(p, v)| *p + 1 >= prompt.len() || v.len() != d)
+        {
+            let msg = format!(
+                "input vector at position {p} ({} values) does not fit a {}-token prompt of a {d}-wide model",
+                v.len(),
+                prompt.len()
+            );
+            return Err((prompt, msg));
+        }
         if !self.has_room() {
             return Err((prompt, "every slot is busy".into()));
         }
@@ -287,7 +315,10 @@ impl Engine {
         );
         // The last prompt token is never prefilled (it is what the first decode step feeds), so a prefix may
         // cover everything before it.
-        let cap = prompt.len() - 1;
+        // nafs-aql: nothing past the first supplied vector comes from the store (it was computed from other vectors).
+        let cap = inputs
+            .first()
+            .map_or(prompt.len() - 1, |x| x.0.min(prompt.len() - 1));
         let fed = match self.prefixes.best(&prompt, cap) {
             Some((snap, lcp)) if kv.restore(snap, lcp) => {
                 self.prefixes.note_hit(lcp);
@@ -319,6 +350,7 @@ impl Engine {
             utf8: Utf8Stream::default(),
             prefill_s: 0.0,
             decode_s: 0.0,
+            inputs,
         });
         Ok(id)
     }
@@ -339,6 +371,10 @@ impl Engine {
         // the wrong tokens, and a later request restores a cache that does not match its prompt.
         let mut tokens: Vec<u32> = s.prompt[..s.fed.min(s.prompt.len())].to_vec();
         tokens.extend(&s.fed_back);
+        // nafs-aql: a cache computed from supplied vectors is described by its tokens only up to the first vector.
+        if let Some((p, _)) = s.inputs.first() {
+            tokens.truncate(*p);
+        }
         let n = tokens.len().min(s.kv.filled());
         tokens.truncate(n);
         if n < crate::prefix::MIN_PREFIX || self.prefixes.covers(&tokens) {
@@ -401,6 +437,13 @@ impl Engine {
         let take = PREFILL_CHUNK.min(last - s.fed);
         let chunk: Vec<u32> = s.prompt[s.fed..s.fed + take].to_vec();
         let start = s.fed;
+        // nafs-aql: this chunk's supplied vectors, by row.
+        self.state.inputs = s
+            .inputs
+            .iter()
+            .filter(|(p, _)| *p >= start && *p < start + take)
+            .map(|(p, v)| (p - start, v.clone()))
+            .collect();
         self.model.forward(
             &mut self.state,
             &mut self.slots[i].kv,
@@ -706,6 +749,58 @@ mod tests {
             second,
             "a restored prefix changed the answer"
         );
+    }
+
+    #[test]
+    fn supplied_input_vectors_are_used_as_given() {
+        // nafs-aql: giving rows their own token embeddings changes nothing; giving them other vectors changes the
+        // answer, and such a prompt is never restored from (or stored as) a token prefix past the first vector.
+        let Some(m) = model() else { return };
+        let mut e = Engine::new(m.clone(), 2, 512, 2, KvPrec::F16, 64 << 20);
+        let prompt = m.tk.encode(
+            "The capital of France is Paris. The capital of Italy is Rome. The capital of Spain is",
+        );
+        let run = |e: &mut Engine, inputs: Vec<(usize, Vec<f32>)>| -> Vec<u32> {
+            let id = e.admit_with_inputs(prompt.clone(), cfg(8), inputs).unwrap();
+            let mut out = vec![];
+            loop {
+                for em in e.step() {
+                    assert_eq!(em.slot, id);
+                    out.push(em.token);
+                    if em.finish.is_some() {
+                        return out;
+                    }
+                }
+            }
+        };
+        let plain = run(&mut e, vec![]);
+        let own: Vec<(usize, Vec<f32>)> =
+            (3..9).map(|p| (p, m.token_embedding(prompt[p]))).collect();
+        assert_eq!(
+            run(&mut e, own),
+            plain,
+            "a row's own embedding must give the same tokens"
+        );
+        let (_, _, hits_before, saved_before) = e.prefix_stats();
+        let noise: Vec<(usize, Vec<f32>)> =
+            (3..9).map(|p| (p, vec![0.05; m.cfg.d_model])).collect();
+        let _ = run(&mut e, noise);
+        let (_, _, hits, saved) = e.prefix_stats();
+        // Whatever was restored stops before position 3.
+        assert!(
+            saved - saved_before <= 3 * (hits - hits_before),
+            "restored past the first supplied vector"
+        );
+        assert!(e
+            .admit_with_inputs(
+                prompt.clone(),
+                cfg(8),
+                vec![(prompt.len() - 1, vec![0.0; m.cfg.d_model])]
+            )
+            .is_err());
+        assert!(e
+            .admit_with_inputs(prompt.clone(), cfg(8), vec![(2, vec![0.0; 7])])
+            .is_err());
     }
 
     #[test]

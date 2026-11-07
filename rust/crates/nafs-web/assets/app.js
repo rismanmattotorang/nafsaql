@@ -69,8 +69,9 @@ function toolcardsHTML(t, live) {
 }
 // Knowledge-base passages the answer was given (numbered as the model cites them), or why there were none.
 function kbSourcesHTML(sources) {
-  const notes = sources.filter(x => x.note), facts = sources.filter(x => x.facts).flatMap(x => x.facts), hits = sources.filter(x => !x.note && !x.facts);
+  const notes = sources.filter(x => x.note), facts = sources.filter(x => x.facts).flatMap(x => x.facts), mem = sources.filter(x => x.memory), hits = sources.filter(x => !x.note && !x.facts && !x.memory);
   let out = notes.map(n => `<div class="sources">${icon.book}<span>${esc(n.note)}</span></div>`).join('');
+  out += mem.map(m => `<div class="sources">${icon.book}<span>Answered with a memory of <b>${esc(m.kb_name || 'your knowledge base')}</b>: ${m.memory.tokens} memory tokens read from ${plural(m.memory.documents, 'passage')} (experimental)${advanced() ? ` · ${fmtMs((m.memory.prepare_ms || 0) + (m.memory.read_ms || 0))}` : ''}.</span></div>`).join('');
   if (facts.length) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.book}<span>Used ${plural(facts.length, 'relation')} from the knowledge graph</span></summary><ul class="kb-facts">${facts.map(f => `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b></li>`).join('')}</ul></details>`;
   if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src"><summary><span class="kb-n">${x.n}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${x.page ? ` <span class="faint">· page ${x.page}</span>` : ''}</span>${advanced() && x.vector_score != null ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
   return out;
@@ -584,7 +585,7 @@ routes.chat = { title: 'Chat', async render(view) {
         <div class="controls">
           <div class="seg" id="modeSeg" role="group" aria-label="Answer mode"><button data-m="auto" title="Auto: answers quickly, and thinks it through when the question needs it">${icon.shield}Auto</button><button data-m="fast" title="Quick: always answer at once">${icon.bolt}Quick</button><button data-m="slow" title="Thorough: always think it through first (slower)">${icon.brain}Thorough</button><button data-m="both" class="adv-only" title="Compare: see a quick and a thorough answer side by side and pick the better one">${icon.compare}Compare</button></div>
           <span class="chip" id="verifyChip" role="button" tabindex="0" title="Give the expected answer, tests or a format, so the reply can be checked">${icon.shield}<span>Add a check</span></span>
-          <label class="chip kb-pick" id="kbChip" hidden title="Answer from the passages of one of your knowledge bases">${icon.book}<select id="kbSel" aria-label="Answer from a knowledge base"><option value="">No knowledge base</option></select><select id="kbMode" aria-label="How to use the knowledge base" hidden><option value="rag">Passages</option><option value="graph">Passages and graph</option></select></label>
+          <label class="chip kb-pick" id="kbChip" hidden title="Answer from the passages of one of your knowledge bases">${icon.book}<select id="kbSel" aria-label="Answer from a knowledge base"><option value="">No knowledge base</option></select><select id="kbMode" aria-label="How to use the knowledge base" hidden><option value="rag">Passages</option><option value="graph">Passages and graph</option><option value="memory" hidden>Memory (experimental)</option></select></label>
           <span class="sp"></span><button class="btn ghost sm adv-only" id="inspBtn" title="Show how each answer was produced (Ctrl/Cmd+I)">${icon.search}Details</button>
         </div><div class="privacy">Answers can be wrong; look for <b>Checked</b> on answers that were verified. <button type="button" class="linkbtn" id="privBtn">Privacy</button></div></div></div></div>
     <aside class="inspector" id="insp"></aside></div>`;
@@ -607,7 +608,9 @@ routes.chat = { title: 'Chat', async render(view) {
   (async () => { try { const st = await api.get('/v1/kb/status'); if (!st.enabled || !st.reachable) return; const r = await api.get('/v1/kb'); const sel = $('#kbSel'); if (!sel || !r.bases.length) return;
     sel.innerHTML = `<option value="">No knowledge base</option>` + r.bases.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
     if (!r.bases.some(b => b.id === PREFS.kb)) { PREFS.kb = null; savePrefs(); } sel.value = PREFS.kb || ''; $('#kbChip').hidden = false; $('#kbChip').classList.toggle('on', !!PREFS.kb);
-    const ms = $('#kbMode'); ms.value = PREFS.kbMode || 'rag'; ms.hidden = !PREFS.kb; ms.onchange = () => { PREFS.kbMode = ms.value; savePrefs(); };
+    const ms = $('#kbMode'); const memOpt = ms.querySelector('option[value=memory]'); memOpt.hidden = !(st.memory && advanced());
+    if (memOpt.hidden && PREFS.kbMode === 'memory') { PREFS.kbMode = 'rag'; savePrefs(); }
+    ms.value = PREFS.kbMode || 'rag'; ms.hidden = !PREFS.kb; ms.onchange = () => { PREFS.kbMode = ms.value; savePrefs(); };
     sel.onchange = () => { PREFS.kb = sel.value || null; savePrefs(); $('#kbChip').classList.toggle('on', !!PREFS.kb); ms.hidden = !PREFS.kb; input.placeholder = PREFS.kb ? `Ask about ${sel.selectedOptions[0].text}` : 'Ask anything'; };
     if (PREFS.kb) input.placeholder = `Ask about ${sel.selectedOptions[0].text}`; } catch {} })();
   const tbPop = $('#tbPop'); $('#tbMenu').onclick = (e) => { e.stopPropagation(); tbPop.hidden = !tbPop.hidden; $('#tbMenu').setAttribute('aria-expanded', String(!tbPop.hidden)); };

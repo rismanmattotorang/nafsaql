@@ -16,6 +16,9 @@
 //! - `n > 1` and `grammar` are refused (400): the engine decodes one stream and has no constrained sampler; the
 //!   gateway already treats a backend without them as it treats vLLM.
 //!
+//! - `memory_embeds` (Phase 20) -> Memorilla's memory tokens: the vectors replace the embeddings of the placeholder
+//!   token's positions in the prompt (`Engine::admit_with_inputs`).
+//!
 //! One session per process (one stream at a time; requests queue): run one process per model, as with llama-server.
 mod embed;
 
@@ -281,6 +284,71 @@ struct Plan {
     budget: Option<usize>,
     logprobs: bool,
     stream: bool,
+    /// Memorilla's memory tokens (Phase 20): vectors for the placeholder token's positions in the prompt, in order.
+    memory: Option<std::sync::Arc<Vec<Vec<f32>>>>,
+    placeholder: String,
+}
+
+/// `memory_embeds: {"vectors": [[f32; d_model]; K], "placeholder"?: "<|fim_pad|>"}`: K vectors for the K places
+/// the placeholder token takes in the prompt (Memorilla puts them in the system prompt).
+/// Memory vectors (shared, as the request is planned twice when the reasoning budget closes) and the placeholder.
+type Memory = (Option<std::sync::Arc<Vec<Vec<f32>>>>, String);
+
+fn memory_of(b: &Value) -> Result<Memory, String> {
+    let m = &b["memory_embeds"];
+    let placeholder = m["placeholder"]
+        .as_str()
+        .unwrap_or("<|fim_pad|>")
+        .to_string();
+    if m.is_null() {
+        return Ok((None, placeholder));
+    }
+    let rows = m["vectors"]
+        .as_array()
+        .ok_or("memory_embeds.vectors must be an array of vectors")?;
+    if rows.is_empty() || rows.len() > 256 {
+        return Err("memory_embeds.vectors must hold 1 to 256 vectors".into());
+    }
+    let vecs = rows
+        .iter()
+        .map(|r| {
+            r.as_array()
+                .ok_or("each memory vector must be an array of numbers")?
+                .iter()
+                .map(|x| {
+                    x.as_f64()
+                        .map(|v| v as f32)
+                        .ok_or("each memory vector must be an array of numbers")
+                })
+                .collect::<Result<Vec<f32>, _>>()
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok((Some(std::sync::Arc::new(vecs)), placeholder))
+}
+
+/// The prompt positions that take memory vectors: every occurrence of the placeholder token, which must match the
+/// number of vectors.
+fn memory_inputs(
+    prompt: &[u32],
+    placeholder: Option<u32>,
+    vecs: &[Vec<f32>],
+) -> Result<Vec<(usize, Vec<f32>)>, String> {
+    let id =
+        placeholder.ok_or("the placeholder is not a single token of this model's vocabulary")?;
+    let at: Vec<usize> = prompt
+        .iter()
+        .enumerate()
+        .filter(|(_, t)| **t == id)
+        .map(|(i, _)| i)
+        .collect();
+    if at.len() != vecs.len() {
+        return Err(format!(
+            "the prompt holds {} memory placeholders for {} memory vectors",
+            at.len(),
+            vecs.len()
+        ));
+    }
+    Ok(at.into_iter().zip(vecs.iter().cloned()).collect())
 }
 
 fn plan(b: &Value) -> Result<Plan, String> {
@@ -329,7 +397,10 @@ fn plan(b: &Value) -> Result<Plan, String> {
         return Err("the last message must be from the user".into());
     };
     let kw = &b["chat_template_kwargs"];
+    let (memory, placeholder) = memory_of(b)?;
     Ok(Plan {
+        memory,
+        placeholder,
         system: (!system.is_empty()).then(|| system.join("\n\n")),
         pairs,
         user,
@@ -396,6 +467,8 @@ fn continuation_prefix(saw_open: bool, reasoning: &str, closing: &str) -> String
 struct Job {
     prompt: Vec<u32>,
     cfg: SlotCfg,
+    /// Memory vectors by prompt position (Memorilla, Phase 20).
+    inputs: Vec<(usize, Vec<f32>)>,
     out: tokio::sync::mpsc::UnboundedSender<Emission>,
 }
 
@@ -439,7 +512,7 @@ fn engine_thread(
             if j.out.is_closed() {
                 continue;
             }
-            match engine.admit(j.prompt, j.cfg) {
+            match engine.admit_with_inputs(j.prompt, j.cfg, j.inputs) {
                 Ok(id) => {
                     routes.insert(id, j.out);
                 }
@@ -535,6 +608,16 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
             prefix.as_deref(),
         );
         let prompt = app.model.tk.encode(&prompt_text);
+        let inputs = match &p.memory {
+            Some(v) => match memory_inputs(&prompt, app.model.tk.id_of(&p.placeholder), v) {
+                Ok(i) => i,
+                Err(e) => {
+                    let _ = tx.send(Msg::Err(e));
+                    return;
+                }
+            },
+            None => Vec::new(),
+        };
         if prompt.len() + 1 >= app.max_ctx {
             let _ = tx.send(Msg::Err(format!(
                 "the prompt is {} tokens; this model is served with {} positions",
@@ -559,6 +642,7 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
             .send(EngineMsg::Run(Box::new(Job {
                 prompt,
                 cfg,
+                inputs,
                 out: etx,
             })))
             .is_err()
@@ -793,6 +877,25 @@ fn async_stream(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn memory_vectors_go_to_the_placeholders_in_order() {
+        use crate::{memory_inputs, plan};
+        let b = serde_json::json!({"messages": [{"role": "user", "content": "q"}],
+            "memory_embeds": {"vectors": [[1.0, 2.0], [3.0, 4.0]]}});
+        let p = plan(&b).unwrap();
+        let v = p.memory.unwrap();
+        assert_eq!(p.placeholder, "<|fim_pad|>");
+        let inputs = memory_inputs(&[5, 9, 7, 9, 2], Some(9), &v).unwrap();
+        assert_eq!(inputs, vec![(1, vec![1.0, 2.0]), (3, vec![3.0, 4.0])]);
+        assert!(memory_inputs(&[5, 9, 2], Some(9), &v)
+            .unwrap_err()
+            .contains("1 memory placeholders for 2"));
+        assert!(memory_inputs(&[5, 9, 2], None, &v).is_err());
+        let bad = serde_json::json!({"messages": [{"role": "user", "content": "q"}], "memory_embeds": {"vectors": [["x"]]}});
+        assert!(plan(&bad).is_err());
+    }
+
     use super::continuation_prefix;
 
     #[test]

@@ -415,6 +415,68 @@ impl MemoryModule {
     }
 }
 
+/// Plain-slice entry points for callers without Candle (the gateway): documents as one row-major `n x E` buffer, the
+/// question as `E` floats, memory tokens back as `K` vectors of `output_dim` floats.
+impl MemoryModule {
+    /// `load` on the CPU.
+    pub fn load_cpu(dir: &std::path::Path) -> std::result::Result<MemoryModule, String> {
+        MemoryModule::load(dir, &Device::Cpu)
+    }
+
+    pub fn prepare_rows(
+        &self,
+        docs: &[f32],
+        n: usize,
+    ) -> std::result::Result<PreparedDocs, String> {
+        let e = self.cfg.embedding_dim;
+        if n == 0 || docs.len() != n * e {
+            return Err(format!(
+                "{} document floats for {n} documents of width {e}",
+                docs.len()
+            ));
+        }
+        let t = Tensor::from_slice(docs, (1, n, e), &Device::Cpu).map_err(|x| x.to_string())?;
+        self.prepare(&t, None).map_err(|x| x.to_string())
+    }
+
+    pub fn read_rows(
+        &self,
+        prepared: &PreparedDocs,
+        question: &[f32],
+    ) -> std::result::Result<Vec<Vec<f32>>, String> {
+        let e = self.cfg.embedding_dim;
+        if question.len() != e {
+            return Err(format!(
+                "question vector has {} values, the module needs {e}",
+                question.len()
+            ));
+        }
+        let q = Tensor::from_slice(question, (1, e), &Device::Cpu).map_err(|x| x.to_string())?;
+        let m = self
+            .forward_prepared(prepared, &q)
+            .map_err(|x| x.to_string())?;
+        m.squeeze(0)
+            .and_then(|t| t.to_vec2::<f32>())
+            .map_err(|x| x.to_string())
+    }
+
+    /// Write `config.json` and `weights.safetensors` (the format `load` reads).
+    pub fn save(
+        vm: &candle_nn::VarMap,
+        cfg: &MemoryConfig,
+        dir: &std::path::Path,
+    ) -> std::result::Result<(), String> {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        std::fs::write(
+            dir.join("config.json"),
+            serde_json::to_vec_pretty(cfg).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        vm.save(dir.join("weights.safetensors"))
+            .map_err(|e| e.to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
