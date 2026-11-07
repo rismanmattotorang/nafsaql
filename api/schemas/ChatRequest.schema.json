@@ -196,10 +196,11 @@
           "enum": [
             "rag",
             "graph",
+            "memory",
             "off"
           ],
           "default": "rag",
-          "description": "rag: passages; graph: passages plus relations around the question's entities"
+          "description": "rag: passages; graph: passages plus relations around the question's entities; memory: Memorilla's 16 memory tokens read from the whole knowledge base (quick model only)"
         },
         "k": {
           "type": "integer",

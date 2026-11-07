@@ -61,6 +61,34 @@ pub trait Knowledge: Send + Sync {
         k: usize,
         mode: &'a str,
     ) -> BoxFuture<'a, Result<Retrieved, String>>;
+
+    /// Memorilla (FR-K23): the memory tokens for `query` read from the whole of knowledge base `kb`.
+    fn memory<'a>(
+        &'a self,
+        _kb: &'a str,
+        _query: &'a str,
+    ) -> BoxFuture<'a, Result<MemoryReadout, String>> {
+        Box::pin(async { Err("memory tokens are not available on this server".to_string()) })
+    }
+}
+
+/// What the memory module read for one question.
+#[derive(Debug, Clone, Default)]
+pub struct MemoryReadout {
+    pub kb_name: String,
+    /// K vectors in the decoder's input-embedding space.
+    pub vectors: Vec<Vec<f32>>,
+    /// The token the prompt carries at each memory position.
+    pub placeholder: String,
+    /// Passages the module read.
+    pub documents: usize,
+    pub prepare_ms: u64,
+    pub read_ms: u64,
+}
+
+/// Memorilla's prompt format: appended to the system prompt, "Memory", K placeholders, "Memory".
+pub fn memory_block(placeholder: &str, k: usize) -> String {
+    format!("\nMemory{}Memory", placeholder.repeat(k))
 }
 
 /// The system-prompt block for retrieved passages (FR-K21, FR-K25). Passages are cut to fit `max_chars` together.

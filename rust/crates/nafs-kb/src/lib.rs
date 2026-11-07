@@ -733,6 +733,20 @@ impl Kb {
         Ok((facts, base))
     }
 
+    /// A question embedded as Memorilla reads it: no instruction prefix (the memory module was trained that way).
+    pub async fn embed_plain(&self, text: &str) -> Result<Vec<f32>, KbError> {
+        let e = self
+            .embedder
+            .as_ref()
+            .ok_or_else(|| KbError::Unavailable("searching by meaning is turned off".into()))?;
+        Ok(e.embed(&[text.to_string()], None).await?.remove(0))
+    }
+
+    /// The width of the passage vectors, when embeddings are on.
+    pub fn embed_dims(&self) -> Option<usize> {
+        self.embedder.as_ref().map(|e| e.cfg.dims)
+    }
+
     pub fn graph_enabled(&self) -> bool {
         self.extractor.is_some()
     }

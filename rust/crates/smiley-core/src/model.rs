@@ -234,6 +234,9 @@ pub struct State {
     tap_layers: Vec<usize>,
     /// `[batch row][tap][d_model]`, written by every `forward` while taps are set.
     pub tap: Vec<f32>,
+    // nafs-aql: input vectors that replace the token embedding of chosen batch rows in the next `forward_rows`
+    // (Memorilla's memory tokens, Phase 20). Consumed by that call.
+    pub inputs: Vec<(usize, Vec<f32>)>,
     /// LittleBit intermediates — the per-stage `g ⊙ x` copies (reused for `ℓ ⊙ t`)
     /// and the raw latents. Sized by `Model::lb_scratch` after the model is known;
     /// empty when nothing was converted, so the dense path pays nothing.
@@ -304,6 +307,7 @@ impl State {
             max_batch: b,
             tap_layers: Vec::new(),
             tap: Vec::new(),
+            inputs: Vec::new(),
             lb_x: Vec::new(),
             lb_t: Vec::new(),
         }
@@ -882,6 +886,13 @@ impl Model {
 
     /// One row of the embedding table, dequantised. The only place a weight is
     /// decoded into a buffer — it is a single row of 960, not a tensor.
+    // nafs-aql: a token's input embedding (dequantised), e.g. to check that supplied input vectors are used as is.
+    pub fn token_embedding(&self, token: u32) -> Vec<f32> {
+        let mut v = vec![0.0; self.cfg.d_model];
+        self.embed(token, &mut v, &mut StepStats::default());
+        v
+    }
+
     fn embed(&self, token: u32, out: &mut [f32], st: &mut StepStats) {
         let t = &self.tok_embd;
         let n = t.dims[0] as usize;
@@ -1495,6 +1506,17 @@ impl Model {
                 ));
             }
             self.embed(t, &mut st8.x[i * c.d_model..(i + 1) * c.d_model], stats);
+        }
+        // nafs-aql: supplied input vectors take the place of their rows' token embeddings.
+        for (row, v) in std::mem::take(&mut st8.inputs) {
+            if row >= nb || v.len() != c.d_model {
+                return Err(format!(
+                    "input vector for row {row} of a {nb}-row batch has {} values, the model needs {}",
+                    v.len(),
+                    c.d_model
+                ));
+            }
+            st8.x[row * c.d_model..(row + 1) * c.d_model].copy_from_slice(&v);
         }
 
         let kvd = c.kv_dim();

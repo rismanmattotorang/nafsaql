@@ -47,6 +47,9 @@ pub struct GenRequest {
     /// where the unit ends; the content is cut there and `finish_reason` is "action_complete". Dropping the
     /// stream stops generation on the server, so nothing after the unit is decoded.
     pub stop_after: Option<fn(&str) -> Option<usize>>,
+    /// Memorilla's memory tokens (Phase 20): vectors for the placeholder token's positions in the prompt. Only the
+    /// Smiley Core server reads them.
+    pub memory_embeds: Option<std::sync::Arc<Vec<Vec<f32>>>>,
 }
 
 /// Early-escalation thresholds on the draft's token log-probs. `below_mean` is the P7-T03 rule (running
@@ -330,6 +333,9 @@ impl Backend {
             b["response_format"] = rf.clone();
         } else if let Some(g) = req.grammar.as_ref().filter(|_| self.supports_grammar()) {
             b["grammar"] = json!(g);
+        }
+        if let Some(m) = &req.memory_embeds {
+            b["memory_embeds"] = json!({"vectors": m.as_ref()});
         }
         if let Some(budget) = req.thinking_budget {
             // Server-side budget forcing (Prop. 9): llama-server closes the reasoning span at the budget;

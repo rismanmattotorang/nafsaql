@@ -1,6 +1,6 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.3, 2026-11-07. Status: Phases 0–4 implemented; Phases 5–8 specified. Research:
+Version 1.4, 2026-11-07. Status: Phases 0–5 implemented; Phases 6–8 specified. Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -70,8 +70,10 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
   carries `sources` (document, heading, chunk id, score).
 - **FR-K22** `graph`: entities of the question (string match + entity-vector search) -> 1–2 hops over `related` ->
   chunks that mention them, ranked with the hybrid score; facts given as `subject — predicate — object` lines.
-- **FR-K23** `memory`: question embedded without a prefix; the memory module turns the whole store into 16 vectors;
-  the engine receives them at 16 placeholder positions; the prompt keeps Memorilla's format.
+- **FR-K23** `memory`: question embedded without a prefix; the memory module turns the whole store into 16 vectors
+  (prepared passage vectors cached per base); the engine receives them at 16 placeholder positions; the prompt keeps
+  Memorilla's format; the turn is answered by the quick model only. Requires `[knowledge] memory_checkpoint`; offered in
+  Advanced mode as experimental until a module trained for System 1 exists (Phase 6).
 - **FR-K24** `hybrid`: `memory` plus the top 2 passages of `rag`. `auto`: chosen by the measured policy of Phase 7.
 - **FR-K25** When no chunk scores above `min_score` and mode is not `memory`, the assistant says the knowledge base
   does not cover the question, and answers from general knowledge only if the person asked for it.
@@ -304,6 +306,8 @@ graph_model = "system1"
 graph_max_tokens = 400
 entity_merge_similarity = 0.92
 graph_facts = 12
+memory_checkpoint = ""                 # Phase 5; "" = memory mode off
+memory_placeholder = "<|fim_pad|>"
 ```
 
 ## 10. Frontend (Knowledge page, `#/knowledge`)

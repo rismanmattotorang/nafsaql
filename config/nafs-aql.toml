@@ -199,6 +199,8 @@ graph_model = "system1"
 graph_max_tokens = 400
 entity_merge_similarity = 0.92         # same-type entities with name vectors this similar are one entity
 graph_facts = 12                       # chat, graph mode: facts put in the prompt
+memory_checkpoint = ""                 # Phase 5: Memorilla module trained for System 1 (dir with config.json + weights.safetensors); "" = memory mode off
+memory_placeholder = "<|fim_pad|>"     # the token at the 16 memory positions of the prompt
 
 [storage]
 sqlite_path = "data/runtime/nafs.sqlite"

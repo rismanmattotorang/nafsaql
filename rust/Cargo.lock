@@ -2339,6 +2339,7 @@ dependencies = [
  "nafs-core",
  "nafs-eval",
  "nafs-kb",
+ "nafs-memorilla",
  "nafs-memory",
  "nafs-types",
  "nafs-verify",

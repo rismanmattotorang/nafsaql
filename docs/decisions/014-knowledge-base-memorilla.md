@@ -1,6 +1,6 @@
 # Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)
 
-Date 2026-11-07. Status: **adopted; Phases 0–4 implemented, 5–8 planned.** Research note:
+Date 2026-11-07. Status: **adopted; Phases 0–5 implemented, 6–8 planned.** Research note:
 [`docs/research/memorilla_knowledge.md`](../research/memorilla_knowledge.md). Specification:
 [`docs/spec/knowledge_base_spec.md`](../spec/knowledge_base_spec.md). Prompt: [`docs/prompts/MEMORILLA_KB_PROMPT.md`](../prompts/MEMORILLA_KB_PROMPT.md).
 
@@ -52,3 +52,6 @@ served by Smiley Core, implemented with Candle.
   unmodified reference, no checkpoint download). On macOS Candle uses Apple Accelerate (6–15x faster matmuls here), and
   the question-independent half is computed once per collection: 49–54 ms per question up to 100 documents, 436 ms at
   10,000 (`benchmarks/memorilla_forward.json`).
+- Phase 5 (2026-11-07): memory tokens reach the quick model through Smiley Core (`admit_with_inputs`, server
+  `memory_embeds`, chat `memory` mode); the prefix store is capped at the first supplied vector. Own-embedding identity
+  holds on the real model; prepare 56 ms once and read 27 ms per question on 20 passages. Experimental until Phase 6.

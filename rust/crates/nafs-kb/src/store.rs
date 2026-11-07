@@ -682,6 +682,32 @@ impl Store {
         rows(r.into_iter().next())
     }
 
+    /// Every passage vector of a knowledge base, in document and passage order, as one row-major buffer: (floats, rows).
+    pub async fn vectors_of(&self, kb: &str, dims: usize) -> Result<(Vec<f32>, usize), KbError> {
+        let r = self
+            .query(
+                "SELECT VALUE embedding FROM chunk WHERE kb = type::record('kb', $kb) AND embedding != NONE ORDER BY doc, ord;",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        let rows = r
+            .into_iter()
+            .next()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default();
+        let mut out = Vec::with_capacity(rows.len() * dims);
+        let mut n = 0;
+        for v in rows {
+            let Some(a) = v.as_array() else { continue };
+            if a.len() != dims {
+                continue;
+            }
+            out.extend(a.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32));
+            n += 1;
+        }
+        Ok((out, n))
+    }
+
     /// Passages of a knowledge base that have a vector.
     pub async fn vector_count(&self, kb: &str) -> Result<u64, KbError> {
         let r = self

@@ -65,6 +65,7 @@ impl Env<'_> {
                 .min(1.0_f32.max(self.orch.cfg.deliberation.slow_temperature)),
         };
         let req = GenRequest {
+            memory_embeds: None,
             messages: messages
                 .into_iter()
                 .map(|(role, content)| Message { role, content })
