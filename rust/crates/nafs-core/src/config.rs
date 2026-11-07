@@ -31,8 +31,73 @@ pub struct Config {
     /// Math and code harness (FR-090..FR-093): the code agent endpoint.
     #[serde(default)]
     pub harness: HarnessCfg,
+    /// Knowledge Base (Phase 20, FR-K*): documents in SurrealDB, searched and used in chat.
+    #[serde(default)]
+    pub knowledge: KnowledgeCfg,
     #[serde(skip)]
     pub hash: String,
+}
+
+/// `[knowledge]` (IF-K02): the SurrealDB connection, the upload limits and the chunker's settings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct KnowledgeCfg {
+    pub enabled: bool,
+    /// SurrealDB HTTP endpoint (scripts/serve_surreal.sh serves 127.0.0.1:8300).
+    pub url: String,
+    pub namespace: String,
+    pub database: String,
+    pub user: String,
+    /// File holding the password (written by scripts/serve_surreal.sh); never the password itself.
+    pub password_file: String,
+    /// Stored originals, one folder per knowledge base.
+    pub files_dir: String,
+    pub max_upload_mb: usize,
+    pub max_files_per_request: usize,
+    /// Passage size and overlap in characters (FR-K15).
+    pub chunk_chars: usize,
+    pub chunk_overlap: usize,
+    pub search_k: usize,
+    /// Embedding server (`nafs-smiley-server --embedding`, Phase 2); empty turns vectors off (full-text only).
+    pub embed_url: String,
+    /// Model id stored with the vectors; changing it means re-embedding.
+    pub embed_model: String,
+    pub embed_dims: usize,
+    /// Passages per embedding request.
+    pub embed_batch: usize,
+    /// Knowledge bases with fewer vectors than this are searched exactly; larger ones through the HNSW index.
+    pub exact_search_below: u64,
+    /// Chat: passages put in the prompt in `rag` mode, and the most characters they may take together.
+    pub rag_k: usize,
+    pub rag_max_chars: usize,
+    /// Chat: a passage is used only when its hybrid rank fuses both lists or its similarity reaches this.
+    pub rag_min_similarity: f64,
+}
+impl Default for KnowledgeCfg {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            url: "http://127.0.0.1:8300".into(),
+            namespace: "nafs".into(),
+            database: "kb".into(),
+            user: "root".into(),
+            password_file: "data/runtime/surreal/root.secret".into(),
+            files_dir: "data/runtime/kb".into(),
+            max_upload_mb: 50,
+            max_files_per_request: 20,
+            chunk_chars: 1200,
+            chunk_overlap: 150,
+            search_k: 8,
+            embed_url: String::new(),
+            embed_model: "Qwen3-Embedding-0.6B".into(),
+            embed_dims: 1024,
+            embed_batch: 8,
+            exact_search_below: 5000,
+            rag_k: 4,
+            rag_max_chars: 4800,
+            rag_min_similarity: 0.45,
+        }
+    }
 }
 
 /// The code agent (FR-093, `POST /v1/harness/code`): Codex's turn loop with Open Math Harness's stop rule,
@@ -849,6 +914,10 @@ impl Config {
         }
         if let Ok(b) = std::env::var("NAFS_BACKEND") {
             cfg.backend.active = b;
+        }
+        // A test gateway can point at its own SurrealDB without editing the file.
+        if let Ok(u) = std::env::var("NAFS_KB_URL") {
+            cfg.knowledge.url = u;
         }
         if !cfg.backends.contains_key(&cfg.backend.active) {
             return Err(NafsError::Config(format!(

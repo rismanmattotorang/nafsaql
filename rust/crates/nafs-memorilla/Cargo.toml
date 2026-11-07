@@ -1,0 +1,21 @@
+[package]
+name = "nafs-memorilla"
+description = "Memorilla for Nafs-Aql (Phase 20) on Candle: the reference text encoder (Qwen3-Embedding), later the memory module and its trainer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+candle-core = "0.11.1"
+candle-nn = "0.11.1"
+candle-transformers = "0.11.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+smiley-core = { path = "../smiley-core" }

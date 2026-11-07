@@ -180,6 +180,31 @@
       "minimum": 0,
       "maximum": 4,
       "description": "FR-096: System 1 samples verified before a failed draft is escalated"
+    },
+    "knowledge": {
+      "type": "object",
+      "description": "FR-K20 (Phase 20): answer from a knowledge base; its best passages go into the prompt as numbered sources",
+      "required": [
+        "kb"
+      ],
+      "properties": {
+        "kb": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "rag",
+            "off"
+          ],
+          "default": "rag"
+        },
+        "k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      }
     }
   }
 }

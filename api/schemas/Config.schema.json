@@ -665,6 +665,89 @@
         }
       },
       "additionalProperties": false
+    },
+    "knowledge": {
+      "type": "object",
+      "description": "Knowledge Base (Phase 20, IF-K02): SurrealDB connection, upload limits, passage size",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+$"
+        },
+        "database": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+$"
+        },
+        "user": {
+          "type": "string"
+        },
+        "password_file": {
+          "type": "string"
+        },
+        "files_dir": {
+          "type": "string"
+        },
+        "max_upload_mb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_files_per_request": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "chunk_chars": {
+          "type": "integer",
+          "minimum": 200
+        },
+        "chunk_overlap": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "search_k": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "embed_url": {
+          "type": "string"
+        },
+        "embed_model": {
+          "type": "string"
+        },
+        "embed_dims": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "embed_batch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "exact_search_below": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rag_k": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "rag_max_chars": {
+          "type": "integer",
+          "minimum": 200
+        },
+        "rag_min_similarity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,

@@ -1,0 +1,29 @@
+[package]
+name = "nafs-kb"
+description = "Knowledge Base (Phase 20): document parsing, chunking, SurrealDB storage, search; vector and graph retrieval"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+sha2 = { workspace = true }
+regex = { workspace = true }
+tracing = { workspace = true }
+pdf_oxide = { version = "0.3.78", default-features = false }
+zip = { version = "9.4.1", default-features = false, features = ["deflate"] }
+quick-xml = "0.42.0"
+ciborium = "0.2.2"
+htmd = "0.5.6"
+text-splitter = { version = "0.33.1", features = ["markdown"] }

@@ -1,5 +1,5 @@
 // Nafs-Aql web UI. Vanilla ES module, no build step. Served by nafs-gateway.
-// Sections: core utilities, markdown, charts, chat, rooms, performance, evaluation, system.
+// Sections: core utilities, markdown, charts, chat, rooms, knowledge, performance, evaluation, system.
 
 // ============================== core ==============================
 const $ = (s, el = document) => el.querySelector(s);
@@ -66,6 +66,13 @@ function toolcardsHTML(t, live) {
     cards.push(`<details class="toolcard ${ok ? 'pass' : 'fail'}"><summary><span class="tc-ico">${ok ? icon.check : icon.x}</span><span class="tc-name">${esc(checkerName(r.verifier))}</span><span class="tc-st"><b>${ok ? 'passed' : 'failed'}</b> · ${esc(v.kind || 'final')}${r.verifier === 'judge' && r.score != null ? ` · score ${num(r.score, 2)}` : ''}</span><span class="tc-dur">${r.duration_ms != null ? fmtMs(r.duration_ms) : ''}</span><span class="tc-chev">▶</span></summary>
       <div class="tc-body">${r.evidence ? `<div class="codebox">${esc(r.evidence)}</div>` : ok ? 'The answer passed this check.' : 'No details recorded.'}${r.verifier === 'judge' && r.details ? judgeBars(r.details) : ''}</div></details>`); }
   return cards.length ? `<div class="toolcards">${cards.join('')}</div>` : '';
+}
+// Knowledge-base passages the answer was given (numbered as the model cites them), or why there were none.
+function kbSourcesHTML(sources) {
+  const notes = sources.filter(x => x.note), hits = sources.filter(x => !x.note);
+  let out = notes.map(n => `<div class="sources">${icon.book}<span>${esc(n.note)}</span></div>`).join('');
+  if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src"><summary><span class="kb-n">${x.n}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${x.page ? ` <span class="faint">· page ${x.page}</span>` : ''}</span>${advanced() && x.vector_score != null ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
+  return out;
 }
 // Follow-ups (OpenUI FollowUpBlock): what to ask next, from the state of this answer.
 function followupsHTML(t) {
@@ -473,6 +480,7 @@ class Turn {
     else ans.innerHTML = md(text) + (live ? '<span class="caret"></span>' : '');
     let notes = '';
     if (r?.retrieved?.length) notes += `<div class="sources">${icon.book}<span>Drew on ${r.retrieved.length} earlier checked answer${r.retrieved.length > 1 ? 's' : ''}: ${r.retrieved.map(x => `<span class="src" title="${esc(x.question || '')}">${esc((x.question || '').slice(0, 60))}${(x.question || '').length > 60 ? '…' : ''} <span class="faint">(${pct(x.score, 0)} match)</span></span>`).join(' · ')}</span></div>`;
+    if (r?.sources?.length) notes += kbSourcesHTML(r.sources);
     if (r?.uncertainty_notice) notes += `<div class="notice ${r.assurance === 'abstained' ? 'bad' : ''}">${icon.alert}<span>${esc(r.uncertainty_notice)}</span></div>`;
     if (this.error) notes += `<div class="notice bad">${icon.alert}<span>${esc(this.error)}</span></div>`;
     el.querySelector('.notes').innerHTML = notes;
@@ -575,6 +583,7 @@ routes.chat = { title: 'Chat', async render(view) {
         <div class="controls">
           <div class="seg" id="modeSeg" role="group" aria-label="Answer mode"><button data-m="auto" title="Auto: answers quickly, and thinks it through when the question needs it">${icon.shield}Auto</button><button data-m="fast" title="Quick: always answer at once">${icon.bolt}Quick</button><button data-m="slow" title="Thorough: always think it through first (slower)">${icon.brain}Thorough</button><button data-m="both" class="adv-only" title="Compare: see a quick and a thorough answer side by side and pick the better one">${icon.compare}Compare</button></div>
           <span class="chip" id="verifyChip" role="button" tabindex="0" title="Give the expected answer, tests or a format, so the reply can be checked">${icon.shield}<span>Add a check</span></span>
+          <label class="chip kb-pick" id="kbChip" hidden title="Answer from the passages of one of your knowledge bases">${icon.book}<select id="kbSel" aria-label="Answer from a knowledge base"><option value="">No knowledge base</option></select></label>
           <span class="sp"></span><button class="btn ghost sm adv-only" id="inspBtn" title="Show how each answer was produced (Ctrl/Cmd+I)">${icon.search}Details</button>
         </div><div class="privacy">Answers can be wrong; look for <b>Checked</b> on answers that were verified. <button type="button" class="linkbtn" id="privBtn">Privacy</button></div></div></div></div>
     <aside class="inspector" id="insp"></aside></div>`;
@@ -593,6 +602,12 @@ routes.chat = { title: 'Chat', async render(view) {
   // settings
   const segBtns = $$('#modeSeg button'); const setMode = (m) => { S.mode = m; segBtns.forEach(b => b.classList.toggle('on', b.dataset.m === m)); cfg.save(); };
   segBtns.forEach(b => b.onclick = () => setMode(b.dataset.m)); setMode(S.mode);
+  // Knowledge picker: shown when the server has knowledge bases; the choice is remembered.
+  (async () => { try { const st = await api.get('/v1/kb/status'); if (!st.enabled || !st.reachable) return; const r = await api.get('/v1/kb'); const sel = $('#kbSel'); if (!sel || !r.bases.length) return;
+    sel.innerHTML = `<option value="">No knowledge base</option>` + r.bases.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
+    if (!r.bases.some(b => b.id === PREFS.kb)) { PREFS.kb = null; savePrefs(); } sel.value = PREFS.kb || ''; $('#kbChip').hidden = false; $('#kbChip').classList.toggle('on', !!PREFS.kb);
+    sel.onchange = () => { PREFS.kb = sel.value || null; savePrefs(); $('#kbChip').classList.toggle('on', !!PREFS.kb); input.placeholder = PREFS.kb ? `Ask about ${sel.selectedOptions[0].text}` : 'Ask anything'; };
+    if (PREFS.kb) input.placeholder = `Ask about ${sel.selectedOptions[0].text}`; } catch {} })();
   const tbPop = $('#tbPop'); $('#tbMenu').onclick = (e) => { e.stopPropagation(); tbPop.hidden = !tbPop.hidden; $('#tbMenu').setAttribute('aria-expanded', String(!tbPop.hidden)); };
   tbPop.onclick = (e) => e.stopPropagation(); const closePop = () => { tbPop.hidden = true; $('#tbMenu')?.setAttribute('aria-expanded', 'false'); }; document.addEventListener('click', closePop);
   $('#privBtn').onclick = () => modal(`<h3 style="margin-top:0">Privacy</h3><p class="small">Chats may be used to improve answers, after personal details are removed and a person has reviewed them. To keep a chat out, open its menu (the three dots above the chat) and choose <b>Don't use to improve answers</b>.</p><p class="small muted">Your chats are kept for 90 days unless you delete them.</p>`);
@@ -655,7 +670,8 @@ routes.chat = { title: 'Chat', async render(view) {
     const mode = modeOverride || S.mode;
     if (mode === 'both') return trial(text, v);
     const body = { conversation_id: convId, messages: [{ role: 'user', content: text }], lambda: S.lambda, thinking_budget: S.budget > 0 ? S.budget : undefined, show_reasoning: S.reason,
-      force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined };
+      force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined,
+      knowledge: PREFS.kb ? { kb: PREFS.kb, mode: 'rag' } : undefined };
     const turn = new Turn(inner, { onSelect: select, onRetry: retry, prompt: text, request: body, onVerify }); turns.push(turn); select(turn);
     turn.onUpdate = (t) => { if (selected === t) insp.innerHTML = inspectorHTML(t); const near = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 160; if (near) scrollDown(); };
     scrollDown(); const ctrl = new AbortController(); setBusy(ctrl);
@@ -1016,6 +1032,225 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
   if (want && (S.rooms.some(r => r.room_id === want) || location.hash.includes(want))) await join(want);
   else if (want) { store.set('lastRoom', null); }
   return () => { S.dead = true; drafts_save(); closeSocket(); S.turns.forEach(t => t.dispose()); clearInterval(tick); clearInterval(poll); clearTimeout(S.retryTimer); resizer.disconnect(); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('online', onOnline); };
+} };
+
+// ============================== knowledge base ==============================
+// Documents a person uploads, read into passages and searchable; later the assistant answers from them.
+const KB_KINDS = { pdf: 'PDF', docx: 'Word', pptx: 'Slides', tex: 'LaTeX', html: 'Web page', md: 'Markdown', txt: 'Text' };
+const KB_ACCEPT = '.pdf,.docx,.pptx,.tex,.latex,.html,.htm,.md,.markdown,.txt';
+const KB_STATE = { queued: ['Waiting', 'warn'], parsing: ['Reading', 'warn'], chunking: ['Reading', 'warn'], storing: ['Saving', 'warn'], embedding: ['Indexing', 'warn'], extracting: ['Linking', 'warn'], ready: ['Ready', 'ok'], failed: ['Failed', 'bad'] };
+const fmtBytes = (n) => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`;
+const fmtCount = (n) => Number(n || 0).toLocaleString();
+// Escape first, then mark the query's words, so nothing from a document is ever rendered as HTML.
+function kbHighlight(text, query) {
+  const stop = new Set(['the', 'and', 'for', 'are', 'was', 'were', 'with', 'what', 'which', 'who', 'how', 'why', 'when', 'where', 'does', 'did', 'this', 'that', 'from', 'into', 'than', 'then', 'they', 'their', 'there', 'has', 'have', 'had', 'can', 'its', 'not', 'but', 'about', 'more', 'most', 'some', 'any', 'all', 'one', 'use', 'used']);
+  const words = [...new Set(String(query).toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) || [])].filter(w => !stop.has(w)).slice(0, 12);
+  let out = esc(String(text).replace(/^#{1,6} /gm, ''));
+  if (!words.length) return out;
+  const re = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'giu');
+  return out.replace(re, '<mark>$1</mark>');
+}
+// Multipart upload with progress (fetch cannot report upload progress).
+function kbUpload(kbId, files, onProgress) {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData(); for (const f of files) fd.append('file', f, f.name);
+    const x = new XMLHttpRequest(); x.open('POST', `/v1/kb/${encodeURIComponent(kbId)}/documents`);
+    const t = api.token(); if (t) x.setRequestHeader('Authorization', `Bearer ${t}`);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {}
+      if (x.status >= 200 && x.status < 300 || x.status === 422) resolve(d || { documents: [], refused: [] });
+      else reject(new Error((d && d.message) || `Upload failed (HTTP ${x.status})`)); };
+    x.onerror = () => reject(new Error('Cannot reach the service. It may be restarting; try again in a moment.'));
+    x.send(fd);
+  });
+}
+
+routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questions', async render(view, alive) {
+  const S = { bases: [], cur: store.get('kbCurrent', null), docs: [], status: null, timer: null, dead: false, query: '', smode: store.get('kbSearchMode', 'hybrid') };
+  view.innerHTML = `<div class="page kb">
+    <div class="kb-grid">
+      <aside class="card kb-side" aria-label="Knowledge bases">
+        <div class="card-h"><h3>Knowledge bases</h3><button class="btn sm" id="kbNew" type="button">${icon.plus}New</button></div>
+        <form id="kbNewForm" class="kb-newform" hidden autocomplete="off">
+          <input id="kbName" type="text" maxlength="80" placeholder="Name, e.g. Project papers" aria-label="Name of the new knowledge base">
+          <input id="kbDesc" type="text" maxlength="300" placeholder="What is in it (optional)" aria-label="Description">
+          <div class="row"><button class="btn sm" type="submit">Create</button><button class="btn sm ghost" type="button" id="kbNewCancel">Cancel</button></div>
+          <div class="rerr" id="kbNewErr" role="alert"></div>
+        </form>
+        <div id="kbList" class="kb-list" role="list"><div class="empty small">Loading…</div></div>
+      </aside>
+      <section id="kbMain" class="kb-main"></section>
+    </div></div>`;
+  const list = $('#kbList', view), main = $('#kbMain', view);
+
+  const notice = (cls, html) => `<div class="notice ${cls}">${icon.alert}<span>${html}</span></div>`;
+  async function loadStatus() {
+    try { S.status = await api.get('/v1/kb/status'); } catch (e) { S.status = { enabled: false, error: e.message }; }
+    if (!S.status.enabled) { main.innerHTML = notice('warn', 'Knowledge is turned off in this server\'s configuration. An administrator can turn it on under <b>[knowledge]</b>.'); list.innerHTML = ''; return false; }
+    if (!S.status.reachable) { main.innerHTML = notice('bad', `The knowledge store is not running, so documents cannot be read or searched. An administrator can start it with <code>scripts/serve_surreal.sh start</code>.${S.status.error && advanced() ? `<br><span class="tiny">${esc(S.status.error)}</span>` : ''}`); list.innerHTML = ''; return false; }
+    return true;
+  }
+  async function loadBases() {
+    const r = await api.get('/v1/kb'); if (!alive()) return; S.bases = r.bases || [];
+    if (!S.bases.some(b => b.id === S.cur)) S.cur = S.bases[0]?.id || null;
+    store.set('kbCurrent', S.cur); drawList();
+  }
+  function drawList() {
+    list.innerHTML = S.bases.length ? S.bases.map(b => `<button type="button" role="listitem" class="kb-item ${b.id === S.cur ? 'on' : ''}" data-id="${esc(b.id)}">
+        <span class="kb-iname">${esc(b.name)}</span><span class="tiny faint">${plural(b.documents, 'document')} · ${fmtCount(b.chunks)} passages</span></button>`).join('')
+      : `<div class="empty small">No knowledge bases yet. Create one, then add documents to it.</div>`;
+    $$('.kb-item', list).forEach(el => el.onclick = () => { S.cur = el.dataset.id; store.set('kbCurrent', S.cur); drawList(); openBase(); });
+  }
+  const curBase = () => S.bases.find(b => b.id === S.cur);
+
+  function drawMain() {
+    const b = curBase();
+    if (!b) { main.innerHTML = `<div class="card"><div class="card-b kb-welcome">${icon.book}<h3>Bring your documents</h3>
+      <p class="muted">Create a knowledge base, then drop PDFs, Word and PowerPoint files, LaTeX sources, web pages, Markdown or text into it. Each document is read into short passages you can search; next, the assistant will answer from them.</p>
+      <button class="btn" type="button" id="kbFirst">${icon.plus}New knowledge base</button></div></div>`;
+      $('#kbFirst', main).onclick = () => $('#kbNew', view).click(); return; }
+    main.innerHTML = `<div class="card kb-head"><div class="card-h"><div><h2 id="kbTitle">${esc(b.name)}</h2>${b.description ? `<div class="small muted">${esc(b.description)}</div>` : ''}</div>
+        <div class="row"><button class="btn sm ghost" id="kbRename" type="button">Rename</button><button class="btn sm ghost" id="kbDelete" type="button">Delete</button></div></div>
+      <div class="card-b kb-stats"><span><b>${fmtCount(b.documents)}</b> ${b.documents === 1 ? 'document' : 'documents'}</span><span><b>${fmtCount(b.chunks)}</b> passages</span><span><b>${fmtCount(b.chars)}</b> characters</span></div></div>
+    <div class="card"><div class="card-h"><h3>Search</h3><div class="seg" id="kbMode" role="group" aria-label="How to search">${[['hybrid', 'Meaning and words', 'Passages close in meaning and passages with your words, ranked together'], ['vector', 'Meaning', 'Passages close in meaning, even without your words'], ['lexical', 'Words', 'Passages that contain your words']].map(([m, l, t]) => `<button type="button" data-m="${m}" title="${t}" class="${S.smode === m ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      <div class="card-b"><div id="kbEmbedNote"></div><form id="kbSearchForm" class="row kb-search" autocomplete="off"><input id="kbQ" type="search" placeholder="Search this knowledge base" aria-label="Search this knowledge base" value="${esc(S.query)}"><button class="btn" type="submit">${icon.search}Search</button></form>
+      <div id="kbResults" class="kb-results" aria-live="polite"></div></div></div>
+    <div class="card"><div class="card-h"><h3>Documents</h3><span class="hint small muted">PDF, Word, PowerPoint, LaTeX, web pages, Markdown and text, up to ${S.status?.limits?.max_upload_mb ?? 50} MB each</span></div>
+      <div class="card-b"><label class="kb-drop" id="kbDrop" tabindex="0"><input type="file" id="kbFile" multiple accept="${KB_ACCEPT}" hidden>
+        ${icon.download}<span><b>Drop files here</b> or <u>choose files</u></span></label>
+        <div id="kbUploads" class="kb-uploads"></div>
+        <div id="kbDocs"></div></div></div>`;
+    $('#kbRename', main).onclick = renameBase; $('#kbDelete', main).onclick = deleteBase;
+    $$('#kbMode button', main).forEach(b => b.onclick = () => { S.smode = b.dataset.m; store.set('kbSearchMode', S.smode); $$('#kbMode button', main).forEach(x => x.classList.toggle('on', x === b)); if (S.query) search(S.query); });
+    $('#kbSearchForm', main).onsubmit = (e) => { e.preventDefault(); search($('#kbQ', main).value); };
+    const drop = $('#kbDrop', main), file = $('#kbFile', main);
+    file.onchange = () => { if (file.files.length) upload([...file.files]); file.value = ''; };
+    drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } };
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])]; if (f.length) upload(f); });
+    drawDocs(); if (S.query) search(S.query);
+  }
+  // Whether passages can be searched by meaning, and a way to index the ones that cannot yet.
+  function embedNote() {
+    const e = S.status?.embedder; const missing = S.docs.filter(d => d.status === 'ready' && d.n_embedded < d.n_chunks).length;
+    if (!e) return '';
+    if (!e.reachable) return `<div class="notice warn kb-note">${icon.alert}<span>Searching by meaning is unavailable: the embedding service is not running, so searches use words only.${advanced() ? ` <span class="tiny">An administrator can start it with <code>scripts/serve_smiley.sh embed</code>.</span>` : ''}</span></div>`;
+    if (missing) return `<div class="notice kb-note">${icon.alert}<span>${plural(missing, 'document')} can only be searched by words so far. <button type="button" class="linkbtn" id="kbReindex">Index for meaning</button></span></div>`;
+    return '';
+  }
+  async function reindex() {
+    try { const r = await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/reindex`); S.reindexing = r.queued > 0; toast(r.queued ? `Indexing ${plural(r.queued, 'document')} for meaning` : 'Everything is already indexed'); await loadDocs(); }
+    catch (e) { toast(e.message, 4000); }
+  }
+  function drawDocs() {
+    const box = $('#kbDocs', main); if (!box) return;
+    const en = $('#kbEmbedNote', main); if (en) { en.innerHTML = embedNote(); const ri = $('#kbReindex', en); if (ri) ri.onclick = reindex; }
+    if (!S.docs.length) { box.innerHTML = `<div class="empty small">No documents yet.</div>`; return; }
+    box.innerHTML = `<table class="t kb-docs"><thead><tr><th>Document</th><th>Type</th><th>Size</th><th>Passages</th><th>State</th><th></th></tr></thead><tbody>${S.docs.map(d => {
+      let [label, cls] = KB_STATE[d.status] || [d.status, 'warn']; const busy = cls === 'warn';
+      if (d.status === 'embedding' && d.n_chunks) label = `Indexing ${Math.round(100 * d.n_embedded / d.n_chunks)}%`;
+      if (d.status === 'ready' && d.n_embedded < d.n_chunks && S.status?.embedder) { label = 'Words only'; cls = 'warn'; }
+      const pages = d.pages ? ` · ${plural(d.pages, 'page')}` : '';
+      return `<tr data-id="${esc(d.id)}"><td><div class="kb-dtitle">${esc(d.title)}</div><div class="tiny faint">${esc(d.filename)}${pages} · added ${ago(d.created_at)}</div></td>
+        <td><span class="badge">${esc(KB_KINDS[d.kind] || d.kind)}</span></td><td class="nowrap">${fmtBytes(d.bytes)}</td><td>${d.status === 'ready' ? fmtCount(d.n_chunks) : '–'}</td>
+        <td><span class="kb-state ${cls}" ${d.error ? `title="${esc(d.error)}"` : ''}>${busy ? '<span class="spin"></span>' : ''}${label}</span>${d.error ? `<div class="tiny kb-err">${esc(d.error)}</div>` : ''}</td>
+        <td class="nowrap"><button class="btn sm ghost" data-act="view" type="button" ${d.status !== 'ready' ? 'disabled' : ''}>Passages</button>
+          <button class="ibtn" data-act="again" type="button" ${busy ? 'disabled' : ''} aria-label="Read ${esc(d.title)} again" title="Read again">${icon.retry}</button>
+          <button class="ibtn" data-act="del" type="button" aria-label="Delete ${esc(d.title)}" title="Delete">${icon.x}</button></td></tr>`; }).join('')}</tbody></table>`;
+    $$('tr[data-id]', box).forEach(tr => { const d = S.docs.find(x => x.id === tr.dataset.id);
+      $$('[data-act]', tr).forEach(b => b.onclick = () => ({ view: () => showPassages(d), again: () => reread(d), del: () => deleteDoc(d) })[b.dataset.act]()); });
+  }
+  async function loadDocs() {
+    if (!S.cur) { S.docs = []; return; }
+    const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/documents`); if (!alive()) return;
+    const was = S.docs.filter(d => KB_STATE[d.status]?.[1] === 'warn').map(d => d.id);
+    S.docs = r.documents || [];
+    const finished = S.docs.filter(d => was.includes(d.id) && d.status === 'ready');
+    if (finished.length) { toast(finished.length === 1 ? `“${finished[0].title}” is ready` : `${finished.length} documents are ready`); await loadBases(); drawMain(); return; }
+    drawDocs(); schedule();
+  }
+  function schedule() {
+    clearTimeout(S.timer);
+    if (S.reindexing && !S.docs.some(d => d.status === 'ready' && d.n_embedded < d.n_chunks)) S.reindexing = false;
+    if (!S.dead && (S.reindexing || S.docs.some(d => KB_STATE[d.status]?.[1] === 'warn'))) S.timer = setTimeout(() => loadDocs().catch(() => schedule()), 1500);
+  }
+  async function openBase() { S.docs = []; S.query = ''; drawMain(); if (S.cur) { await loadDocs(); drawDocs(); } }
+
+  async function upload(files) {
+    const box = $('#kbUploads', main); const row = h(`<div class="kb-up"><div class="small">Uploading ${plural(files.length, 'file')}…</div><div class="progress"><span style="width:0%"></span></div></div>`);
+    box.prepend(row);
+    try {
+      const r = await kbUpload(S.cur, files, (p) => { const bar = row.querySelector('.progress span'); if (bar) bar.style.width = `${Math.round(p * 100)}%`; });
+      const dup = (r.documents || []).filter(d => d.duplicate);
+      const parts = [];
+      const added = (r.documents || []).length - dup.length;
+      if (added) parts.push(`${plural(added, 'document')} added; reading ${added === 1 ? 'it' : 'them'} now`);
+      if (dup.length) parts.push(`${plural(dup.length, 'file')} already in this knowledge base`);
+      row.innerHTML = `<div class="small">${esc(parts.join('. ') || 'Nothing was added.')}</div>${(r.refused || []).map(x => `<div class="tiny kb-err">${esc(x.filename)}: ${esc(x.reason)}</div>`).join('')}`;
+      setTimeout(() => row.remove(), (r.refused || []).length ? 15000 : 5000);
+      await loadDocs(); await loadBases();
+    } catch (e) { row.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; }
+  }
+  async function search(q) {
+    S.query = q.trim(); const box = $('#kbResults', main); if (!box) return;
+    if (!S.query) { box.innerHTML = ''; return; }
+    box.innerHTML = `<div class="small muted"><span class="spin"></span> Searching…</div>`;
+    try {
+      const r = await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/search`, { query: S.query, k: 8, mode: S.smode });
+      if (!alive()) return;
+      const how = { hybrid: 'by meaning and words', vector: 'by meaning', lexical: 'by words' }[r.mode];
+      box.innerHTML = (r.fallback ? `<div class="tiny kb-err">Searched by words only: ${esc(r.fallback)}.</div>` : '') + (r.results.length ? `<div class="tiny faint">${plural(r.results.length, 'passage')} ${how} · ${fmtMs(r.took_ms)}</div>` + r.results.map(x => `<article class="kb-hit">
+          <div class="kb-hmeta"><b>${esc(x.doc_title)}</b>${x.heading ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${x.page ? ` <span class="faint">· page ${x.page}</span>` : ''}${x.vector_score != null ? ` <span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}${advanced() ? ` <span class="tiny faint">score ${num(x.score, 3)}</span>` : ''}</div>
+          <div class="kb-htext">${kbHighlight(x.text, S.query)}</div></article>`).join('')
+        : `<div class="empty small">No passage matches. Try other words, or check that the documents are ready.</div>`);
+    } catch (e) { box.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; }
+  }
+  async function showPassages(d, offset = 0) {
+    const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/documents/${encodeURIComponent(d.id)}/chunks?offset=${offset}&limit=50`);
+    const more = offset + r.chunks.length < r.total;
+    modal(`<h3 style="margin-top:0">${esc(d.title)}</h3><div class="small muted">${plural(r.total, 'passage')}${d.pages ? ` from ${plural(d.pages, 'page')}` : ''}; showing ${offset + 1}–${offset + r.chunks.length}.</div>
+      <div class="kb-passages">${r.chunks.map(c => `<div class="kb-pass"><div class="tiny faint">#${c.ord + 1}${c.heading ? ` · ${esc(c.heading)}` : ''}${c.page ? ` · page ${c.page}` : ''}</div><div class="kb-ptext">${esc(c.text.replace(/^#{1,6} /gm, ''))}</div></div>`).join('')}</div>
+      <div class="row" style="justify-content:space-between;margin-top:10px">${offset > 0 ? `<button class="btn sm ghost" type="button" id="kbPrev">Previous</button>` : '<span></span>'}${more ? `<button class="btn sm ghost" type="button" id="kbNext">Next 50</button>` : ''}</div>`);
+    const p = $('#kbPrev'), n = $('#kbNext');
+    if (p) p.onclick = () => showPassages(d, Math.max(0, offset - 50)); if (n) n.onclick = () => showPassages(d, offset + 50);
+  }
+  async function reread(d) {
+    try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/documents/${encodeURIComponent(d.id)}/reingest`); toast(`Reading “${d.title}” again`); await loadDocs(); }
+    catch (e) { toast(e.message, 4000); }
+  }
+  async function deleteDoc(d) {
+    if (!await confirmDialog({ title: `Delete “${d.title}”?`, body: `<p class="small">The document and its ${fmtCount(d.n_chunks)} passages are removed from this knowledge base, with the stored file. This cannot be undone.</p>` })) return;
+    try { await api.del(`/v1/kb/${encodeURIComponent(S.cur)}/documents/${encodeURIComponent(d.id)}`); toast('Document deleted'); await loadBases(); await openBase(); }
+    catch (e) { toast(e.message, 4000); }
+  }
+  async function renameBase() {
+    const b = curBase(); if (!b) return;
+    modal(`<h3 style="margin-top:0">Rename knowledge base</h3><form id="kbRen" class="stack" autocomplete="off"><label class="f">Name<input id="kbRn" type="text" maxlength="80" value="${esc(b.name)}"></label>
+      <label class="f">Description<input id="kbRd" type="text" maxlength="300" value="${esc(b.description || '')}"></label><div class="rerr" id="kbRe" role="alert"></div>
+      <div class="row" style="justify-content:flex-end"><button class="btn" type="submit">Save</button></div></form>`);
+    $('#kbRen').onsubmit = async (e) => { e.preventDefault();
+      try { await api.patch(`/v1/kb/${encodeURIComponent(b.id)}`, { name: $('#kbRn').value, description: $('#kbRd').value }); $('#modal').close(); await loadBases(); drawMain(); drawDocs(); }
+      catch (err) { $('#kbRe').textContent = err.message; } };
+  }
+  async function deleteBase() {
+    const b = curBase(); if (!b) return;
+    if (!await confirmDialog({ title: `Delete “${b.name}”?`, body: `<p class="small">This removes the knowledge base for good: its ${plural(b.documents, 'document')}, ${fmtCount(b.chunks)} passages and the stored files. This cannot be undone.</p>` })) return;
+    try { await api.del(`/v1/kb/${encodeURIComponent(b.id)}`); toast('Knowledge base deleted'); S.cur = null; await loadBases(); await openBase(); }
+    catch (e) { toast(e.message, 4000); }
+  }
+
+  const form = $('#kbNewForm', view);
+  $('#kbNew', view).onclick = () => { form.hidden = false; $('#kbName', view).focus(); };
+  $('#kbNewCancel', view).onclick = () => { form.hidden = true; $('#kbNewErr', view).textContent = ''; };
+  form.onsubmit = async (e) => { e.preventDefault();
+    const name = cleanRoomName($('#kbName', view).value); if (!name) { $('#kbNewErr', view).textContent = 'Give it a name.'; return; }
+    try { const b = await api.post('/v1/kb', { name, description: $('#kbDesc', view).value.trim() }); form.hidden = true; form.reset(); $('#kbNewErr', view).textContent = '';
+      S.cur = b.id; await loadBases(); await openBase(); }
+    catch (err) { $('#kbNewErr', view).textContent = err.message; } };
+
+  if (await loadStatus()) { await loadBases(); await openBase(); }
+  return () => { S.dead = true; clearTimeout(S.timer); };
 } };
 
 // ============================== performance console ==============================

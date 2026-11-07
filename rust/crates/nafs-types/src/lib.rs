@@ -155,6 +155,20 @@ impl VerificationInputs {
     }
 }
 
+/// FR-K20: which knowledge base a chat request answers from, and how.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct KnowledgeRequest {
+    /// Knowledge base id.
+    pub kb: String,
+    /// `rag` (default): the best passages go into the prompt as numbered sources; `off`: none. `graph` and `memory`
+    /// arrive in later phases.
+    #[serde(default)]
+    pub mode: Option<String>,
+    /// Passages to use (default from `[knowledge] rag_k`).
+    #[serde(default)]
+    pub k: Option<usize>,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatRequest {
     #[serde(default)]
@@ -188,6 +202,9 @@ pub struct ChatRequest {
     /// FR-061: use (true) or skip (false) retrieval of earlier verified answers; default from config.
     #[serde(default)]
     pub retrieve: Option<bool>,
+    /// FR-K20 (Phase 20): answer from a knowledge base.
+    #[serde(default)]
+    pub knowledge: Option<KnowledgeRequest>,
     /// FR-082: use (true) or skip (false) the adaptive reasoning exit; default from config.
     #[serde(default)]
     pub adaptive_exit: Option<bool>,
@@ -396,6 +413,9 @@ pub struct ChatReply {
     /// FR-061: earlier verified answers placed in the prompt as data (provenance and score).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub retrieved: Vec<Value>,
+    /// FR-K21: knowledge-base passages placed in the prompt as numbered sources (document, heading, page, scores).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub sources: Vec<Value>,
 }
 
 /// SSE / WebSocket stream events (FR-006).

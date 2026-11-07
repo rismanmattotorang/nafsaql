@@ -17,6 +17,8 @@
 //!   gateway already treats a backend without them as it treats vLLM.
 //!
 //! One session per process (one stream at a time; requests queue): run one process per model, as with llama-server.
+mod embed;
+
 use axum::{
     extract::State,
     http::StatusCode,
@@ -74,6 +76,12 @@ struct Args {
     /// beside a model must not switch the weights silently. A missing or corrupt sidecar refuses to start.
     #[arg(long, default_value_t = false)]
     littlebit: bool,
+    /// Serve an embedding model (Qwen3-Embedding) behind `POST /v1/embeddings` instead of the chat API (Phase 20).
+    #[arg(long, default_value_t = false)]
+    embedding: bool,
+    /// Longest text embedded, in tokens (embedding mode); longer texts are truncated.
+    #[arg(long = "embed-max-tokens", default_value_t = 1024)]
+    embed_max_tokens: usize,
 }
 
 struct App {
@@ -111,6 +119,18 @@ async fn main() {
     let threads = a
         .threads
         .unwrap_or_else(|| std::thread::available_parallelism().map_or(4, |n| n.get()));
+    if a.embedding {
+        embed::run(
+            &a.model,
+            a.alias.clone(),
+            &a.host,
+            a.port,
+            threads,
+            a.embed_max_tokens,
+        )
+        .await;
+        return;
+    }
     let t0 = Instant::now();
     let gguf = match smiley_core::gguf::Gguf::open(&a.model).and_then(|g| {
         smiley_core::check_compatible(&g)?;

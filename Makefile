@@ -42,6 +42,8 @@ rooms-test:      ## live test of Rooms against the running stack (add SLOW=1 for
 
 up: build
 	scripts/serve_smiley.sh start
+	@if grep -A1 '^\[knowledge\]' config/nafs-aql.toml | grep -q 'enabled = true'; then scripts/serve_surreal.sh start; fi
+	@if grep -q '^embed_url = "http' config/nafs-aql.toml && [ -f models/Qwen3-Embedding-0.6B-Q8_0.gguf ]; then scripts/serve_smiley.sh embed; fi
 	scripts/gateway.sh start
 	@echo "Open http://127.0.0.1:8080"
 
@@ -49,6 +51,7 @@ down:
 	scripts/gateway.sh stop
 	scripts/serve_smiley.sh stop
 	scripts/serve_llama.sh stop
+	scripts/serve_surreal.sh stop
 
 up-llama:
 	scripts/serve_llama.sh start

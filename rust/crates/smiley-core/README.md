@@ -28,5 +28,7 @@ Modifications for Nafs-Aql, each marked `// nafs-aql:` in the source:
 - `Caches::{Shared, PerRow}`, `Model::forward_rows` and a per-row `attend`: several users advance in one weight pass, each
   against its own cache (`serve.rs`, Phase 18). Attention runs one row at a time per user, so a user's logits equal a solo
   run's bit for bit; `attn.rs` itself is untouched.
+- `embed.rs` (`Embedder`) and `Model::final_hidden`: last-token-pooled, L2-normalised embeddings from a decoder-only
+  embedding model (Qwen3-Embedding), with the text followed by `<|endoftext|>`; the output head is never read (Phase 20).
 
 The upstream tests are kept; those that need model files under `~/models` skip when the files are absent.

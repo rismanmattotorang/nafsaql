@@ -393,6 +393,13 @@
         "null"
       ],
       "description": "System 2 reasoning content (kept for traces and debugging, not an explanation)"
+    },
+    "sources": {
+      "type": "array",
+      "description": "FR-K21: the knowledge-base passages the answer was given (n, doc_title, heading, page, text, scores), or a note saying why there were none",
+      "items": {
+        "type": "object"
+      }
     }
   }
 }

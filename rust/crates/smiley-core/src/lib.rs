@@ -21,6 +21,8 @@
 
 pub mod attn;
 pub mod dspark;
+// nafs-aql: last-token-pooled embeddings (Qwen3-Embedding), Phase 20.
+pub mod embed;
 pub mod gguf;
 pub mod kv;
 pub mod lbq;

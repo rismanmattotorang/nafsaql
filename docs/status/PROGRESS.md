@@ -1,5 +1,34 @@
 # Progress checkpoint
 
+## Phase 20 (Knowledge): Knowledge Base, GraphRAG and Memorilla (started 2026-11-07)
+
+Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0, 1 and 2 done; next is Phase 3.
+
+| When | Unit of work | Evidence |
+|---|---|---|
+| 09:00 | Memorilla read from `third_party/memorilla` (d8f1889) and the paper (2610.21375v3, `papers/`); revised prompt written | `docs/prompts/MEMORILLA_KB_PROMPT.md` |
+| 09:05 | SurrealDB 3.3.5 installed (`tools/surrealdb`, sha256 checked), `scripts/serve_surreal.sh` (install, start, stop, status, spike); spike PASS (HNSW, BM25 `@1,OR@`, two-hop RELATE traversal) | `scripts/serve_surreal.sh spike` |
+| 09:30 | Phase 0 documents: research note, specification (FR-K, NFR-K, SR-K, IF-K, data model, API, frontend, engine, training), decision 014, A-104..A-107 | `docs/research/memorilla_knowledge.md`, `docs/spec/knowledge_base_spec.md` |
+| 10:15 | Phase 1: `nafs-kb` crate (parsers, chunker, SurrealDB store, ingestion worker), gateway `/v1/kb/*`, `[knowledge]` config + schema, Knowledge page, OpenAPI | 118 tests pass; clippy/fmt clean |
+| 10:20 | Defect found by the live round trip: SurrealDB JSON RPC turns `"Caption: Model ..."` into a record id; client switched to CBOR (A-108), regression in `tests/surreal_it.rs` | 6/6 fixture formats ready |
+| 10:40 | PDF tidy-up (bold runs, running headers, numbered all-caps sections as headings, title heuristic: 21/25 papers titled); ingestion benchmark | `benchmarks/kb_ingest.json` |
+| 10:31 | Owner approved Phase 2 and the download: Qwen3-Embedding-0.6B Q8_0 GGUF + safetensors (`scripts/fetch_models.sh embed`, hashes in `config/models.manifest.json`) | 639 MB + 1.1 GB |
+| 10:50 | Smiley Core `embed.rs` + `Model::final_hidden`; `nafs-smiley-server --embedding` (:8203); Candle reference (`nafs-memorilla`); parity: cosine >= 0.9991, model-card scores reproduced exactly | `cargo test -p nafs-memorilla` |
+| 11:00 | nafs-kb: embedding step, `n_embedded`, HNSW index, exact/HNSW vector search, hybrid RRF, reindex; gateway `/v1/kb/{kb}/reindex`, search modes; config `[knowledge] embed_*`, `rag_*` | integration test with live vectors |
+| 11:05 | Chat: `ChatRequest.knowledge`, `ChatReply.sources`, `nafs_core::knowledge` trait + prompt block, gateway `ChatKnowledge` with the similarity filter | chat answers with citations on :8091 |
+| 11:12 | Indexing measured (379 passages, 964 s, load 44–60); retrieval eval: hybrid 0.90 recall@5 (words 0.85, meaning 0.55); HNSW = exact on 20/20; threshold 0.45 set from off-topic vs relevant scores | `benchmarks/kb_retrieval.json` |
+| 11:25 | UI: search modes, indexing progress, Index for meaning, knowledge picker in chat, Sources list; checked in the browser | screenshots in session |
+
+### Next three actions (Phase 3)
+1. Entity and relation extraction per passage with System 1 under a JSON Schema (schema verifier), as a background step after embedding.
+2. Entity resolution (normalised name + entity-vector cosine >= 0.92), `mentions` / `related` edges, Leiden communities (`leiden-rs`).
+3. Knowledge mode `graph` (local search: question entities -> 1–2 hops -> passages) and a Graph tab on the Knowledge page.
+
+### Open questions
+- Whether the live gateway on :8080 should be restarted to serve the Knowledge page and knowledge in chat (it runs the pre-Phase-20 binary).
+- Indexing is slow on a loaded host (69 tokens/s); re-measure on a quiet one, and consider batching several passages per forward pass.
+
+
 Branch `feat/complete-nafs-aql`, started 2026-10-21 07:20 (+07) from `246c063`. Read this first after any context reset.
 
 ## Done

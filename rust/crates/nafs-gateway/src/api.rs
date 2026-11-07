@@ -43,6 +43,8 @@ pub struct AppStateInner {
     outcomes: Mutex<std::collections::VecDeque<(Instant, bool)>>,
     /// Alert drill: while set and in the future, every rule reports firing (P5 exit criterion).
     drill_until: Mutex<Option<Instant>>,
+    /// Knowledge Base (Phase 20); `None` when `[knowledge]` is off.
+    pub kb: Option<Arc<nafs_kb::Kb>>,
 }
 pub type AppState = Arc<AppStateInner>;
 
@@ -69,7 +71,15 @@ pub fn new_state(
                 .filter(|s| !s.is_empty()),
         );
     }
+    let kb = crate::kb::from_config(&cfg.knowledge);
+    if let Some(k) = &kb {
+        orch.set_knowledge(Arc::new(crate::kb::ChatKnowledge::new(
+            k.clone(),
+            cfg.knowledge.rag_min_similarity,
+        )));
+    }
     Arc::new(AppStateInner {
+        kb,
         cfg,
         orch,
         store,
@@ -220,6 +230,8 @@ pub fn router(state: AppState) -> Router {
         .layer(tower_http::limit::RequestBodyLimitLayer::new(
             2 * 1024 * 1024,
         ))
+        // The knowledge routes carry their own guard, auth and limits (uploads are larger than 2 MB).
+        .merge(crate::kb::routes(state.clone()))
         // Outermost: extractor rejections (malformed JSON, wrong field types, oversized bodies) arrive as plain
         // text from the framework; clients of this API get the same {code, message} envelope as every other error.
         .layer(middleware::from_fn(json_error_envelope))
@@ -302,7 +314,7 @@ fn host_only(h: &str) -> String {
 /// Same-origin and DNS-rebinding guard (review H4). A browser on another origin cannot call the API
 /// (no CORS headers, and requests carrying a foreign Origin are refused, including WebSocket upgrades);
 /// without auth tokens the Host header must also name this machine.
-async fn origin_guard(State(s): State<AppState>, req: Request, next: Next) -> Response {
+pub(crate) async fn origin_guard(State(s): State<AppState>, req: Request, next: Next) -> Response {
     let h = req.headers();
     let host = h
         .get(header::HOST)
@@ -358,7 +370,12 @@ fn percent_decode(s: &str) -> String {
 
 /// Bearer-token auth and per-token rate limiting (NFR-022, NFR-011). WebSockets may pass ?token=
 /// (percent-decoded, review M13).
-async fn auth(State(s): State<AppState>, headers: HeaderMap, req: Request, next: Next) -> Response {
+pub(crate) async fn auth(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    req: Request,
+    next: Next,
+) -> Response {
     if s.tokens.is_empty() {
         return next.run(req).await;
     }
@@ -1600,6 +1617,7 @@ async fn system(State(s): State<AppState>) -> Json<Value> {
                  "fixed": c.gate.fixed, "audit_fraction": c.gate.audit_fraction, "state": gate_view(&s)},
         "judge": c.judge, "audit": {"config": c.audit, "counts": s.store.audit_counts().unwrap_or(Value::Null)},
         "verifier_rates": s.orch.hub.rates.read_locked().clone(),
+        "knowledge": {"enabled": c.knowledge.enabled, "url": c.knowledge.url, "queue": s.kb.as_ref().map(|k| k.queue())},
         "deliberation": c.deliberation, "server": {"bind": c.server.bind, "request_wall_clock_cap_s": c.server.request_wall_clock_cap_s, "max_prompt_tokens": c.server.max_prompt_tokens},
     }))
 }

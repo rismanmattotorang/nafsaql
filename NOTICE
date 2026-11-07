@@ -12,6 +12,10 @@ Third-party components keep their own licences:
 - EAGLE-3 speculative heads (AngelSlim): Apache-2.0. Not part of this repository.
 - OpenAI Codex (codex-rs, Copyright 2025 OpenAI): Apache-2.0. The apply_patch parser and matcher, output
   truncation and the exec output format are derived from it in rust/crates/nafs-harness (see its NOTICE).
+- SurrealDB (SurrealDB Ltd): Business Source License 1.1. Not vendored or redistributed; the server binary is
+  downloaded by scripts/serve_surreal.sh into tools/surrealdb and run as a separate local process (Knowledge Base).
+- Memorilla (snap-stanford/memorilla, arXiv 2610.21375): Apache-2.0. The memory-module design and data layout are
+  followed in the Knowledge Base work; the reference checkout lives in third_party/memorilla (not in version control).
 - Open Math Harness (openmathmodel/open-math-harness): Apache-2.0. The Lean textual rules and verify protocol,
   the discovery scoring protocol and the candidate-tree policy are derived from it in rust/crates/nafs-harness
   (see its NOTICE).
