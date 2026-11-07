@@ -2,7 +2,7 @@
 
 ## Phase 20 (Knowledge): Knowledge Base, GraphRAG and Memorilla (started 2026-11-07)
 
-Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 5 done (0–2 b8da406, 3 f5dfd63, 4 e148c3b, on feat/phase20-knowledge-base); next is Phase 6.
+Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 6 done (0–2 b8da406, 3 f5dfd63, 4 e148c3b, 5 8c0e2f9, on feat/phase20-knowledge-base); next is Phase 7.
 
 | When | Unit of work | Evidence |
 |---|---|---|
@@ -35,10 +35,19 @@ Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 5 done (0–2 b8da406
 | 15:00 | Server `memory_embeds`; gateway `memory` mode, `MemoryReader` with per-base prepared cache, config, UI option (Advanced, experimental) | e2e on :8091 with a test S1 on :8211 |
 | 15:10 | Server check: zero vectors ~ no vectors, large vectors derail, count mismatch refused | session log |
 
-### Next three actions (Phase 6)
-1. Dataset builder per knowledge base (reconstruction, graph claims, synthetic QA filtered by System 1), written in Memorilla's parquet + safetensors layout.
-2. Candle trainer through a frozen f32 Qwen3-1.7B (`models/hf/Qwen3-1.7B`) taking input embeddings: answer-only loss, AdamW, warm-up + cosine, clipping; measure seconds per example first and decide the size of a CPU run from it.
-3. Train a `retrieval_init` module on the fixture base, compare memory mode with rag on held-out questions, and write the GPU recipe for Stages 1–2.
+| 15:20 | Phase 5 committed (8c0e2f9) | git |
+| 15:35 | Differentiable Qwen3 decoder (logits within 2e-5 of candle-transformers on the 1.7B); dataset builder; `memorilla-train`; training runs in the gateway | `nafs-memorilla`, `nafs-kb::dataset`, `memory_runs.rs` |
+| 16:10 | First 1.7B run stalled in swap (four graphs at once); per-example backward | measured |
+| 16:40 | Three silent-failure defects found with probes (fused LayerNorm/softmax without backward, zero init, SiLU NaN) and fixed; gradient test added | `examples/*_probe.rs`, `memory::tests` |
+| 16:50 | 0.6B: check loss 3.46 -> 0.70 in 80 questions; 1.7B: 36–94 s per question, check loss 10.26 -> 1.82 in 8 | research note §15 |
+| 2026-11-08 06:30 | Phase 6 review before the commit: two defects fixed. A run interrupted while its dataset was being built stayed `building` for ever and refused every later run for that base (the gateway's own pid is now recorded and checked); chat offered `memory` mode for bases with no module (`GET /v1/kb` now reports `memory` per base, and the composer hides the option). Two clippy lints in `dataset.rs`; `GET /v1/kb`'s `memory` field and `ChatRequest.knowledge` / `ChatReply.sources` added to OpenAPI (they had never been documented) | 418 Rust tests, fmt and clippy clean, artefacts valid |
+
+### Next three actions (Phase 7)
+1. An overnight 1.7B run on the fixture base (3 epochs, about 5–12 h here; needs 8–11 GB free), then activate it.
+2. A held-out question set from real documents; memory vs rag vs graph vs hybrid (quality and latency, paired), with the
+   noise-documents control from the paper (does the module use the evidence?).
+3. Synthetic QA rows by System 2 if claims and reconstruction alone do not teach recall; an `auto` knowledge mode from the
+   measurements.
 
 ### Open questions
 - Whether the live gateway on :8080 should be restarted to serve the Knowledge page and knowledge in chat (it runs the pre-Phase-20 binary).

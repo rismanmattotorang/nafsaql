@@ -43,3 +43,6 @@ data/bench/calib_set.jsonl
 data/bench/core_set.jsonl
 # SurrealDB server binary (scripts/serve_surreal.sh fetches it)
 tools/surrealdb/
+
+# Source papers used as knowledge-base fixtures (59 MB of third-party PDFs; not part of the repository).
+papers/

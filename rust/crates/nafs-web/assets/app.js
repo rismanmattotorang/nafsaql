@@ -608,10 +608,14 @@ routes.chat = { title: 'Chat', async render(view) {
   (async () => { try { const st = await api.get('/v1/kb/status'); if (!st.enabled || !st.reachable) return; const r = await api.get('/v1/kb'); const sel = $('#kbSel'); if (!sel || !r.bases.length) return;
     sel.innerHTML = `<option value="">No knowledge base</option>` + r.bases.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
     if (!r.bases.some(b => b.id === PREFS.kb)) { PREFS.kb = null; savePrefs(); } sel.value = PREFS.kb || ''; $('#kbChip').hidden = false; $('#kbChip').classList.toggle('on', !!PREFS.kb);
-    const ms = $('#kbMode'); const memOpt = ms.querySelector('option[value=memory]'); memOpt.hidden = !(st.memory && advanced());
-    if (memOpt.hidden && PREFS.kbMode === 'memory') { PREFS.kbMode = 'rag'; savePrefs(); }
-    ms.value = PREFS.kbMode || 'rag'; ms.hidden = !PREFS.kb; ms.onchange = () => { PREFS.kbMode = ms.value; savePrefs(); };
-    sel.onchange = () => { PREFS.kb = sel.value || null; savePrefs(); $('#kbChip').classList.toggle('on', !!PREFS.kb); ms.hidden = !PREFS.kb; input.placeholder = PREFS.kb ? `Ask about ${sel.selectedOptions[0].text}` : 'Ask anything'; };
+    const ms = $('#kbMode'); const memOpt = ms.querySelector('option[value=memory]');
+    // Memory mode needs a module for the chosen base: the server says which bases have one.
+    const syncMode = () => { const b = r.bases.find(x => x.id === PREFS.kb);
+      memOpt.hidden = !(st.memory && advanced() && b && b.memory);
+      if (memOpt.hidden && PREFS.kbMode === 'memory') { PREFS.kbMode = 'rag'; savePrefs(); }
+      ms.value = PREFS.kbMode || 'rag'; ms.hidden = !PREFS.kb; };
+    syncMode(); ms.onchange = () => { PREFS.kbMode = ms.value; savePrefs(); };
+    sel.onchange = () => { PREFS.kb = sel.value || null; savePrefs(); $('#kbChip').classList.toggle('on', !!PREFS.kb); syncMode(); input.placeholder = PREFS.kb ? `Ask about ${sel.selectedOptions[0].text}` : 'Ask anything'; };
     if (PREFS.kb) input.placeholder = `Ask about ${sel.selectedOptions[0].text}`; } catch {} })();
   const tbPop = $('#tbPop'); $('#tbMenu').onclick = (e) => { e.stopPropagation(); tbPop.hidden = !tbPop.hidden; $('#tbMenu').setAttribute('aria-expanded', String(!tbPop.hidden)); };
   tbPop.onclick = (e) => e.stopPropagation(); const closePop = () => { tbPop.hidden = true; $('#tbMenu')?.setAttribute('aria-expanded', 'false'); }; document.addEventListener('click', closePop);
@@ -1126,7 +1130,9 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
         <div id="kbUploads" class="kb-uploads"></div>
         <div id="kbDocs"></div></div></div>
     <div class="card" id="kbGraphCard"><div class="card-h"><h3>Knowledge graph</h3><span class="hint small muted">The things your documents name, and how they relate.</span></div>
-      <div class="card-b" id="kbGraph"><div class="empty small">Loading…</div></div></div>`;
+      <div class="card-b" id="kbGraph"><div class="empty small">Loading…</div></div></div>
+    <div class="card adv-only" id="kbMemCard"><div class="card-h"><h3>Memory <span class="tiny faint">experimental</span></h3><span class="hint small muted">Teaches a small memory module this knowledge base, for answers from 16 memory tokens.</span></div>
+      <div class="card-b" id="kbMem"><div class="empty small">Loading…</div></div></div>`;
     $('#kbRename', main).onclick = renameBase; $('#kbDelete', main).onclick = deleteBase;
     $$('#kbMode button', main).forEach(b => b.onclick = () => { S.smode = b.dataset.m; store.set('kbSearchMode', S.smode); $$('#kbMode button', main).forEach(x => x.classList.toggle('on', x === b)); if (S.query) search(S.query); });
     $('#kbSearchForm', main).onsubmit = (e) => { e.preventDefault(); search($('#kbQ', main).value); };
@@ -1183,7 +1189,37 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     if (S.reindexing && !S.docs.some(d => d.status === 'ready' && d.n_embedded < d.n_chunks)) S.reindexing = false;
     if (!S.dead && (S.reindexing || S.docs.some(d => KB_STATE[d.status]?.[1] === 'warn'))) S.timer = setTimeout(() => loadDocs().catch(() => schedule()), 1500);
   }
-  async function openBase() { S.docs = []; S.query = ''; S.gcenter = null; drawMain(); if (S.cur) { await loadDocs(); drawDocs(); loadGraph(); } }
+  async function openBase() { S.docs = []; S.query = ''; S.gcenter = null; drawMain(); if (S.cur) { await loadDocs(); drawDocs(); loadGraph(); if (advanced()) loadMemory(); } }
+
+  // ---- memory: training runs of a Memorilla module on this base (Advanced) ----
+  const RUN_STATE = { building: 'Preparing the questions', preparing: 'Loading the model', training: 'Training', done: 'Finished', stopped: 'Stopped', failed: 'Failed' };
+  function lossChart(pts) {
+    if (pts.length < 2) return '';
+    const W = 260, H = 54, xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys) || 1;
+    const P = pts.map(([x, y]) => `${(4 + (W - 8) * (x - x0) / Math.max(1, x1 - x0)).toFixed(1)},${(4 + (H - 8) * (1 - (y - y0) / Math.max(1e-9, y1 - y0))).toFixed(1)}`).join(' ');
+    return `<svg class="kb-loss" viewBox="0 0 ${W} ${H}" role="img" aria-label="Training loss from ${num(ys[0], 2)} to ${num(ys[ys.length - 1], 2)}"><polyline points="${P}" fill="none" stroke="var(--accent)" stroke-width="1.6"/></svg>`;
+  }
+  async function loadMemory() {
+    const box = $('#kbMem', main); if (!box || !S.cur) return;
+    let r; try { r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs`); } catch (e) { box.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; return; }
+    if (!alive()) return;
+    const busy = r.runs.some(x => ['building', 'preparing', 'training'].includes(x.state));
+    const head = `<div class="row kb-ghead"><span class="small">${r.active ? '<b>A module is in use</b> for this knowledge base.' : 'No module yet.'}</span><span class="sp"></span>
+      ${!r.trainer ? '<span class="tiny faint">The trainer is not built on this server.</span>' : busy ? '' : `<button class="btn sm" type="button" id="kbTrain">Train a module</button>${r.active ? '<button class="btn sm ghost" type="button" id="kbTune">Fine-tune</button>' : ''}`}</div>
+      <div class="tiny faint">Training runs on this computer's processor and takes hours; it uses the knowledge graph's facts as well as the passages, so build the graph first.</div>`;
+    box.innerHTML = head + (r.runs.length ? r.runs.map(x => { const p = x.progress || {}; const loss = (p.loss || []).map(([a, b]) => [a, b]);
+      return `<div class="kb-run"><div class="row"><b class="small">${esc(x.kind === 'finetune' ? 'Fine-tune' : 'Training')} · ${esc(new Date(x.created_at).toLocaleString())}</b><span class="kb-state ${x.state === 'failed' ? 'bad' : ['done', 'stopped'].includes(x.state) ? 'ok' : 'warn'}">${['building', 'preparing', 'training'].includes(x.state) ? '<span class="spin"></span>' : ''}${RUN_STATE[x.state] || esc(x.state)}</span><span class="sp"></span>
+        ${['building', 'preparing', 'training'].includes(x.state) ? `<button class="btn sm ghost" type="button" data-stop="${esc(x.id)}">Stop</button>` : ''}${x.has_checkpoint && !['building', 'preparing'].includes(x.state) ? `<button class="btn sm ghost" type="button" data-use="${esc(x.id)}">Use this module</button>` : ''}</div>
+        <div class="tiny muted">${p.train_examples != null ? `${p.train_examples} training and ${p.validation_examples} check questions · ` : ''}${p.steps ? `step ${p.step} of ${p.steps}` : ''}${p.seconds_per_example ? ` · ${num(p.seconds_per_example, 1)} s per question` : ''}${p.start_val_loss != null ? ` · check loss ${num(p.start_val_loss, 2)}${(p.val_loss || []).length ? ` → ${num(p.val_loss[p.val_loss.length - 1][1], 2)}` : ''}` : ''}</div>
+        ${x.error ? `<div class="tiny kb-err">${esc(x.error)}</div>` : ''}${lossChart(loss)}</div>`; }).join('') : '');
+    const t = $('#kbTrain', box), f = $('#kbTune', box);
+    const go = async (kind) => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs`, { kind, epochs: 3 }); toast(kind === 'finetune' ? 'Fine-tuning started' : 'Training started'); loadMemory(); } catch (e) { toast(e.message, 5000); } };
+    if (t) t.onclick = () => go('train'); if (f) f.onclick = () => go('finetune');
+    $$('[data-stop]', box).forEach(b => b.onclick = async () => { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.stop}/stop`); toast('The run stops after its current step'); loadMemory(); });
+    $$('[data-use]', box).forEach(b => b.onclick = async () => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.use}/activate`); toast('Memory questions now use this module'); loadMemory(); } catch (e) { toast(e.message, 4000); } });
+    clearTimeout(S.mtimer); if (busy && !S.dead) S.mtimer = setTimeout(loadMemory, 5000);
+  }
 
   // ---- knowledge graph: build, browse, one entity's relations with the passages behind them ----
   const GCOL = ['var(--accent)', 'var(--slow)', 'var(--warn)', 'var(--ok)', 'var(--bad)', 'var(--focus)', 'var(--muted)'];
@@ -1313,7 +1349,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     catch (err) { $('#kbNewErr', view).textContent = err.message; } };
 
   if (await loadStatus()) { await loadBases(); await openBase(); }
-  return () => { S.dead = true; clearTimeout(S.timer); clearTimeout(S.gtimer); };
+  return () => { S.dead = true; clearTimeout(S.timer); clearTimeout(S.gtimer); clearTimeout(S.mtimer); };
 } };
 
 // ============================== performance console ==============================

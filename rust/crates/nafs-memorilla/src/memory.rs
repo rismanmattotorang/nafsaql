@@ -13,7 +13,7 @@
 //! Dropout is the identity (inference; training adds it in Phase 6).
 
 use candle_core::{DType, Device, IndexOp, Module, Result, Tensor, D};
-use candle_nn::{layer_norm, linear, LayerNorm, LayerNormConfig, Linear, VarBuilder};
+use candle_nn::{linear, Init, Linear, VarBuilder};
 use serde::{Deserialize, Serialize};
 
 /// Constructor arguments, as `config.json` beside a checkpoint stores them.
@@ -98,8 +98,18 @@ struct Mha {
 
 impl Mha {
     fn new(e: usize, heads: usize, vb: VarBuilder) -> Result<Mha> {
-        let w = vb.get((3 * e, e), "in_proj_weight")?;
-        let b = vb.get(3 * e, "in_proj_bias")?;
+        // PyTorch's initialisation (used only when the weights are created, not loaded): Xavier-uniform packed
+        // projection, zero biases.
+        let bound = (6.0 / (4 * e) as f64).sqrt();
+        let w = vb.get_with_hints(
+            (3 * e, e),
+            "in_proj_weight",
+            Init::Uniform {
+                lo: -bound,
+                up: bound,
+            },
+        )?;
+        let b = vb.get_with_hints(3 * e, "in_proj_bias", Init::Const(0.0))?;
         Ok(Mha {
             wq: w.narrow(0, 0, e)?,
             wk: w.narrow(0, e, e)?,
@@ -156,7 +166,8 @@ impl Mha {
             let neg = neg.reshape((b, 1, 1, lk))?;
             scores = scores.broadcast_add(&neg)?;
         }
-        let attn = candle_nn::ops::softmax_last_dim(&scores)?;
+        // The composed softmax: `softmax_last_dim` is a fused kernel without a backward pass.
+        let attn = candle_nn::ops::softmax(&scores, D::Minus1)?;
         let ctx = attn
             .matmul(vh)?
             .transpose(1, 2)?
@@ -223,15 +234,30 @@ pub struct MemoryModule {
     projection: Linear,
 }
 
+/// LayerNorm (eps 1e-5) from differentiable parts. Candle's `LayerNorm` takes a fused kernel without a backward
+/// pass for contiguous input, and Candle's autograd silently treats such an op as a constant: nothing before it would
+/// learn.
+struct LayerNorm {
+    weight: Tensor,
+    bias: Tensor,
+}
+
+impl LayerNorm {
+    fn forward(&self, x: &Tensor) -> Result<Tensor> {
+        let mean = x.mean_keepdim(D::Minus1)?;
+        let xc = x.broadcast_sub(&mean)?;
+        let var = xc.sqr()?.mean_keepdim(D::Minus1)?;
+        xc.broadcast_div(&(var + 1e-5)?.sqrt()?)?
+            .broadcast_mul(&self.weight)?
+            .broadcast_add(&self.bias)
+    }
+}
+
 fn ln(e: usize, vb: VarBuilder) -> Result<LayerNorm> {
-    layer_norm(
-        e,
-        LayerNormConfig {
-            eps: 1e-5,
-            ..Default::default()
-        },
-        vb,
-    )
+    Ok(LayerNorm {
+        weight: vb.get_with_hints(e, "weight", Init::Const(1.0))?,
+        bias: vb.get_with_hints(e, "bias", Init::Const(0.0))?,
+    })
 }
 
 impl MemoryModule {
@@ -248,7 +274,16 @@ impl MemoryModule {
         let memory_queries = if cfg.retrieval_init {
             None
         } else {
-            Some(vb.get((1, cfg.num_memories, e), "memory_queries")?)
+            // Xavier uniform as in `memory.py` (fan_in K*E, fan_out E for a [1, K, E] tensor).
+            let bound = (6.0 / (cfg.num_memories * e + e) as f64).sqrt();
+            Some(vb.get_with_hints(
+                (1, cfg.num_memories, e),
+                "memory_queries",
+                Init::Uniform {
+                    lo: -bound,
+                    up: bound,
+                },
+            )?)
         };
         let encoder = (0..cfg.num_self_attn_layers)
             .map(|i| {
@@ -480,6 +515,39 @@ impl MemoryModule {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every parameter learns: a fused op without a backward pass (Candle's LayerNorm and softmax_last_dim) or a
+    /// zero initialisation would leave parameters without a gradient, silently.
+    #[test]
+    fn every_parameter_gets_a_finite_nonzero_gradient() {
+        for retrieval_init in [true, false] {
+            let cfg = MemoryConfig {
+                retrieval_init,
+                num_memories: 4,
+                num_self_attn_layers: 1,
+                ..MemoryConfig::paper(32, 16)
+            };
+            let vm = candle_nn::VarMap::new();
+            let m = MemoryModule::new(cfg, VarBuilder::from_varmap(&vm, DType::F32, &Device::Cpu))
+                .unwrap();
+            let docs = Tensor::randn(0f32, 0.05, (1, 9, 32), &Device::Cpu).unwrap();
+            let q = Tensor::randn(0f32, 0.05, (1, 32), &Device::Cpu).unwrap();
+            let out = m.forward(&docs, None, &q).unwrap();
+            let w = Tensor::randn(0f32, 1.0, out.dims(), &Device::Cpu).unwrap();
+            let g = (out * w).unwrap().sum_all().unwrap().backward().unwrap();
+            for (name, v) in vm.data().lock().unwrap().iter() {
+                let t = g.get(v).unwrap_or_else(|| panic!("{name}: no gradient"));
+                let s = t
+                    .sqr()
+                    .unwrap()
+                    .sum_all()
+                    .unwrap()
+                    .to_scalar::<f32>()
+                    .unwrap();
+                assert!(s.is_finite() && s > 0.0, "{name}: gradient norm {s}");
+            }
+        }
+    }
 
     #[test]
     fn the_paper_parameter_counts() {

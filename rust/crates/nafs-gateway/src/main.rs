@@ -2,6 +2,7 @@
 mod api;
 mod gates;
 mod kb;
+mod memory_runs;
 mod rooms;
 mod security;
 use clap::Parser;

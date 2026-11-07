@@ -91,6 +91,18 @@ pub fn routes(state: AppState) -> Router<AppState> {
         .route("/v1/kb/{kb}/graph/build", post(graph_build))
         .route("/v1/kb/{kb}/graph/entities", get(graph_entities))
         .route("/v1/kb/{kb}/graph/entities/{entity}", get(graph_entity))
+        .route(
+            "/v1/kb/{kb}/memory/runs",
+            get(crate::memory_runs::list).post(crate::memory_runs::start),
+        )
+        .route(
+            "/v1/kb/{kb}/memory/runs/{run}/stop",
+            post(crate::memory_runs::stop),
+        )
+        .route(
+            "/v1/kb/{kb}/memory/runs/{run}/activate",
+            post(crate::memory_runs::activate),
+        )
         .layer(tower_http::limit::RequestBodyLimitLayer::new(
             2 * 1024 * 1024,
         ));
@@ -179,7 +191,22 @@ async fn status(State(s): State<AppState>) -> Json<Value> {
 
 async fn list_kbs(State(s): State<AppState>) -> KbResult<Json<Value>> {
     let kb = ready(&s).await?;
-    Ok(Json(json!({ "bases": kb.store().list_kbs().await? })))
+    // `memory` per base (Phase 6): chat may only offer memory mode for a base that has a module to read it with.
+    let bases: Vec<Value> = kb
+        .store()
+        .list_kbs()
+        .await?
+        .into_iter()
+        .map(|b| {
+            let has = s.knowledge_memory_global
+                || crate::memory_runs::active_checkpoint(&s.cfg.knowledge.files_dir, &b.id)
+                    .is_some();
+            let mut v = serde_json::to_value(b).unwrap_or_default();
+            v["memory"] = json!(has);
+            v
+        })
+        .collect();
+    Ok(Json(json!({ "bases": bases })))
 }
 
 #[derive(Deserialize)]
@@ -513,39 +540,81 @@ type Prepared = (String, Arc<nafs_memorilla::memory::PreparedDocs>, usize);
 /// Memorilla's reader (FR-K23): the module, and per knowledge base its prepared documents, kept until the base's
 /// vectors change (count or last update).
 pub struct MemoryReader {
-    module: Arc<nafs_memorilla::MemoryModule>,
+    /// `[knowledge] memory_checkpoint`: used for a base that has no module of its own.
+    global: Option<(std::path::PathBuf, Arc<nafs_memorilla::MemoryModule>)>,
+    files_dir: String,
+    embed_dims: usize,
     placeholder: String,
+    /// Modules loaded so far, by checkpoint directory.
+    loaded: std::sync::Mutex<
+        std::collections::HashMap<std::path::PathBuf, Arc<nafs_memorilla::MemoryModule>>,
+    >,
     prepared: std::sync::Mutex<std::collections::HashMap<String, Prepared>>,
 }
 
 impl MemoryReader {
-    /// Load the checkpoint named by `[knowledge] memory_checkpoint`; `None` (with a log line) when unset or unusable.
+    /// The reader for this configuration (with embeddings on); the global checkpoint is loaded now if set.
     pub fn from_config(k: &KnowledgeCfg) -> Option<MemoryReader> {
-        if k.memory_checkpoint.trim().is_empty() {
+        if k.embed_url.trim().is_empty() {
             return None;
         }
-        match nafs_memorilla::MemoryModule::load_cpu(std::path::Path::new(&k.memory_checkpoint)) {
-            Ok(m) if m.cfg.embedding_dim == k.embed_dims => {
-                tracing::info!(checkpoint = %k.memory_checkpoint, params = m.cfg.parameters(), "memory module loaded");
-                Some(MemoryReader {
-                    module: Arc::new(m),
-                    placeholder: k.memory_placeholder.clone(),
-                    prepared: Default::default(),
-                })
+        let global = (!k.memory_checkpoint.trim().is_empty())
+            .then(|| std::path::PathBuf::from(&k.memory_checkpoint))
+            .and_then(|p| match nafs_memorilla::MemoryModule::load_cpu(&p) {
+                Ok(m) if m.cfg.embedding_dim == k.embed_dims => {
+                    tracing::info!(checkpoint = %p.display(), params = m.cfg.parameters(), "memory module loaded");
+                    Some((p, Arc::new(m)))
+                }
+                Ok(m) => {
+                    tracing::warn!(want = k.embed_dims, got = m.cfg.embedding_dim, "memory module reads vectors of another width; not used");
+                    None
+                }
+                Err(e) => {
+                    tracing::warn!(checkpoint = %p.display(), error = %e, "memory module not loaded");
+                    None
+                }
+            });
+        Some(MemoryReader {
+            global,
+            files_dir: k.files_dir.clone(),
+            embed_dims: k.embed_dims,
+            placeholder: k.memory_placeholder.clone(),
+            loaded: Default::default(),
+            prepared: Default::default(),
+        })
+    }
+
+    /// The module for a knowledge base: its activated run, else the global checkpoint.
+    fn module_for(
+        &self,
+        kb: &str,
+    ) -> Result<(std::path::PathBuf, Arc<nafs_memorilla::MemoryModule>), String> {
+        if let Some(p) = crate::memory_runs::active_checkpoint(&self.files_dir, kb) {
+            if let Some(m) = self
+                .loaded
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&p)
+            {
+                return Ok((p.clone(), m.clone()));
             }
-            Ok(m) => {
-                tracing::warn!(
-                    want = k.embed_dims,
-                    got = m.cfg.embedding_dim,
-                    "memory module reads vectors of another width; memory mode off"
-                );
-                None
+            let m = nafs_memorilla::MemoryModule::load_cpu(&p)?;
+            if m.cfg.embedding_dim != self.embed_dims {
+                return Err(format!(
+                    "the module reads {}-wide vectors; the passages are {}-wide",
+                    m.cfg.embedding_dim, self.embed_dims
+                ));
             }
-            Err(e) => {
-                tracing::warn!(checkpoint = %k.memory_checkpoint, error = %e, "memory module not loaded; memory mode off");
-                None
-            }
+            let m = Arc::new(m);
+            self.loaded
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .insert(p.clone(), m.clone());
+            return Ok((p, m));
         }
+        self.global.clone().ok_or_else(|| {
+            "no memory module for this knowledge base: train one on the Knowledge page".to_string()
+        })
     }
 }
 
@@ -566,6 +635,11 @@ impl ChatKnowledge {
 
     pub fn memory_enabled(&self) -> bool {
         self.memory.is_some()
+    }
+
+    /// Whether `[knowledge] memory_checkpoint` named a module that loaded: it serves any base without its own.
+    pub fn memory_global(&self) -> bool {
+        self.memory.as_ref().is_some_and(|m| m.global.is_some())
     }
 }
 
@@ -679,7 +753,8 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
             let reader = self
                 .memory
                 .as_ref()
-                .ok_or("no memory module is configured ([knowledge] memory_checkpoint)")?;
+                .ok_or("searching by meaning is turned off, so memory cannot be read")?;
+            let (ckpt, module) = reader.module_for(kb)?;
             let base = self
                 .kb
                 .store()
@@ -697,7 +772,7 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 .vector_count(kb)
                 .await
                 .map_err(|e| e.to_string())? as usize;
-            let stamp = format!("{}|{n_vec}", base.updated_at);
+            let stamp = format!("{}|{n_vec}|{}", base.updated_at, ckpt.display());
             let cached = reader
                 .prepared
                 .lock()
@@ -718,7 +793,7 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                     if n == 0 {
                         return Err("this knowledge base has no meaning index yet".into());
                     }
-                    let m = reader.module.clone();
+                    let m = module.clone();
                     let p = tokio::task::spawn_blocking(move || m.prepare_rows(&rows, n))
                         .await
                         .map_err(|e| e.to_string())??;
@@ -737,7 +812,7 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 .await
                 .map_err(|e| e.to_string())?;
             let t1 = std::time::Instant::now();
-            let m = reader.module.clone();
+            let m = module.clone();
             let vectors = tokio::task::spawn_blocking(move || m.read_rows(&prepared, &q))
                 .await
                 .map_err(|e| e.to_string())??;
@@ -745,6 +820,7 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 kb_name: base.name,
                 vectors,
                 placeholder: reader.placeholder.clone(),
+                system: nafs_memorilla::train::SYSTEM_PROMPT.to_string(),
                 documents,
                 prepare_ms,
                 read_ms: t1.elapsed().as_millis() as u64,

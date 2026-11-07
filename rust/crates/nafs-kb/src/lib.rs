@@ -4,6 +4,7 @@
 //! added to the same store.
 
 pub mod chunk;
+pub mod dataset;
 pub mod embed;
 pub mod graph;
 pub mod parse;
@@ -740,6 +741,15 @@ impl Kb {
             .as_ref()
             .ok_or_else(|| KbError::Unavailable("searching by meaning is turned off".into()))?;
         Ok(e.embed(&[text.to_string()], None).await?.remove(0))
+    }
+
+    /// Texts embedded without an instruction (Memorilla's questions), in order.
+    pub async fn embed_texts_plain(&self, texts: &[String]) -> Result<Vec<Vec<f32>>, KbError> {
+        let e = self
+            .embedder
+            .as_ref()
+            .ok_or_else(|| KbError::Unavailable("searching by meaning is turned off".into()))?;
+        e.embed(texts, None).await
     }
 
     /// The width of the passage vectors, when embeddings are on.

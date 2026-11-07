@@ -1,6 +1,6 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.4, 2026-11-07. Status: Phases 0–5 implemented; Phases 6–8 specified. Research:
+Version 1.5, 2026-11-07. Status: Phases 0–6 implemented (6: training works; a useful 1.7B module needs an overnight CPU run or a GPU); Phases 7–8 specified. Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -72,8 +72,9 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
   chunks that mention them, ranked with the hybrid score; facts given as `subject — predicate — object` lines.
 - **FR-K23** `memory`: question embedded without a prefix; the memory module turns the whole store into 16 vectors
   (prepared passage vectors cached per base); the engine receives them at 16 placeholder positions; the prompt keeps
-  Memorilla's format; the turn is answered by the quick model only. Requires `[knowledge] memory_checkpoint`; offered in
-  Advanced mode as experimental until a module trained for System 1 exists (Phase 6).
+  Memorilla's format; the turn is answered by the quick model only. Needs a module for that base: its own activated
+  training run (Phase 6) or `[knowledge] memory_checkpoint`. Offered in Advanced mode as experimental, and only for a
+  base that has one (`GET /v1/kb` reports `memory` per base).
 - **FR-K24** `hybrid`: `memory` plus the top 2 passages of `rag`. `auto`: chosen by the measured policy of Phase 7.
 - **FR-K25** When no chunk scores above `min_score` and mode is not `memory`, the assistant says the knowledge base
   does not cover the question, and answers from general knowledge only if the person asked for it.
@@ -98,11 +99,16 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
 - **FR-K40** Memory module in Candle with the parameter names and maths of `memorilla/memory.py`; loads converted
   safetensors with `config.json`; parity with PyTorch (§8). Implemented: `nafs_memorilla::MemoryModule`, with
   `prepare` (question-independent keys and values, once per collection) and `forward_prepared` (per question).
-- **FR-K41** Dataset builder per knowledge base: reconstruction rows, graph-claim rows, synthetic QA rows (§7), split
-  90/10 by question; written in Memorilla's parquet + safetensors layout.
-- **FR-K42** Train (from scratch, `retrieval_init` on) and fine-tune (from a checkpoint) a module for System 1, as a
-  background job with progress, loss curve, cancel and resume; one checkpoint per epoch; the best by validation loss is
-  marked active for that knowledge base.
+- **FR-K41** Dataset builder per knowledge base (`nafs_kb::dataset`): reconstruction rows and graph-claim rows (true and
+  object-swapped false claims), every row reading the whole base, split 90/10 by a hash of the question; written as
+  `dataset.json` + f32 safetensors, exported to Memorilla's parquet layout by `training/memorilla/export_dataset.py`.
+  Synthetic QA rows by System 2 are **not built yet** (one model call per passage; Phase 7 decides if they pay).
+- **FR-K42** Train (from scratch, `retrieval_init` on) and fine-tune (from the active checkpoint) a module for System 1:
+  `memorilla-train`, a separate process started by `POST /v1/kb/{kb}/memory/runs`, through a frozen f32 Qwen3-1.7B
+  (`nafs_memorilla::decoder`, differentiable throughout), answer-only loss, AdamW, warm-up + cosine, clipping, one example's
+  graph at a time; progress file, stop, a checkpoint per epoch plus `best/` and `last/`; `activate` makes a run's module the
+  base's. Initialisation: zero projection weights and the placeholder's embedding as bias (the untrained module returns
+  the plain prompt). Not built: resume after a crash.
 - **FR-K43** A GPU recipe (`training/memorilla/`) to pre-train Stages 1–2 for our encoder/decoder pair with the
   reference PyTorch code, with a cost estimate derived from measured per-example times.
 
@@ -118,7 +124,7 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
 | NFR-K06 | Ingestion never runs more than one heavy step at a time and yields to chat (lower priority) | Phase 2 |
 | NFR-K07 | A knowledge base of 1,000 documents / 50,000 chunks stays usable (list, search) | Phase 8 |
 | NFR-K08 | Memory module forward < 50 ms for N = 10,000 chunks on this CPU | Phase 4 bench: per question 49–54 ms up to 100 documents, 88 ms at 1,000, 436 ms at 10,000 (load 34); **not met at 10,000** |
-| NFR-K09 | Training time per example measured and shown before a job starts (estimate for the whole run) | Phase 6 |
+| NFR-K09 | Training time per example measured and shown before a job starts (estimate for the whole run) | Phase 6: 36–94 s per question on Qwen3-1.7B (shared machine), 8–11 s on Qwen3-0.6B; shown per run on the Knowledge page |
 
 ## 5. Security requirements
 
@@ -270,7 +276,8 @@ plain path.
 | `GET /v1/kb/{kb}/graph/entities?q` | | `{entities}` | 3 |
 | `GET /v1/kb/{kb}/graph/entities/{entity}` | | `{facts, passages}` | 3 |
 | `POST /v1/kb/{kb}/memory/runs` | `{kind: "train"\|"finetune", epochs?, from?}` | `MemoryRun` (202) | 6 |
-| `GET /v1/kb/{kb}/memory/runs`, `.../{run}`, `POST .../{run}/cancel` | | | 6 |
+| `GET /v1/kb/{kb}/memory/runs` | | `{runs, active, trainer}` | 6 |
+| `POST /v1/kb/{kb}/memory/runs/{run}/stop`, `.../activate` | | the run / `{active}` | 6 |
 
 `Document`: `{id, kb, title, filename, kind, bytes, status, error?, pages?, n_chunks, n_chars, parse_ms?, created_at,
 updated_at, duplicate?}`. `Hit`: `{chunk_id, doc_id, doc_title, ord, heading, page?, text, score, rank}`.
@@ -308,6 +315,9 @@ entity_merge_similarity = 0.92
 graph_facts = 12
 memory_checkpoint = ""                 # Phase 5; "" = memory mode off
 memory_placeholder = "<|fim_pad|>"
+memory_trainer = "rust/target/release/memorilla-train"   # Phase 6
+memory_decoder = "models/hf/Qwen3-1.7B"
+memory_gguf = "models/Qwen3-1.7B-Q4_K_M.gguf"
 ```
 
 ## 10. Frontend (Knowledge page, `#/knowledge`)

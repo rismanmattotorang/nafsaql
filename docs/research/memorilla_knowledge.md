@@ -299,3 +299,41 @@ carries the 16 vectors. The request is held on the quick path: the module lives 
 (`examples/memory_init.rs`), whose tokens carry no knowledge: the model answered that it could not tell. `memory` mode is
 therefore offered only in Advanced mode, labelled experimental, and only when `[knowledge] memory_checkpoint` names a
 module. Phase 6 trains one.
+
+## 15. Phase 6 results (2026-11-07): datasets and training on this CPU
+
+**What was built.** `nafs_kb::dataset` (reconstruction and graph-claim rows over the whole base, question vectors without
+an instruction, `dataset.json` + safetensors, a parquet exporter for the PyTorch trainer); `nafs_memorilla::decoder` (Qwen3
+from differentiable parts, input embeddings in; logits within 2e-5 of candle-transformers' Qwen3 on the real 1.7B);
+`memorilla-train` (answer-only loss through the frozen decoder, own AdamW, warm-up + cosine, clipping, one example's graph
+at a time, checkpoints, claim accuracy with and without memory); training runs in the gateway (`/v1/kb/{kb}/memory/runs`,
+start, stop, activate) and a Memory card on the Knowledge page (Advanced).
+
+**Three defects, each of which would have made training silently useless.** (1) Candle's `LayerNorm` (contiguous input)
+and `softmax_last_dim` are fused kernels without a backward pass, and Candle's autograd treats them as constants: only the
+final projection received a gradient. Replaced by composed versions; a test now requires a finite, non-zero gradient on
+every parameter. (2) `VarBuilder::get` on a `VarMap` initialises to zero: the attention projections and the learned slots
+started at 0. Now PyTorch's initialisation (Xavier uniform, zero biases). (3) SiLU as x/(1+e^-x): for a large negative
+gate activation e^-x overflows, the forward value is 0 but the backward pass computes 0 x inf = NaN; every memory gradient
+through Qwen3's MLP was NaN. Now x(1+tanh(x/2))/2.
+
+**Initialisation.** Random vectors at the embedding scale derailed Qwen3-1.7B (first check loss 14.7 nats); exact zeros
+put the memory rows at the RMS norm's singular point (gradient norm about 1e7). The trainer starts from zero projection
+weights and the placeholder token's embedding as bias: the untrained module gives the plain prompt (check loss 3.46 on
+0.6B, the closed-book value), and gradients are ordinary.
+
+**Dataset of the fixture base.** 20 passages, 164 questions: 17 + 1 reconstruction, 68 + 5 true and 65 + 8 false claims
+(train + validation). The false claims are object swaps; some may be true in fact ("nafs-core implements Ledger"), the
+usual noise of FactKG-style negatives.
+
+**Measured (shared machine; load 16 to 34, other workloads holding most of the 32 GB and 18–24 GB of swap).**
+
+| Decoder | Seconds per question | Check loss | Claim accuracy (13 held-out) with / without memory |
+|---|---|---|---|
+| Qwen3-0.6B, 80 questions (20 steps, lr 1e-3) | 8–18 | 3.46 -> 0.70 | (not measured in that run) |
+| Qwen3-1.7B, 8 questions (2 steps) | 36 and 94 | 10.26 -> 1.82 | 8/13 vs 9/13 |
+
+The early loss drop is the answer format (exactly `True` + end of turn), not knowledge; after 8 questions the 1.7B module
+does not beat the model without memory, as expected. A first attempt with four examples' graphs held at once stalled the
+machine in swap; one graph at a time runs. **A useful 1.7B module needs the full run** (3 epochs of 150 questions: about
+5–12 hours here) or a GPU pre-train (`training/memorilla/GPU_RECIPE.md`). Synthetic QA rows are not built yet.

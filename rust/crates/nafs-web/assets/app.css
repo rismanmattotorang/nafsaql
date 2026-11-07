@@ -598,3 +598,5 @@ details.fold-card>summary h3::before{content:"▸ ";color:var(--faint)}details.f
 .kb-factbox summary{cursor:pointer;list-style:none} .kb-factbox summary::-webkit-details-marker{display:none}
 #kbMode{border-left:1px solid var(--border);padding-left:6px}
 @media (max-width:820px){.kb-gwrap{grid-template-columns:1fr}.kb-svg{height:300px}}
+.kb-run{border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-top:8px} .kb-run .row{gap:8px}
+.kb-loss{width:260px;height:54px;margin-top:4px;display:block}
