@@ -73,6 +73,8 @@ pub struct Orchestrator {
     params: RwLock<DerivedParams>,
     /// User and evaluation requests currently inside `handle` (the audit worker runs only at zero).
     pub inflight: Arc<AtomicUsize>,
+    /// Knowledge-base retrieval (Phase 20), set by the gateway when `[knowledge]` is on.
+    knowledge: RwLock<Option<Arc<dyn crate::knowledge::Knowledge>>>,
 }
 
 /// Event emitter that tolerates a missing or closed receiver.
@@ -272,6 +274,12 @@ fn judge_feedback_prompt(reason: &str) -> String {
 const REFUSAL: &str = "I can't help with that request. If you have a related question I can answer safely, I'm happy to help.";
 
 impl Orchestrator {
+    /// Attach knowledge-base retrieval (FR-K20); requests with `knowledge` are refused-free but answered without
+    /// passages until this is set.
+    pub fn set_knowledge(&self, k: Arc<dyn crate::knowledge::Knowledge>) {
+        *self.knowledge.write().unwrap_or_else(|e| e.into_inner()) = Some(k);
+    }
+
     pub fn new(cfg: Arc<Config>, store: Arc<Store>) -> Self {
         let mut pairs = vec![];
         for (name, set) in &cfg.backends {
@@ -361,6 +369,7 @@ impl Orchestrator {
             gate_state: RwLock::new(gate_state),
             params: RwLock::new(params),
             inflight: Arc::new(AtomicUsize::new(0)),
+            knowledge: RwLock::new(None),
         }
     }
 
@@ -895,6 +904,55 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             stages.push(StageTiming {
                 stage: "retrieval".into(),
                 ms: tr.elapsed().as_millis() as u64,
+                ..Default::default()
+            });
+        }
+        // FR-K20..K25: passages of a knowledge base, numbered and delimited as data (Phase 20).
+        let mut sources: Vec<Value> = vec![];
+        if let Some(kq) = req
+            .knowledge
+            .as_ref()
+            .filter(|k| k.mode.as_deref().unwrap_or("rag") != "off")
+        {
+            let tk = Instant::now();
+            let retriever = self
+                .knowledge
+                .read()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+            let k = kq.k.unwrap_or(cfg.knowledge.rag_k).clamp(1, 12);
+            match retriever {
+                Some(r) => match r.retrieve(&kq.kb, &user.content, k).await {
+                    Ok(found) => {
+                        system.push_str(&crate::knowledge::prompt_block(
+                            &found,
+                            cfg.knowledge.rag_max_chars,
+                        ));
+                        sources = found
+                            .passages
+                            .iter()
+                            .enumerate()
+                            .map(|(i, p)| json!({"n": i + 1, "kb": kq.kb, "kb_name": found.kb_name, "chunk_id": p.chunk_id, "doc_id": p.doc_id,
+                                "doc_title": p.doc_title, "heading": p.heading, "page": p.page, "text": p.text, "score": p.score,
+                                "lexical_score": p.lexical_score, "vector_score": p.vector_score, "mode": found.mode}))
+                            .collect();
+                        if sources.is_empty() {
+                            sources.push(json!({"note": format!("The knowledge base \"{}\" has no passage about this question.", found.kb_name), "kb": kq.kb}));
+                        }
+                        metrics::counter!("nafs_knowledge_passages_total")
+                            .increment(found.passages.len() as u64);
+                    }
+                    Err(e) => {
+                        tracing::warn!(kb = %kq.kb, error = %e, "knowledge retrieval failed; answering without it");
+                        sources.push(json!({"note": format!("The knowledge base could not be searched: {e}"), "kb": kq.kb}));
+                    }
+                },
+                None => sources
+                    .push(json!({"note": "Knowledge is turned off on this server.", "kb": kq.kb})),
+            }
+            stages.push(StageTiming {
+                stage: "knowledge".into(),
+                ms: tk.elapsed().as_millis() as u64,
                 ..Default::default()
             });
         }
@@ -2181,6 +2239,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             rounds: rounds.clone(),
             draft_conditioned: conditioned && draft.is_some() && mode == ReasoningMode::Slow,
             retrieved: retrieved.iter().map(|h| json!({"reply_id": h["reply_id"], "score": h["score"], "created_at": h["created_at"], "question": h["question"]})).collect(),
+            sources: sources.clone(),
         };
 
         // Persist (FR-013, FR-060, IF-010).

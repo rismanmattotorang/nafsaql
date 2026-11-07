@@ -1204,6 +1204,15 @@ impl Model {
         st.ns_matmul += t0.elapsed().as_nanos() as u64;
     }
 
+    // nafs-aql: the output-normed final hidden state of batch row `b` of the last `forward`, which must have run
+    // without logits (the head path overwrites the scratch it normalises into). An embedding model's pooled vector.
+    pub fn final_hidden(&self, st8: &State, b: usize) -> Vec<f32> {
+        let d = self.cfg.d_model;
+        let mut out = vec![0.0; d];
+        self.rmsnorm_into(&st8.x[b * d..(b + 1) * d], &self.out_norm, &mut out);
+        out
+    }
+
     fn rmsnorm(&self, x: &[f32], w: &TensorInfo, out: &mut [f32], st: &mut StepStats) {
         self.rmsnorm_into(x, w, out);
         st.bytes_weights += w.bytes();

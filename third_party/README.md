@@ -5,6 +5,7 @@ Checkouts that Nafs-Aql still needs at run or build time. They are excluded from
 | Directory | Source | Needed for |
 |-----------|--------|------------|
 | `llama.cpp/` | github.com/ggml-org/llama.cpp (commit 797de63, 2026-10-17), built CPU-only | the llama backend: `scripts/serve_llama.sh`, the launchd and systemd units, the benchmark scripts and the GGUF conversion all run its `build/bin/llama-server` |
+| `memorilla/` | github.com/snap-stanford/memorilla (commit d8f1889, 2026-11) | reference for the Knowledge Base's Memorilla port (Phase 20): parity tests and the GPU pre-training recipe use its PyTorch code |
 | `vllm/` | github.com/vllm-project/vllm (tag v0.32.0 plus main of 2026-10-18) | the Docker profile: `deploy/docker/docker-compose.yml` builds from it |
 
 The Smiley Core engine is not here: it is vendored into the workspace as `rust/crates/smiley-core` (Phase 15) and builds with `cargo build`.

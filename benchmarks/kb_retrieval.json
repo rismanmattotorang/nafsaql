@@ -1,0 +1,535 @@
+{
+  "what": "Knowledge Base retrieval, fixture knowledge base, fixed question set",
+  "date": "2026-11-07 11:13",
+  "questions": 20,
+  "k": 5,
+  "embedder": "Qwen3-Embedding-0.6B Q8_0 on Smiley Core",
+  "host_load_average": [
+    29.3,
+    42.9,
+    46.4
+  ],
+  "note": "SHARED MACHINE",
+  "summary": {
+    "lexical": {
+      "hit@1": 0.5,
+      "recall@5": 0.85,
+      "mrr": 0.6599999999999999,
+      "median_ms": 93.5,
+      "median_embed_ms": 0.0
+    },
+    "vector": {
+      "hit@1": 0.35,
+      "recall@5": 0.55,
+      "mrr": 0.4141666666666667,
+      "median_ms": 518.0,
+      "median_embed_ms": 343.5
+    },
+    "hybrid": {
+      "hit@1": 0.55,
+      "recall@5": 0.9,
+      "mrr": 0.6725,
+      "median_ms": 655.0,
+      "median_embed_ms": 401.0
+    }
+  },
+  "rows": [
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "How many soft tokens does the memory module hand to the frozen decoder?",
+      "rank": 1,
+      "took_ms": 94,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "What accuracy did the method reach on the knowledge-graph fact-checking benchmark, against giving the model every document?",
+      "rank": 2,
+      "took_ms": 85,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Which model turns the documents into embeddings?",
+      "rank": null,
+      "took_ms": 89,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "How fast is an answer with 512 stored documents compared with putting them all in the prompt?",
+      "rank": null,
+      "took_ms": 110,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Does training with eight times more memory slots help?",
+      "rank": 2,
+      "took_ms": 72,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Which reinforcement learning method trained the agent's memory in the text adventure games?",
+      "rank": 2,
+      "took_ms": 93,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Why can the system lose small factual details?",
+      "rank": 1,
+      "took_ms": 114,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "How many Wikipedia examples were used in the first training stage?",
+      "rank": 2,
+      "took_ms": 84,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Which kinds of narrative questions does plain retrieval answer better?",
+      "rank": 1,
+      "took_ms": 100,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Which bridging architecture from vision-language models was compared in the ablation?",
+      "rank": 1,
+      "took_ms": 144,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Which operating-system idea inspired the way the cache memory is managed?",
+      "rank": 2,
+      "took_ms": 77,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "By how much does the serving system improve throughput over earlier systems?",
+      "rank": 1,
+      "took_ms": 181,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "How are blocks shared between sequences duplicated only when one of them writes?",
+      "rank": 2,
+      "took_ms": 117,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "How does the system serve several output samples for one prompt?",
+      "rank": 1,
+      "took_ms": 515,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Why do existing systems waste most of the key-value cache?",
+      "rank": 1,
+      "took_ms": 794,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "What does the scheduler do when the GPU has no free blocks left?",
+      "rank": 5,
+      "took_ms": 84,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Which port does the gateway use to reach the database?",
+      "rank": 1,
+      "took_ms": 195,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "How large may each uploaded file be?",
+      "rank": 1,
+      "took_ms": 84,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "Where do the memory vectors enter the inference engine?",
+      "rank": null,
+      "took_ms": 86,
+      "fallback": null
+    },
+    {
+      "mode": "lexical",
+      "asked": "lexical",
+      "question": "How does local search walk the entity graph?",
+      "rank": 1,
+      "took_ms": 82,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "How many soft tokens does the memory module hand to the frozen decoder?",
+      "rank": null,
+      "took_ms": 478,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "What accuracy did the method reach on the knowledge-graph fact-checking benchmark, against giving the model every document?",
+      "rank": null,
+      "took_ms": 666,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Which model turns the documents into embeddings?",
+      "rank": 1,
+      "took_ms": 549,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "How fast is an answer with 512 stored documents compared with putting them all in the prompt?",
+      "rank": null,
+      "took_ms": 592,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Does training with eight times more memory slots help?",
+      "rank": null,
+      "took_ms": 598,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Which reinforcement learning method trained the agent's memory in the text adventure games?",
+      "rank": null,
+      "took_ms": 556,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Why can the system lose small factual details?",
+      "rank": null,
+      "took_ms": 428,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "How many Wikipedia examples were used in the first training stage?",
+      "rank": 1,
+      "took_ms": 462,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Which kinds of narrative questions does plain retrieval answer better?",
+      "rank": null,
+      "took_ms": 411,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Which bridging architecture from vision-language models was compared in the ablation?",
+      "rank": 1,
+      "took_ms": 524,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Which operating-system idea inspired the way the cache memory is managed?",
+      "rank": 5,
+      "took_ms": 477,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "By how much does the serving system improve throughput over earlier systems?",
+      "rank": 3,
+      "took_ms": 512,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "How are blocks shared between sequences duplicated only when one of them writes?",
+      "rank": 2,
+      "took_ms": 783,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "How does the system serve several output samples for one prompt?",
+      "rank": null,
+      "took_ms": 526,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Why do existing systems waste most of the key-value cache?",
+      "rank": 1,
+      "took_ms": 498,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "What does the scheduler do when the GPU has no free blocks left?",
+      "rank": null,
+      "took_ms": 606,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Which port does the gateway use to reach the database?",
+      "rank": 1,
+      "took_ms": 466,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "How large may each uploaded file be?",
+      "rank": 1,
+      "took_ms": 485,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "Where do the memory vectors enter the inference engine?",
+      "rank": 1,
+      "took_ms": 507,
+      "fallback": null
+    },
+    {
+      "mode": "vector",
+      "asked": "vector",
+      "question": "How does local search walk the entity graph?",
+      "rank": 4,
+      "took_ms": 545,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "How many soft tokens does the memory module hand to the frozen decoder?",
+      "rank": 3,
+      "took_ms": 857,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "What accuracy did the method reach on the knowledge-graph fact-checking benchmark, against giving the model every document?",
+      "rank": null,
+      "took_ms": 891,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Which model turns the documents into embeddings?",
+      "rank": 3,
+      "took_ms": 560,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "How fast is an answer with 512 stored documents compared with putting them all in the prompt?",
+      "rank": null,
+      "took_ms": 842,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Does training with eight times more memory slots help?",
+      "rank": 1,
+      "took_ms": 670,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Which reinforcement learning method trained the agent's memory in the text adventure games?",
+      "rank": 2,
+      "took_ms": 705,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Why can the system lose small factual details?",
+      "rank": 1,
+      "took_ms": 644,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "How many Wikipedia examples were used in the first training stage?",
+      "rank": 1,
+      "took_ms": 778,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Which kinds of narrative questions does plain retrieval answer better?",
+      "rank": 1,
+      "took_ms": 666,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Which bridging architecture from vision-language models was compared in the ablation?",
+      "rank": 1,
+      "took_ms": 683,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Which operating-system idea inspired the way the cache memory is managed?",
+      "rank": 1,
+      "took_ms": 713,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "By how much does the serving system improve throughput over earlier systems?",
+      "rank": 1,
+      "took_ms": 632,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "How are blocks shared between sequences duplicated only when one of them writes?",
+      "rank": 2,
+      "took_ms": 626,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "How does the system serve several output samples for one prompt?",
+      "rank": 5,
+      "took_ms": 539,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Why do existing systems waste most of the key-value cache?",
+      "rank": 1,
+      "took_ms": 503,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "What does the scheduler do when the GPU has no free blocks left?",
+      "rank": 4,
+      "took_ms": 551,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Which port does the gateway use to reach the database?",
+      "rank": 1,
+      "took_ms": 740,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "How large may each uploaded file be?",
+      "rank": 1,
+      "took_ms": 474,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "Where do the memory vectors enter the inference engine?",
+      "rank": 3,
+      "took_ms": 525,
+      "fallback": null
+    },
+    {
+      "mode": "hybrid",
+      "asked": "hybrid",
+      "question": "How does local search walk the entity graph?",
+      "rank": 1,
+      "took_ms": 476,
+      "fallback": null
+    }
+  ],
+  "hnsw_vs_exact": {
+    "questions": 20,
+    "top1_agreement": "20/20",
+    "top5_overlap": 1.0,
+    "exact_median_ms": 101,
+    "hnsw_median_ms": 111,
+    "vectors": 379,
+    "note": "<|5,64|> against a cosine scan of the same knowledge base"
+  },
+  "indexing": {
+    "passages": 379,
+    "tokens": 66978,
+    "seconds": 964,
+    "tokens_per_s": 69.5,
+    "host_load_average": "44-60",
+    "note": "SHARED MACHINE: embedding server got about 70% of one core"
+  }
+}

@@ -6,6 +6,7 @@ pub mod domain;
 pub mod drift;
 pub mod gate;
 pub mod harness;
+pub mod knowledge;
 pub mod orchestrator;
 pub mod parallel;
 pub mod sequential;

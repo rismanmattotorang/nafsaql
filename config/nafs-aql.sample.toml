@@ -173,6 +173,28 @@ lean_path = ""                         # LEAN_PATH of a Mathlib build ("" = core
 lean_timeout_s = 120
 lean_memory_mb = 4096
 
+[knowledge]                            # Phase 20 (FR-K*): Knowledge Base in SurrealDB (scripts/serve_surreal.sh, decision 014)
+enabled = true
+url = "http://127.0.0.1:8300"           # SurrealDB HTTP; NAFS_KB_URL overrides
+namespace = "nafs"
+database = "kb"
+user = "root"
+password_file = "data/runtime/surreal/root.secret"
+files_dir = "data/runtime/kb"          # stored originals, one folder per knowledge base
+max_upload_mb = 50
+max_files_per_request = 20
+chunk_chars = 1200                     # passage size in characters (about 300 tokens), A-106
+chunk_overlap = 150
+search_k = 8
+embed_url = "http://127.0.0.1:8203"     # Phase 2: nafs-smiley-server --embedding (scripts/serve_smiley.sh embed); "" = words only
+embed_model = "Qwen3-Embedding-0.6B"
+embed_dims = 1024
+embed_batch = 8
+exact_search_below = 5000              # vectors per base below which search scans exactly; above, HNSW
+rag_k = 4                              # chat: passages put in the prompt
+rag_max_chars = 4800                   # chat: their total size (about 1,200 tokens)
+rag_min_similarity = 0.45              # chat: weakest passage similarity still used (off-topic passages scored 0.38-0.40, relevant 0.45-0.77)
+
 [storage]
 sqlite_path = "data/runtime/nafs.sqlite"
 trace_path = "data/runtime/traces/trace.jsonl"

@@ -40,6 +40,7 @@ security:
 - bearerAuth: []
 tags:
 - name: chat
+- name: knowledge
 - name: rooms
 - name: bench
 - name: eval
@@ -1736,6 +1737,557 @@ paths:
                     type: boolean
         '403':
           $ref: '#/components/responses/Forbidden'
+  /v1/kb/status:
+    get:
+      tags:
+      - knowledge
+      operationId: getKnowledgeStatus
+      summary: Whether the knowledge store is enabled and reachable, its version, limits and ingestion queue
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                  reachable:
+                    type: boolean
+                  version:
+                    type: string
+                  queue:
+                    type: object
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/kb:
+    get:
+      tags:
+      - knowledge
+      operationId: listKnowledgeBases
+      summary: Knowledge bases with document, passage and character counts (FR-K01)
+      responses:
+        '200':
+          description: Knowledge bases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bases:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KbSummary'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - knowledge
+      operationId: createKnowledgeBase
+      summary: Create a knowledge base (FR-K01)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 80
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KbSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/kb/{kb}:
+    get:
+      tags:
+      - knowledge
+      operationId: getKnowledgeBase
+      summary: One knowledge base with its counts
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Knowledge base
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KbSummary'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - knowledge
+      operationId: updateKnowledgeBase
+      summary: Rename or describe a knowledge base
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 80
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KbSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - knowledge
+      operationId: deleteKnowledgeBase
+      summary: Delete a knowledge base with its documents, passages and stored files
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  documents:
+                    type: integer
+                  chunks:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/kb/{kb}/documents:
+    get:
+      tags:
+      - knowledge
+      operationId: listKnowledgeDocuments
+      summary: Documents of a knowledge base, newest first, with their reading state (FR-K05)
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KbDocument'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - knowledge
+      operationId: uploadKnowledgeDocuments
+      summary: Upload files as multipart parts named file (PDF, DOCX, PPTX, TEX, HTML, Markdown, text); each is read in the background (FR-K02..K04)
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        '202':
+          description: Accepted documents and refused files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KbDocument'
+                  refused:
+                    type: array
+                    items:
+                      type: object
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: A file is larger than the limit
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: No file was accepted (each refusal says why)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/kb/{kb}/documents/{doc}:
+    get:
+      tags:
+      - knowledge
+      operationId: getKnowledgeDocument
+      summary: One document and its reading state
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: doc
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KbDocument'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - knowledge
+      operationId: deleteKnowledgeDocument
+      summary: Delete a document with its passages and stored file
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: doc
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+                  chunks:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/kb/{kb}/documents/{doc}/reingest:
+    post:
+      tags:
+      - knowledge
+      operationId: reingestKnowledgeDocument
+      summary: Read a document again from its stored original
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: doc
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Queued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KbDocument'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/kb/{kb}/documents/{doc}/chunks:
+    get:
+      tags:
+      - knowledge
+      operationId: listKnowledgePassages
+      summary: A document's passages in order, with heading path and page (FR-K06)
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: doc
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: offset
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+      responses:
+        '200':
+          description: Passages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chunks:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                  offset:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/kb/{kb}/reindex:
+    post:
+      tags:
+      - knowledge
+      operationId: reindexKnowledgeBase
+      summary: Give vectors to the passages that lack them (stored before the embedder ran, or while it was down)
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Documents queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge or embeddings are turned off, or SurrealDB is not reachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /v1/kb/{kb}/search:
+    post:
+      tags:
+      - knowledge
+      operationId: searchKnowledgeBase
+      summary: Search passages by words (BM25), meaning (vectors) or both fused (FR-K07)
+      parameters:
+      - name: kb
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - query
+              properties:
+                query:
+                  type: string
+                  maxLength: 2000
+                k:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                mode:
+                  type: string
+                  enum:
+                  - hybrid
+                  - vector
+                  - lexical
+                  default: hybrid
+                  description: hybrid fuses BM25 and vector ranks (RRF); vector and hybrid fall back to lexical without vectors and say so in fallback
+      responses:
+        '200':
+          description: Ranked passages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/KbHit'
+                  took_ms:
+                    type: integer
+                  mode:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          description: Knowledge is turned off, or SurrealDB is not reachable (code kb_unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -1791,6 +2343,54 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    KbSummary:
+      type: object
+      required: [id, name, created_at, updated_at, documents, chunks, chars]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        description: {type: string}
+        created_at: {type: string}
+        updated_at: {type: string}
+        documents: {type: integer}
+        chunks: {type: integer, description: passages}
+        chars: {type: integer}
+    KbDocument:
+      type: object
+      required: [id, kb, title, filename, kind, bytes, sha256, status, n_chunks, n_chars, created_at, updated_at]
+      properties:
+        id: {type: string}
+        kb: {type: string}
+        title: {type: string}
+        filename: {type: string}
+        kind: {type: string, enum: [pdf, docx, pptx, tex, html, md, txt]}
+        bytes: {type: integer}
+        sha256: {type: string}
+        status: {type: string, enum: [queued, parsing, chunking, storing, embedding, extracting, ready, failed]}
+        error: {type: [string, 'null']}
+        pages: {type: [integer, 'null']}
+        n_chunks: {type: integer}
+        n_chars: {type: integer}
+        n_embedded: {type: integer, description: passages with a vector}
+        parse_ms: {type: [integer, 'null']}
+        created_at: {type: string}
+        updated_at: {type: string}
+        duplicate: {type: boolean, description: the same file was already in this knowledge base}
+    KbHit:
+      type: object
+      required: [chunk_id, doc_id, doc_title, ord, text, score, rank]
+      properties:
+        chunk_id: {type: string}
+        doc_id: {type: string}
+        doc_title: {type: string}
+        ord: {type: integer}
+        heading: {type: string}
+        page: {type: [integer, 'null']}
+        text: {type: string}
+        score: {type: number, description: BM25, cosine, or the fused reciprocal-rank score}
+        rank: {type: integer}
+        lexical_score: {type: number}
+        vector_score: {type: number}
     Error:
       type: object
       required:

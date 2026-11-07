@@ -261,6 +261,120 @@ Request body: `CodeAgentRequest` (* = required).
 
 Responses: `200`, `400`, `403`.
 
+## knowledge
+
+### `GET /v1/kb`
+
+Knowledge bases with document, passage and character counts (FR-K01)
+
+Responses: `200`, `403`, `503`.
+
+### `POST /v1/kb`
+
+Create a knowledge base (FR-K01)
+
+Request body: `name`*, `description` (* = required).
+
+Responses: `201`, `400`, `409`, `403`, `503`.
+
+### `GET /v1/kb/status`
+
+Whether the knowledge store is enabled and reachable, its version, limits and ingestion queue
+
+Responses: `200`, `403`.
+
+### `DELETE /v1/kb/{kb}`
+
+Delete a knowledge base with its documents, passages and stored files
+
+Parameters: `kb` (path, required).
+
+Responses: `200`, `404`, `403`, `503`.
+
+### `GET /v1/kb/{kb}`
+
+One knowledge base with its counts
+
+Parameters: `kb` (path, required).
+
+Responses: `200`, `404`, `403`, `503`.
+
+### `PATCH /v1/kb/{kb}`
+
+Rename or describe a knowledge base
+
+Parameters: `kb` (path, required).
+
+Request body: `name`, `description` (* = required).
+
+Responses: `200`, `400`, `404`, `409`, `403`, `503`.
+
+### `GET /v1/kb/{kb}/documents`
+
+Documents of a knowledge base, newest first, with their reading state (FR-K05)
+
+Parameters: `kb` (path, required).
+
+Responses: `200`, `404`, `403`, `503`.
+
+### `POST /v1/kb/{kb}/documents`
+
+Upload files as multipart parts named file (PDF, DOCX, PPTX, TEX, HTML, Markdown, text); each is read in the background (FR-K02..K04)
+
+Parameters: `kb` (path, required).
+
+Responses: `202`, `400`, `404`, `413`, `422`, `403`, `503`.
+
+### `DELETE /v1/kb/{kb}/documents/{doc}`
+
+Delete a document with its passages and stored file
+
+Parameters: `kb` (path, required), `doc` (path, required).
+
+Responses: `200`, `404`, `403`, `503`.
+
+### `GET /v1/kb/{kb}/documents/{doc}`
+
+One document and its reading state
+
+Parameters: `kb` (path, required), `doc` (path, required).
+
+Responses: `200`, `404`, `403`, `503`.
+
+### `GET /v1/kb/{kb}/documents/{doc}/chunks`
+
+A document's passages in order, with heading path and page (FR-K06)
+
+Parameters: `kb` (path, required), `doc` (path, required), `offset` (query), `limit` (query).
+
+Responses: `200`, `404`, `403`, `503`.
+
+### `POST /v1/kb/{kb}/documents/{doc}/reingest`
+
+Read a document again from its stored original
+
+Parameters: `kb` (path, required), `doc` (path, required).
+
+Responses: `202`, `404`, `409`, `403`, `503`.
+
+### `POST /v1/kb/{kb}/reindex`
+
+Give vectors to the passages that lack them (stored before the embedder ran, or while it was down)
+
+Parameters: `kb` (path, required).
+
+Responses: `202`, `404`, `403`, `503`.
+
+### `POST /v1/kb/{kb}/search`
+
+Search passages by words (BM25), meaning (vectors) or both fused (FR-K07)
+
+Parameters: `kb` (path, required).
+
+Request body: `query`*, `k`, `mode` (* = required).
+
+Responses: `200`, `400`, `404`, `403`, `503`.
+
 ## lab
 
 ### `GET /v1/lab/insights`
@@ -515,6 +629,9 @@ Responses: `202`, `404`, `403`.
 
 ## Schemas
 
+- `KbSummary`
+- `KbDocument`
+- `KbHit`
 - `Error`
 - `ModelProfile`: Model profile (MR-001)
 - `ReasoningMode`: Path that produced the reply (IF-003)

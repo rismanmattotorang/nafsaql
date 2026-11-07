@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # The Smiley Core backend (Phase 15): the vendored Rust engine behind the gateway's OpenAI-compatible API, one process per
-# model, like scripts/serve_llama.sh. Usage: scripts/serve_smiley.sh start|stop|stop-one|status|logs
+# model, like scripts/serve_llama.sh. Usage: scripts/serve_smiley.sh start|stop|stop-one|status|logs|embed|stop-embed
 #   System 1 :8201  Qwen3-1.7B Q4_K_M        System 2 :8202  Qwen3-4B-Thinking-2507 Q4_K_M
+#   embed    :8203  Qwen3-Embedding-0.6B Q8_0 (`embed`, Phase 20 Knowledge Base; scripts/fetch_models.sh embed)
 # Both servers run on the same four cores as the llama-servers; switch the gateway with POST /v1/system/backend
 # {"name": "smiley"} (the System page), which warms the pair first. SLOTS (users served at once, Phase 18),
 # THREADS, S1_MODEL, S2_MODEL, KV (f16|i8),
@@ -28,9 +29,18 @@ case "${1:-status}" in
     start_one system1 8201 "$S1" 8192
     if [ -n "${DSPARK:-}" ]; then start_one system2 8202 "$S2" 8192 --dspark "$DSPARK"; else start_one system2 8202 "$S2" 8192; fi
     for p in 8201 8202; do for i in $(seq 1 120); do curl -sf "localhost:$p/health" >/dev/null && { echo ":$p healthy"; break; }; sleep 1; done; done ;;
-  stop)  for n in system1 system2; do [ -f "$RUN/smiley-$n.pid" ] && kill "$(cat $RUN/smiley-$n.pid)" 2>/dev/null && echo "stopped smiley $n"; rm -f "$RUN/smiley-$n.pid"; done ;;
+  embed) # The Knowledge Base's embedding server: /v1/embeddings, no chat. EMBED_MODEL and EMBED_THREADS override.
+    E=${EMBED_MODEL:-models/Qwen3-Embedding-0.6B-Q8_0.gguf}
+    if [ -f "$RUN/smiley-embed.pid" ] && kill -0 "$(cat "$RUN/smiley-embed.pid")" 2>/dev/null; then echo "smiley embed already running (pid $(cat $RUN/smiley-embed.pid))"; exit 0; fi
+    [ -x "$BIN" ] || (cd rust && cargo build --release -p nafs-smiley-server)
+    [ -f "$E" ] || { echo "missing $E: run scripts/fetch_models.sh embed"; exit 1; }
+    nohup "$BIN" -m "$E" --alias embed -t "${EMBED_THREADS:-$THREADS}" --port 8203 --embedding > logs/smiley-embed.log 2>&1 &
+    echo $! > "$RUN/smiley-embed.pid"; echo "started smiley embed on :8203 (pid $!)"
+    for i in $(seq 1 60); do curl -sf localhost:8203/health >/dev/null && { echo ":8203 healthy"; break; }; sleep 1; done ;;
+  stop-embed) [ -f "$RUN/smiley-embed.pid" ] && kill "$(cat $RUN/smiley-embed.pid)" 2>/dev/null && echo "stopped smiley embed"; rm -f "$RUN/smiley-embed.pid" ;;
+  stop)  for n in system1 system2 embed; do [ -f "$RUN/smiley-$n.pid" ] && kill "$(cat $RUN/smiley-$n.pid)" 2>/dev/null && echo "stopped smiley $n"; rm -f "$RUN/smiley-$n.pid"; done ;;
   stop-one) n=${2:?usage: stop-one system1|system2}; [ -f "$RUN/smiley-$n.pid" ] && kill "$(cat $RUN/smiley-$n.pid)" 2>/dev/null && echo "stopped smiley $n"; rm -f "$RUN/smiley-$n.pid" ;;
-  status) for p in 8201 8202; do printf ":%s " $p; curl -sf "localhost:$p/health" || echo "down"; echo; done ;;
+  status) for p in 8201 8202 8203; do printf ":%s " $p; curl -sf "localhost:$p/health" || echo "down"; echo; done ;;
   logs) tail -n 40 logs/smiley-system1.log logs/smiley-system2.log ;;
-  *) echo "usage: $0 start|stop|stop-one <name>|status|logs"; exit 2 ;;
+  *) echo "usage: $0 start|stop|stop-one <name>|status|logs|embed|stop-embed"; exit 2 ;;
 esac
