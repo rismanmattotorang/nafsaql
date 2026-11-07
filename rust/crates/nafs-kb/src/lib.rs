@@ -5,20 +5,24 @@
 
 pub mod chunk;
 pub mod embed;
+pub mod graph;
 pub mod parse;
 pub mod store;
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
 use serde::Serialize;
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::sync::{mpsc, Mutex};
 
 pub use chunk::{chunk, Chunk, ChunkOpts};
 pub use embed::{EmbedConfig, Embedder, QUERY_INSTRUCTION};
+pub use graph::{Extractor, GraphConfig};
 pub use parse::{parse, Kind, Parsed};
 pub use store::{Document, Hit, KbSummary, NewDocument, Store, StoreConfig, StoredChunk};
 
@@ -70,6 +74,8 @@ pub struct KbConfig {
     pub embed: Option<EmbedConfig>,
     /// Knowledge bases with fewer vectors than this are searched exactly (a scan); larger ones through HNSW.
     pub exact_search_below: u64,
+    /// Phase 3: entity and relation extraction by the quick model; `None` turns the graph off.
+    pub graph: Option<GraphConfig>,
 }
 
 /// How a search ranks passages (FR-K07).
@@ -115,11 +121,21 @@ pub struct QueueStatus {
     pub running: usize,
 }
 
+/// What a queued job does to its document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JobKind {
+    /// Parse, chunk, store and embed.
+    Ingest,
+    /// Only compute missing vectors (the passages are already stored).
+    Vectors,
+    /// Read the passages for the knowledge graph (Phase 3).
+    Graph,
+}
+
 struct Job {
     kb: String,
     doc: String,
-    /// Only compute missing vectors (the passages are already stored).
-    vectors_only: bool,
+    kind: JobKind,
 }
 
 /// The knowledge-base service: the store plus the ingestion worker.
@@ -132,6 +148,7 @@ pub struct Kb {
     schema_ready: AtomicBool,
     bootstrap_lock: Mutex<()>,
     embedder: Option<Embedder>,
+    extractor: Option<Extractor>,
 }
 
 impl Kb {
@@ -139,6 +156,7 @@ impl Kb {
     pub fn start(cfg: KbConfig) -> Arc<Kb> {
         let (tx, rx) = mpsc::unbounded_channel();
         let embedder = cfg.embed.clone().map(Embedder::new);
+        let extractor = cfg.graph.clone().map(Extractor::new);
         let kb = Arc::new(Kb {
             store: Store::new(cfg.store.clone()),
             cfg,
@@ -148,6 +166,7 @@ impl Kb {
             schema_ready: AtomicBool::new(false),
             bootstrap_lock: Mutex::new(()),
             embedder,
+            extractor,
         });
         tokio::spawn(worker(Arc::downgrade(&kb), rx));
         let k = kb.clone();
@@ -156,7 +175,7 @@ impl Kb {
             if k.ready().await.is_ok() {
                 if let Ok(docs) = k.store.unfinished_documents().await {
                     for d in docs {
-                        k.enqueue(&d.kb, &d.id, false);
+                        k.enqueue(&d.kb, &d.id, JobKind::Ingest);
                     }
                 }
                 // Passages stored before the embedder ran (Phase 1 documents, or the embedder was down) get vectors.
@@ -199,14 +218,14 @@ impl Kb {
         Ok(())
     }
 
-    fn enqueue(&self, kb: &str, doc: &str, vectors_only: bool) {
+    fn enqueue(&self, kb: &str, doc: &str, kind: JobKind) {
         self.pending.fetch_add(1, Ordering::Relaxed);
         if self
             .tx
             .send(Job {
                 kb: kb.into(),
                 doc: doc.into(),
-                vectors_only,
+                kind,
             })
             .is_err()
         {
@@ -273,7 +292,7 @@ impl Kb {
                 },
             )
             .await?;
-        self.enqueue(kb, &doc.id, false);
+        self.enqueue(kb, &doc.id, JobKind::Ingest);
         Ok(doc)
     }
 
@@ -283,14 +302,14 @@ impl Kb {
         let d = self.store.get_document(kb, doc).await?;
         if matches!(
             d.status.as_str(),
-            "queued" | "parsing" | "chunking" | "storing" | "embedding"
+            "queued" | "parsing" | "chunking" | "storing" | "embedding" | "extracting"
         ) {
             return Err(KbError::Conflict(
                 "the document is already being read".into(),
             ));
         }
         self.store.set_status(doc, "queued", None).await?;
-        self.enqueue(kb, doc, false);
+        self.enqueue(kb, doc, JobKind::Ingest);
         self.store.get_document(kb, doc).await
     }
 
@@ -298,6 +317,9 @@ impl Kb {
         self.ready().await?;
         let d = self.store.get_document(kb, doc).await?;
         let n = self.store.delete_document(kb, doc).await?;
+        if self.store.prune_graph(kb).await.is_ok() {
+            let _ = self.recompute_communities(kb).await;
+        }
         // Another document of the same base may share the stored file (same content); it cannot, by FR-K04.
         let _ = tokio::fs::remove_file(&d.path).await;
         Ok(n)
@@ -343,6 +365,10 @@ impl Kb {
         self.store
             .store_chunks(&job.kb, &d.id, &title, parsed.pages, parse_ms, &chunks)
             .await?;
+        // A re-read replaces the passages, so what the graph held about the old ones goes.
+        if self.store.prune_graph(&job.kb).await.is_ok() {
+            let _ = self.recompute_communities(&job.kb).await;
+        }
         let vectors = self.embed_document(&job.kb, &d.id, &title).await;
         self.store
             .set_status(&d.id, "ready", vectors.err().as_deref())
@@ -428,9 +454,287 @@ impl Kb {
         }
         let docs = self.store.documents_missing_vectors(kb).await?;
         for d in &docs {
-            self.enqueue(&d.kb, &d.id, true);
+            self.enqueue(&d.kb, &d.id, JobKind::Vectors);
         }
         Ok(docs.len())
+    }
+
+    /// Queue every ready document of a knowledge base whose passages are not all read for the graph (FR-K30). This
+    /// is a long job on the quick model (about 12-25 s per passage here), so it runs only when asked.
+    pub async fn build_graph(&self, kb: &str, fresh: bool) -> Result<usize, KbError> {
+        self.ready().await?;
+        if self.extractor.is_none() {
+            return Err(KbError::Unavailable(
+                "the knowledge graph is turned off ([knowledge] graph_llm_url is empty)".into(),
+            ));
+        }
+        if fresh {
+            // Every passage is read again (after a change to the extraction, or to start over).
+            self.store.reset_graph(kb).await?;
+        }
+        let docs = self.store.documents_missing_graph(kb).await?;
+        for d in &docs {
+            self.store.set_status(&d.id, "queued", None).await?;
+            self.enqueue(&d.kb, &d.id, JobKind::Graph);
+        }
+        Ok(docs.len())
+    }
+
+    /// Read a document's unread passages for the graph (state `extracting`): extract, resolve each entity to an
+    /// existing one by key or, failing that, by name vector (same type, similarity >= `merge_similarity`), store.
+    /// A reply that fails the schema skips its passage. Communities are recomputed at the end.
+    async fn graph_document(&self, kb: &str, doc: &str) -> Result<(), String> {
+        let Some(x) = &self.extractor else {
+            return Ok(());
+        };
+        let todo = self
+            .store
+            .chunks_for_graph(doc)
+            .await
+            .map_err(|e| e.to_string())?;
+        if todo.is_empty() {
+            return Ok(());
+        }
+        self.store
+            .set_status(doc, "extracting", None)
+            .await
+            .map_err(|e| e.to_string())?;
+        let t0 = Instant::now();
+        let (mut ok, mut skipped, mut tokens, mut merged) = (0usize, 0usize, 0u64, 0usize);
+        // Keys resolved in this job, so a name is embedded and matched once.
+        let mut resolved: HashMap<String, String> = HashMap::new();
+        for (chunk_id, _heading, text) in &todo {
+            let call = x.extract(text).await.map_err(|e| {
+                format!("The knowledge graph could not be built: {e}. Passages read so far are kept; build again to continue.")
+            })?;
+            tokens += call.completion_tokens;
+            let ex = match call.result {
+                Ok(ex) => ex,
+                Err(why) => {
+                    skipped += 1;
+                    tracing::debug!(chunk = %chunk_id, %why, "graph extraction skipped");
+                    self.store
+                        .store_extraction(kb, doc, chunk_id, &[], &[])
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    continue;
+                }
+            };
+            // key -> record key for every entity of this passage.
+            let mut rec: HashMap<String, String> = HashMap::new();
+            let mut ents: Vec<Value> = Vec::new();
+            let fresh: Vec<&graph::ExtractedEntity> = ex
+                .entities
+                .iter()
+                .filter(|e| !resolved.contains_key(&e.key))
+                .collect();
+            let ids: Vec<String> = fresh.iter().map(|e| graph::entity_id(kb, &e.key)).collect();
+            let existing = self
+                .store
+                .existing_entities(kb, &ids)
+                .await
+                .map_err(|e| e.to_string())?;
+            let need: Vec<&graph::ExtractedEntity> = fresh
+                .iter()
+                .copied()
+                .filter(|e| !existing.contains_key(&graph::entity_id(kb, &e.key)))
+                .collect();
+            let vecs = match (&self.embedder, need.is_empty()) {
+                (Some(em), false) => em
+                    .embed(
+                        &need.iter().map(|e| e.name.clone()).collect::<Vec<_>>(),
+                        None,
+                    )
+                    .await
+                    .ok(),
+                _ => None,
+            };
+            for e in &ex.entities {
+                let id = if let Some(id) = resolved.get(&e.key) {
+                    id.clone()
+                } else {
+                    let own = graph::entity_id(kb, &e.key);
+                    let mut id = own.clone();
+                    let mut v = None;
+                    if !existing.contains_key(&own) {
+                        if let Some(i) = need.iter().position(|n| n.key == e.key) {
+                            v = vecs.as_ref().and_then(|vs| vs.get(i).cloned());
+                            if let Some(vv) = &v {
+                                if let Ok(Some((other, _))) = self
+                                    .store
+                                    .similar_entity(kb, vv, &e.kind, x.cfg.merge_similarity)
+                                    .await
+                                {
+                                    id = other;
+                                    merged += 1;
+                                }
+                            }
+                        }
+                    }
+                    resolved.insert(e.key.clone(), id.clone());
+                    if id == own {
+                        ents.push(json!({ "id": id, "key": e.key, "name": e.name, "type": e.kind, "v": v }));
+                    } else {
+                        ents.push(json!({ "id": id, "key": e.key, "name": e.name, "type": e.kind, "v": null }));
+                    }
+                    id
+                };
+                if !ents.iter().any(|x| x["id"] == json!(id)) {
+                    ents.push(json!({ "id": id, "key": e.key, "name": e.name, "type": e.kind, "v": null }));
+                }
+                rec.insert(e.key.clone(), id);
+            }
+            let rels: Vec<Value> = ex
+                .relations
+                .iter()
+                .filter_map(|r| {
+                    let (s, t) = (rec.get(&r.source)?, rec.get(&r.target)?);
+                    (s != t).then(|| json!({ "id": graph::relation_id(kb, s, &r.predicate, t), "s": s, "t": t, "p": r.predicate }))
+                })
+                .collect();
+            self.store
+                .store_extraction(kb, doc, chunk_id, &ents, &rels)
+                .await
+                .map_err(|e| e.to_string())?;
+            ok += 1;
+        }
+        let _ = self.recompute_communities(kb).await;
+        tracing::info!(
+            doc,
+            passages = todo.len(),
+            ok,
+            skipped,
+            merged,
+            tokens,
+            ms = t0.elapsed().as_millis() as u64,
+            "knowledge graph read"
+        );
+        Ok(())
+    }
+
+    /// Louvain communities over the relations, each labelled by its three most mentioned entities.
+    pub async fn recompute_communities(&self, kb: &str) -> Result<usize, KbError> {
+        let ents = self.store.graph_entities(kb).await?;
+        if ents.is_empty() {
+            self.store.set_communities(kb, &[], &[]).await?;
+            return Ok(0);
+        }
+        let index: HashMap<&str, usize> = ents
+            .iter()
+            .enumerate()
+            .map(|(i, e)| (e.0.as_str(), i))
+            .collect();
+        let edges: Vec<(usize, usize, f64)> = self
+            .store
+            .graph_edges(kb)
+            .await?
+            .iter()
+            .filter_map(|(s, t, w)| Some((*index.get(s.as_str())?, *index.get(t.as_str())?, *w)))
+            .collect();
+        let comm = graph::louvain(ents.len(), &edges);
+        let n = comm.iter().max().map_or(0, |m| m + 1);
+        let mut comms = Vec::new();
+        for c in 0..n {
+            // `ents` is sorted by mentions, so the first members are the most mentioned.
+            let members: Vec<&str> = ents
+                .iter()
+                .zip(&comm)
+                .filter(|(_, x)| **x == c)
+                .map(|(e, _)| e.1.as_str())
+                .collect();
+            comms.push((
+                c,
+                members.len(),
+                members
+                    .iter()
+                    .take(3)
+                    .copied()
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ));
+        }
+        let assign: Vec<(String, usize)> = ents
+            .iter()
+            .zip(&comm)
+            .map(|(e, c)| (e.0.clone(), *c))
+            .collect();
+        self.store.set_communities(kb, &assign, &comms).await?;
+        Ok(n)
+    }
+
+    /// Graph search for chat (FR-K22, local search): entities nearest the question (by meaning and by name), the
+    /// relations around them, and passages, with passages that mention those entities or carry the strongest facts
+    /// ranked first. Returns (facts, passages).
+    pub async fn graph_search(
+        &self,
+        kb: &str,
+        query: &str,
+        k: usize,
+    ) -> Result<(Vec<Value>, SearchResult), KbError> {
+        self.ready().await?;
+        let mut base = self
+            .search(kb, query, (k * 3).max(12), SearchMode::Hybrid)
+            .await?;
+        let qv = match &self.embedder {
+            Some(e) => e
+                .embed(&[query.to_string()], Some(QUERY_INSTRUCTION))
+                .await
+                .ok()
+                .map(|mut v| v.remove(0)),
+            None => None,
+        };
+        let found = self
+            .store
+            .find_entities(kb, query, qv.as_deref(), 8)
+            .await?;
+        let seeds: Vec<String> = found
+            .iter()
+            .filter(|e| {
+                e["score"].as_f64().is_some_and(|s| s > 0.0)
+                    || e["similarity"].as_f64().is_some_and(|s| s >= 0.5)
+            })
+            .filter_map(|e| e["id"].as_str().map(str::to_string))
+            .take(5)
+            .collect();
+        if seeds.is_empty() {
+            base.results.truncate(k);
+            return Ok((Vec::new(), base));
+        }
+        let facts = self.store.facts_for(kb, &seeds, 12).await?;
+        let mentioning = self.store.chunks_mentioning(kb, &seeds).await?;
+        // Evidence of the strongest facts joins the candidates when the search missed it.
+        let mut evidence: Vec<String> = Vec::new();
+        for f in facts.iter().take(4) {
+            if let Some(e) = f["evidence"]
+                .as_array()
+                .and_then(|a| a.first())
+                .and_then(Value::as_str)
+            {
+                if !base.results.iter().any(|h| h.chunk_id == e) && !evidence.iter().any(|x| x == e)
+                {
+                    evidence.push(e.to_string());
+                }
+            }
+        }
+        let mut hits = base.results;
+        hits.extend(self.store.hits_by_id(&evidence).await?);
+        // Stable re-rank: passages mentioning more seed entities first, then the search order.
+        let mut ranked: Vec<(usize, usize, Hit)> = hits
+            .into_iter()
+            .enumerate()
+            .map(|(i, h)| (mentioning.get(&h.chunk_id).copied().unwrap_or(0), i, h))
+            .collect();
+        ranked.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+        let mut results: Vec<Hit> = ranked.into_iter().map(|x| x.2).take(k).collect();
+        for (i, h) in results.iter_mut().enumerate() {
+            h.rank = i + 1;
+        }
+        base.results = results;
+        Ok((facts, base))
+    }
+
+    pub fn graph_enabled(&self) -> bool {
+        self.extractor.is_some()
     }
 
     /// Whether vectors can be made and searched now (the embedding server answers).
@@ -508,9 +812,14 @@ async fn worker(kb: std::sync::Weak<Kb>, mut rx: mpsc::UnboundedReceiver<Job>) {
         let Some(kb) = kb.upgrade() else { return };
         kb.pending.fetch_sub(1, Ordering::Relaxed);
         kb.running.fetch_add(1, Ordering::Relaxed);
-        if job.vectors_only {
+        if job.kind == JobKind::Vectors {
             if let Ok(d) = kb.store.get_document(&job.kb, &job.doc).await {
                 let note = kb.embed_document(&job.kb, &d.id, &d.title).await.err();
+                let _ = kb.store.set_status(&d.id, "ready", note.as_deref()).await;
+            }
+        } else if job.kind == JobKind::Graph {
+            if let Ok(d) = kb.store.get_document(&job.kb, &job.doc).await {
+                let note = kb.graph_document(&job.kb, &d.id).await.err();
                 let _ = kb.store.set_status(&d.id, "ready", note.as_deref()).await;
             }
         } else if let Err(e) = kb.ingest(&job).await {

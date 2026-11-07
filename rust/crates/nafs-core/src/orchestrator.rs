@@ -914,6 +914,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             .as_ref()
             .filter(|k| k.mode.as_deref().unwrap_or("rag") != "off")
         {
+            let kmode = kq.mode.as_deref().unwrap_or("rag");
             let tk = Instant::now();
             let retriever = self
                 .knowledge
@@ -922,7 +923,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 .clone();
             let k = kq.k.unwrap_or(cfg.knowledge.rag_k).clamp(1, 12);
             match retriever {
-                Some(r) => match r.retrieve(&kq.kb, &user.content, k).await {
+                Some(r) => match r.retrieve(&kq.kb, &user.content, k, kmode).await {
                     Ok(found) => {
                         system.push_str(&crate::knowledge::prompt_block(
                             &found,
@@ -936,7 +937,10 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                 "doc_title": p.doc_title, "heading": p.heading, "page": p.page, "text": p.text, "score": p.score,
                                 "lexical_score": p.lexical_score, "vector_score": p.vector_score, "mode": found.mode}))
                             .collect();
-                        if sources.is_empty() {
+                        if !found.facts.is_empty() {
+                            sources.push(json!({"facts": found.facts, "kb": kq.kb, "kb_name": found.kb_name}));
+                        }
+                        if found.passages.is_empty() && found.facts.is_empty() {
                             sources.push(json!({"note": format!("The knowledge base \"{}\" has no passage about this question.", found.kb_name), "kb": kq.kb}));
                         }
                         metrics::counter!("nafs_knowledge_passages_total")

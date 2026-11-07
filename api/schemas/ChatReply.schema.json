@@ -396,7 +396,7 @@
     },
     "sources": {
       "type": "array",
-      "description": "FR-K21: the knowledge-base passages the answer was given (n, doc_title, heading, page, text, scores), or a note saying why there were none",
+      "description": "FR-K21/K22: the knowledge-base passages the answer was given (n, doc_title, heading, page, text, scores); in graph mode one entry {facts: [{source, predicate, target, weight}]}; or a note saying why there were none",
       "items": {
         "type": "object"
       }

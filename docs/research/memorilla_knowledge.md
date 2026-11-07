@@ -207,3 +207,38 @@ default** for search and for chat. Off-topic passages scored 0.38 to 0.40 and re
 passages with similarity >= 0.45 (`rag_min_similarity`). Grounding is not perfect: on "How many training examples did
 Memorilla use in its first stage?" System 1 read the right passage and still wrote "15 English Wikipedia articles" (the
 page number), and the agreement samples marked it Cross-checked. Quality of grounded answers is measured in Phase 7.
+
+## 12. Phase 3 results (2026-11-07): the knowledge graph and GraphRAG
+
+Shared machine throughout (load average 16 to 86). Extraction model: System 1 (Qwen3-1.7B Q4_K_M on Smiley Core).
+
+**The extraction prompt was measured, not guessed.** Four variants on the same two passages:
+
+| Variant | Output tokens | Result |
+|---|---|---|
+| JSON objects with a description per entity and relation | 327 | faithful, valid; 60 s per passage at load 16–23 |
+| `E | name | type` / `R | s | p | t` lines | 155–199 | format broken: literal `name`, predicates as entities |
+| JSON arrays `[name, type]`, `[s, p, t]` | 15–231 | copied the template (`["name","type"]`), split into two objects |
+| **JSON objects without descriptions, one worked example on an unrelated topic** | 138–139 | faithful, valid; adopted |
+
+**First full build, and what it showed.** On the five small fixture documents (20 passages) the first build gave 91
+entities, but the most mentioned were the document's own headings ("Architecture and Design", "Components"), relations
+such as `architecture > Components`, and "LLVM", copied from the prompt's example into passages that never mention it.
+Three changes, all in `graph.rs`: heading lines are removed from the extraction input; every word of an entity's name
+must occur in the passage (grounding); generic words (`system`, `architecture`, ...) are not entities. The rebuild
+(`?fresh=true`) kept 109 entities and 73 relations whose top items are the system's real parts (`nafs-core implements
+The gate`, `SurrealDB uses HNSW`, `Ledger feeds dashboard`, `The gate computes features verifier outcome`). 18 of 20
+replies passed the JSON Schema both times; 1 entity was merged by meaning in the first build, 0 in the second.
+
+**Cost.** 17 to 28 seconds per passage (load 33 to 40), about 140 output tokens each. A 189-passage paper would take
+about an hour, so building the graph is an explicit, resumable background job (`Build the graph` on the Knowledge
+page), not part of every upload.
+
+**Chat.** On "Which component implements the gate, and what features does the gate compute?" both `rag` and `graph`
+modes answered correctly; graph mode put `nafs-core | implements | The gate` and the six `computes features` relations in
+the prompt ahead of the passages, along with a few weaker facts from loosely matched entities. Whether graph mode helps
+on balance is Phase 7's measurement.
+
+**Known limits.** TeX macros defined outside the uploaded file stay as names (`\Sone` reads "Sone"); the file's own
+`\newcommand`/`\def` macros are expanded. Types are coarse (eight words). Community summaries and global search are not
+built (one System 2 call per community).

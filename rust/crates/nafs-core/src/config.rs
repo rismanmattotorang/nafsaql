@@ -72,6 +72,15 @@ pub struct KnowledgeCfg {
     pub rag_max_chars: usize,
     /// Chat: a passage is used only when its hybrid rank fuses both lists or its similarity reaches this.
     pub rag_min_similarity: f64,
+    /// Knowledge graph (Phase 3): the OpenAI-compatible server and model that extract entities and relations; empty
+    /// turns the graph off.
+    pub graph_llm_url: String,
+    pub graph_model: String,
+    pub graph_max_tokens: usize,
+    /// Entities of one type whose name vectors are at least this similar are merged.
+    pub entity_merge_similarity: f64,
+    /// Chat in `graph` mode: facts put in the prompt.
+    pub graph_facts: usize,
 }
 impl Default for KnowledgeCfg {
     fn default() -> Self {
@@ -96,6 +105,11 @@ impl Default for KnowledgeCfg {
             rag_k: 4,
             rag_max_chars: 4800,
             rag_min_similarity: 0.45,
+            graph_llm_url: String::new(),
+            graph_model: "system1".into(),
+            graph_max_tokens: 400,
+            entity_merge_similarity: 0.92,
+            graph_facts: 12,
         }
     }
 }

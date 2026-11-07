@@ -2361,6 +2361,7 @@ dependencies = [
  "chrono",
  "ciborium",
  "htmd",
+ "jsonschema",
  "pdf_oxide",
  "quick-xml",
  "regex",

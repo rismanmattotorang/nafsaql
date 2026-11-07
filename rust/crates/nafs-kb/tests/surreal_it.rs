@@ -36,6 +36,7 @@ fn config(db: &str, dir: &std::path::Path) -> Option<KbConfig> {
             batch: 8,
         }),
         exact_search_below: 5000,
+        graph: None,
     })
 }
 

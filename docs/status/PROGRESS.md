@@ -2,7 +2,7 @@
 
 ## Phase 20 (Knowledge): Knowledge Base, GraphRAG and Memorilla (started 2026-11-07)
 
-Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0, 1 and 2 done; next is Phase 3.
+Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 3 done (0–2 committed as b8da406 on feat/phase20-knowledge-base); next is Phase 4.
 
 | When | Unit of work | Evidence |
 |---|---|---|
@@ -19,10 +19,16 @@ Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0, 1 and 2 done; next is P
 | 11:12 | Indexing measured (379 passages, 964 s, load 44–60); retrieval eval: hybrid 0.90 recall@5 (words 0.85, meaning 0.55); HNSW = exact on 20/20; threshold 0.45 set from off-topic vs relevant scores | `benchmarks/kb_retrieval.json` |
 | 11:25 | UI: search modes, indexing progress, Index for meaning, knowledge picker in chat, Sources list; checked in the browser | screenshots in session |
 
-### Next three actions (Phase 3)
-1. Entity and relation extraction per passage with System 1 under a JSON Schema (schema verifier), as a background step after embedding.
-2. Entity resolution (normalised name + entity-vector cosine >= 0.92), `mentions` / `related` edges, Leiden communities (`leiden-rs`).
-3. Knowledge mode `graph` (local search: question entities -> 1–2 hops -> passages) and a Graph tab on the Knowledge page.
+| 11:50 | Phases 0–2 committed (b8da406, branch feat/phase20-knowledge-base; papers/ left out) | git |
+| 11:55 | Extraction prompt measured in four variants on System 1; objects without descriptions + one example adopted | research note §12 |
+| 12:10 | `graph.rs` (schema check, keys, ids, Louvain), store graph methods, Kb jobs (build, resolution, communities, graph search); mock-LLM integration test | `tests/graph_it.rs` |
+| 12:26 | First real build: headings and the prompt's example leaked in; fixed by grounding, heading-free input, generic-word filter; TeX macro expansion; `?fresh=true` | rebuild 12:46: 109 entities, 73 relations |
+| 12:50 | Chat `graph` mode, graph API (4 routes), Graph card and chat mode choice; checked in the browser | screenshots in session |
+
+### Next three actions (Phase 4)
+1. `nafs-memorilla::memory`: the memory module in Candle with `memory.py`'s parameter names (packed in_proj MHA, key padding mask, pre-norm blocks, GELU FFN, projection); `retrieval_init`.
+2. Convert a released checkpoint (`memory.pt` -> safetensors + config.json) with a Python one-off (ask before downloading it, Stage 3 is about 0.8 GB) and a parity test against PyTorch on random inputs (max abs error < 1e-3).
+3. Forward-time benchmark for N = 10 ... 10,000 documents on this CPU (NFR-K08).
 
 ### Open questions
 - Whether the live gateway on :8080 should be restarted to serve the Knowledge page and knowledge in chat (it runs the pre-Phase-20 binary).

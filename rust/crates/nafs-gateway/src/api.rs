@@ -76,6 +76,7 @@ pub fn new_state(
         orch.set_knowledge(Arc::new(crate::kb::ChatKnowledge::new(
             k.clone(),
             cfg.knowledge.rag_min_similarity,
+            cfg.knowledge.graph_facts,
         )));
     }
     Arc::new(AppStateInner {

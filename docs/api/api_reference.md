@@ -357,6 +357,38 @@ Parameters: `kb` (path, required), `doc` (path, required).
 
 Responses: `202`, `404`, `409`, `403`, `503`.
 
+### `GET /v1/kb/{kb}/graph`
+
+The most mentioned things and their relations, or the two-hop neighbourhood of one (FR-K34), with counts and build progress
+
+Parameters: `kb` (path, required), `entity` (query), `depth` (query), `limit` (query).
+
+Responses: `200`, `403`, `404`, `503`.
+
+### `POST /v1/kb/{kb}/graph/build`
+
+Read the passages for the knowledge graph in the background (FR-K30); fresh=true starts over
+
+Parameters: `kb` (path, required), `fresh` (query).
+
+Responses: `202`, `403`, `404`, `503`.
+
+### `GET /v1/kb/{kb}/graph/entities`
+
+Things in the graph whose names match the words
+
+Parameters: `kb` (path, required), `q` (query).
+
+Responses: `200`, `403`, `404`, `503`.
+
+### `GET /v1/kb/{kb}/graph/entities/{entity}`
+
+One thing's relations and the passage that states each
+
+Parameters: `kb` (path, required), `entity` (path, required).
+
+Responses: `200`, `403`, `404`, `503`.
+
 ### `POST /v1/kb/{kb}/reindex`
 
 Give vectors to the passages that lack them (stored before the embedder ran, or while it was down)

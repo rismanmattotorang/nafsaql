@@ -69,8 +69,9 @@ function toolcardsHTML(t, live) {
 }
 // Knowledge-base passages the answer was given (numbered as the model cites them), or why there were none.
 function kbSourcesHTML(sources) {
-  const notes = sources.filter(x => x.note), hits = sources.filter(x => !x.note);
+  const notes = sources.filter(x => x.note), facts = sources.filter(x => x.facts).flatMap(x => x.facts), hits = sources.filter(x => !x.note && !x.facts);
   let out = notes.map(n => `<div class="sources">${icon.book}<span>${esc(n.note)}</span></div>`).join('');
+  if (facts.length) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.book}<span>Used ${plural(facts.length, 'relation')} from the knowledge graph</span></summary><ul class="kb-facts">${facts.map(f => `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b></li>`).join('')}</ul></details>`;
   if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src"><summary><span class="kb-n">${x.n}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${x.page ? ` <span class="faint">· page ${x.page}</span>` : ''}</span>${advanced() && x.vector_score != null ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
   return out;
 }
@@ -583,7 +584,7 @@ routes.chat = { title: 'Chat', async render(view) {
         <div class="controls">
           <div class="seg" id="modeSeg" role="group" aria-label="Answer mode"><button data-m="auto" title="Auto: answers quickly, and thinks it through when the question needs it">${icon.shield}Auto</button><button data-m="fast" title="Quick: always answer at once">${icon.bolt}Quick</button><button data-m="slow" title="Thorough: always think it through first (slower)">${icon.brain}Thorough</button><button data-m="both" class="adv-only" title="Compare: see a quick and a thorough answer side by side and pick the better one">${icon.compare}Compare</button></div>
           <span class="chip" id="verifyChip" role="button" tabindex="0" title="Give the expected answer, tests or a format, so the reply can be checked">${icon.shield}<span>Add a check</span></span>
-          <label class="chip kb-pick" id="kbChip" hidden title="Answer from the passages of one of your knowledge bases">${icon.book}<select id="kbSel" aria-label="Answer from a knowledge base"><option value="">No knowledge base</option></select></label>
+          <label class="chip kb-pick" id="kbChip" hidden title="Answer from the passages of one of your knowledge bases">${icon.book}<select id="kbSel" aria-label="Answer from a knowledge base"><option value="">No knowledge base</option></select><select id="kbMode" aria-label="How to use the knowledge base" hidden><option value="rag">Passages</option><option value="graph">Passages and graph</option></select></label>
           <span class="sp"></span><button class="btn ghost sm adv-only" id="inspBtn" title="Show how each answer was produced (Ctrl/Cmd+I)">${icon.search}Details</button>
         </div><div class="privacy">Answers can be wrong; look for <b>Checked</b> on answers that were verified. <button type="button" class="linkbtn" id="privBtn">Privacy</button></div></div></div></div>
     <aside class="inspector" id="insp"></aside></div>`;
@@ -606,7 +607,8 @@ routes.chat = { title: 'Chat', async render(view) {
   (async () => { try { const st = await api.get('/v1/kb/status'); if (!st.enabled || !st.reachable) return; const r = await api.get('/v1/kb'); const sel = $('#kbSel'); if (!sel || !r.bases.length) return;
     sel.innerHTML = `<option value="">No knowledge base</option>` + r.bases.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
     if (!r.bases.some(b => b.id === PREFS.kb)) { PREFS.kb = null; savePrefs(); } sel.value = PREFS.kb || ''; $('#kbChip').hidden = false; $('#kbChip').classList.toggle('on', !!PREFS.kb);
-    sel.onchange = () => { PREFS.kb = sel.value || null; savePrefs(); $('#kbChip').classList.toggle('on', !!PREFS.kb); input.placeholder = PREFS.kb ? `Ask about ${sel.selectedOptions[0].text}` : 'Ask anything'; };
+    const ms = $('#kbMode'); ms.value = PREFS.kbMode || 'rag'; ms.hidden = !PREFS.kb; ms.onchange = () => { PREFS.kbMode = ms.value; savePrefs(); };
+    sel.onchange = () => { PREFS.kb = sel.value || null; savePrefs(); $('#kbChip').classList.toggle('on', !!PREFS.kb); ms.hidden = !PREFS.kb; input.placeholder = PREFS.kb ? `Ask about ${sel.selectedOptions[0].text}` : 'Ask anything'; };
     if (PREFS.kb) input.placeholder = `Ask about ${sel.selectedOptions[0].text}`; } catch {} })();
   const tbPop = $('#tbPop'); $('#tbMenu').onclick = (e) => { e.stopPropagation(); tbPop.hidden = !tbPop.hidden; $('#tbMenu').setAttribute('aria-expanded', String(!tbPop.hidden)); };
   tbPop.onclick = (e) => e.stopPropagation(); const closePop = () => { tbPop.hidden = true; $('#tbMenu')?.setAttribute('aria-expanded', 'false'); }; document.addEventListener('click', closePop);
@@ -671,7 +673,7 @@ routes.chat = { title: 'Chat', async render(view) {
     if (mode === 'both') return trial(text, v);
     const body = { conversation_id: convId, messages: [{ role: 'user', content: text }], lambda: S.lambda, thinking_budget: S.budget > 0 ? S.budget : undefined, show_reasoning: S.reason,
       force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined,
-      knowledge: PREFS.kb ? { kb: PREFS.kb, mode: 'rag' } : undefined };
+      knowledge: PREFS.kb ? { kb: PREFS.kb, mode: PREFS.kbMode || 'rag' } : undefined };
     const turn = new Turn(inner, { onSelect: select, onRetry: retry, prompt: text, request: body, onVerify }); turns.push(turn); select(turn);
     turn.onUpdate = (t) => { if (selected === t) insp.innerHTML = inspectorHTML(t); const near = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 160; if (near) scrollDown(); };
     scrollDown(); const ctrl = new AbortController(); setBusy(ctrl);
@@ -1038,7 +1040,7 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
 // Documents a person uploads, read into passages and searchable; later the assistant answers from them.
 const KB_KINDS = { pdf: 'PDF', docx: 'Word', pptx: 'Slides', tex: 'LaTeX', html: 'Web page', md: 'Markdown', txt: 'Text' };
 const KB_ACCEPT = '.pdf,.docx,.pptx,.tex,.latex,.html,.htm,.md,.markdown,.txt';
-const KB_STATE = { queued: ['Waiting', 'warn'], parsing: ['Reading', 'warn'], chunking: ['Reading', 'warn'], storing: ['Saving', 'warn'], embedding: ['Indexing', 'warn'], extracting: ['Linking', 'warn'], ready: ['Ready', 'ok'], failed: ['Failed', 'bad'] };
+const KB_STATE = { queued: ['Waiting', 'warn'], parsing: ['Reading', 'warn'], chunking: ['Reading', 'warn'], storing: ['Saving', 'warn'], embedding: ['Indexing', 'warn'], extracting: ['Reading for the graph', 'warn'], ready: ['Ready', 'ok'], failed: ['Failed', 'bad'] };
 const fmtBytes = (n) => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(0)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 const fmtCount = (n) => Number(n || 0).toLocaleString();
 // Escape first, then mark the query's words, so nothing from a document is ever rendered as HTML.
@@ -1119,7 +1121,9 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
       <div class="card-b"><label class="kb-drop" id="kbDrop" tabindex="0"><input type="file" id="kbFile" multiple accept="${KB_ACCEPT}" hidden>
         ${icon.download}<span><b>Drop files here</b> or <u>choose files</u></span></label>
         <div id="kbUploads" class="kb-uploads"></div>
-        <div id="kbDocs"></div></div></div>`;
+        <div id="kbDocs"></div></div></div>
+    <div class="card" id="kbGraphCard"><div class="card-h"><h3>Knowledge graph</h3><span class="hint small muted">The things your documents name, and how they relate.</span></div>
+      <div class="card-b" id="kbGraph"><div class="empty small">Loading…</div></div></div>`;
     $('#kbRename', main).onclick = renameBase; $('#kbDelete', main).onclick = deleteBase;
     $$('#kbMode button', main).forEach(b => b.onclick = () => { S.smode = b.dataset.m; store.set('kbSearchMode', S.smode); $$('#kbMode button', main).forEach(x => x.classList.toggle('on', x === b)); if (S.query) search(S.query); });
     $('#kbSearchForm', main).onsubmit = (e) => { e.preventDefault(); search($('#kbQ', main).value); };
@@ -1150,6 +1154,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     box.innerHTML = `<table class="t kb-docs"><thead><tr><th>Document</th><th>Type</th><th>Size</th><th>Passages</th><th>State</th><th></th></tr></thead><tbody>${S.docs.map(d => {
       let [label, cls] = KB_STATE[d.status] || [d.status, 'warn']; const busy = cls === 'warn';
       if (d.status === 'embedding' && d.n_chunks) label = `Indexing ${Math.round(100 * d.n_embedded / d.n_chunks)}%`;
+      if (d.status === 'extracting' && d.n_chunks) label = `Graph ${Math.round(100 * d.n_graphed / d.n_chunks)}%`;
       if (d.status === 'ready' && d.n_embedded < d.n_chunks && S.status?.embedder) { label = 'Words only'; cls = 'warn'; }
       const pages = d.pages ? ` · ${plural(d.pages, 'page')}` : '';
       return `<tr data-id="${esc(d.id)}"><td><div class="kb-dtitle">${esc(d.title)}</div><div class="tiny faint">${esc(d.filename)}${pages} · added ${ago(d.created_at)}</div></td>
@@ -1167,7 +1172,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     const was = S.docs.filter(d => KB_STATE[d.status]?.[1] === 'warn').map(d => d.id);
     S.docs = r.documents || [];
     const finished = S.docs.filter(d => was.includes(d.id) && d.status === 'ready');
-    if (finished.length) { toast(finished.length === 1 ? `“${finished[0].title}” is ready` : `${finished.length} documents are ready`); await loadBases(); drawMain(); return; }
+    if (finished.length) { toast(finished.length === 1 ? `“${finished[0].title}” is ready` : `${finished.length} documents are ready`); await loadBases(); drawMain(); drawDocs(); loadGraph(); return; }
     drawDocs(); schedule();
   }
   function schedule() {
@@ -1175,7 +1180,62 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     if (S.reindexing && !S.docs.some(d => d.status === 'ready' && d.n_embedded < d.n_chunks)) S.reindexing = false;
     if (!S.dead && (S.reindexing || S.docs.some(d => KB_STATE[d.status]?.[1] === 'warn'))) S.timer = setTimeout(() => loadDocs().catch(() => schedule()), 1500);
   }
-  async function openBase() { S.docs = []; S.query = ''; drawMain(); if (S.cur) { await loadDocs(); drawDocs(); } }
+  async function openBase() { S.docs = []; S.query = ''; S.gcenter = null; drawMain(); if (S.cur) { await loadDocs(); drawDocs(); loadGraph(); } }
+
+  // ---- knowledge graph: build, browse, one entity's relations with the passages behind them ----
+  const GCOL = ['var(--accent)', 'var(--slow)', 'var(--warn)', 'var(--ok)', 'var(--bad)', 'var(--focus)', 'var(--muted)'];
+  async function loadGraph(center = S.gcenter) {
+    const box = $('#kbGraph', main); if (!box || !S.cur) return;
+    S.gcenter = center || null;
+    let g; try { g = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/graph?depth=${center ? 2 : 1}&limit=${center ? 40 : 50}${center ? `&entity=${encodeURIComponent(center)}` : ''}`); } catch (e) { box.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; return; }
+    if (!alive()) return;
+    const p = g.progress || {}, st = g.stats || {}, left = (p.passages || 0) - (p.passages_read || 0);
+    const head = `<div class="row kb-ghead"><span class="small"><b>${fmtCount(st.entities)}</b> things · <b>${fmtCount(st.relations)}</b> relations · <b>${fmtCount(st.communities)}</b> groups</span><span class="sp"></span>
+      ${!g.enabled ? '<span class="tiny faint">The graph is turned off on this server.</span>' : p.building ? `<span class="small"><span class="spin"></span> Reading ${fmtCount(p.passages_read)} of ${fmtCount(p.passages)} passages</span>` : left > 0 ? `<button class="btn sm" type="button" id="kbBuild">${st.entities ? 'Continue the graph' : 'Build the graph'}</button>` : ''}</div>
+      ${g.enabled && !p.building && left > 0 ? `<div class="tiny faint">The quick model reads each passage for names and relations: ${fmtCount(left)} passages, about ${Math.max(1, Math.round(left * 15 / 60))} minutes on this computer. Chat keeps working meanwhile.</div>` : ''}`;
+    const nodes = g.nodes || [];
+    box.innerHTML = head + (nodes.length ? `<div class="row kb-gtools"><input type="search" id="kbEnt" placeholder="Find a thing by name" aria-label="Find a thing in the graph">${S.gcenter ? '<button class="btn sm ghost" type="button" id="kbGAll">Show the most mentioned</button>' : ''}</div><div id="kbEntList" class="kb-entlist"></div>
+      <div class="kb-gwrap"><svg id="kbSvg" class="kb-svg" role="img" aria-label="Knowledge graph: things and their relations"></svg><aside id="kbEntity" class="kb-entity"><div class="tiny faint">Choose a thing in the graph to see what the documents say about it.</div></aside></div>`
+      : `<div class="empty small">${st.entities ? 'Nothing to show.' : 'No graph yet. Build it to see the people, systems, methods and ideas your documents name, and how they connect.'}</div>`);
+    const b = $('#kbBuild', box); if (b) b.onclick = async () => { try { const r = await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/graph/build`); toast(r.queued ? `Reading ${plural(r.queued, 'document')} for the graph` : 'The graph is up to date'); S.reindexing = r.queued > 0; await loadDocs(); loadGraph(); } catch (e) { toast(e.message, 4000); } };
+    const all = $('#kbGAll', box); if (all) all.onclick = () => loadGraph(null);
+    const ent = $('#kbEnt', box); if (ent) { let t; ent.oninput = () => { clearTimeout(t); t = setTimeout(async () => { const q = ent.value.trim(); const l = $('#kbEntList', box); if (!q) { l.innerHTML = ''; return; }
+      const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/graph/entities?q=${encodeURIComponent(q)}`); l.innerHTML = r.entities.slice(0, 12).map(e => `<button type="button" class="rchip" data-id="${esc(e.id)}">${esc(e.name)} <span class="faint">${esc(e.type)}</span></button>`).join('') || '<span class="tiny faint">No match.</span>';
+      $$('button', l).forEach(x => x.onclick = () => loadGraph(x.dataset.id)); }, 250); }; }
+    if (nodes.length) { drawGraph($('#kbSvg', box), nodes, g.edges || []); if (S.gcenter) showEntity(S.gcenter, nodes.find(n => n.id === S.gcenter)); }
+    if (p.building && !S.gtimer) S.gtimer = setTimeout(() => { S.gtimer = null; if (!S.dead) loadGraph(); }, 4000);
+  }
+  // A small force layout (springs on edges, repulsion between nodes), run to rest before drawing.
+  function drawGraph(svg, allNodes, edges) {
+    // The overview keeps connected things only (isolated ones crowd the edges and say nothing about relations).
+    const linked = new Set(edges.flatMap(e => [e.source, e.target]));
+    const nodes = S.gcenter || !edges.length ? allNodes : allNodes.filter(n => linked.has(n.id)).slice(0, 36);
+    const W = Math.max(svg.clientWidth || 600, 320), H = 380; svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const idx = new Map(nodes.map((n, i) => [n.id, i])); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const P = nodes.map(() => ({ x: W / 2 + (rnd() - 0.5) * W * 0.6, y: H / 2 + (rnd() - 0.5) * H * 0.6, vx: 0, vy: 0 }));
+    const E = edges.map(e => [idx.get(e.source), idx.get(e.target), e]).filter(e => e[0] != null && e[1] != null);
+    const ci = S.gcenter ? idx.get(S.gcenter) : -1;
+    for (let it = 0; it < 300; it++) {
+      const K = (W * H) / Math.max(8, nodes.length) / 6;
+      for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) { const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = dx * dx + dy * dy + 0.01, f = K / d2; P[i].vx += dx * f / Math.sqrt(d2); P[i].vy += dy * f / Math.sqrt(d2); P[j].vx -= dx * f / Math.sqrt(d2); P[j].vy -= dy * f / Math.sqrt(d2); }
+      for (const [a, b] of E) { const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - 90) * 0.02; P[a].vx += dx / d * f; P[a].vy += dy / d * f; P[b].vx -= dx / d * f; P[b].vy -= dy / d * f; }
+      for (let i = 0; i < P.length; i++) { const p = P[i]; p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004; if (i === ci) { p.vx += (W / 2 - p.x) * 0.1; p.vy += (H / 2 - p.y) * 0.1; }
+        p.x = Math.min(W - 30, Math.max(30, p.x + Math.max(-12, Math.min(12, p.vx)))); p.y = Math.min(H - 16, Math.max(16, p.y + Math.max(-12, Math.min(12, p.vy)))); p.vx *= 0.6; p.vy *= 0.6; }
+    }
+    const maxM = Math.max(1, ...nodes.map(n => n.mentions || 1));
+    // Labels for the most mentioned and the chosen thing; the rest show their name on hover.
+    const labelled = new Set([...nodes].sort((a, b) => (b.mentions || 0) - (a.mentions || 0)).slice(0, 14).map(n => n.id)); if (S.gcenter) labelled.add(S.gcenter);
+    svg.innerHTML = E.map(([a, b, e]) => `<line x1="${P[a].x}" y1="${P[a].y}" x2="${P[b].x}" y2="${P[b].y}" class="kb-edge" stroke-width="${Math.min(4, 0.8 + (e.weight || 1) * 0.6)}"><title>${esc(nodes[a].name)} ${esc(e.predicate)} ${esc(nodes[b].name)}</title></line>`).join('')
+      + nodes.map((n, i) => { const r = 4 + 9 * Math.sqrt((n.mentions || 1) / maxM); return `<g class="kb-node ${i === ci ? 'on' : ''}" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.name)}"><circle cx="${P[i].x}" cy="${P[i].y}" r="${r}" fill="${GCOL[(n.community ?? 6) % GCOL.length]}"/>${labelled.has(n.id) ? `<text x="${P[i].x + r + 3}" y="${P[i].y + 4}">${esc(n.name.length > 26 ? n.name.slice(0, 25) + '…' : n.name)}</text>` : ''}<title>${esc(n.name)} (${esc(n.type)}, mentioned in ${plural(n.mentions || 0, 'passage')})</title></g>`; }).join('');
+    $$('.kb-node', svg).forEach(g => { const go = () => loadGraph(g.dataset.id); g.onclick = go; g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+  }
+  async function showEntity(id, node) {
+    const box = $('#kbEntity', main); if (!box) return;
+    const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/graph/entities/${encodeURIComponent(id)}`); if (!alive()) return;
+    const pass = new Map((r.passages || []).map(p => [p.chunk_id, p]));
+    box.innerHTML = `<h4>${esc(node?.name || '')} <span class="tiny faint">${esc(node?.type || '')}</span></h4><div class="tiny faint">Mentioned in ${plural(node?.mentions || 0, 'passage')}.</div>`
+      + (r.facts.length ? `<ul class="kb-facts">${r.facts.map(f => { const p = pass.get((f.evidence || [])[0]); return `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b>${f.weight > 1 ? ` <span class="tiny faint">(${f.weight} passages)</span>` : ''}${p ? `<details><summary class="tiny">Where it says so: ${esc(p.doc_title)}${p.page ? `, page ${p.page}` : ''}</summary><div class="kb-ptext">${esc(p.text.replace(/^#{1,6} /gm, ''))}</div></details>` : ''}</li>`; }).join('')}</ul>` : '<div class="tiny faint">No relation recorded.</div>');
+  }
 
   async function upload(files) {
     const box = $('#kbUploads', main); const row = h(`<div class="kb-up"><div class="small">Uploading ${plural(files.length, 'file')}…</div><div class="progress"><span style="width:0%"></span></div></div>`);
@@ -1250,7 +1310,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     catch (err) { $('#kbNewErr', view).textContent = err.message; } };
 
   if (await loadStatus()) { await loadBases(); await openBase(); }
-  return () => { S.dead = true; clearTimeout(S.timer); };
+  return () => { S.dead = true; clearTimeout(S.timer); clearTimeout(S.gtimer); };
 } };
 
 // ============================== performance console ==============================

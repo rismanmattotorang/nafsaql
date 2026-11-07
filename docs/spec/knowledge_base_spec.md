@@ -1,6 +1,6 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.1, 2026-11-07. Status: Phases 0–2 implemented; Phases 3–8 specified. Research:
+Version 1.2, 2026-11-07. Status: Phases 0–3 implemented; Phases 4–8 specified. Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -77,14 +77,20 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
   does not cover the question, and answers from general knowledge only if the person asked for it.
 
 ### Graph (Phase 3)
-- **FR-K30** Per chunk, System 1 extracts `{entities:[{name,type,description}], relations:[{source,predicate,target,description}]}`
-  under a JSON Schema checked by the schema verifier; failures are retried once and then skipped.
-- **FR-K31** Entity resolution: lower-case, trimmed, punctuation-free name per type; merged with an existing entity
-  when names match or entity vectors have cosine >= 0.92 and types agree.
-- **FR-K32** Edges: `chunk -mentions-> entity`, `entity -related-> entity` with predicate, weight (count) and evidence chunks.
-- **FR-K33** Communities by Leiden over `related` (weighted); a summary per community written by System 2 in the
-  background (global search, optional).
-- **FR-K34** Graph view: neighbourhood of an entity, searchable, with the chunks that support each edge.
+- **FR-K30** On request (`POST /v1/kb/{kb}/graph/build`, a background job; `?fresh=true` starts over), System 1 reads
+  each passage (heading lines removed) and replies `{entities:[{name,type}], relations:[{source,predicate,target}]}`
+  (one worked example in the prompt; per-item descriptions were dropped: 2.4x the output tokens). The reply must pass a
+  JSON Schema (`graph::extraction_schema`); a failing reply skips its passage. Entities are **grounded**: every word of
+  a name must occur in the passage, and generic words (`system`, `architecture`, ...) are dropped.
+- **FR-K31** Entity resolution: the key is the lower-case name without punctuation or a leading article; a new key is
+  merged into an existing entity of the same type whose name vector has cosine >= `entity_merge_similarity` (0.92).
+- **FR-K32** Edges: `chunk -mentions-> entity`, `entity -related-> entity` with predicate, weight (passages stating it)
+  and evidence passages; a relation's id is a hash of (source, predicate, target), so repeats merge. Deleting or
+  re-reading a document prunes evidence, relations and entities it alone supported.
+- **FR-K33** Communities by Louvain (own implementation, deterministic) over `related`, labelled by their three most
+  mentioned entities. Community summaries by System 2 and global search are deferred (one model call per community).
+- **FR-K34** Graph view: the most mentioned entities or the two-hop neighbourhood of one, entity search by name, and
+  for an entity its relations with the passage that states each.
 
 ### Memorilla (Phases 4–6)
 - **FR-K40** Memory module in Candle with the parameter names and maths of `memorilla/memory.py`; loads converted
@@ -255,7 +261,10 @@ plain path.
 | `POST /v1/kb/{kb}/search` | `{query, k?: 8, mode?: "hybrid" \| "vector" \| "lexical"}` | `{results: [Hit], mode, took_ms, embed_ms, fallback?}` | 1 (lexical), 2 (vector, hybrid; default hybrid) |
 | `POST /v1/kb/{kb}/reindex` | | `{queued}` (202): documents whose passages lack vectors | 2 |
 | `GET /v1/kb/status` | | `{enabled, reachable, version, url, queue: {pending, running}}` | 1 |
-| `GET /v1/kb/{kb}/graph?entity&depth` | | `{nodes, edges}` | 3 |
+| `GET /v1/kb/{kb}/graph?entity&depth&limit` | | `{nodes, edges, stats, enabled, progress}` | 3 |
+| `POST /v1/kb/{kb}/graph/build?fresh` | | `{queued}` (202) | 3 |
+| `GET /v1/kb/{kb}/graph/entities?q` | | `{entities}` | 3 |
+| `GET /v1/kb/{kb}/graph/entities/{entity}` | | `{facts, passages}` | 3 |
 | `POST /v1/kb/{kb}/memory/runs` | `{kind: "train"\|"finetune", epochs?, from?}` | `MemoryRun` (202) | 6 |
 | `GET /v1/kb/{kb}/memory/runs`, `.../{run}`, `POST .../{run}/cancel` | | | 6 |
 
@@ -288,6 +297,11 @@ exact_search_below = 5000
 rag_k = 4
 rag_max_chars = 4800
 rag_min_similarity = 0.45
+graph_llm_url = "http://127.0.0.1:8201/v1"   # Phase 3; "" = graph off
+graph_model = "system1"
+graph_max_tokens = 400
+entity_merge_similarity = 0.92
+graph_facts = 12
 ```
 
 ## 10. Frontend (Knowledge page, `#/knowledge`)
