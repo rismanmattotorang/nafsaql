@@ -1,0 +1,4069 @@
+{
+ "runs": [
+  {
+   "model": "system1",
+   "task": "long_group_anagrams",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.9,
+   "finished": "2026-11-08T14:43:34",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 117.9,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 322,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "none"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 13585,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 23241,
+     "usage": {
+      "completion_tokens": 114,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 34501,
+     "usage": {
+      "completion_tokens": 91,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 17305,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 5731,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 23432,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block."
+    }
+   ],
+   "files": {
+    "solution.py": "def group_anagrams(words):\n    from collections import defaultdict\n    \n    groups = defaultdict(list)\n    for word in words:\n        groups[str(word)].append(word)\n    \n    # Sort the groups by the first word in each group\n    sorted_groups = sorted(groups.values(), key=lambda x: x[0])\n    \n    return sorted_groups\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_group_anagrams",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.6,
+   "finished": "2026-11-08T14:44:49",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 75.0,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 322,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "none"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1722,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 26176,
+     "usage": {
+      "completion_tokens": 114,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 16419,
+     "usage": {
+      "completion_tokens": 91,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 3239,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 12260,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 15129,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block."
+    }
+   ],
+   "files": {
+    "solution.py": "def group_anagrams(words):\n    from collections import defaultdict\n    \n    groups = defaultdict(list)\n    for word in words:\n        groups[str(word)].append(word)\n    \n    # Sort the groups by the first word in each group\n    sorted_groups = sorted(groups.values(), key=lambda x: x[0])\n    \n    return sorted_groups\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_csv_totals",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.1,
+   "finished": "2026-11-08T14:46:59",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 129.7,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 471,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 17782,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 17272,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> ValueError: invalid "
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 29078,
+     "usage": {
+      "completion_tokens": 102,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 15053,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 5587,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 44786,
+     "usage": {
+      "completion_tokens": 252,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    }
+   ],
+   "files": {
+    "solution.py": "def totals(text):\n    out = {}\n    for line in text.split('\\n'):\n        if line.strip() == '':\n            continue\n        category, amount = line.strip().split(',')\n        out[category] = out.get(category, 0) + int(amount)\n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_csv_totals",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 7.6,
+   "finished": "2026-11-08T14:48:33",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 94.7,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 471,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 3334,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 13640,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> ValueError: invalid "
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 21063,
+     "usage": {
+      "completion_tokens": 102,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2514,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2683,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 51323,
+     "usage": {
+      "completion_tokens": 252,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    }
+   ],
+   "files": {
+    "solution.py": "def totals(text):\n    out = {}\n    for line in text.split('\\n'):\n        if line.strip() == '':\n            continue\n        category, amount = line.strip().split(',')\n        out[category] = out.get(category, 0) + int(amount)\n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_wrap",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.2,
+   "finished": "2026-11-08T14:50:02",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 88.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 262,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "run",
+    "write",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 15692,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 11797,
+     "usage": {
+      "completion_tokens": 109,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 18009,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 19334,
+     "usage": {
+      "completion_tokens": 108,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 17562,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result."
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 5388,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def wrap(text, width):\n    lines, cur = [], ''\n    for w in text.split():\n        if len(cur) + len(w) > width:\n            lines.append(cur)\n            cur = w\n        else:\n            cur += ' ' + w\n    lines.append(cur)\n    return lines\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_wrap",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 7.3,
+   "finished": "2026-11-08T14:50:52",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 50.7,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 262,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "run",
+    "write",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1916,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 20332,
+     "usage": {
+      "completion_tokens": 109,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 5647,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 19350,
+     "usage": {
+      "completion_tokens": 108,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1107,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result."
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1943,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def wrap(text, width):\n    lines, cur = [], ''\n    for w in text.split():\n        if len(cur) + len(w) > width:\n            lines.append(cur)\n            cur = w\n        else:\n            cur += ' ' + w\n    lines.append(cur)\n    return lines\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_pascal",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.4,
+   "finished": "2026-11-08T14:51:14",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 21.9,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 96,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 21936,
+     "usage": {
+      "completion_tokens": 96,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j]"
+    }
+   ],
+   "files": {
+    "solution.py": "def pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j])\n        if i > 0:\n            row.append(1)\n        triangle.append(row)\n    return triangle\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_pascal",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.4,
+   "finished": "2026-11-08T14:51:25",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 10.5,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 96,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 10461,
+     "usage": {
+      "completion_tokens": 96,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j]"
+    }
+   ],
+   "files": {
+    "solution.py": "def pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j])\n        if i > 0:\n            row.append(1)\n        triangle.append(row)\n    return triangle\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_spiral",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.2,
+   "finished": "2026-11-08T14:53:33",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 3,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 128.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 594,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 3,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "none",
+    "write"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 14572,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 55846,
+     "usage": {
+      "completion_tokens": 341,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block.\nSteps left: 4."
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 57629,
+     "usage": {
+      "completion_tokens": 245,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n     "
+    }
+   ],
+   "files": {
+    "solution.py": "def spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n        # Traverse from left to right on top row\n        for i in range(left, right + 1):\n            out.append(m[top][i])\n        top += 1\n        \n        # Traverse from top to bottom on right column\n        for i in range(top, bottom + 1):\n            out.append(m[i][right])\n        right -= 1\n        \n        # Traverse from right to left on bottom row\n        if top <= bottom:\n            for i in range(right, left - 1, -1):\n                out.append(m[bottom][i])\n            bottom -= 1\n        \n        # Traverse from bottom to top on left column\n        if left <= right:\n            for i in range(bottom, top - 1, -1):\n                out.append(m[i][left])\n            left += 1\n    \n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_spiral",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 10.0,
+   "finished": "2026-11-08T14:55:11",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 3,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 98.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 594,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 3,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "none",
+    "write"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1806,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 55614,
+     "usage": {
+      "completion_tokens": 341,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block.\nSteps left: 4."
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 40598,
+     "usage": {
+      "completion_tokens": 245,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n     "
+    }
+   ],
+   "files": {
+    "solution.py": "def spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n        # Traverse from left to right on top row\n        for i in range(left, right + 1):\n            out.append(m[top][i])\n        top += 1\n        \n        # Traverse from top to bottom on right column\n        for i in range(top, bottom + 1):\n            out.append(m[i][right])\n        right -= 1\n        \n        # Traverse from right to left on bottom row\n        if top <= bottom:\n            for i in range(right, left - 1, -1):\n                out.append(m[bottom][i])\n            bottom -= 1\n        \n        # Traverse from bottom to top on left column\n        if left <= right:\n            for i in range(bottom, top - 1, -1):\n                out.append(m[i][left])\n            left += 1\n    \n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_dedupe_runs",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.8,
+   "finished": "2026-11-08T14:55:47",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 35.4,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 133,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 2,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 19278,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 16010,
+     "usage": {
+      "completion_tokens": 125,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n "
+    }
+   ],
+   "files": {
+    "solution.py": "def compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n            result.append(current_value)\n            current_value = xs[i]\n            count = 1\n    \n    result.append(current_value)\n    return result\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_dedupe_runs",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.9,
+   "finished": "2026-11-08T14:56:10",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 23.7,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 133,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 2,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1380,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 22218,
+     "usage": {
+      "completion_tokens": 125,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n "
+    }
+   ],
+   "files": {
+    "solution.py": "def compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n            result.append(current_value)\n            current_value = xs[i]\n            count = 1\n    \n    result.append(current_value)\n    return result\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_histogram",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.2,
+   "finished": "2026-11-08T14:58:03",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 112.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 270,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 14721,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 21142,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 42351,
+     "usage": {
+      "completion_tokens": 97,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 17395,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 6469,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 9923,
+     "usage": {
+      "completion_tokens": 46,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def histogram(xs):\n    from collections import Counter\n    counts = Counter(xs)\n    result = []\n    for value, count in counts.items():\n        result.append(f\"{value}: #{count}\")\n    return '\\n'.join(result)\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_histogram",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.1,
+   "finished": "2026-11-08T14:58:50",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 47.8,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 270,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 728,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 13898,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 19913,
+     "usage": {
+      "completion_tokens": 97,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 4063,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1831,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 7060,
+     "usage": {
+      "completion_tokens": 46,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def histogram(xs):\n    from collections import Counter\n    counts = Counter(xs)\n    result = []\n    for value, count in counts.items():\n        result.append(f\"{value}: #{count}\")\n    return '\\n'.join(result)\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_matrix_rotate",
+   "arm": "p22_noprune",
+   "rep": 0,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.4,
+   "finished": "2026-11-08T15:00:22",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 4,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 91.4,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 243,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 4,
+   "s2_steps": 0,
+   "actions": [
+    "write",
+    "write",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 18167,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 34290,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 1; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 17264,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 21521,
+     "usage": {
+      "completion_tokens": 111,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return "
+    }
+   ],
+   "files": {
+    "solution.py": "def rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return result\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_matrix_rotate",
+   "arm": "p22_prune",
+   "rep": 0,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.7,
+   "finished": "2026-11-08T15:00:55",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 4,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 33.4,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 243,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 4,
+   "s2_steps": 0,
+   "actions": [
+    "write",
+    "write",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 2644,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 10478,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 1; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1321,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 18876,
+     "usage": {
+      "completion_tokens": 111,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return "
+    }
+   ],
+   "files": {
+    "solution.py": "def rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return result\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_group_anagrams",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 12.2,
+   "finished": "2026-11-08T15:02:58",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 122.6,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 322,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "none"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 11505,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 35431,
+     "usage": {
+      "completion_tokens": 114,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 34762,
+     "usage": {
+      "completion_tokens": 91,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 16940,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 3620,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 20266,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block."
+    }
+   ],
+   "files": {
+    "solution.py": "def group_anagrams(words):\n    from collections import defaultdict\n    \n    groups = defaultdict(list)\n    for word in words:\n        groups[str(word)].append(word)\n    \n    # Sort the groups by the first word in each group\n    sorted_groups = sorted(groups.values(), key=lambda x: x[0])\n    \n    return sorted_groups\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_group_anagrams",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.9,
+   "finished": "2026-11-08T15:04:01",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 63.2,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 322,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "none"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1798,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 19236,
+     "usage": {
+      "completion_tokens": 114,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 15931,
+     "usage": {
+      "completion_tokens": 91,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2572,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2300,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 21080,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block."
+    }
+   ],
+   "files": {
+    "solution.py": "def group_anagrams(words):\n    from collections import defaultdict\n    \n    groups = defaultdict(list)\n    for word in words:\n        groups[str(word)].append(word)\n    \n    # Sort the groups by the first word in each group\n    sorted_groups = sorted(groups.values(), key=lambda x: x[0])\n    \n    return sorted_groups\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_csv_totals",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.4,
+   "finished": "2026-11-08T15:06:12",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 129.9,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 471,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 11174,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 18079,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> ValueError: invalid "
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 27572,
+     "usage": {
+      "completion_tokens": 102,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 14167,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 3347,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 54085,
+     "usage": {
+      "completion_tokens": 252,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    }
+   ],
+   "files": {
+    "solution.py": "def totals(text):\n    out = {}\n    for line in text.split('\\n'):\n        if line.strip() == '':\n            continue\n        category, amount = line.strip().split(',')\n        out[category] = out.get(category, 0) + int(amount)\n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_csv_totals",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.3,
+   "finished": "2026-11-08T15:07:52",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 100.6,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 471,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2433,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 19704,
+     "usage": {
+      "completion_tokens": 93,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> ValueError: invalid "
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 22949,
+     "usage": {
+      "completion_tokens": 102,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2065,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1687,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 51545,
+     "usage": {
+      "completion_tokens": 252,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    }
+   ],
+   "files": {
+    "solution.py": "def totals(text):\n    out = {}\n    for line in text.split('\\n'):\n        if line.strip() == '':\n            continue\n        category, amount = line.strip().split(',')\n        out[category] = out.get(category, 0) + int(amount)\n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_wrap",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.9,
+   "finished": "2026-11-08T15:09:26",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 93.0,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 262,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "run",
+    "write",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 13111,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 23637,
+     "usage": {
+      "completion_tokens": 109,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 16676,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 23609,
+     "usage": {
+      "completion_tokens": 108,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 8101,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result."
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2744,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def wrap(text, width):\n    lines, cur = [], ''\n    for w in text.split():\n        if len(cur) + len(w) > width:\n            lines.append(cur)\n            cur = w\n        else:\n            cur += ' ' + w\n    lines.append(cur)\n    return lines\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_wrap",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.3,
+   "finished": "2026-11-08T15:10:12",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 45.8,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 262,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "run",
+    "write",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1218,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 14829,
+     "usage": {
+      "completion_tokens": 109,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 4852,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 21194,
+     "usage": {
+      "completion_tokens": 108,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1548,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result."
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1773,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def wrap(text, width):\n    lines, cur = [], ''\n    for w in text.split():\n        if len(cur) + len(w) > width:\n            lines.append(cur)\n            cur = w\n        else:\n            cur += ' ' + w\n    lines.append(cur)\n    return lines\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_pascal",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.5,
+   "finished": "2026-11-08T15:10:35",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 22.9,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 96,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 22880,
+     "usage": {
+      "completion_tokens": 96,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j]"
+    }
+   ],
+   "files": {
+    "solution.py": "def pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j])\n        if i > 0:\n            row.append(1)\n        triangle.append(row)\n    return triangle\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_pascal",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 7.7,
+   "finished": "2026-11-08T15:10:50",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 1,
+   "verifier_calls": 1,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 15.3,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 96,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 1,
+   "s2_steps": 0,
+   "actions": [
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 15265,
+     "usage": {
+      "completion_tokens": 96,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j]"
+    }
+   ],
+   "files": {
+    "solution.py": "def pascal(n):\n    if n < 0:\n        return []\n    triangle = []\n    for i in range(n):\n        row = [1]\n        if i > 0:\n            for j in range(1, i):\n                row.append(triangle[i-1][j-1] + triangle[i-1][j])\n        if i > 0:\n            row.append(1)\n        triangle.append(row)\n    return triangle\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_spiral",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 14.9,
+   "finished": "2026-11-08T15:13:15",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 3,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 144.8,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 594,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 3,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "none",
+    "write"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 18472,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 52854,
+     "usage": {
+      "completion_tokens": 341,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block.\nSteps left: 4."
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 73435,
+     "usage": {
+      "completion_tokens": 245,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n     "
+    }
+   ],
+   "files": {
+    "solution.py": "def spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n        # Traverse from left to right on top row\n        for i in range(left, right + 1):\n            out.append(m[top][i])\n        top += 1\n        \n        # Traverse from top to bottom on right column\n        for i in range(top, bottom + 1):\n            out.append(m[i][right])\n        right -= 1\n        \n        # Traverse from right to left on bottom row\n        if top <= bottom:\n            for i in range(right, left - 1, -1):\n                out.append(m[bottom][i])\n            bottom -= 1\n        \n        # Traverse from bottom to top on left column\n        if left <= right:\n            for i in range(bottom, top - 1, -1):\n                out.append(m[i][left])\n            left += 1\n    \n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_spiral",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.9,
+   "finished": "2026-11-08T15:14:53",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 3,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 98.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 594,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 3,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "none",
+    "write"
+   ],
+   "malformed": 1,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 3764,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "none",
+     "passed": null,
+     "score": null,
+     "ms": 56708,
+     "usage": {
+      "completion_tokens": 341,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block.\nSteps left: 4."
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 37502,
+     "usage": {
+      "completion_tokens": 245,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n     "
+    }
+   ],
+   "files": {
+    "solution.py": "def spiral(m):\n    out = []\n    if not m or not m[0]:\n        return out\n    \n    rows, cols = len(m), len(m[0])\n    top, bottom, left, right = 0, rows - 1, 0, cols - 1\n    \n    while top <= bottom and left <= right:\n        # Traverse from left to right on top row\n        for i in range(left, right + 1):\n            out.append(m[top][i])\n        top += 1\n        \n        # Traverse from top to bottom on right column\n        for i in range(top, bottom + 1):\n            out.append(m[i][right])\n        right -= 1\n        \n        # Traverse from right to left on bottom row\n        if top <= bottom:\n            for i in range(right, left - 1, -1):\n                out.append(m[bottom][i])\n            bottom -= 1\n        \n        # Traverse from bottom to top on left column\n        if left <= right:\n            for i in range(bottom, top - 1, -1):\n                out.append(m[i][left])\n            left += 1\n    \n    return out\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_dedupe_runs",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.5,
+   "finished": "2026-11-08T15:15:29",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 35.7,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 133,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 2,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 14618,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 21011,
+     "usage": {
+      "completion_tokens": 125,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n "
+    }
+   ],
+   "files": {
+    "solution.py": "def compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n            result.append(current_value)\n            current_value = xs[i]\n            count = 1\n    \n    result.append(current_value)\n    return result\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_dedupe_runs",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.7,
+   "finished": "2026-11-08T15:15:55",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 2,
+   "verifier_calls": 2,
+   "compactions": 0,
+   "pruned_steps": 0,
+   "wall_s": 26.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 133,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 2,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1631,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 24440,
+     "usage": {
+      "completion_tokens": 125,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n "
+    }
+   ],
+   "files": {
+    "solution.py": "def compress(xs):\n    if not xs:\n        return []\n    \n    result = []\n    current_value = xs[0]\n    count = 1\n    \n    for i in range(1, len(xs)):\n        if xs[i] == current_value:\n            count += 1\n        else:\n            result.append(current_value)\n            current_value = xs[i]\n            count = 1\n    \n    result.append(current_value)\n    return result\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_histogram",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.1,
+   "finished": "2026-11-08T15:17:39",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 103.9,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 270,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 14445,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 22285,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 33157,
+     "usage": {
+      "completion_tokens": 97,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 16636,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 4654,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 12601,
+     "usage": {
+      "completion_tokens": 46,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def histogram(xs):\n    from collections import Counter\n    counts = Counter(xs)\n    result = []\n    for value, count in counts.items():\n        result.append(f\"{value}: #{count}\")\n    return '\\n'.join(result)\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_histogram",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.3,
+   "finished": "2026-11-08T15:18:38",
+   "status": "exhausted",
+   "passed": false,
+   "score": 0.05,
+   "model_calls": 6,
+   "verifier_calls": 2,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 58.8,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 270,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 6,
+   "s2_steps": 0,
+   "actions": [
+    "run",
+    "write",
+    "write",
+    "run",
+    "run",
+    "run"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2671,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 5."
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 19581,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 3,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 18838,
+     "usage": {
+      "completion_tokens": 97,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 2; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 4,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 3832,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 2."
+    },
+    {
+     "step": 5,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 2144,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nOne step left: only a patch or the whole solution.py can still change the result.\nYou have sent this same action three times. Do something different.\nThe same failure as the previous step. Do not repeat that edit: try a different a"
+    },
+    {
+     "step": 6,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 11194,
+     "usage": {
+      "completion_tokens": 46,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nThe same failure as the previous step. Do not repeat that edit: try a different approach."
+    }
+   ],
+   "files": {
+    "solution.py": "def histogram(xs):\n    from collections import Counter\n    counts = Counter(xs)\n    result = []\n    for value, count in counts.items():\n        result.append(f\"{value}: #{count}\")\n    return '\\n'.join(result)\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_matrix_rotate",
+   "arm": "p22_noprune",
+   "rep": 1,
+   "order": 0,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 9.1,
+   "finished": "2026-11-08T15:19:57",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 4,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 79.1,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 243,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 4,
+   "s2_steps": 0,
+   "actions": [
+    "write",
+    "write",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 12956,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 28958,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 1; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 17365,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 19621,
+     "usage": {
+      "completion_tokens": 111,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return "
+    }
+   ],
+   "files": {
+    "solution.py": "def rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return result\n"
+   }
+  },
+  {
+   "model": "system1",
+   "task": "long_matrix_rotate",
+   "arm": "p22_prune",
+   "rep": 1,
+   "order": 1,
+   "label": "SHARED MACHINE: concurrent with a 1.7B training run and a gate probe",
+   "load_1m_after": 8.6,
+   "finished": "2026-11-08T15:20:48",
+   "status": "verified",
+   "passed": true,
+   "score": 1.0,
+   "model_calls": 4,
+   "verifier_calls": 3,
+   "compactions": 1,
+   "pruned_steps": 0,
+   "wall_s": 50.2,
+   "prefill_tokens": 0,
+   "cached_tokens": 0,
+   "decoded_tokens": 243,
+   "cascade": false,
+   "cascade_samples": 0,
+   "lint_rejections": 0,
+   "rollbacks": 0,
+   "s1_steps": 4,
+   "s2_steps": 0,
+   "actions": [
+    "write",
+    "write",
+    "run",
+    "write"
+   ],
+   "malformed": 0,
+   "steps": [
+    {
+     "step": 1,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 7539,
+     "usage": {
+      "completion_tokens": 21,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n    e = list(exp.items -> AssertionError: inpu"
+    },
+    {
+     "step": 2,
+     "action": "write",
+     "passed": false,
+     "score": 0.05,
+     "ms": 21261,
+     "usage": {
+      "completion_tokens": 103,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nThese files are identical to the files after step 1; the hidden tests already judged them.\nHidden tests: failed.\n<verifier_evidence>\nTests failed:\n0 of 1 tests passed.\ntest 1: def show(got, exp, inp):\n    g = list(got.items()) if isinstance(got, dict) else (got.split('"
+    },
+    {
+     "step": 3,
+     "action": "run",
+     "passed": null,
+     "score": null,
+     "ms": 1793,
+     "usage": {
+      "completion_tokens": 8,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": true,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "No such file in the workspace: check.py. The files are: solution.py.\nSteps left: 3."
+    },
+    {
+     "step": 4,
+     "action": "write",
+     "passed": true,
+     "score": 1.0,
+     "ms": 19506,
+     "usage": {
+      "completion_tokens": 111,
+      "reasoning_tokens": 0,
+      "finish_reason": "action_complete",
+      "constrained": false
+     },
+     "compacted": false,
+     "pruned": false,
+     "model": "system1",
+     "samples": 1,
+     "retries": 0,
+     "rolled_back": null,
+     "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return "
+    }
+   ],
+   "files": {
+    "solution.py": "def rotate(m):\n    if not m:\n        return []\n    \n    n = len(m)\n    result = [[0] * n for _ in range(n)]\n    \n    for i in range(n):\n        for j in range(n):\n            result[j][n - 1 - i] = m[i][j]\n    \n    return result\n"
+   }
+  }
+ ],
+ "arms": {
+  "phase10": {
+   "context": "reset",
+   "constrain": false,
+   "stream_cut": false,
+   "edit_format": "any"
+  },
+  "phase11": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto"
+  },
+  "phase11_any": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "any"
+  },
+  "phase11_u": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "unstick": true
+  },
+  "phase11_nou": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "unstick": false
+  },
+  "phase11_b512": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512
+  },
+  "phase11_b256": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 256
+  },
+  "phase11_r3": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512,
+   "first_step_thinking_budget": 0
+  },
+  "phase11_adapt": {
+   "context": "append",
+   "constrain": true,
+   "stream_cut": true,
+   "edit_format": "auto",
+   "thinking_budget": 512,
+   "first_step_thinking_budget": 256
+  },
+  "s2": {
+   "cascade": false
+  },
+  "cascade": {
+   "cascade": true,
+   "cascade_samples": 4
+  },
+  "p15": {
+   "lint": false,
+   "rollback": false,
+   "stuck_after": 0
+  },
+  "p16": {
+   "lint": true,
+   "rollback": true,
+   "stuck_after": 4
+  },
+  "p22_prune": {
+   "prune": true,
+   "compact_at_tokens": 1400
+  },
+  "p22_noprune": {
+   "prune": false,
+   "compact_at_tokens": 1400
+  }
+ }
+}

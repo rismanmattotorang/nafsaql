@@ -151,6 +151,14 @@ idle_only = true                       # audits run only when no user request is
 poll_s = 15
 min_audits_measured = 30
 
+[labels]                               # Phase 23: labelled gate samples collected while the machine is idle (off by default)
+enabled = false                        # when on: quick-model drafts of a verifiable dataset, judged by the exact verifier, no System 2
+dataset = "calib_set"                  # in [eval] datasets_dir; GSM8K train plus MBPP train
+poll_s = 20
+per_hour = 90                          # never more than this many tasks in an hour
+seed = 11                              # orders the dataset; the position reached is kept in cursor_file
+cursor_file = "data/runtime/label_cursor.json"
+
 [alerts]                               # OR-004: evaluated over the last window_min minutes; drill with POST /v1/alerts/drill
 window_min = 60
 min_samples = 10
@@ -188,6 +196,14 @@ password_file = "data/runtime/surreal/root.secret"
 files_dir = "data/runtime/kb"          # stored originals, one folder per knowledge base
 max_upload_mb = 50
 max_files_per_request = 20
+max_request_mb = 200                   # Phase 8 (SR-K11): the most one upload request may carry in all
+concurrent_uploads = 2                 # uploads received at once (each is held in memory while it arrives)
+max_documents_per_base = 2000          # NFR-K07
+max_chunks_per_document = 6000         # a larger file is refused with a request to split it
+max_queued_jobs = 500                  # reads, embeddings and graph builds waiting; more uploads get "busy"
+parse_timeout_s = 180                  # a parser that takes longer is given up on
+search_timeout_s = 10                   # a hybrid search gives up on the words after this and answers by meaning alone
+max_concurrent_trainers = 1            # memory-training runs at once across all bases (8-11 GB each)
 chunk_chars = 1200                     # passage size in characters (about 300 tokens), A-106
 chunk_overlap = 150
 search_k = 8
@@ -199,6 +215,7 @@ exact_search_below = 5000              # vectors per base below which search sca
 rag_k = 4                              # chat: passages put in the prompt
 rag_max_chars = 4800                   # chat: their total size (about 1,200 tokens)
 rag_min_similarity = 0.45              # chat: weakest passage similarity still used (off-topic passages scored 0.38-0.40, relevant 0.45-0.77)
+rag_lexical_rescue = 10.0               # chat: a passage whose words match this strongly (BM25) is used even if the meaning search missed it; 0 = off (off-topic <= 8.0, answering >= 10.8)
 graph_llm_url = "http://127.0.0.1:8201/v1"   # Phase 3: the quick model extracts entities and relations ("" = graph off)
 graph_model = "system1"
 graph_max_tokens = 400

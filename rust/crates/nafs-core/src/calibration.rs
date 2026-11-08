@@ -321,7 +321,7 @@ impl Calibration {
             fitted_at: chrono::Utc::now().to_rfc3339(),
             n,
             ece: ece(&held, ys, 5),
-            risk_bins: risk_bins(&held, ys, 5, 0.05),
+            risk_bins: risk_bins(&held, ys, risk_bin_count(n), 0.05),
             brier: held
                 .iter()
                 .zip(ys)
@@ -467,6 +467,13 @@ pub fn clopper_pearson_upper(k: usize, n: usize, alpha: f64) -> f64 {
     hi
 }
 
+/// FR-R1: how many bins a calibration of `n` held-out samples is split into: about a hundred drafts each, between two
+/// and five. Each bin's bound is taken at `alpha / bins` (Bonferroni) and shrinks with the bin's size, so more bins on
+/// few samples only widen every bound; two bins of a hundred certify a clean half where five of forty certify nothing.
+pub fn risk_bin_count(n: usize) -> usize {
+    (n / 100).clamp(2, 5)
+}
+
 /// FR-R1: equal-mass bins of the held-out e1 with each bin's certified error bound at `alpha / bins`
 /// (Bonferroni over the bins, which are declared before any is read).
 pub fn risk_bins(ps: &[f32], ys: &[bool], bins: usize, alpha: f32) -> Vec<RiskBin> {
@@ -552,6 +559,16 @@ mod risk_tests {
         assert!(clopper_pearson_upper(0, 200, 0.05) < clopper_pearson_upper(0, 20, 0.05));
         assert_eq!(clopper_pearson_upper(0, 0, 0.05), 1.0);
         assert_eq!(clopper_pearson_upper(3, 3, 0.05), 1.0);
+    }
+
+    /// The number of bins follows the sample size: about a hundred drafts per bin, two to five bins.
+    #[test]
+    fn the_number_of_risk_bins_follows_the_sample_size() {
+        assert_eq!(risk_bin_count(0), 2);
+        assert_eq!(risk_bin_count(200), 2);
+        assert_eq!(risk_bin_count(350), 3);
+        assert_eq!(risk_bin_count(2_900), 5);
+        assert_eq!(risk_bin_count(1_000_000), 5);
     }
 
     /// Bins are equal-mass over the held-out e1, each with its own bound, and a draft is certified only in a bin

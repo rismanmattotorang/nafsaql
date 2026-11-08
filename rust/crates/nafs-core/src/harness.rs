@@ -358,6 +358,15 @@ impl Orchestrator {
         {
             return Err("stuck_after must be 0 (never) or in [2, 12]".into());
         }
+        if req.prune_over.is_some_and(|n| !(200..=4_000).contains(&n)) {
+            return Err("prune_over must be in [200, 4000]".into());
+        }
+        if req
+            .compact_at_tokens
+            .is_some_and(|n| !(400..=20_000).contains(&n))
+        {
+            return Err("compact_at_tokens must be in [400, 20000]".into());
+        }
         if req
             .guidance
             .as_deref()
@@ -430,7 +439,13 @@ impl Orchestrator {
             max_steps: req.max_steps.unwrap_or(h.max_steps),
             context,
             keep_exchanges: h.keep_exchanges,
-            compact_at_tokens: h.compact_at_tokens,
+            compact_at_tokens: req
+                .compact_at_tokens
+                .map_or(h.compact_at_tokens, |n| n as usize),
+            prune: req.prune.unwrap_or(true),
+            prune_over: req
+                .prune_over
+                .map_or(nafs_harness::context::PRUNE_OVER, |n| n as usize),
             constrain,
             notes: h.notes,
             edit_format,

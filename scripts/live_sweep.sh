@@ -13,6 +13,7 @@ declare -a SUITES=(
   "rooms:python3 -I scripts/rooms_test.py"
   "e2e:python3 -I scripts/e2e_sweep.py"
   "kb:python3 -I scripts/kb_sweep.py --no-chat"
+  "kbsec:scripts/kb_security_run.sh"
   "harness:python3 -I scripts/harness_sweep.py"
   "acceptance:python3 -I scripts/mvp_acceptance.py"
 )

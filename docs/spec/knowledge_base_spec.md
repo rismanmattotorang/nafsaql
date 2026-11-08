@@ -1,8 +1,8 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.8, 2026-11-08. Status: Phases 0–7 implemented (6: training works; 7: `hybrid`, `auto` and the measured
-mode comparison), Phase 21's retrieval and graph upgrade (FR-K50 to FR-K59, below) and Phase 22's two-lane
-ingestion (FR-K61); Phase 8 specified. Research:
+Version 1.9, 2026-11-08. Status: Phases 0–7 implemented (6: training works; 7: `hybrid`, `auto` and the measured
+mode comparison), Phase 21's retrieval and graph upgrade (FR-K50 to FR-K59, below), Phase 22's two-lane
+ingestion (FR-K61) and Phase 8's hardening (SR-K11 to SR-K13, FR-K62; decision 016). Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -143,6 +143,11 @@ Phase 21 (retrieval and graph upgrade; the gap analysis and the reasoning are in
   scored by weight (normalised to the heaviest first-hop relation) times `graph_decay` per hop; a second-hop fact
   carries `via`, and the prompt shows the chain.
 - **FR-K59** Every knowledge reply carries a `sources` row naming the arms that ran and why any did not.
+- **FR-K62** (Phase 8) The chat relevance filter keeps a passage whose meaning similarity reaches `rag_min_similarity`
+  **or** whose words match strongly (`rag_lexical_rescue`, a BM25 score, default 10.0; 0 = off). Found by ranking the
+  answering passages: vector search alone left 4 of 20 outside its top 20 on the paper base, and one of them, ranked
+  first by the words, was dropped by the similarity test, so the question went unanswered. Off-topic questions scored
+  at most 8.0 on that base, answering passages at least 10.8.
 - **FR-K61** (Phase 22) Ingestion runs on two lanes: parsing, chunking and storing on a fast lane that sets the
   document `ready` (words searchable at once); vectors and the graph on a slow lane, one job at a time. A new upload
   never waits behind another base's embedding or extraction. Found by the live sweep: a 187-byte upload waited five
@@ -169,17 +174,39 @@ Phase 21 (retrieval and graph upgrade; the gap analysis and the reasoning are in
 
 ## 5. Security requirements
 
-- **SR-K01** Uploads are size-limited (`max_upload_mb`, default 50 per file) and count-limited (20 per request).
+- **SR-K01** Uploads are size-limited (`max_upload_mb`, default 50 per file) and count-limited (20 per request). Phase 8:
+  a file is read in pieces and refused the moment it passes the limit (it is never held whole), and the request as a
+  whole is limited by `max_request_mb` (default 200), not by files times file size (which let one request carry a
+  gigabyte).
 - **SR-K02** Files are stored under `data/runtime/kb/<kb>/<doc>.<ext>` with names the server generates; the client's
   file name is metadata only (no path traversal).
 - **SR-K03** ZIP-based formats: at most 2,000 entries, at most 200 MB uncompressed in total, compression ratio per
-  entry at most 200; only the XML parts needed are read.
+  entry at most 200; only the XML parts needed are read. Phase 8: the headers' sizes can lie, so the bytes actually
+  decompressed are summed and bounded as well (a deck of a thousand slides that each claim to be small cannot expand
+  to a thousand times the cap); an XML entity bomb is not expanded; a LaTeX file reads no other file (`\input` and its
+  kin are ignored); a reader that panics is that document's error.
 - **SR-K04** HTML is converted to text; nothing from an uploaded document is ever rendered as HTML in the UI (escaped).
+  Phase 8: scripts, styles, frames and objects are dropped, and a link whose target runs script (`javascript:`,
+  `vbscript:`, `data:`) keeps its words and loses its target, so stored text is safe in a viewer that renders links.
 - **SR-K05** Retrieved text and graph facts are delimited as data in the prompt (as FR-061); instructions inside documents
   are not followed.
 - **SR-K06** SurrealDB listens on 127.0.0.1 only; root credentials in `data/runtime/surreal/root.secret` (mode 600),
   passed by environment, never logged; the gateway is the only client.
 - **SR-K07** The knowledge API sits behind the gateway's token auth like every other `/v1` route.
+- **SR-K11** (Phase 8) Resources are bounded: at most `concurrent_uploads` (2) requests are received at once, the next
+  is told to try again (429, code `busy`); at most `max_queued_jobs` (500) jobs wait; a base holds at most
+  `max_documents_per_base` (2,000) documents; a document makes at most `max_chunks_per_document` (6,000) passages
+  (a larger one is refused with a request to split it); a parser that takes more than `parse_timeout_s` (180 s) is
+  given up on; at most `max_concurrent_trainers` (1) training runs go at once across all bases.
+- **SR-K12** (Phase 8) Deleting a base removes it everywhere: its rows in SurrealDB (documents, passages, vectors, graph),
+  its folder (originals, training runs, activated modules), the prepared documents the memory reader keeps in
+  memory, and the passages and graph quotes copied into the ledger's stored replies; a training run still going for it
+  is stopped first. Deleting one document removes its originals, rows and its passages from stored replies (and the
+  graph facts of that base, whose quotes cannot be traced to one document). The response reports how many replies
+  were scrubbed and how many trainers stopped.
+- **SR-K13** (Phase 8) What is deliberately not done: the answers a conversation received from a deleted base stay in the
+  conversation (they are the user's own record, and a model's words cannot be traced to a passage); bases have no
+  retention period of their own (they stay until deleted, like rooms); the upload folder is not encrypted at rest.
 
 ## 6. Data model (SurrealDB, namespace `nafs`, database `kb`)
 
@@ -400,4 +427,4 @@ Plain language: passages (not chunks), knowledge base, "reading", "ready". Copy-
 | 5 | identity logits test; prefix-store key test | memory mode answers end to end |
 | 6 | dataset builder layout readable by `memorilla.data`; trainer loss decreases on a toy set | seconds per example measured; one module trained for a fixture base |
 | 7 | paired A/B | per-mode quality and latency with CIs |
-| 8 | security tests for SR-K01..K07 | runbook, report |
+| 8 | security tests for SR-K01..K07 and SR-K11..K13 | `scripts/kb_security_sweep.py` (36 checks, `--chat` for the ledger checks) on its own gateway with small limits (`scripts/kb_security_gateway.sh`), unit tests for the parsers and the scrub; runbook; report |

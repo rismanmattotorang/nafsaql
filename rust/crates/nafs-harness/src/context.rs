@@ -47,8 +47,6 @@ pub struct Transcript {
 /// budget and that observation is not the newest (DeepSeek Harness prunes at 8,192 / 4,096 / 1,024 characters;
 /// these are bytes, on a 2,600-token budget).
 pub const PRUNE_OVER: usize = 1_200;
-pub const PRUNE_HEAD: usize = 600;
-pub const PRUNE_TAIL: usize = 200;
 
 impl Transcript {
     pub fn new(system: &str, first_user: String) -> Self {
@@ -72,6 +70,15 @@ impl Transcript {
     /// cut message on, as it would be by a compaction, but the model keeps its recent history instead of a
     /// summary of it; the full text was already seen when it was fresh.
     pub fn prune_older(&mut self) -> usize {
+        self.prune_older_over(PRUNE_OVER)
+    }
+
+    /// `prune_older` with the threshold given: an observation over `over` bytes keeps its first `over / 2` and last
+    /// `over / 6` (600 and 200 at the default 1,200). The shipped 1,200 never engaged on the failures the agent is
+    /// shown (the verifier's evidence reaches the model at about 930 bytes at most), which is why the threshold is
+    /// a request setting.
+    pub fn prune_older_over(&mut self, over: usize) -> usize {
+        let (head, tail) = (over / 2, over / 6);
         let n = self.messages.len();
         if n < 4 {
             return 0;
@@ -80,11 +87,11 @@ impl Transcript {
         // Indices 1..n-2: after the task message, before the newest (assistant, user) exchange.
         for i in 1..n.saturating_sub(2) {
             let (role, content) = &self.messages[i];
-            if role != "user" || content.len() <= PRUNE_OVER || content.contains("…pruned…") {
+            if role != "user" || content.len() <= over || content.contains("…pruned…") {
                 continue;
             }
-            let head_end = crate::truncate::floor_boundary(content, PRUNE_HEAD);
-            let tail_start = crate::truncate::ceil_boundary(content, content.len() - PRUNE_TAIL);
+            let head_end = crate::truncate::floor_boundary(content, head);
+            let tail_start = crate::truncate::ceil_boundary(content, content.len() - tail);
             let removed = tail_start.saturating_sub(head_end);
             let cut = format!(
                 "{}\n…pruned… ({removed} bytes of this older output left out)\n{}",

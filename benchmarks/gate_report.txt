@@ -1,0 +1,40 @@
+203 labelled samples, 51 drafts wrong (25.1 %)
+
+full fit: held-out ECE 0.024, Brier 0.117
+ e1 from    e1 to     n   wrong    bound  certified at max_risk 0.15
+   0.000    0.150   101       8    0.150  no
+   0.150    1.000   102      43    0.523  no
+not promotable: n = 203 held-out samples < 2900 required (NFR-020)
+
+the fixed rule on the same drafts: keeps 159 of 203 (78.3 %), wrong among them 16 (10.1 %)
+
+out of sample, 400 random 60/40 splits (0 of them promotable at max_risk 0.15):
+  certified bins tested 29; held-out errors significantly above the bound in 0 (0.0 %)
+  held-out drafts in certified bins: 1574 of 32800 binned; wrong among them 187 (11.9 %)
+
+  coverage and selective error by the risk a bin must be certified at (held-out):
+   max_risk   coverage error among kept bins significantly over
+       0.10       0.5%            14.6%              0 of 3     
+       0.15       4.8%            11.9%              0 of 29    
+       0.20      23.6%            11.5%              0 of 146   
+       0.25      56.2%            10.3%              0 of 347   
+       0.30      63.3%             9.9%              0 of 391   
+       0.40      64.8%            10.0%              1 of 401   
+  (keeping every draft: error 25.1 %)
+
+the rules on the same held-out drafts (400 random 60/40 splits; the calibration is fitted on the 60 %):
+  rule                                                 kept   wrong among kept          escalated
+  fixed rule (in force today)                         78.2%              10.1%              21.8%
+  calibrated, expected loss only                      85.8%              16.6%              14.2%
+  calibrated + certified bins, max_risk 0.40          63.6%               9.5%              36.4%
+  calibrated + certified bins, max_risk 0.25          54.5%               9.9%              45.5%
+  calibrated + certified bins, max_risk 0.15           5.4%              12.4%              94.6%
+
+bins counted on a part the model never saw (400 splits: fit 50 %, count 25 %, test 25 %):
+   max_risk   coverage error among kept bins significantly over
+       0.15       0.0%             0.0%              0 of 0     
+       0.20       0.0%             0.0%              0 of 0     
+       0.25       0.0%             0.0%              0 of 0     
+       0.30       0.0%             0.0%              0 of 0     
+       0.40      25.9%            10.8%              1 of 321   
+       0.50      25.9%            10.8%              1 of 321   

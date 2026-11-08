@@ -28,7 +28,8 @@ it costs today.
 
 - **FR-R1 — certified per-bin risk.** The fitted calibration keeps, beside the isotonic map, the held-out
   reliability bins of ê₁ with their counts `n_b` and errors `k_b`, and for each bin the one-sided Clopper–Pearson
-  upper bound on the error rate at `α / B` (Bonferroni over the `B` pre-declared bins; `α = 0.05`): the smallest
+  upper bound on the error rate at `α / B` (Bonferroni over the `B` bins, which are declared before any is read;
+  `α = 0.05`; `B` is about one bin per hundred held-out drafts, between 2 and 5, `risk_bin_count`): the smallest
   `u` with `I_u(k+1, n−k) ≥ 1 − α/B`, found by bisection on the regularised incomplete beta; for `k = 0`,
   `u = 1 − (α/B)^{1/n}`. A bin is **certified** when `u ≤ [gate] max_risk`. In calibrated mode (not budget mode,
   which fixes the escalation rate by design) a draft is kept only if its ê₁ falls in a certified bin; a draft whose bin is uncertified is escalated, and the decision record
@@ -49,6 +50,13 @@ it costs today.
   set differs from the query's by at most two tokens and a negation cue (`not, no, never, without, cannot, n't`)
   or a swapped antonym pair (`enable/disable, on/off, add/remove, allow/deny, start/stop, open/close, true/false,
   before/after, more/less, increase/decrease`) is on one side only. Pure function, tested.
+- **FR-R6 — a label stream (Phase 23).** `[labels] enabled` (off by default) starts a worker that, while no user request
+  is in flight, answers tasks of a verifiable dataset (`calib_set`: GSM8K train and MBPP train, in a fixed order given by
+  a hash of `seed` and the task id, position kept in `cursor_file`) with the quick model alone — a forced-fast draft that
+  still draws its agreement samples (`gate_probe`) — and lets the exact verifier judge the draft. Each task is a
+  labelled gate sample in the ledger (`draft_verified` and `k > 0`), which the scheduled recalibration
+  (`[gate] recalibrate_every_h`) already reads. At most `per_hour` tasks an hour; a user request arriving cancels the
+  draft in progress. `GET /v1/gate/labels` reports the stream, the labelled samples held and the calibration's bins.
 - **FR-R5 — difficulty prior (specified).** Two prototype banks of example questions per domain, embedded once by
   the knowledge embedder, clustered at cosine 0.9 to at most 8 medoids; the margin `score(hard) − score(easy)` with
   `score = 0.75·best + 0.25·mean(top-2)` becomes a gate feature. Deferred: it needs a labelled example set per
@@ -61,10 +69,17 @@ it costs today.
   number of messages it held; the estimate is that count plus bytes/3 of what was appended since, and a
   compaction or a prune clears the anchor. Implemented: `Transcript::anchor`.
 - **FR-H2 — prune, then compact.** When the transcript is over `compact_at_tokens`, older observations (every user
-  message but the task and the newest exchange) longer than 1,200 bytes are cut to a 600-byte head and a 200-byte
-  tail with a marker saying how much was left out; only if the transcript is still over the budget is it compacted
-  into the task message. The newest exchange is never cut, and a prune never separates an action from its
-  observation. Implemented: `Transcript::prune_older`; the step records `pruned`.
+  message but the task and the newest exchange) longer than `prune_over` bytes (default 1,200; a request setting,
+  200 to 4,000) are cut to their first half and last sixth (600 and 200 at the default) with a marker saying how much
+  was left out; only if the transcript is still over the budget is it compacted into the task message. The newest
+  exchange is never cut, and a prune never separates an action from its observation. Implemented:
+  `Transcript::prune_older_over`; the step records `pruned`. **Measured, and inert:** 8 tasks whose failures print an
+  element-by-element comparison, 2 repetitions, prune against compact-at-once with compaction forced at 1,400
+  estimated tokens (`benchmarks/harness_prune_ab.json`, `harness_prune600_ab.json`). The largest observation the
+  model is ever shown is about 930 bytes (the verifier's evidence is capped before it reaches the transcript), so at
+  the default the prune never fired in 16 runs; at 600 bytes it fired in 2 of 16 (one task); 8 of 16 runs were
+  solved in each arm in both pairs, with identical action sequences in all 16. The prune guards a long `run` output
+  (up to `max_observation_bytes`, 2,000) and costs nothing; it is on, and no gain is claimed for it.
 - **FR-H3 — no edit from a cut reply.** A patch or a whole file in a reply whose `finish_reason` is `length` is
   refused with an instruction to send a shorter edit; a `run` is still read. Implemented in `parse_allowed`.
 - **FR-H4 — the repeat notice.** The same action text sent a third time draws a gentle notice, a fifth time a
@@ -83,8 +98,23 @@ it costs today.
 
 ## 5. What Phase 22 implements, and what it defers
 
-Implemented: FR-R1, FR-R2, FR-R3, FR-R4, FR-H1 to FR-H4, FR-K61. Specified and deferred, with the reason: FR-R5
+Implemented: FR-R1, FR-R2, FR-R3, FR-R4, FR-H1 to FR-H4, FR-K61 (FR-H2 measured inert, see above), and in Phase 23 FR-R6. Specified and deferred, with the reason: FR-R5
 (a labelled example set and a calibration measurement first), FR-H5 (a read action first).
+
+## 5a. What was measured on a live ledger (Phase 23)
+
+203 labelled drafts (GSM8K and MBPP train items, 190 math and 13 code; `fast_probe`, `benchmarks/gate_probe_run_*.json`,
+shared machine), 51 wrong (25.1 %). The fit is well calibrated (held-out ECE 0.024, Brier 0.117) but **cannot be
+promoted**: NFR-020 asks for 2,900 held-out samples. `cargo run --release -p nafs-eval --example gate_report`
+(`benchmarks/gate_report.txt`), 400 random 60/40 splits: with two bins of about 100, the lower bin has 8 wrong of 101
+(bound 0.150, so nothing is certified at the default `max_risk` 0.15 yet; with five bins of 40 the bound is 0.19 at best).
+**The certificate holds out of sample:** among 1,300 held-out bin tests at `max_risk` 0.15 to 0.40, one broke its bound
+significantly (a binomial tail of 0.01 or less; one in 401 at 0.40, none in the 347 at 0.25 and none in the 29 at 0.15).
+**But at this size it costs coverage** (same held-out drafts): the fixed rule keeps 78.2 % at 10.1 % wrong (21.8 %
+escalated); the calibrated rule on expected loss alone keeps 85.8 % at 16.6 % wrong; with certified bins it keeps 63.6 %
+at 9.5 % wrong (`max_risk` 0.40), 54.5 % at 9.9 % (0.25) and 5.4 % at 12.4 % (0.15). So until the ledger reaches the
+promotion floor the fixed rule stays in force, and it is the better rule at this n; the label stream
+(`[labels]`, FR-R6) is how the ledger reaches 2,900 (about 32 hours of idle time at 90 an hour).
 
 ## 6. Acceptance
 

@@ -1,0 +1,201 @@
+{
+ "kb": "exnbgaoul5q9zd5a9oyp",
+ "k": 20,
+ "summary": {
+  "lexical": {
+   "recall": {
+    "1": 0.9,
+    "2": 0.95,
+    "4": 0.95,
+    "8": 1.0,
+    "20": 1.0
+   },
+   "mrr": 0.932,
+   "missing": 0
+  },
+  "vector": {
+   "recall": {
+    "1": 0.65,
+    "2": 0.8,
+    "4": 0.8,
+    "8": 0.9,
+    "20": 1.0
+   },
+   "mrr": 0.75,
+   "missing": 0
+  },
+  "hybrid": {
+   "recall": {
+    "1": 0.9,
+    "2": 0.95,
+    "4": 0.95,
+    "8": 0.95,
+    "20": 1.0
+   },
+   "mrr": 0.929,
+   "missing": 0
+  }
+ },
+ "rows": [
+  {
+   "question": "How much memory does the engine's prefix store keep per model?",
+   "ranks": {
+    "lexical": 2,
+    "vector": 7,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "How many decode threads beat four in all six interleaved pairs?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "What bandwidth did the streaming read reach with one thread?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "Which revision of the vendored Smiley Core did Phase 19 replace?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "Which revision is the new Smiley Core that Phase 19 merged?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "How many nanoseconds per row did the small-batch Q4_K kernel take in the slow build?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "How many tests of the workspace passed after the Phase 19 merge?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 2,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "What does LittleBit approximate a weight matrix as?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 2,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "Which version of core Lean does the verifier run against?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "What was the median time from the gate's decision to System 2's first reasoning token?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "How long did the gate's own time take when escalating?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 5,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "What median did llama.cpp take for the System 1 to System 2 switch in Phase 14?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 2,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "By how much is cold prefill slower at three threads?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "Which transform is the int8 key-value cache rotated by?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "Which model abstained on the proof of n plus zero equals n?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "How many megabytes per token does System 1 read at decode?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 9,
+    "hybrid": 2
+   }
+  },
+  {
+   "question": "What share of decode time goes to the matmuls and the output head?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "What did the prefix store bring a switch of request kind down to?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "Which version of SurrealDB stores the knowledge base?",
+   "ranks": {
+    "lexical": 1,
+    "vector": 1,
+    "hybrid": 1
+   }
+  },
+  {
+   "question": "How many parameters does the memory module for System 1 have?",
+   "ranks": {
+    "lexical": 7,
+    "vector": 19,
+    "hybrid": 13
+   }
+  }
+ ]
+}

@@ -64,10 +64,11 @@ fn d_systems() -> Vec<String> {
     vec!["nafs_aql".into(), "fast_only".into(), "slow_only".into()]
 }
 
-pub const FIXED_SYSTEMS: [&str; 10] = [
+pub const FIXED_SYSTEMS: [&str; 11] = [
     "nafs_aql",
     "nafs_blind",
     "fast_only",
+    "fast_probe",
     "slow_only",
     "slow_conditioned",
     "slow_noexit",
@@ -91,6 +92,9 @@ pub fn gated(system: &str) -> Option<(bool, Option<f32>)> {
     match base {
         "nafs_aql" => Some((false, lam)),
         "nafs_blind" => Some((true, lam)),
+        // A forced-fast draft with its agreement samples and no System 2 call: labelled gate samples at the cost of
+        // the draft alone (the verifier is hidden from the gate, as in `nafs_blind`).
+        "fast_probe" => Some((true, None)),
         _ => None,
     }
 }
@@ -284,7 +288,7 @@ pub async fn run_item(
         }],
         domain_hint: if blind { task_domain(t) } else { None },
         force_mode: match sys {
-            "fast_only" => Some(ReasoningMode::Fast),
+            "fast_only" | "fast_probe" => Some(ReasoningMode::Fast),
             "slow_only"
             | "slow_conditioned"
             | "slow_noexit"
@@ -303,6 +307,7 @@ pub async fn run_item(
             Some(t.verification.clone())
         },
         ephemeral: Some(true),
+        gate_probe: (sys == "fast_probe").then_some(true),
         lab: true,
         show_reasoning: Some(false),
         audit: Some(false),

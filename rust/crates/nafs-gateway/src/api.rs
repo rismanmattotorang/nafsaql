@@ -82,6 +82,7 @@ pub fn new_state(
         let ck = crate::kb::ChatKnowledge::new(
             k.clone(),
             cfg.knowledge.rag_min_similarity,
+            cfg.knowledge.rag_lexical_rescue,
             cfg.knowledge.graph_facts,
             crate::kb::MemoryReader::from_config(&cfg.knowledge),
             cfg.knowledge.auto_order.clone(),
@@ -186,6 +187,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/verifiers/runs/{id}/cancel", post(cancel_run))
         .route("/v1/gate", get(get_gate).post(set_gate))
         .route("/v1/gate/recalibrate", post(recalibrate))
+        .route("/v1/gate/labels", get(get_labels))
         .route("/v1/gate/derive", post(derive_params))
         .route("/v1/gate/params", get(get_params).delete(reset_params))
         .route("/v1/audits", get(list_audits))
@@ -1748,6 +1750,10 @@ pub fn spawn_background(s: AppState) {
             }
         });
     }
+    if s.cfg.labels.enabled {
+        let s2 = s.clone();
+        tokio::spawn(async move { label_worker(s2).await });
+    }
     if s.cfg.storage.retention_days > 0 {
         let s2 = s.clone();
         tokio::spawn(async move {
@@ -1814,4 +1820,169 @@ mod tests {
         assert_eq!(host_only("[::1]:8080"), "[::1]");
         assert_eq!(host_only("evil.example:8080"), "evil.example");
     }
+}
+
+// ---------------- The label stream (Phase 23) ----------------
+
+/// What the label worker has done since the gateway started (reported by `GET /v1/gate/labels`).
+#[derive(Default)]
+struct LabelStats {
+    tasks: usize,
+    cursor: usize,
+    answered: u64,
+    cancelled: u64,
+    errors: u64,
+    last_error: Option<String>,
+}
+static LABELS: std::sync::Mutex<Option<LabelStats>> = std::sync::Mutex::new(None);
+
+fn label_stats<R>(f: impl FnOnce(&mut LabelStats) -> R) -> R {
+    let mut g = LABELS.lock().unwrap_or_else(|e| e.into_inner());
+    f(g.get_or_insert_with(Default::default))
+}
+
+/// FNV-1a: a stable order for a dataset whatever the Rust version.
+fn label_order_key(seed: u64, id: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ seed;
+    for b in id.bytes() {
+        h ^= b as u64;
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
+}
+
+async fn label_worker(s: AppState) {
+    let cfg = s.cfg.labels.clone();
+    let mut tasks = match nafs_eval::load_tasks(&s.cfg.eval.datasets_dir, &cfg.dataset) {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(
+                "label stream: dataset {}: {e}; the stream is off",
+                cfg.dataset
+            );
+            label_stats(|st| st.last_error = Some(e.to_string()));
+            return;
+        }
+    };
+    tasks.retain(|t| t.verification.is_verifiable());
+    tasks.sort_by_key(|t| label_order_key(cfg.seed, &t.id));
+    let mut cursor: usize = std::fs::read_to_string(&cfg.cursor_file)
+        .ok()
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        .and_then(|v| v["index"].as_u64())
+        .unwrap_or(0) as usize;
+    label_stats(|st| {
+        st.tasks = tasks.len();
+        st.cursor = cursor;
+    });
+    tracing::info!(
+        "label stream on: {} verifiable tasks of {}, from position {cursor}",
+        tasks.len(),
+        cfg.dataset
+    );
+    let mut recent: std::collections::VecDeque<Instant> = Default::default();
+    loop {
+        tokio::time::sleep(Duration::from_secs(cfg.poll_s.max(1))).await;
+        while recent
+            .front()
+            .is_some_and(|t| t.elapsed() > Duration::from_secs(3600))
+        {
+            recent.pop_front();
+        }
+        if tasks.is_empty()
+            || recent.len() >= cfg.per_hour as usize
+            || s.orch.inflight.load(Ordering::SeqCst) > 0
+        {
+            continue;
+        }
+        let t = &tasks[cursor % tasks.len()];
+        // A user request arriving while the draft is being made cancels it: the stream yields to people.
+        let cancel = Arc::new(AtomicBool::new(false));
+        let watcher = {
+            let (c, orch) = (cancel.clone(), s.orch.clone());
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(Duration::from_millis(400)).await;
+                    // The probe itself counts once; a second request in flight is a person.
+                    if orch.inflight.load(Ordering::SeqCst) > 1 {
+                        c.store(true, Ordering::SeqCst);
+                        return;
+                    }
+                }
+            })
+        };
+        let req = ChatRequest {
+            messages: vec![nafs_types::Message {
+                role: "user".into(),
+                content: t.prompt.clone(),
+            }],
+            force_mode: Some(nafs_types::ReasoningMode::Fast),
+            gate_probe: Some(true),
+            verification: Some(t.verification.clone()),
+            ephemeral: Some(true),
+            lab: true,
+            show_reasoning: Some(false),
+            audit: Some(false),
+            ..Default::default()
+        };
+        let r = s
+            .orch
+            .handle_with_cancel(req, Emitter(None), Some(cancel))
+            .await;
+        watcher.abort();
+        match r {
+            Ok(_) => {
+                recent.push_back(Instant::now());
+                cursor += 1;
+                let _ = std::fs::write(&cfg.cursor_file, json!({"index": cursor}).to_string());
+                label_stats(|st| {
+                    st.answered += 1;
+                    st.cursor = cursor;
+                });
+            }
+            Err(NafsError::Cancelled) => label_stats(|st| st.cancelled += 1),
+            Err(e) => {
+                // A task the model or the server cannot answer is passed over, or it would block the stream for ever.
+                tracing::debug!("label stream: {}: {e}", t.id);
+                cursor += 1;
+                label_stats(|st| {
+                    st.errors += 1;
+                    st.last_error = Some(e.to_string());
+                    st.cursor = cursor;
+                });
+            }
+        }
+    }
+}
+
+/// `GET /v1/gate/labels`: the label stream and the labelled samples the ledger now holds.
+async fn get_labels(State(s): State<AppState>) -> ApiResult<Json<Value>> {
+    let store = s.store.clone();
+    let (n, wrong) = tokio::task::spawn_blocking(move || {
+        store
+            .labelled_gate_samples(200_000)
+            .map(|v| (v.len(), v.iter().filter(|x| x.2).count()))
+            .unwrap_or((0, 0))
+    })
+    .await
+    .unwrap_or((0, 0));
+    let (st_tasks, st_cursor, answered, cancelled, errors, last_error) = label_stats(|st| {
+        (
+            st.tasks,
+            st.cursor,
+            st.answered,
+            st.cancelled,
+            st.errors,
+            st.last_error.clone(),
+        )
+    });
+    let cal = s.orch.calibration();
+    Ok(Json(json!({
+        "enabled": s.cfg.labels.enabled, "dataset": s.cfg.labels.dataset, "per_hour": s.cfg.labels.per_hour,
+        "tasks": st_tasks, "position": st_cursor, "answered_since_start": answered, "yielded_to_users": cancelled,
+        "errors": errors, "last_error": last_error,
+        "ledger": { "labelled": n, "draft_wrong": wrong },
+        "calibration": { "version": cal.version, "n": cal.n, "ece": cal.ece, "risk_bins": cal.risk_bins },
+        "recalibrate_every_h": s.cfg.gate.recalibrate_every_h,
+    })))
 }

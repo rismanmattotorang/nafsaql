@@ -209,6 +209,10 @@ pub struct ChatRequest {
     /// FR-082: use (true) or skip (false) the adaptive reasoning exit; default from config.
     #[serde(default)]
     pub adaptive_exit: Option<bool>,
+    /// Gate-calibration probe: with `force_mode = fast`, still draw the k agreement samples, so the draft's gate
+    /// features are recorded with no System 2 call behind them. Used by the evaluation system `fast_probe`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate_probe: Option<bool>,
     /// Phase 8: stopping rule of the adaptive exit on non-verifiable tasks, "consistency" (k consecutive
     /// agreeing probes) or "posterior" (majority posterior above a collapsing bound); default from config.
     #[serde(default)]
@@ -647,6 +651,16 @@ pub struct CodeAgentRequest {
     /// Phase 16 override of `harness.stuck_after` (0 = never, else 2..=12).
     #[serde(default)]
     pub stuck_after: Option<u32>,
+    /// Phase 22 (FR-H2): cut older long observations before compacting (default true); false compacts at once.
+    #[serde(default)]
+    pub prune: Option<bool>,
+    /// Phase 22: an older observation over this many bytes is cut when pruning (200..=4,000; default 1,200).
+    #[serde(default)]
+    pub prune_over: Option<u32>,
+    /// Phase 22: override of `harness.compact_at_tokens` for this run (400..=20,000), to make a short run reach
+    /// compaction when measuring it.
+    #[serde(default)]
+    pub compact_at_tokens: Option<u32>,
     /// Phase 16: the caller's conventions for this workspace (at most 2,000 characters), shown to the model with
     /// the task, as AGENTS.md, CLAUDE.md and GEMINI.md are in the agents that read them.
     #[serde(default)]
