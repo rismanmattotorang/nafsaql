@@ -349,6 +349,10 @@ pub struct GateFeatures {
     pub draft_verified: Option<bool>,
     pub prompt_tokens: u32,
     pub draft_tokens: u32,
+    /// FR-R3: the question repeats the previous user turn of the conversation (content-word overlap at or above
+    /// `[gate] reask_overlap`), which is evidence the last answer did not satisfy.
+    #[serde(default)]
+    pub reask: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -359,6 +363,12 @@ pub enum GateRule {
     Budget,
     ForcedFailedVerification,
     ForcedOverride,
+    /// FR-R1: the calibrated rule would keep the draft, but its e1 bin's certified error bound is above
+    /// `[gate] max_risk`, so it was escalated.
+    UncertifiedBin,
+    /// FR-R2: a feature the gate needs was missing (no log-probabilities), and `[gate] on_unknown` decided.
+    UnknownEscalate,
+    UnknownKeep,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -662,6 +672,9 @@ pub struct CodeAgentStep {
     /// The transcript was compacted before this step's call.
     #[serde(default)]
     pub compacted: bool,
+    /// Older observations were cut before this step's call (FR-H2).
+    #[serde(default)]
+    pub pruned: bool,
     /// The model this step went to ("system1" on a cascade step).
     #[serde(default)]
     pub model: String,

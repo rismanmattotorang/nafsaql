@@ -1,41 +1,41 @@
 {
   "base": "http://127.0.0.1:8080",
-  "at": "2026-11-05T08:10:02+0700",
+  "at": "2026-11-08T14:13:27+0700",
   "results": [
     {
       "id": "MVP-A1",
       "name": "Fast reply",
       "pass": true,
-      "detail": "mode=fast assurance=unverified ttft=142ms rule=fixed",
-      "seconds": 1.7
+      "detail": "mode=fast assurance=unverified ttft=141ms rule=fixed",
+      "seconds": 1.4
     },
     {
       "id": "MVP-A2",
       "name": "Verified code + forced escalation",
       "pass": true,
       "detail": "verified=verified via fast; impossible test -> rule=forced_failed_verification escalate=True final=verified",
-      "seconds": 44.4
+      "seconds": 45.5
     },
     {
       "id": "MVP-A3",
       "name": "Slow path within budget",
       "pass": true,
-      "detail": "mode=slow reasoning=987/1024 wall=133s assurance=verified",
-      "seconds": 132.7
+      "detail": "mode=slow reasoning=987/1024 wall=135s assurance=verified",
+      "seconds": 135.2
     },
     {
       "id": "MVP-A4",
       "name": "Abstention with notice",
       "pass": true,
       "detail": "assurance=abstained state=X notice=yes answer_nonempty=True",
-      "seconds": 199.0
+      "seconds": 204.0
     },
     {
       "id": "MVP-A5",
       "name": "Bounded loop (Lemma 1)",
       "pass": true,
       "detail": "model_calls=4 <= 1 + k + N(R+1) = 10 (k=2, rescue=4, N=1, R=2)",
-      "seconds": 63.2
+      "seconds": 62.1
     },
     {
       "id": "MVP-A6",
@@ -56,7 +56,7 @@
       "name": "Records and schemas",
       "pass": true,
       "detail": "decision retrievable=True, conversation messages=2, schemas: CONTRACT TESTS PASSED",
-      "seconds": 1.1
+      "seconds": 1.0
     },
     {
       "id": "MVP-A9",

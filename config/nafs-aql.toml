@@ -69,6 +69,11 @@ recalibrate_every_h = 24               # FR-015: refit from the ledger; promoted
 params_file = "data/runtime/gate_params.json"   # measured e2_hat, delta_c, caps, budgets (Phase 0)
 sample_max_tokens_hard = 384           # math/code samples need room for 'Answer:' (review M11)
 samples_on_verifiable = false          # speed: skip the k samples when an exact verifier decides (Thm 1)
+max_risk = 0.15                        # FR-R1 (Phase 22): a calibrated bin keeps a draft only if its certified error bound (Clopper-Pearson, Bonferroni) is at most this
+risk_alpha = 0.05                      # FR-R1: the level of that bound
+on_unknown = "escalate"                # FR-R2: with no token log-probabilities from the backend: escalate | keep | fixed
+reask_overlap = 0.6                    # FR-R3: content-word overlap with the previous user turn at or above which a question is a reask
+reask_escalates = true                 # FR-R3: a reask of an unverified draft escalates under the fixed rule
 samples_when_uncertain = true        # P7-T02: draw the k samples after the draft, only when its log-prob is within the band of the threshold
 fuse_always_samples = true               # FR-095: draw the always-drawn agreement samples (unverified maths) together with the draft, in one batch
 rescue_samples = 4                     # FR-096: on a failed exact check, draw this many System 1 samples at once (one request, n choices) before escalating; 0 = off; >= 3 needed to rescue anything (benchmarks/s1_rescue.json, rescue_ab.json)

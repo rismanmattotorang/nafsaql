@@ -5,7 +5,8 @@ Drives a headless Chrome with a throw-away profile over the DevTools protocol ag
 (http://127.0.0.1:8080 by default) and writes PNGs to docs/shared/screenshots/. Nothing is submitted: the script
 only navigates, clicks a conversation and the Inspect button, and scrolls.
 
-Usage: python3 scripts/capture_screenshots.py [--base http://127.0.0.1:8080] [--only chat,lab]
+Usage: python3 scripts/capture_screenshots.py [--base http://127.0.0.1:8080] [--only chat,lab] [--kb ID] [--kb-graph ID]
+(--kb and --kb-graph are knowledge-base ids for the knowledge, knowledge_graph and knowledge_chat shots.)
 Needs Google Chrome and the websocket-client package.
 """
 import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
@@ -147,6 +148,41 @@ def main():
         if want("system"):
             go("system")
             tab.shot("system")
+        # Phase 20/21: the Knowledge page, its graph, and a chat answer with numbered sources. They need a base: pass
+        # --kb <id> (a base with passages) and, for the graph shot, --kb-graph <id> (a base whose graph is built).
+        kb = args[args.index("--kb") + 1] if "--kb" in args else ""
+        kb_graph = args[args.index("--kb-graph") + 1] if "--kb-graph" in args else kb
+        def pick_base(base_id):
+            # localStorage belongs to the page's origin, so the app must be loaded once before it can be written.
+            go("chat")
+            tab.js(f"localStorage.setItem('nafs.kbCurrent', JSON.stringify({json.dumps(base_id)})); localStorage.setItem('nafs.advanced', 'true')")
+        if want("knowledge") and kb:
+            pick_base(kb)
+            go("knowledge")
+            tab.wait_for("document.querySelectorAll('#kbDocs table tr, #kbDocs .kb-doc').length > 2", 40)
+            time.sleep(1.5)
+            tab.shot("knowledge")
+        if want("knowledge_graph") and kb_graph:
+            pick_base(kb_graph)
+            go("knowledge")
+            tab.wait_for("!!document.querySelector('#kbGraph svg')", 40)
+            scroll_to_heading(tab, "Knowledge graph")
+            time.sleep(2.5)
+            tab.shot("knowledge_graph")
+        if want("knowledge_chat") and kb:
+            # The base with a graph, in "Passages and graph" mode, so the answer shows both the relations it used
+            # (with their verified quotes) and the numbered passages.
+            pick_base(kb_graph)
+            tab.js(f"localStorage.setItem('nafs.chatSettings', JSON.stringify({{mode: 'fast', kb: {json.dumps(kb_graph)}, kbMode: 'graph'}}))")
+            # The chat page reads its settings once at load, and a hash navigation does not reload it.
+            tab.js("location.reload()")
+            time.sleep(3)
+            tab.wait_for("!!document.getElementById('input') && document.getElementById('kbSel')?.value", 30)
+            tab.js("""(() => { const i = document.getElementById('input'); i.value = 'Which revision of Smiley Core did Phase 19 merge, and what slowdown did it expose?';
+              i.dispatchEvent(new Event('input', {bubbles: true})); document.getElementById('sendBtn').click(); return true; })()""")
+            tab.wait_for("document.querySelectorAll('.kb-sources').length > 0", 240)
+            time.sleep(2)
+            tab.shot("knowledge_chat")
         if want("rooms"):
             # A throw-away room with three people and two real answers, photographed, then deleted.
             ws_base = base.replace("http", "ws", 1)

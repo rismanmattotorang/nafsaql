@@ -27,6 +27,7 @@ pub fn fixed_window_threshold(cfg: &Config, lambda: f32, domain: Domain) -> Opti
         .map(|t| t + 0.25 * care(cfg, lambda))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn features(
     draft: &GenOutput,
     samples: &[GenOutput],
@@ -35,6 +36,7 @@ pub fn features(
     draft_verified: Option<bool>,
     prompt_tokens: u32,
     window: usize,
+    reask: bool,
 ) -> GateFeatures {
     // Agreement = mean similarity of each cheap sample to the draft (exact for numeric answers, word overlap for text).
     // Truncated samples (finish_reason "length") carry an intermediate number, not an answer (M11).
@@ -64,7 +66,29 @@ pub fn features(
         draft_verified,
         prompt_tokens,
         draft_tokens: draft.completion_tokens.max(draft.logprobs.len() as u32),
+        reask,
     }
+}
+
+/// FR-R3: whether `question` repeats `previous` (the conversation's last user turn): the Jaccard overlap of their
+/// content words (three letters or more) is at or above `threshold`. Lexical rather than cosine because the gate
+/// runs without the embedder and must cost nothing.
+pub fn is_reask(question: &str, previous: Option<&str>, threshold: f32) -> bool {
+    let Some(prev) = previous else { return false };
+    let words = |t: &str| -> std::collections::HashSet<String> {
+        t.to_lowercase()
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| w.len() >= 3)
+            .map(String::from)
+            .collect()
+    };
+    let (a, b) = (words(question), words(prev));
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    let inter = a.intersection(&b).count() as f32;
+    let union = a.union(&b).count() as f32;
+    inter / union >= threshold
 }
 
 #[derive(Debug, Clone)]
@@ -137,10 +161,47 @@ pub fn decide(f: &GateFeatures, ctx: &GateCtx) -> GateDecision {
             format!("The draft passed an exact verifier (threshold 1.0), so deliberation cannot improve precision (Thm 1); e1_hat {e1:.2} recorded for calibration."),
         );
     }
+    // FR-R2: a feature the gate needs is missing (a backend without log-probabilities). Not a silent default: the
+    // configured policy decides and the record says which feature was missing.
+    if f.mean_logprob.is_none() {
+        match cfg.gate.on_unknown.as_str() {
+            "keep" => {
+                return mk(
+                    false,
+                    GateRule::UnknownKeep,
+                    "No token log-probabilities from this backend; [gate] on_unknown = keep."
+                        .into(),
+                );
+            }
+            "fixed" => {}
+            _ => {
+                return mk(
+                    true,
+                    GateRule::UnknownEscalate,
+                    "No token log-probabilities from this backend; [gate] on_unknown = escalate."
+                        .into(),
+                );
+            }
+        }
+    }
     if use_cal {
         let cost = lambda * delta_c / cfg.gate.cost_unit_s;
         let gain = cfg.gate.loss_wrong * (e1 - e2);
         let escalate = gain > cost;
+        // FR-R1: keeping the draft also needs its e1 bin's certified error bound within the allowed risk. Not in
+        // budget mode, which fixes the escalation rate by design and would otherwise overshoot it.
+        if let (false, GateRule::Calibrated, Some((bin, false))) =
+            (escalate, cal_rule, cal.certified_for(e1, cfg.gate.max_risk))
+        {
+            return mk(
+                true,
+                GateRule::UncertifiedBin,
+                format!(
+                    "L(e1-e2) = {gain:.3} <= lambda*dc = {cost:.3}, but e1 {e1:.2} falls in a bin whose certified error bound {:.3} ({} wrong of {}) is above max_risk {:.2}, so the draft is not kept.",
+                    bin.upper, bin.errors, bin.n, cfg.gate.max_risk
+                ),
+            );
+        }
         let how = match lambda_star {
             Some(_) => format!(
                 "budget mode B = {:.0}%, lambda* = {:.3}",
@@ -201,6 +262,10 @@ pub fn decide(f: &GateFeatures, ctx: &GateCtx) -> GateDecision {
             ));
         }
     }
+    // FR-R3: the question was asked again, and the draft is not verified: the last answer did not satisfy.
+    if f.reask && cfg.gate.reask_escalates && f.draft_verified.is_none() {
+        reasons.push("the question repeats the previous turn (asked again)".into());
+    }
     if fx.escalate_open_domains
         && care > 0.9
         && matches!(f.domain, Domain::Math | Domain::Code)
@@ -228,6 +293,27 @@ pub fn decide(f: &GateFeatures, ctx: &GateCtx) -> GateDecision {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_question_asked_again_is_a_reask() {
+        assert!(is_reask(
+            "Which port does the gateway use?",
+            Some("which port does the gateway use"),
+            0.6
+        ));
+        assert!(is_reask(
+            "Which port does the gateway use to reach SurrealDB?",
+            Some("Which port does the gateway use?"),
+            0.6
+        ));
+        assert!(!is_reask(
+            "Which port does the gateway use?",
+            Some("How many cores does it have?"),
+            0.6
+        ));
+        assert!(!is_reask("Which port?", None, 0.6));
+        assert!(!is_reask("", Some("x"), 0.6));
+    }
     fn cfg() -> Config {
         let p = concat!(env!("CARGO_MANIFEST_DIR"), "/../../../config/nafs-aql.toml");
         Config::load(p).expect("config loads")
@@ -244,6 +330,7 @@ mod tests {
             draft_verified: verified,
             prompt_tokens: 40,
             draft_tokens: 60,
+            reask: false,
         }
     }
     fn ctx<'a>(
@@ -394,7 +481,7 @@ mod tests {
             cal.e1(&f(-1.8, 1.0, Domain::Math, None)) > cal.e1(&f(-0.1, 1.0, Domain::Math, None))
         );
         assert!(cal.ece < 0.05, "held-out ECE {}", cal.ece);
-        assert!(cal.promotable(2900, 30, 0.05).is_ok());
+        assert!(cal.promotable(2900, 30, 0.05, 0.5).is_ok());
         assert_eq!(cal.lambda_quantiles.len(), 101);
     }
     #[test]
@@ -408,8 +495,8 @@ mod tests {
             .collect();
         let ys = vec![false; 10];
         let cal = Calibration::fit(&xs, &ys, None, &th);
-        assert!(cal.promotable(2900, 30, 0.05).is_err());
-        assert!(cal.promotable(1, 30, 0.05).is_err(), "one class only");
+        assert!(cal.promotable(2900, 30, 0.05, 0.5).is_err());
+        assert!(cal.promotable(1, 30, 0.05, 0.5).is_err(), "one class only");
     }
     #[test]
     fn budget_mode_meets_the_escalation_budget() {
@@ -458,11 +545,12 @@ mod tests {
             None,
             10,
             16,
+            false,
         );
         assert_eq!(g.k, 1);
         assert_eq!(g.agreement, Some(1.0));
         assert_eq!(
-            features(&draft, &[cut], Domain::Math, false, None, 10, 16).agreement,
+            features(&draft, &[cut], Domain::Math, false, None, 10, 16, false).agreement,
             None
         );
     }

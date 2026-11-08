@@ -14,6 +14,10 @@ pub struct Calibration {
     pub n: usize,
     /// Held-out (out-of-fold) ECE, 5 equal-mass bins.
     pub ece: f32,
+    /// FR-R1: the held-out bins of e1 with their certified error bounds; empty for a calibration fitted before
+    /// Phase 22 (then no bin is certified and the mode stays fixed until a refit).
+    #[serde(default)]
+    pub risk_bins: Vec<RiskBin>,
     pub brier: f32,
     pub weights: Vec<f32>,
     pub feature_names: Vec<String>,
@@ -180,6 +184,7 @@ impl Calibration {
             fitted_at: "-".into(),
             n: 0,
             ece: f32::NAN,
+            risk_bins: vec![],
             brier: f32::NAN,
             weights: vec![-2.2, -3.0, -0.08, 2.5, 0.1, 0.6, 0.3, -1.0],
             feature_names: FEATURE_NAMES.iter().map(|s| s.to_string()).collect(),
@@ -205,12 +210,24 @@ impl Calibration {
     pub fn is_fitted(&self) -> bool {
         self.n > 0
     }
+
+    /// FR-R1: the bin a draft's e1 falls in, and whether its certified error bound is within `max_risk`.
+    /// `None` when the calibration has no bins (fitted before Phase 22).
+    pub fn certified_for(&self, e1: f32, max_risk: f32) -> Option<(&RiskBin, bool)> {
+        let bin = self
+            .risk_bins
+            .iter()
+            .find(|b| e1 >= b.lo && e1 <= b.hi)
+            .or_else(|| self.risk_bins.last())?;
+        Some((bin, bin.upper <= max_risk))
+    }
     /// NFR-020 promotion test: enough held-out samples of both classes and held-out ECE within target.
     pub fn promotable(
         &self,
         min_n: usize,
         min_per_class: usize,
         max_ece: f32,
+        max_risk: f32,
     ) -> Result<(), String> {
         if !self.is_fitted() {
             return Err("no fitted calibration (uncalibrated prior)".into());
@@ -229,6 +246,17 @@ impl Calibration {
         }
         if self.ece.is_nan() || self.ece > max_ece {
             return Err(format!("held-out ECE {:.3} > {:.3}", self.ece, max_ece));
+        }
+        // FR-R1: a calibration none of whose bins can keep a draft at the allowed risk would escalate everything,
+        // which the fixed rule does more cheaply.
+        if !self.risk_bins.iter().any(|b| b.upper <= max_risk) {
+            return Err(format!(
+                "no e1 bin is certified at max_risk {max_risk:.2} (lowest bound {:.3})",
+                self.risk_bins
+                    .iter()
+                    .map(|b| b.upper)
+                    .fold(f32::INFINITY, f32::min)
+            ));
         }
         Ok(())
     }
@@ -293,6 +321,7 @@ impl Calibration {
             fitted_at: chrono::Utc::now().to_rfc3339(),
             n,
             ece: ece(&held, ys, 5),
+            risk_bins: risk_bins(&held, ys, 5, 0.05),
             brier: held
                 .iter()
                 .zip(ys)
@@ -321,6 +350,155 @@ impl Calibration {
         }
         cal
     }
+}
+
+/// FR-R1: one held-out bin of e1 with its certified error bound.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct RiskBin {
+    /// The bin's range of held-out e1 (the last bin's `hi` is 1.0, the first's `lo` 0.0).
+    pub lo: f32,
+    pub hi: f32,
+    pub n: usize,
+    /// Drafts in the bin that were wrong.
+    pub errors: usize,
+    /// One-sided Clopper-Pearson upper bound on the bin's error rate at `alpha / bins`.
+    pub upper: f32,
+}
+
+/// The regularised incomplete beta function I_x(a, b) by Lentz's continued fraction (Numerical Recipes 6.4).
+fn betainc(x: f64, a: f64, b: f64) -> f64 {
+    if x <= 0.0 {
+        return 0.0;
+    }
+    if x >= 1.0 {
+        return 1.0;
+    }
+    // The continued fraction converges fast on one side of the mean; use the symmetry on the other.
+    if x > (a + 1.0) / (a + b + 2.0) {
+        return 1.0 - betainc(1.0 - x, b, a);
+    }
+    let ln_beta = ln_gamma(a) + ln_gamma(b) - ln_gamma(a + b);
+    let front = (a * x.ln() + b * (1.0 - x).ln() - ln_beta).exp();
+    let tiny = 1e-300;
+    let mut c = 1.0;
+    let mut d = 1.0 - (a + b) * x / (a + 1.0);
+    if d.abs() < tiny {
+        d = tiny;
+    }
+    d = 1.0 / d;
+    let mut h = d;
+    for m in 1..300 {
+        let m = m as f64;
+        let aa = m * (b - m) * x / ((a + 2.0 * m - 1.0) * (a + 2.0 * m));
+        d = 1.0 + aa * d;
+        if d.abs() < tiny {
+            d = tiny;
+        }
+        c = 1.0 + aa / c;
+        if c.abs() < tiny {
+            c = tiny;
+        }
+        d = 1.0 / d;
+        h *= d * c;
+        let aa = -(a + m) * (a + b + m) * x / ((a + 2.0 * m) * (a + 2.0 * m + 1.0));
+        d = 1.0 + aa * d;
+        if d.abs() < tiny {
+            d = tiny;
+        }
+        c = 1.0 + aa / c;
+        if c.abs() < tiny {
+            c = tiny;
+        }
+        d = 1.0 / d;
+        let del = d * c;
+        h *= del;
+        if (del - 1.0).abs() < 1e-12 {
+            break;
+        }
+    }
+    front * h / a
+}
+
+/// ln Gamma(x) (Lanczos, g = 7).
+fn ln_gamma(x: f64) -> f64 {
+    const G: [f64; 9] = [
+        0.999_999_999_999_809_9,
+        676.520_368_121_885_1,
+        -1_259.139_216_722_402_8,
+        771.323_428_777_653_1,
+        -176.615_029_162_140_6,
+        12.507_343_278_686_905,
+        -0.138_571_095_265_720_12,
+        9.984_369_578_019_572e-6,
+        1.505_632_735_149_311_6e-7,
+    ];
+    if x < 0.5 {
+        return (std::f64::consts::PI / (std::f64::consts::PI * x).sin()).ln() - ln_gamma(1.0 - x);
+    }
+    let x = x - 1.0;
+    let mut a = G[0];
+    let t = x + 7.5;
+    for (i, g) in G.iter().enumerate().skip(1) {
+        a += g / (x + i as f64);
+    }
+    0.5 * (2.0 * std::f64::consts::PI).ln() + (x + 0.5) * t.ln() - t + a.ln()
+}
+
+/// FR-R1: the one-sided Clopper-Pearson upper bound on a rate with `k` events in `n` trials at level `alpha`:
+/// the smallest `u` with I_u(k + 1, n - k) >= 1 - alpha, by bisection; `1 - alpha^(1/n)` when `k = 0`; 1.0
+/// when nothing was observed or everything failed.
+pub fn clopper_pearson_upper(k: usize, n: usize, alpha: f64) -> f64 {
+    if n == 0 || k >= n {
+        return 1.0;
+    }
+    if k == 0 {
+        return 1.0 - alpha.powf(1.0 / n as f64);
+    }
+    let (a, b) = ((k + 1) as f64, (n - k) as f64);
+    let (mut lo, mut hi) = (0.0f64, 1.0f64);
+    for _ in 0..64 {
+        let mid = 0.5 * (lo + hi);
+        if betainc(mid, a, b) >= 1.0 - alpha {
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    hi
+}
+
+/// FR-R1: equal-mass bins of the held-out e1 with each bin's certified error bound at `alpha / bins`
+/// (Bonferroni over the bins, which are declared before any is read).
+pub fn risk_bins(ps: &[f32], ys: &[bool], bins: usize, alpha: f32) -> Vec<RiskBin> {
+    if ps.is_empty() || bins == 0 {
+        return vec![];
+    }
+    let mut idx: Vec<usize> = (0..ps.len()).collect();
+    idx.sort_by(|&a, &b| {
+        ps[a]
+            .partial_cmp(&ps[b])
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    let n = ps.len();
+    let level = alpha as f64 / bins as f64;
+    let mut out: Vec<RiskBin> = vec![];
+    for b in 0..bins {
+        let lo = b * n / bins;
+        let hi = ((b + 1) * n / bins).min(n);
+        if hi <= lo {
+            continue;
+        }
+        let sl = &idx[lo..hi];
+        let errors = sl.iter().filter(|&&i| ys[i]).count();
+        out.push(RiskBin {
+            lo: if out.is_empty() { 0.0 } else { ps[sl[0]] },
+            hi: if hi == n { 1.0 } else { ps[sl[sl.len() - 1]] },
+            n: sl.len(),
+            errors,
+            upper: clopper_pearson_upper(errors, sl.len(), level) as f32,
+        });
+    }
+    out
 }
 
 /// Expected calibration error with equal-mass bins (spec Section 10.1).
@@ -358,4 +536,43 @@ pub fn reliability(ps: &[f32], ys: &[bool], bins: usize) -> Vec<(f32, f32, usize
         ));
     }
     out
+}
+
+#[cfg(test)]
+mod risk_tests {
+    use super::*;
+
+    /// Known values (scipy `beta.ppf(0.95, k + 1, n - k)`): 0 of 20 at alpha 0.05 is 1 - 0.05^(1/20) = 0.1391; 1 of
+    /// 10 is 0.3942; 5 of 100 is 0.1023. The bound shrinks with n and grows with k.
+    #[test]
+    fn the_clopper_pearson_upper_bound_matches_known_values() {
+        assert!((clopper_pearson_upper(0, 20, 0.05) - 0.1391).abs() < 1e-3);
+        assert!((clopper_pearson_upper(1, 10, 0.05) - 0.3942).abs() < 2e-3);
+        assert!((clopper_pearson_upper(5, 100, 0.05) - 0.1023).abs() < 2e-3);
+        assert!(clopper_pearson_upper(0, 200, 0.05) < clopper_pearson_upper(0, 20, 0.05));
+        assert_eq!(clopper_pearson_upper(0, 0, 0.05), 1.0);
+        assert_eq!(clopper_pearson_upper(3, 3, 0.05), 1.0);
+    }
+
+    /// Bins are equal-mass over the held-out e1, each with its own bound, and a draft is certified only in a bin
+    /// whose bound is within the risk.
+    #[test]
+    fn risk_bins_certify_only_the_safe_bins() {
+        // 100 drafts: the lower half of e1 is always right, the upper half wrong half the time.
+        let ps: Vec<f32> = (0..100).map(|i| i as f32 / 100.0).collect();
+        let ys: Vec<bool> = (0..100).map(|i| i >= 50 && i % 2 == 0).collect();
+        let bins = risk_bins(&ps, &ys, 5, 0.05);
+        assert_eq!(bins.len(), 5);
+        assert_eq!(bins[0].lo, 0.0);
+        assert_eq!(bins[4].hi, 1.0);
+        assert!(bins[0].errors == 0 && bins[0].upper < 0.25, "{:?}", bins[0]);
+        assert!(bins[4].errors == 10 && bins[4].upper > 0.5, "{:?}", bins[4]);
+        let cal = Calibration {
+            risk_bins: bins,
+            ..Calibration::prior()
+        };
+        assert_eq!(cal.certified_for(0.05, 0.25).map(|x| x.1), Some(true));
+        assert_eq!(cal.certified_for(0.95, 0.25).map(|x| x.1), Some(false));
+        assert!(Calibration::prior().certified_for(0.5, 0.25).is_none());
+    }
 }

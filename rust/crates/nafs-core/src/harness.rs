@@ -511,6 +511,7 @@ impl Orchestrator {
                         constrained: u.constrained,
                     }),
                     compacted: s.compacted,
+                    pruned: s.pruned,
                     model: match s.stage {
                         Stage::Cheap => "system1".into(),
                         Stage::Main => model.clone(),

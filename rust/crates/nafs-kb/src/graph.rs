@@ -296,7 +296,10 @@ pub fn parse_extraction_under(
     let words: std::collections::HashSet<String> =
         entity_key(passage).split(' ').map(str::to_string).collect();
     let start = reply.find('{').ok_or("no JSON object in the reply")?;
-    let mut de = serde_json::Deserializer::from_str(&reply[start..]).into_iter::<Value>();
+    // A model that copies a sentence out of LaTeX source writes its backslashes unescaped, which is invalid JSON
+    // and used to lose the whole passage (seen on the technical paper's own sources). Repair first, then parse.
+    let repaired = repair_escapes(&reply[start..]);
+    let mut de = serde_json::Deserializer::from_str(&repaired).into_iter::<Value>();
     let v = match de.next() {
         Some(Ok(v)) => v,
         Some(Err(e)) => return Err(format!("the reply is not valid JSON: {e}")),
@@ -390,6 +393,42 @@ pub fn parse_extraction_under(
     }
     out.context = context_line(v["context"].as_str().unwrap_or(""), passage);
     Ok(out)
+}
+
+/// Double every backslash in a JSON reply that does not start a valid escape (`\\"`, `\\\\`, `\\/`, `\\b`, `\\f`, `\\n`, `\\r`, `\\t`,
+/// or `\\u` and four hex digits), so `\\emph{x}` and `\\%` survive as the characters the passage holds. Valid
+/// escapes are left exactly as written.
+pub fn repair_escapes(json: &str) -> String {
+    let b: Vec<char> = json.chars().collect();
+    let mut out = String::with_capacity(json.len() + 8);
+    let mut i = 0;
+    while i < b.len() {
+        let c = b[i];
+        if c != '\\' {
+            out.push(c);
+            i += 1;
+            continue;
+        }
+        match b.get(i + 1) {
+            Some('"') | Some('\\') | Some('/') | Some('b') | Some('f') | Some('n') | Some('r')
+            | Some('t') => {
+                out.push(c);
+                out.push(b[i + 1]);
+                i += 2;
+            }
+            Some('u')
+                if b.len() >= i + 6 && b[i + 2..i + 6].iter().all(|h| h.is_ascii_hexdigit()) =>
+            {
+                out.extend(&b[i..i + 6]);
+                i += 6;
+            }
+            _ => {
+                out.push_str("\\\\");
+                i += 1;
+            }
+        }
+    }
+    out
 }
 
 /// FR-K55: the quote as the passage states it, or `None`. The claimed sentence must occur in the passage after
@@ -772,6 +811,27 @@ mod tests {
             ""
         );
         assert_eq!(context_line("too short", passage), "");
+    }
+
+    /// A quote copied out of LaTeX source has bare backslashes; the reply must still parse and the quote still verify.
+    #[test]
+    fn a_reply_with_bare_backslashes_is_repaired_not_lost() {
+        let passage = r"The gate is \emph{derived, not tuned}, and it costs 5\% of the budget.";
+        let reply = r#"{"context":"What the gate is.","entities":[{"name":"gate","type":"system"},{"name":"budget","type":"concept"}],
+            "relations":[{"source":"gate","predicate":"costs","target":"budget","quote":"The gate is \emph{derived, not tuned}, and it costs 5\% of the budget."}]}"#;
+        assert!(
+            serde_json::from_str::<Value>(reply).is_err(),
+            "the fixture is invalid JSON on purpose"
+        );
+        let x = parse_extraction(reply, passage).expect("repaired");
+        assert_eq!(x.relations.len(), 1, "{:?}", x);
+        assert_eq!(x.quote_drops, 0);
+        // Valid escapes are left alone.
+        assert_eq!(
+            repair_escapes(r#"{"a":"x\ny\"z\\w\u00e9"}"#),
+            r#"{"a":"x\ny\"z\\w\u00e9"}"#
+        );
+        assert_eq!(repair_escapes(r"\q"), r"\\q");
     }
 
     /// FR-K54: the types are data; the prompt is built from them and a type outside them is mapped onto one inside.

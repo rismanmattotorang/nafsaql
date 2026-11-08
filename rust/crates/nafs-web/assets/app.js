@@ -1177,7 +1177,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
       if (d.status === 'ready' && d.n_embedded < d.n_chunks && S.status?.embedder) { label = 'Words only'; cls = 'warn'; }
       const pages = d.pages ? ` · ${plural(d.pages, 'page')}` : '';
       return `<tr data-id="${esc(d.id)}"><td><div class="kb-dtitle">${esc(d.title)}</div><div class="tiny faint">${esc(d.filename)}${pages} · added ${ago(d.created_at)}</div></td>
-        <td><span class="badge">${esc(KB_KINDS[d.kind] || d.kind)}</span></td><td class="nowrap">${fmtBytes(d.bytes)}</td><td>${d.status === 'ready' ? fmtCount(d.n_chunks) : '–'}</td>
+        <td><span class="badge">${esc(KB_KINDS[d.kind] || d.kind)}</span></td><td class="nowrap">${fmtBytes(d.bytes)}</td><td>${d.status === 'ready' || d.n_chunks ? fmtCount(d.n_chunks) : '–'}</td>
         <td><span class="kb-state ${cls}" ${d.error ? `title="${esc(d.error)}"` : ''}>${busy ? '<span class="spin"></span>' : ''}${label}</span>${d.error ? `<div class="tiny kb-err">${esc(d.error)}</div>` : ''}</td>
         <td class="nowrap"><button class="btn sm ghost" data-act="view" type="button" ${d.status !== 'ready' ? 'disabled' : ''}>Passages</button>
           <button class="ibtn" data-act="again" type="button" ${busy ? 'disabled' : ''} aria-label="Read ${esc(d.title)} again" title="Read again">${icon.retry}</button>

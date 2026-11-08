@@ -1,0 +1,94 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 22 -- the gate and the harness against vLLM Semantic Router and DeepSeek Harness
+% ---------------------------------------------------------------------------
+\section{Phase 22: The Gate and the Harness Against Two Open Projects}
+\label{sec:phase22}
+
+Phase~22 (8 November 2026) reads vLLM Semantic Router~\cite{semanticrouter2026} and DeepSeek Harness~\cite{deepseekharness2026} in full against the
+Aql gate of Section~\ref{sec:math} and the agent harness of Sections~\ref{sec:harness2} and~\ref{sec:phase16}, closes the gaps the reading exposes, and records what it did not copy and
+why. The research note is \texttt{docs/research/router\_harness\_comparison.md}, the specification
+\texttt{docs/spec/router\_harness\_upgrade\_spec.md}, and the decision \texttt{docs/decisions/015-router-harness-phase22.md}. The ground rule of every phase
+holds: nothing here adds a model call to a request. Both projects measured their own gates at 79\,ms to 9.8\,s per request on a CPU; ours stays at the
+0.08\,s it costs today.
+
+\subsection{Where the design was already ahead}
+
+Semantic Router is a decision layer in front of many models: signals (keyword, embedding, domain, complexity, reask, and typed questions answered by a
+``decision model''), Boolean rules over the signals that pick a decision, and an algorithm inside the decision that picks the model. Its decision rule is
+lexicographic and hand-tuned (tier, then priority, then evidence; a \texttt{multi\_factor} min--max utility with 0.25 weights); the paper's
+$\arg\max\,\mathrm{Quality}-\lambda\cdot\mathrm{Cost}$ is a framing that no selector implements. It has no exact verifier in production: of seven declared
+verifier kinds three exist, two of which never approve, and the reference AutoMix verifier returns a uniform random number when \texttt{transformers} is
+missing. Its cascade stops at the first response over a threshold and, when none passes, serves the \emph{last} response rather than the best. Our gate is
+one rule derived from expected loss, $L(\hat e_1-\hat e_2)>\lambda\,\Delta c$, with $\lambda$ a price of latency in real units; our verifiers' verdicts are
+final; when nothing passes, the best candidate is returned, or the system abstains.
+
+DeepSeek Harness (\texttt{dsh}) is a ReAct loop over an event-sourced session log: every model request is derived from the log, so any prompt the model
+saw can be rebuilt byte for byte. It has no verifiers, no search over candidates, no rollback, no compile gate, no grammar-constrained decoding and no
+maximum number of steps per turn; a run ends when the model says it is complete, and its benchmarks measure host overhead with no model. Its sandbox
+binds the filesystem read-only but does not unshare the network. Ours ends a run only when an exact verifier accepts or the budget is spent, keeps a
+best-first tree of candidates, checks a compile before the verifier, rolls back, stops on the fourth identical failure, and denies the network.
+
+\subsection{What was genuinely better there, and was built}
+
+Each item is a pure mechanism, each tested, none spending a model call.
+
+\begin{itemize}
+\item \textbf{Certified per-bin risk} (FR-R1). Semantic Router's System~One cascade accepts a cheap answer only in a score bin whose one-sided
+  Clopper--Pearson upper bound on the error rate, at $\alpha/B$ over $B$ pre-declared bins, is at or below a configured risk. Our calibrated mode was
+  promoted on held-out ECE $\le 0.05$, which bounds the \emph{average} miscalibration; the per-bin bound is the stronger guarantee, and our exact verifiers
+  supply the error counts for free. The fitted calibration now keeps five equal-mass bins of held-out $\hat e_1$ with their counts and, for each, the
+  smallest $u$ with $I_u(k{+}1,\,n{-}k)\ge 1-\alpha/B$ by bisection on the regularised incomplete beta ($u=1-(\alpha/B)^{1/n}$ when $k=0$). A draft is kept
+  only in a certified bin; otherwise the decision says \texttt{uncertified\_bin} with the bound, and a calibration with no certified bin is not promoted.
+  With $\alpha=0.05$ and five bins, a bin of twenty drafts none of which was wrong still bounds its error at 0.21, so a young ledger certifies little and
+  escalates more; the bound tightens with the ledger by itself.
+\item \textbf{A declared unknown} (FR-R2). A draft without log-probabilities (a backend that does not return them, a failed sample) used to look like a
+  confident draft. The gate now applies a declared policy, \texttt{on\_unknown} = \texttt{escalate} (default), \texttt{keep} or \texttt{fixed}, and the
+  decision's rule says which (\texttt{unknown\_escalate}) and which feature was missing, after Semantic Router's three-valued rule logic.
+\item \textbf{Reask} (FR-R3). A user turn whose content words overlap the previous user turn's at Jaccard $\ge 0.6$ is a reask: asking again is evidence
+  that the last answer failed. A reask of an unverified draft escalates under the fixed rule, and the feature is logged so a refit can learn its weight.
+  Lexical rather than cosine, because the gate runs without the embedder and must stay at its cost.
+\item \textbf{A polarity guard} (FR-R4). A retrieval-memory hit whose stored question differs from the query by at most two content words with a negation
+  cue or an antonym pair on one side only is dropped: ``is caching enabled'' no longer retrieves the stored answer to ``is caching disabled''.
+\item \textbf{An anchored token meter} (FR-H1). The harness transcript's size was bytes/4; it is now the server's reported \texttt{prompt\_tokens} of the
+  last call plus bytes/3 of what was appended since, cleared by a prune or a compaction. On a CPU where prefill is the cost, the difference between an
+  estimate and the server's count is the difference between compacting at the right step and the wrong one.
+\item \textbf{Prune, then compact} (FR-H2). Compaction was one step into a fresh task message, so a long test log took the whole transcript down with it.
+  Now older observations over 1,200 bytes are cut to a 600-byte head and a 200-byte tail (never the task, never the newest exchange, never an action apart
+  from its observation), and only if the transcript is still over its budget is it compacted. Each step records whether it was pruned.
+\item \textbf{No edit from a cut reply} (FR-H3). A patch or whole file in a reply that ended on the token budget is refused with an instruction to send a
+  shorter edit; a \texttt{run} is still read. \texttt{dsh} drops every tool call from such a message.
+\item \textbf{The repeat notice} (FR-H4). The same action text sent a third time draws a gentle notice, a fifth a detailed one naming it. The stall guard
+  reacts to the same \emph{failure}; this names the same \emph{attempt} before it fails. The notice is appended after the guard has taken the step's
+  signature: the first version appended it before, and an existing test (a missing file run again and again) failed because the altered observation hid
+  the identical failure from the guard.
+\item \textbf{Two-lane ingestion} (FR-K61). Found by this phase's live sweep: a 187-byte upload waited five minutes behind a 517-passage re-index, and the
+  graph build behind both. Parsing, chunking and storing now run on a fast lane that sets the document ready, and vectors and the graph queue on a slow
+  lane, one job at a time.
+\end{itemize}
+
+Specified and deferred, with the reason: a difficulty prior from contrastive prototype banks (FR-R5; a labelled example set per domain and a measured gain
+first, since a new feature invalidates stored calibrations), and spilling a long observation to a file with a head-and-tail preview (FR-H5; the action
+vocabulary has no \emph{read}, so this is a prompt change to measure, not a mechanism).
+
+\subsection{What was not copied}
+
+A model of 0.3\,B parameters or more as the per-request gate, which on four cores costs more than the small model's answer; model-judged cascades
+(self-rated confidence, a judge-written fusion, a random-fallback verifier, serving the last response rather than the best), none with a measured gain in
+the repository; hand-weighted utilities with no price of latency; model-claimed completion and unbounded loops, strictly weaker than verifiers and budgets;
+a plugin architecture two of whose four postmortems are composition bugs (a YAML expression in a \texttt{disabled:} field that silently never evaluated, so
+the filesystem tools were off and the snapshot recorded the failure as expected output); and a session log that uploads up to 8\,MiB per request to the
+provider. Nothing leaves this machine.
+
+\subsection{Validation}
+
+The workspace has 436 tests, all passing in release mode, with \texttt{rustfmt}, \texttt{clippy -D warnings} and \texttt{cargo deny} clean. Each
+mechanism has a unit test: the Clopper--Pearson bound against known values (0 of 20 at 0.1391, 1 of 10 at 0.3942, 5 of 100 at 0.1023, from
+\texttt{scipy}), bins that certify only the safe ones, the reask and polarity predicates, the unknown policies, the prune keeping the newest exchange, the
+refusal of an edit from a cut reply, and the repeat notice's order against the stall guard. Running the full suite found three defects of ours, all
+fixed: a wrong reference value in our own test of the bound (the one-sided 5/100 bound is 0.1023, not the two-sided 0.0975); the certified-bin rule
+overriding budget mode, which fixes the escalation rate by design and escalated every draft (it now applies to the calibrated rule only); and a
+round-trip test and a sweep that assumed vectors exist when a document is ready, which two lanes make untrue. The live sweep on the final binary, on a
+host at load 6--17: contract tests, security 26 of 26, Rooms 10 of 10, end to end 67 of 67, the knowledge sweep 78 of 78 with chat and the PDF and
+ontology checks, harness 55 of 55 and acceptance 9 of 9. Not measured, and said so: the gate's certified bins on a live ledger (the reference
+machine's ledger is too young to certify a bin at $\alpha=0.05$, so calibrated mode stays unpromoted and the fixed rule decides), and the harness's prune
+against a long agent run (a unit test shows it cuts and keeps the newest exchange; a paired run on task success is future work).

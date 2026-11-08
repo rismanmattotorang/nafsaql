@@ -138,6 +138,50 @@ pub struct Store {
     trace: Mutex<Option<std::fs::File>>,
 }
 
+/// FR-R4 (after vLLM Semantic Router's cache polarity guard): two questions that differ by at most two content
+/// words, where a negation cue or one side of an antonym pair is on one side only, ask opposite things, and a
+/// stored answer to one must not be served for the other ("is caching enabled" / "is caching disabled").
+pub fn polarity_conflict(a: &str, b: &str) -> bool {
+    const NEGATION: [&str; 7] = ["not", "no", "never", "without", "cannot", "none", "nothing"];
+    const ANTONYMS: [(&str, &str); 12] = [
+        ("enable", "disable"),
+        ("enabled", "disabled"),
+        ("on", "off"),
+        ("add", "remove"),
+        ("allow", "deny"),
+        ("start", "stop"),
+        ("open", "close"),
+        ("true", "false"),
+        ("before", "after"),
+        ("more", "less"),
+        ("increase", "decrease"),
+        ("always", "never"),
+    ];
+    let words = |t: &str| -> std::collections::HashSet<String> {
+        t.to_lowercase()
+            .replace("n't", " not")
+            .split(|c: char| !c.is_alphanumeric())
+            .filter(|w| !w.is_empty())
+            .map(String::from)
+            .collect()
+    };
+    let (wa, wb) = (words(a), words(b));
+    let diff: Vec<&String> = wa.symmetric_difference(&wb).collect();
+    if diff.is_empty() || diff.len() > 4 {
+        // Identical, or different questions altogether: polarity is not what separates them.
+        return false;
+    }
+    let only_a: std::collections::HashSet<&str> = wa.difference(&wb).map(String::as_str).collect();
+    let only_b: std::collections::HashSet<&str> = wb.difference(&wa).map(String::as_str).collect();
+    let negation_one_side = NEGATION
+        .iter()
+        .any(|n| only_a.contains(n) != only_b.contains(n));
+    let antonym_swapped = ANTONYMS.iter().any(|(x, y)| {
+        (only_a.contains(x) && only_b.contains(y)) || (only_a.contains(y) && only_b.contains(x))
+    });
+    negation_one_side || antonym_swapped
+}
+
 impl Store {
     /// The connection. A panic while a guard was held must not turn every later request into a panic too: the
     /// guard is recovered (statements are atomic in SQLite and multi-statement updates run in a transaction).
@@ -1044,6 +1088,8 @@ impl Store {
             .map_err(st)?
             .flatten()
             .filter(|d| exclude_conv.map(|x| x.to_string() != d.1).unwrap_or(true))
+            // FR-R4: a stored answer to the opposite question is not a hit, however close the words.
+            .filter(|d: &MemoryDoc| !polarity_conflict(query, d.4.as_str()))
             .collect();
         drop(s);
         drop(c);
@@ -1757,6 +1803,34 @@ mod tests {
         assert_eq!(st.purge_older_than(1).unwrap(), 0);
         let _ = std::fs::remove_dir_all(d);
     }
+    #[test]
+    fn the_polarity_guard_separates_opposite_questions() {
+        assert!(polarity_conflict(
+            "Is caching enabled by default?",
+            "Is caching disabled by default?"
+        ));
+        assert!(polarity_conflict(
+            "Does the gate escalate?",
+            "Does the gate not escalate?"
+        ));
+        assert!(polarity_conflict(
+            "Can it run offline?",
+            "Can't it run offline?"
+        ));
+        assert!(!polarity_conflict(
+            "Is caching enabled by default?",
+            "Is caching enabled by default?"
+        ));
+        assert!(!polarity_conflict(
+            "Is caching enabled?",
+            "Which port does the gateway use?"
+        ));
+        assert!(!polarity_conflict(
+            "How many cores does it use?",
+            "How many threads does it use?"
+        ));
+    }
+
     #[test]
     fn bm25_retrieves_the_relevant_verified_answer() {
         let (st, d) = tmp_store();

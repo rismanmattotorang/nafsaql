@@ -226,6 +226,18 @@ pub struct HarnessCfg {
     #[serde(default = "d_agent_stuck_after")]
     pub stuck_after: u32,
 }
+fn d_max_risk() -> f32 {
+    0.15
+}
+fn d_risk_alpha() -> f32 {
+    0.05
+}
+fn d_on_unknown() -> String {
+    "escalate".into()
+}
+fn d_reask_overlap() -> f32 {
+    0.6
+}
 fn d_agent_stuck_after() -> u32 {
     4
 }
@@ -525,6 +537,21 @@ pub struct GateCfg {
     /// to collect calibration features from live verifiable traffic).
     #[serde(default)]
     pub samples_on_verifiable: bool,
+    /// FR-R1 (Phase 22): the largest certified error rate at which a calibrated bin may keep a draft, and the
+    /// confidence level of the one-sided Clopper-Pearson bound (Bonferroni over the bins).
+    #[serde(default = "d_max_risk")]
+    pub max_risk: f32,
+    #[serde(default = "d_risk_alpha")]
+    pub risk_alpha: f32,
+    /// FR-R2: what the gate does when a feature it needs is missing: "escalate" (default), "keep" or "fixed".
+    #[serde(default = "d_on_unknown")]
+    pub on_unknown: String,
+    /// FR-R3: content-word overlap with the previous user turn at or above which a question is a reask, and
+    /// whether a reask of an unverified draft escalates under the fixed rule.
+    #[serde(default = "d_reask_overlap")]
+    pub reask_overlap: f32,
+    #[serde(default = "d_true")]
+    pub reask_escalates: bool,
     /// P7-T02 sequential sampling: under the fixed rule, draw the k cheap samples only after the draft and
     /// only when the draft's mean log-prob lies within `uncertain_band` of the threshold. Confident drafts
     /// skip them (three sequences on four cores tripled the factual draft time, benchmarks/samples_ab_factual.json).
