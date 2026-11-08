@@ -40,6 +40,7 @@ fn config(db: &str, dir: &std::path::Path) -> Option<KbConfig> {
         graph_weight: 1.0,
         graph_beam: 8,
         graph_decay: 0.6,
+        limits: nafs_kb::Limits::default(),
     })
 }
 

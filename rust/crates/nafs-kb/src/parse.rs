@@ -115,7 +115,9 @@ pub const ZIP_MAX_RATIO: u64 = 200;
 pub fn parse(kind: Kind, bytes: &[u8]) -> Result<Parsed, String> {
     kind.sniff(bytes)?;
     let mut p = match kind {
-        Kind::Pdf => parse_pdf(bytes)?,
+        // A crafted file can make a reader panic; that is this document's error, not the worker's.
+        Kind::Pdf => std::panic::catch_unwind(|| parse_pdf(bytes))
+            .map_err(|_| "the PDF could not be read (the reader failed on it)".to_string())??,
         Kind::Docx => parse_docx(bytes)?,
         Kind::Pptx => parse_pptx(bytes)?,
         Kind::Tex => parse_tex(&String::from_utf8_lossy(bytes)),
@@ -372,6 +374,10 @@ fn drop_running_lines(pages: Vec<String>) -> Vec<String> {
 
 struct Zip<'a> {
     archive: zip::ZipArchive<Cursor<&'a [u8]>>,
+    /// Bytes actually decompressed so far: the headers' sizes can lie, so the sum of what is really read is bounded
+    /// too (a deck of a thousand slides that each claim to be small must not expand to a thousand times the cap).
+    read_total: u64,
+    budget: u64,
 }
 
 impl<'a> Zip<'a> {
@@ -403,7 +409,11 @@ impl<'a> Zip<'a> {
         if total > ZIP_MAX_TOTAL {
             return Err("the archive expands to more than 200 MB".into());
         }
-        Ok(Zip { archive })
+        Ok(Zip {
+            archive,
+            read_total: 0,
+            budget: ZIP_MAX_TOTAL,
+        })
     }
 
     fn names(&self) -> Vec<String> {
@@ -414,11 +424,21 @@ impl<'a> Zip<'a> {
     }
 
     fn read(&mut self, name: &str) -> Option<String> {
+        let left = self.budget.saturating_sub(self.read_total);
+        if left == 0 {
+            return None;
+        }
         let f = self.archive.by_name(name).ok()?;
         let mut s = String::new();
-        // `take` bounds the read even if the declared size lies.
-        f.take(ZIP_MAX_TOTAL).read_to_string(&mut s).ok()?;
+        // `take` bounds the read even if the declared size lies, and `left` bounds all the reads together.
+        let n = f.take(left).read_to_string(&mut s).ok()?;
+        self.read_total += n as u64;
         Some(s)
+    }
+
+    /// Whether every read so far stayed inside the budget (a part that hit the cap was cut, not read whole).
+    fn within_budget(&self) -> bool {
+        self.read_total < self.budget
     }
 }
 
@@ -528,6 +548,9 @@ fn parse_docx(bytes: &[u8]) -> Result<Parsed, String> {
     if title.is_none() {
         title = docx_core_title(&mut zip);
     }
+    if !zip.within_budget() {
+        return Err("the archive expands to more than 200 MB".into());
+    }
     Ok(Parsed {
         title,
         text: out,
@@ -608,6 +631,9 @@ fn parse_pptx(bytes: &[u8]) -> Result<Parsed, String> {
         }
         out.push('\n');
     }
+    if !zip.within_budget() {
+        return Err("the archive expands to more than 200 MB".into());
+    }
     Ok(Parsed {
         title,
         text: out,
@@ -659,12 +685,26 @@ fn parse_html(html: &str) -> Result<Parsed, String> {
     let md = conv
         .convert(html)
         .map_err(|e| format!("the HTML could not be read: {e}"))?;
+    let md = drop_unsafe_links(&md);
     let title = title.or_else(|| first_heading(&md));
     Ok(Parsed {
         title,
         text: md,
         ..Default::default()
     })
+}
+
+/// A Markdown link whose target runs script (`javascript:`, `vbscript:`, `data:`) keeps its words and loses the
+/// target: stored text may be shown by a viewer that renders links, and a passage is only ever data.
+fn drop_unsafe_links(md: &str) -> String {
+    static LINK: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = LINK.get_or_init(|| {
+        regex::Regex::new(
+            r"(?is)\[([^\]]*)\]\(\s*<?\s*(?:javascript|vbscript|data)\s*:(?:[^()]|\([^()]*\))*\)",
+        )
+        .expect("a fixed pattern")
+    });
+    re.replace_all(md, "$1").into_owned()
 }
 
 fn html_unescape(s: &str) -> String {
@@ -1014,6 +1054,103 @@ mod tests {
         assert!(a < b && b < c, "{}", p.text);
         assert!(p.text.contains("Notes: Say this aloud"), "{}", p.text);
         assert!(!p.text.contains("Notes: Say this aloud 1"), "{}", p.text);
+    }
+
+    /// SR-K03: the sum of what is really decompressed is bounded, whatever the headers claim.
+    #[test]
+    fn the_total_actually_read_from_an_archive_is_bounded() {
+        let part = "x".repeat(60_000);
+        let bytes = zip_of(&[("a.xml", &part), ("b.xml", &part), ("c.xml", &part)]);
+        let mut z = Zip::open(&bytes).unwrap();
+        z.budget = 100_000;
+        assert_eq!(z.read("a.xml").map(|s| s.len()), Some(60_000));
+        assert_eq!(
+            z.read("b.xml").map(|s| s.len()),
+            Some(40_000),
+            "cut at what is left"
+        );
+        assert!(!z.within_budget());
+        assert!(
+            z.read("c.xml").is_none(),
+            "nothing more is read once it is spent"
+        );
+    }
+
+    /// SR-K03: an entity that expands exponentially (billion laughs) is not expanded.
+    #[test]
+    fn xml_entity_bombs_are_not_expanded() {
+        let doc = "<?xml version=\"1.0\"?><!DOCTYPE d [<!ENTITY a \"aaaaaaaaaa\"><!ENTITY b \"&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;\"><!ENTITY c \"&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;\">]><w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>start &c; end</w:t></w:r></w:p></w:body></w:document>";
+        let bytes = zip_of(&[("word/document.xml", doc)]);
+        let p = parse(Kind::Docx, &bytes).unwrap();
+        assert!(
+            p.text.contains("start") && p.text.len() < 200,
+            "{}",
+            p.text.len()
+        );
+    }
+
+    /// SR-K03: nothing in a LaTeX file reads another file off the machine.
+    #[test]
+    fn latex_includes_do_not_read_files() {
+        let dir = std::env::temp_dir().join(format!("nafs-kb-tex-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let secret = dir.join("secret.tex");
+        std::fs::write(&secret, "SECRET-MARKER-9f3a").unwrap();
+        let tex = format!(
+            "\\section{{A}}\n\nvisible text\n\n\\input{{{p}}}\n\\include{{{p}}}\n\\verbatiminput{{{p}}}\n\\lstinputlisting{{{p}}}\n\\includegraphics{{{p}}}\n",
+            p = secret.display()
+        );
+        let p = parse(Kind::Tex, tex.as_bytes()).unwrap();
+        std::fs::remove_dir_all(&dir).ok();
+        assert!(p.text.contains("visible text"), "{}", p.text);
+        assert!(!p.text.contains("SECRET-MARKER-9f3a"), "{}", p.text);
+    }
+
+    /// SR-K03: scripts, styles, frames and handlers in a web page never reach the text.
+    #[test]
+    fn html_active_content_is_dropped() {
+        let html = "<html><head><title>T</title><style>.x{color:red}STYLE-MARK</style><script>alert('SCRIPT-MARK')</script></head><body onload=\"alert('HANDLER-MARK')\"><iframe src=\"http://evil.example/IFRAME-MARK\"></iframe><object data=\"OBJECT-MARK\"></object><p>Real text <a href=\"javascript:alert('HREF-MARK')\">link</a></p><noscript>NOSCRIPT-MARK</noscript></body></html>";
+        let p = parse(Kind::Html, html.as_bytes()).unwrap();
+        for m in [
+            "STYLE-MARK",
+            "SCRIPT-MARK",
+            "HANDLER-MARK",
+            "IFRAME-MARK",
+            "OBJECT-MARK",
+            "HREF-MARK",
+        ] {
+            assert!(!p.text.contains(m), "{m} survived: {}", p.text);
+        }
+        assert!(p.text.contains("Real text"));
+    }
+
+    /// SR-K03: damaged and hostile PDFs are an error for the document, not a panic and not a hang.
+    #[test]
+    fn damaged_pdfs_fail_cleanly_and_quickly() {
+        let started = std::time::Instant::now();
+        let mut inputs: Vec<Vec<u8>> = vec![
+            b"%PDF-1.7\n".to_vec(),
+            b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 99999999 0 R >>\nendobj\ntrailer << /Root 1 0 R >>\n%%EOF".to_vec(),
+            [b"%PDF-1.4\n".as_slice(), &[0xffu8; 4096]].concat(),
+            b"%PDF-1.4\nxref\n0 99999999999\n".to_vec(),
+        ];
+        let real = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../docs/publication/nafs_aql_lab_results.pdf");
+        if let Ok(bytes) = std::fs::read(real) {
+            for cut in [bytes.len() / 4, bytes.len() / 2, bytes.len() - 40] {
+                inputs.push(bytes[..cut].to_vec());
+            }
+            let mut flipped = bytes.clone();
+            for i in (200..flipped.len()).step_by(997) {
+                flipped[i] ^= 0x5a;
+            }
+            inputs.push(flipped);
+        }
+        for (i, b) in inputs.iter().enumerate() {
+            // Either outcome is fine; reaching the end of the loop is the assertion.
+            let _ = parse(Kind::Pdf, b);
+            assert!(started.elapsed().as_secs() < 60, "input {i} was slow");
+        }
     }
 
     #[test]

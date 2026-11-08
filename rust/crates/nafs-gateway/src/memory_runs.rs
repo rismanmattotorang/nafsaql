@@ -233,6 +233,74 @@ fn d_epochs() -> usize {
     3
 }
 
+/// Run directories, in every base or in one, whose trainer is being prepared or is going.
+fn active_runs(files_dir: &str, only: Option<&str>) -> Vec<PathBuf> {
+    let root = PathBuf::from(files_dir);
+    let bases: Vec<PathBuf> = match only {
+        Some(kb) => {
+            let safe: String = kb.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+            if safe.is_empty() {
+                vec![]
+            } else {
+                vec![root.join(safe)]
+            }
+        }
+        None => std::fs::read_dir(&root)
+            .map(|r| r.filter_map(|e| e.ok()).map(|e| e.path()).collect())
+            .unwrap_or_default(),
+    };
+    let mut out = vec![];
+    for b in bases {
+        let Ok(rd) = std::fs::read_dir(b.join("memorilla").join("runs")) else {
+            continue;
+        };
+        for e in rd.filter_map(|e| e.ok()) {
+            if let Some(r) = describe(&e.path()) {
+                if matches!(
+                    r["state"].as_str(),
+                    Some("building" | "preparing" | "training")
+                ) {
+                    out.push(e.path());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// SR-K12: stop every run of a knowledge base that is going to be deleted. The run is asked to stop and its trainer
+/// process, if it is one of ours (the command line is checked, since a pid can be reused), is ended. Returns how many
+/// runs were stopped.
+pub fn stop_trainers(files_dir: &str, kb: &str) -> usize {
+    let mut n = 0;
+    for dir in active_runs(files_dir, Some(kb)) {
+        let _ = std::fs::create_dir_all(dir.join("out"))
+            .and_then(|_| std::fs::write(dir.join("out").join("stop"), b""));
+        let pid = std::fs::read(dir.join("run.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|r| r["pid"].as_u64())
+            .unwrap_or(0);
+        if pid > 0 && running(&dir, pid) && is_trainer(pid) {
+            #[cfg(unix)]
+            unsafe {
+                libc::kill(pid as i32, libc::SIGTERM);
+            }
+        }
+        n += 1;
+    }
+    n
+}
+
+/// Whether the process is our trainer (not some other program that was given a dead trainer's pid).
+fn is_trainer(pid: u64) -> bool {
+    std::process::Command::new("ps")
+        .args(["-p", &pid.to_string(), "-o", "command="])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains("memorilla-train"))
+        .unwrap_or(false)
+}
+
 /// FR-K42: build the dataset (reconstruction and graph claims) and start the trainer. One run at a time per base.
 pub async fn start(
     State(s): State<AppState>,
@@ -271,6 +339,15 @@ pub async fn start(
     static STARTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let (id, run_dir) = {
         let _one_at_a_time = STARTING.lock().unwrap_or_else(|e| e.into_inner());
+        // Each run holds 8 to 11 GB while it trains: only so many at once across all bases.
+        let allowed = s.cfg.knowledge.max_concurrent_trainers.max(1);
+        let going = active_runs(&s.cfg.knowledge.files_dir, None).len();
+        if going >= allowed {
+            return Err(KbError::Conflict(format!(
+                "{going} training run(s) are already going on this server (the limit is {allowed}); wait for one to finish or stop it"
+            ))
+            .into());
+        }
         if let Ok(rd) = std::fs::read_dir(dir.join("runs")) {
             for e in rd.filter_map(|e| e.ok()) {
                 if let Some(r) = describe(&e.path()) {
@@ -441,4 +518,58 @@ pub async fn activate(
     let abs = std::fs::canonicalize(&dest).map_err(io)?;
     std::fs::write(home.join("active"), abs.to_string_lossy().as_bytes()).map_err(io)?;
     Ok(Json(json!({ "active": abs, "from": ckpt })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_files_dir() -> PathBuf {
+        let d = std::env::temp_dir().join(format!("nafs-runs-{}-{}", std::process::id(), line!()));
+        let _ = std::fs::remove_dir_all(&d);
+        d
+    }
+
+    fn make_run(files: &Path, kb: &str, id: &str, state: &str) -> PathBuf {
+        let dir = files.join(kb).join("memorilla").join("runs").join(id);
+        std::fs::create_dir_all(dir.join("out")).unwrap();
+        // "building" counts as going while the owner (this process) is alive; the pid is not a real trainer.
+        let run = json!({ "id": id, "kind": "train", "state": state, "pid": 0, "owner": std::process::id() });
+        std::fs::write(dir.join("run.json"), run.to_string()).unwrap();
+        dir
+    }
+
+    /// SR-K12: the runs of a base about to be deleted are found and asked to stop; other bases' runs are not touched.
+    #[test]
+    fn the_runs_of_a_deleted_base_are_stopped_and_only_those() {
+        let files = temp_files_dir();
+        let mine = make_run(&files, "basea", "r1", "building");
+        let other = make_run(&files, "baseb", "r2", "building");
+        let done = make_run(&files, "basea", "r3", "failed");
+        std::fs::write(
+            done.join("run.json"),
+            json!({"id": "r3", "state": "failed", "pid": 0, "owner": 0, "error": "x"}).to_string(),
+        )
+        .unwrap();
+        assert_eq!(
+            active_runs(files.to_str().unwrap(), None).len(),
+            2,
+            "both going runs are counted"
+        );
+        assert_eq!(active_runs(files.to_str().unwrap(), Some("basea")).len(), 1);
+        assert_eq!(stop_trainers(files.to_str().unwrap(), "basea"), 1);
+        assert!(
+            mine.join("out").join("stop").exists(),
+            "the run is asked to stop"
+        );
+        assert!(
+            !other.join("out").join("stop").exists(),
+            "another base's run is left alone"
+        );
+        assert!(!done.join("out").join("stop").exists());
+        // An id that is not a key reaches nothing.
+        assert_eq!(stop_trainers(files.to_str().unwrap(), "../.."), 0);
+        assert_eq!(active_runs(files.to_str().unwrap(), Some("")).len(), 0);
+        let _ = std::fs::remove_dir_all(&files);
+    }
 }

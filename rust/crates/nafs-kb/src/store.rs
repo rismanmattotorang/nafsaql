@@ -222,6 +222,31 @@ pub struct NewDocument {
 const DOC_FIELDS: &str = "record::id(id) AS id, record::id(kb) AS kb, title, filename, kind, bytes, sha256, path, status, \
     error, pages, n_chunks, n_chars, n_embedded, n_graphed, parse_ms, <string> created_at AS created_at, <string> updated_at AS updated_at";
 
+/// English function words: they appear in nearly every passage, carry no information for ranking, and (the words
+/// being OR-ed) make the store score all of those passages. Measured at 50,000 passages: a query with one very
+/// common word took 18 s against 1.4 s for the rare word alone.
+const FUNCTION_WORDS: &[&str] = &[
+    "a", "an", "the", "and", "or", "but", "if", "of", "to", "in", "on", "at", "by", "for", "with",
+    "from", "as", "is", "are", "was", "were", "be", "been", "being", "do", "does", "did", "have",
+    "has", "had", "it", "its", "this", "that", "these", "those", "what", "which", "who", "whom",
+    "how", "when", "where", "why", "many", "much", "than", "then", "there", "their", "they", "you",
+    "your", "we", "our", "i", "he", "she", "his", "her", "not", "no", "can", "could", "would",
+    "should", "will", "about", "into", "over", "under", "between", "per", "also", "so", "such",
+];
+
+/// The query with its function words removed; the query itself when nothing else would be left.
+pub fn content_words(query: &str) -> String {
+    let kept: Vec<&str> = query
+        .split(|c: char| !c.is_alphanumeric() && c != '\'' && c != '-' && c != '.' && c != '_')
+        .filter(|w| !w.is_empty() && !FUNCTION_WORDS.contains(&w.to_lowercase().as_str()))
+        .collect();
+    if kept.is_empty() {
+        query.to_string()
+    } else {
+        kept.join(" ")
+    }
+}
+
 impl Store {
     pub fn new(cfg: StoreConfig) -> Store {
         let http = reqwest::Client::builder()
@@ -632,6 +657,9 @@ impl Store {
         if q.is_empty() {
             return Ok(Vec::new());
         }
+        // Function words score next to nothing and, because the words are OR-ed, make the store score every passage
+        // that holds one; they are left out of what is sent (the query as typed is kept when nothing else is left).
+        let q = content_words(q);
         let r = self
             .query(
                 "SELECT record::id(id) AS chunk_id, record::id(doc) AS doc_id, doc.title AS doc_title, ord, heading, page, text, \
@@ -693,12 +721,26 @@ impl Store {
             .iter()
             .map(|(id, v)| json!({ "id": id, "v": v }))
             .collect();
-        self.query(
-            "FOR $r IN $rows { UPDATE type::record('chunk', $r.id) SET embedding = $r.v; };",
-            json!({ "rows": rows }),
-        )
-        .await
-        .map(|_| ())
+        // Setting a vector is idempotent, and the HNSW index it updates can collide with the store's own background
+        // work ("Transaction write conflict ... can be retried", seen by the 50,000-passage scale test), so a conflict
+        // is retried with a short wait instead of failing the document.
+        let mut wait = Duration::from_millis(100);
+        for attempt in 0..6 {
+            let r = self
+                .query(
+                    "FOR $r IN $rows { UPDATE type::record('chunk', $r.id) SET embedding = $r.v; };",
+                    json!({ "rows": rows }),
+                )
+                .await;
+            match r {
+                Err(KbError::Store(m)) if m.contains("can be retried") && attempt < 5 => {
+                    tokio::time::sleep(wait).await;
+                    wait *= 2;
+                }
+                other => return other.map(|_| ()),
+            }
+        }
+        unreachable!("the last attempt returns")
     }
 
     /// Recount a document's vectors and record the embedder on its knowledge base.
@@ -1514,6 +1556,21 @@ mod cbor {
 
 #[cfg(test)]
 mod tests {
+    /// Function words are left out of a words search, and the query is kept whole when nothing else is left.
+    #[test]
+    fn function_words_are_left_out_of_a_words_search() {
+        assert_eq!(
+            content_words("How many parameters does the memory module for System 1 have?"),
+            "parameters memory module System 1"
+        );
+        assert_eq!(
+            content_words("What is the prefix store's size?"),
+            "prefix store's size"
+        );
+        assert_eq!(content_words("to be or not to be"), "to be or not to be");
+        assert_eq!(content_words("12.9 GB/s"), "12.9 GB s");
+    }
+
     use super::*;
 
     #[test]

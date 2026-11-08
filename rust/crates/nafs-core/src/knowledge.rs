@@ -84,6 +84,10 @@ pub trait Knowledge: Send + Sync {
         Box::pin(async move { m })
     }
 
+    /// A knowledge base was deleted: drop everything held in memory that was derived from it (prepared documents,
+    /// caches), so nothing of it can still be read.
+    fn forget(&self, _kb: &str) {}
+
     /// Memorilla (FR-K23): the memory tokens for `query` read from the whole of knowledge base `kb`.
     fn memory<'a>(
         &'a self,

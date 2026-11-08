@@ -149,7 +149,10 @@ def main():
             if a.force_mode:
                 body["force_mode"] = a.force_mode
             if mode != "off":
-                body["knowledge"] = {"kb": a.kb, "mode": mode}
+                # "rag@2" is the mode rag with two passages: the control that gives the passages alone as many as
+                # `hybrid` gets, so whatever the memory tokens add is the difference between the two.
+                name, _, k = mode.partition("@")
+                body["knowledge"] = {"kb": a.kb, "mode": name, **({"k": int(k)} if k else {})}
             t = time.time()
             try:
                 r = http(a.base, "/v1/chat", body)

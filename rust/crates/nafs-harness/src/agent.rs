@@ -217,6 +217,10 @@ pub struct AgentConfig {
     pub keep_exchanges: usize,
     /// Append mode: estimated transcript tokens above which it is compacted before the next call.
     pub compact_at_tokens: usize,
+    /// FR-H2: cut older long observations before compacting (off = compact at once, the Phase 16 behaviour).
+    pub prune: bool,
+    /// FR-H2: an older observation over this many bytes is cut when the transcript is pruned.
+    pub prune_over: usize,
     /// Sample under the action grammar (the host decides whether its server can).
     pub constrain: bool,
     /// Prose lines a non-reasoning model may write before its action under the grammar.
@@ -271,6 +275,8 @@ impl Default for AgentConfig {
             context: ContextMode::Append,
             keep_exchanges: 4,
             compact_at_tokens: 2600,
+            prune: true,
+            prune_over: crate::context::PRUNE_OVER,
             constrain: true,
             notes: 2,
             edit_format: EditFormat::Auto,
@@ -654,8 +660,8 @@ pub async fn run_agent(
         let messages = if append {
             // Two phases (after DeepSeek Harness): first the model-free cut of older outputs, then, only if the
             // transcript is still over its budget, the compaction into a fresh task message.
-            if transcript.estimated_tokens() > cfg.compact_at_tokens && !compact_next {
-                pruned = transcript.prune_older() > 0;
+            if cfg.prune && transcript.estimated_tokens() > cfg.compact_at_tokens && !compact_next {
+                pruned = transcript.prune_older_over(cfg.prune_over) > 0;
             }
             if transcript.estimated_tokens() > cfg.compact_at_tokens || compact_next {
                 transcript.compact(task_message(task, &ws, &last, &attempts, cfg));

@@ -24,6 +24,9 @@ pub struct Config {
     pub judge: JudgeCfg,
     #[serde(default)]
     pub audit: AuditCfg,
+    /// Labelled gate samples collected while the machine is idle (Phase 23).
+    #[serde(default)]
+    pub labels: LabelCfg,
     #[serde(default)]
     pub alerts: AlertsCfg,
     #[serde(default)]
@@ -54,6 +57,19 @@ pub struct KnowledgeCfg {
     pub files_dir: String,
     pub max_upload_mb: usize,
     pub max_files_per_request: usize,
+    /// Phase 8 (SR-K11): the most one upload request may carry in all, so many large parts cannot be held in memory
+    /// together; and how many uploads are received at once.
+    pub max_request_mb: usize,
+    pub concurrent_uploads: usize,
+    /// Documents one base may hold, passages one document may make, jobs that may wait, and seconds a parser may take.
+    pub max_documents_per_base: u64,
+    pub max_chunks_per_document: usize,
+    pub max_queued_jobs: usize,
+    pub parse_timeout_s: u64,
+    /// Seconds a search by words may take before a hybrid search answers by meaning alone (a words-only search is refused).
+    pub search_timeout_s: u64,
+    /// Training runs that may go at once across all bases (each needs 8 to 11 GB for the 1.7B decoder).
+    pub max_concurrent_trainers: usize,
     /// Passage size and overlap in characters (FR-K15).
     pub chunk_chars: usize,
     pub chunk_overlap: usize,
@@ -72,6 +88,9 @@ pub struct KnowledgeCfg {
     pub rag_max_chars: usize,
     /// Chat: a passage is used only when its hybrid rank fuses both lists or its similarity reaches this.
     pub rag_min_similarity: f64,
+    /// Chat: a passage whose words match this strongly (a BM25 score) is used even if the meaning search missed it or
+    /// scored it low; 0 turns it off. Off-topic questions scored at most 8.0, answering passages at least 10.8.
+    pub rag_lexical_rescue: f64,
     /// Knowledge graph (Phase 3): the OpenAI-compatible server and model that extract entities and relations; empty
     /// turns the graph off.
     pub graph_llm_url: String,
@@ -117,6 +136,14 @@ impl Default for KnowledgeCfg {
             files_dir: "data/runtime/kb".into(),
             max_upload_mb: 50,
             max_files_per_request: 20,
+            max_request_mb: 200,
+            concurrent_uploads: 2,
+            max_documents_per_base: 2_000,
+            max_chunks_per_document: 6_000,
+            max_queued_jobs: 500,
+            parse_timeout_s: 180,
+            search_timeout_s: 10,
+            max_concurrent_trainers: 1,
             chunk_chars: 1200,
             chunk_overlap: 150,
             search_k: 8,
@@ -128,6 +155,7 @@ impl Default for KnowledgeCfg {
             rag_k: 4,
             rag_max_chars: 4800,
             rag_min_similarity: 0.45,
+            rag_lexical_rescue: 10.0,
             graph_llm_url: String::new(),
             graph_model: "system1".into(),
             graph_max_tokens: 400,
@@ -383,6 +411,37 @@ impl Default for RetrievalCfg {
             enabled: false,
             top_k: 2,
             min_score: 0.35,
+        }
+    }
+}
+
+/// The label stream (Phase 23): while no user request is in flight, the gateway answers tasks of a verifiable dataset
+/// with the quick model alone (a draft and its agreement samples, no System 2 call), judges each draft with the exact
+/// verifier, and so grows the ledger of labelled gate samples that calibration needs. The existing scheduled
+/// recalibration (`[gate] recalibrate_every_h`) then fits and, if the held-out tests pass, promotes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LabelCfg {
+    pub enabled: bool,
+    /// A dataset in `[eval] datasets_dir` whose tasks carry exact verification (`calib_set` is GSM8K train plus MBPP train).
+    pub dataset: String,
+    /// Seconds between idle checks.
+    pub poll_s: u64,
+    /// The most tasks answered in any hour, so the stream never takes the machine over.
+    pub per_hour: u32,
+    /// Orders the dataset (a hash of seed and task id); the position reached is kept in `cursor_file`.
+    pub seed: u64,
+    pub cursor_file: String,
+}
+impl Default for LabelCfg {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            dataset: "calib_set".into(),
+            poll_s: 20,
+            per_hour: 90,
+            seed: 11,
+            cursor_file: "data/runtime/label_cursor.json".into(),
         }
     }
 }

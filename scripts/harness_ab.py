@@ -45,6 +45,13 @@ ARMS = {
     # production defaults): the compile check before the verifier, rollback to the best version, the stall guard.
     "p15": {"lint": False, "rollback": False, "stuck_after": 0},
     "p16": {"lint": True, "rollback": True, "stuck_after": 4},
+    # Phase 22 (FR-H2): the same run, compaction reached early (1,400 estimated tokens) so it matters on a short task;
+    # older long observations cut first (the default) against compaction at once (the Phase 16 behaviour).
+    "p22_prune": {"prune": True, "compact_at_tokens": 1400},
+    "p22_noprune": {"prune": False, "compact_at_tokens": 1400},
+    # The first pair ran 32 times with no pruned step: the failures the agent is shown stay under the 1,200-byte
+    # default. The same pair again with the threshold at 600 bytes, where they are cut.
+    "p22_prune600": {"prune": True, "prune_over": 600, "compact_at_tokens": 1400},
 }
 
 TASKS = [
@@ -102,6 +109,86 @@ TASKS = [
 ]
 
 
+def _words(n):
+    base = ("listen silent enlist google gogole cat act tac dog god odg evil vile live veil rat tar art star tars "
+            "rats arts stare tears aster inlets tinsel elints stone notes onset tones steno").split()
+    return (base * 3)[:n]
+
+
+def _anagram_groups(words):
+    by = {}
+    for w in set(words):
+        by.setdefault("".join(sorted(w)), []).append(w)
+    return sorted(sorted(g) for g in by.values())
+
+
+# Phase 22: tasks whose failures print a lot. Each test names what it got and what it expected, so a failed run's
+# observation is one to two kilobytes, long enough for the prune to have something to cut.
+LONG_TASKS = [
+    {"name": "long_group_anagrams",
+     "task": "group_anagrams(words) returns a list of groups; each group is the sorted list of the distinct words that are anagrams of each other, and the groups are sorted by their first word. Fix solution.py.",
+     "files": {"solution.py": "def group_anagrams(words):\n    groups = {}\n    for w in words:\n        groups.setdefault(w, []).append(w)\n    return list(groups.values())\n"},
+     "tests": ["words = " + repr(_words(36)) + "\nexp = " + repr(_anagram_groups(_words(36))) +
+               "\ngot = group_anagrams(words)\nassert got == exp, f'got {got!r} expected {exp!r}'"]},
+    {"name": "long_csv_totals",
+     "task": "totals(text) reads CSV text whose first line is the header 'category,amount'; it returns a dict from each category to the sum of its amounts as an int, with the keys in sorted order. Fix solution.py.",
+     "files": {"solution.py": "def totals(text):\n    out = {}\n    for line in text.split('\\n'):\n        c, a = line.split(',')\n        out[c] = a\n    return out\n"},
+     "tests": ["rows = [('fruit', 3), ('veg', 4), ('fruit', 5), ('dairy', 7), ('veg', 1), ('grain', 9), ('dairy', 2), ('fruit', 6)] * 4\n"
+               "text = 'category,amount\\n' + '\\n'.join(f'{c},{a}' for c, a in rows)\n"
+               "exp = {'dairy': 36, 'fruit': 56, 'grain': 36, 'veg': 20}\n"
+               "got = totals(text)\nassert list(got.items()) == list(exp.items()), f'text {text!r} got {got!r} expected {exp!r}'"]},
+    {"name": "long_wrap",
+     "task": "wrap(text, width) splits text on whitespace and packs the words greedily into lines of at most width characters, joined by single spaces; it returns the list of lines (a word longer than width gets its own line). Fix solution.py.",
+     "files": {"solution.py": "def wrap(text, width):\n    lines, cur = [], ''\n    for w in text.split():\n        if len(cur) + len(w) > width:\n            lines.append(cur)\n            cur = ''\n        cur += w\n    lines.append(cur)\n    return lines\n"},
+     "tests": ["text = 'the quick brown fox jumps over the lazy dog while seventeen unusually patient owls watched quietly from an enormous oak tree beside the river'\n"
+               "exp = ['the quick brown fox', 'jumps over the lazy', 'dog while seventeen', 'unusually patient owls', 'watched quietly from', 'an enormous oak tree', 'beside the river']\n"
+               "got = wrap(text, 22)\nassert got == exp, f'got {got!r} expected {exp!r}'"]},
+    {"name": "long_pascal",
+     "task": "Write pascal(n) in solution.py: the first n rows of Pascal's triangle as a list of lists of ints (pascal(0) is []).",
+     "files": {},
+     "tests": ["exp = [[1], [1, 1], [1, 2, 1], [1, 3, 3, 1], [1, 4, 6, 4, 1], [1, 5, 10, 10, 5, 1], [1, 6, 15, 20, 15, 6, 1], [1, 7, 21, 35, 35, 21, 7, 1], [1, 8, 28, 56, 70, 56, 28, 8, 1], [1, 9, 36, 84, 126, 126, 84, 36, 9, 1], [1, 10, 45, 120, 210, 252, 210, 120, 45, 10, 1], [1, 11, 55, 165, 330, 462, 462, 330, 165, 55, 11, 1]]\n"
+               "got = pascal(12)\nassert got == exp, f'got {got!r} expected {exp!r}'", "assert pascal(0) == []"]},
+    {"name": "long_spiral",
+     "task": "spiral(m) returns the elements of the rectangular matrix m (a list of equal-length lists) in clockwise spiral order starting at the top left. Fix solution.py.",
+     "files": {"solution.py": "def spiral(m):\n    out = []\n    for row in m:\n        out.extend(row)\n    return out\n"},
+     "tests": ["m = [[1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], [13, 14, 15, 16, 17, 18], [19, 20, 21, 22, 23, 24], [25, 26, 27, 28, 29, 30]]\n"
+               "exp = [1, 2, 3, 4, 5, 6, 12, 18, 24, 30, 29, 28, 27, 26, 25, 19, 13, 7, 8, 9, 10, 11, 17, 23, 22, 21, 20, 14, 15, 16]\n"
+               "got = spiral(m)\nassert got == exp, f'matrix {m!r} got {got!r} expected {exp!r}'", "assert spiral([]) == []"]},
+    {"name": "long_dedupe_runs",
+     "task": "compress(xs) collapses every run of equal consecutive items in the list xs into one (xs itself is not changed); compress([1,1,2,2,2,1]) is [1,2,1]. Fix solution.py.",
+     "files": {"solution.py": "def compress(xs):\n    return list(set(xs))\n"},
+     "tests": ["xs = [3, 3, 3, 1, 1, 2, 2, 2, 2, 3, 3, 1, 5, 5, 5, 5, 5, 2, 2, 7, 7, 7, 1, 1, 1, 1, 3, 3, 2, 2, 2, 9, 9, 4, 4, 4, 4, 4, 4, 1]\n"
+               "exp = [3, 1, 2, 3, 1, 5, 2, 7, 1, 3, 2, 9, 4, 1]\n"
+               "got = compress(xs)\nassert got == exp, f'input {xs!r} got {got!r} expected {exp!r}'", "assert compress([]) == []"]},
+    {"name": "long_histogram",
+     "task": "histogram(xs) returns a string with one line per distinct value of xs in ascending order, each 'value: ' followed by one '#' per occurrence; lines are joined with newlines and there is no trailing newline. Fix solution.py.",
+     "files": {"solution.py": "def histogram(xs):\n    out = ''\n    for x in xs:\n        out += str(x) + ': #\\n'\n    return out\n"},
+     "tests": ["xs = [4, 2, 4, 1, 3, 4, 2, 5, 4, 1, 3, 3, 5, 4, 2, 2, 1, 4, 5, 5]\n"
+               "exp = '1: ###\\n2: ####\\n3: ###\\n4: ######\\n5: ####'\n"
+               "got = histogram(xs)\nassert got == exp, f'input {xs!r} got {got!r} expected {exp!r}'"]},
+    {"name": "long_matrix_rotate",
+     "task": "rotate(m) returns a new square matrix: m rotated 90 degrees clockwise (m itself is not changed). Fix solution.py.",
+     "files": {"solution.py": "def rotate(m):\n    return [list(r) for r in zip(*m)]\n"},
+     "tests": ["m = [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15], [16, 17, 18, 19, 20], [21, 22, 23, 24, 25]]\n"
+               "exp = [[21, 16, 11, 6, 1], [22, 17, 12, 7, 2], [23, 18, 13, 8, 3], [24, 19, 14, 9, 4], [25, 20, 15, 10, 5]]\n"
+               "got = rotate(m)\nassert got == exp, f'matrix {m!r} got {got!r} expected {exp!r}'"]},
+]
+
+
+_SHOW = (
+    "def show(got, exp, inp):\n"
+    "    g = list(got.items()) if isinstance(got, dict) else (got.split('\\n') if isinstance(got, str) else list(got))\n"
+    "    e = list(exp.items()) if isinstance(exp, dict) else (exp.split('\\n') if isinstance(exp, str) else list(exp))\n"
+    "    rows = [f'{i}: {a!r} vs {b!r}' for i, (a, b) in enumerate(zip(g, e))]\n"
+    "    return f'input: {inp!r}\\ngot: {got!r}\\nexpected: {exp!r}\\nelement by element:\\n' + '\\n'.join(rows)\n"
+)
+_INPUT = {"long_group_anagrams": "words", "long_csv_totals": "text", "long_wrap": "text", "long_pascal": "12",
+          "long_spiral": "m", "long_dedupe_runs": "xs", "long_histogram": "xs", "long_matrix_rotate": "m"}
+for _t in LONG_TASKS:
+    _head, _, _last = _t["tests"][0].rpartition("\n")
+    _t["tests"][0] = _SHOW + _head + "\n" + _last.split(", f'")[0] + f", show(got, exp, {_INPUT[_t['name']]})"
+
+
 def post(base, path, body, timeout):
     req = urllib.request.Request(base + path, json.dumps(body).encode(), {"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -113,7 +200,7 @@ def summary(r):
     return {
         "status": r.get("status"), "passed": r.get("passed"), "score": r.get("score"),
         "model_calls": r.get("model_calls"), "verifier_calls": r.get("verifier_calls"),
-        "compactions": r.get("compactions"), "wall_s": round(r.get("wall_ms", 0) / 1000, 1),
+        "compactions": r.get("compactions"), "pruned_steps": sum(1 for s in steps if s.get("pruned")), "wall_s": round(r.get("wall_ms", 0) / 1000, 1),
         "prefill_tokens": r.get("prefill_tokens"), "cached_tokens": r.get("cached_tokens"),
         "decoded_tokens": r.get("decoded_tokens"),
         "cascade": r.get("cascade"), "cascade_samples": r.get("cascade_samples"),
@@ -121,7 +208,7 @@ def summary(r):
         "s1_steps": sum(1 for s in steps if s.get("model") == "system1"), "s2_steps": sum(1 for s in steps if s.get("model") == "system2"),
         "actions": [s["action"] for s in steps],
         "malformed": sum(1 for s in steps if s["action"] in ("none", "rejected") or s["observation"].startswith("The patch was not applied")),
-        "steps": [{**{k: s.get(k) for k in ("step", "action", "passed", "score", "ms", "usage", "compacted", "model", "samples", "retries", "rolled_back")}, "observation": s["observation"][:300]} for s in steps],
+        "steps": [{**{k: s.get(k) for k in ("step", "action", "passed", "score", "ms", "usage", "compacted", "pruned", "model", "samples", "retries", "rolled_back")}, "observation": s["observation"][:300]} for s in steps],
         "files": r.get("files"),
     }
 
@@ -135,17 +222,22 @@ def main():
     ap.add_argument("--out", default=os.path.join(ROOT, "benchmarks/harness_ab.json"))
     ap.add_argument("--label", default="")
     ap.add_argument("--arms", default="phase10,phase11")
+    ap.add_argument("--suite", default="base", choices=["base", "long"], help="long: the Phase 22 long-evidence tasks")
+    ap.add_argument("--reps", type=int, default=1, help="repetitions of every task and arm (the model samples)")
     a = ap.parse_args()
-    tasks = TASKS if a.tasks == "all" else [t for t in TASKS if t["name"] in a.tasks.split(",")]
+    pool = LONG_TASKS if a.suite == "long" else TASKS
+    tasks = pool if a.tasks == "all" else [t for t in pool if t["name"] in a.tasks.split(",")]
+    tasks = [t for _ in range(a.reps) for t in tasks]
     doc = json.load(open(a.out)) if os.path.exists(a.out) else {"runs": []}
     doc.setdefault("arms", ARMS)
-    done = {(x["model"], x["task"], x["arm"]) for x in doc["runs"]}
+    done = {(x["model"], x["task"], x["arm"], x.get("rep", 0)) for x in doc["runs"]}
     for i, t in enumerate(tasks):
+        rep = i // (len(tasks) // a.reps)
         # Rotate which arm goes first, so a drift in machine load does not favour one arm.
         arms = a.arms.split(",")
         order = arms[i % len(arms):] + arms[:i % len(arms)]
         for arm in order:
-            if (a.model, t["name"], arm) in done:
+            if (a.model, t["name"], arm, rep) in done:
                 continue
             body = {"task": t["task"], "files": t["files"], "verification": {"tests": t["tests"]},
                     "model": a.model, "max_steps": a.max_steps, **ARMS[arm]}
@@ -155,7 +247,7 @@ def main():
             except (urllib.error.URLError, TimeoutError) as e:
                 r = {"error": str(e), "wall_s": round(time.time() - t0, 1)}
             load = os.getloadavg()[0]
-            rec = {"model": a.model, "task": t["name"], "arm": arm, "order": order.index(arm),
+            rec = {"model": a.model, "task": t["name"], "arm": arm, "rep": rep, "order": order.index(arm),
                    "label": a.label, "load_1m_after": round(load, 1),
                    "finished": time.strftime("%Y-%m-%dT%H:%M:%S"), **r}
             doc["runs"].append(rec)

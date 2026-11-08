@@ -127,6 +127,7 @@ async fn graph_build_search_and_prune() {
         graph_weight: 1.0,
         graph_beam: 8,
         graph_decay: 0.6,
+        limits: nafs_kb::Limits::default(),
     });
     match kb.ready().await {
         Err(KbError::Unavailable(e)) => {

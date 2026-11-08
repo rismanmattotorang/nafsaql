@@ -107,6 +107,10 @@
         },
         "draft_tokens": {
           "type": "integer"
+        },
+        "reask": {
+          "type": "boolean",
+          "description": "The question repeats the previous user turn (FR-R3)"
         }
       }
     },
@@ -136,7 +140,10 @@
         "calibrated",
         "budget",
         "forced_failed_verification",
-        "forced_override"
+        "forced_override",
+        "uncertified_bin",
+        "unknown_escalate",
+        "unknown_keep"
       ]
     },
     "audit": {

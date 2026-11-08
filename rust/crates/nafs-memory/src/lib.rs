@@ -3,7 +3,7 @@ use chrono::Utc;
 use nafs_types::{ChatReply, DecisionRecord, Message, NafsError, Result, TraceRecord};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::io::Write;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -963,6 +963,60 @@ impl Store {
         }
         Ok(out)
     }
+    /// Phase 8 (SR-K12): a deleted knowledge base (or document) is gone from the ledger too. A stored reply keeps the
+    /// `sources` it was answered from, passage text and graph quotes included; this removes them from every reply
+    /// of knowledge base `kb` (or, with `doc`, the passages of that document and the graph facts, whose quotes
+    /// cannot be traced to one document) and leaves a note that says so. Returns the replies changed.
+    pub fn scrub_kb_sources(&self, kb: &str, doc: Option<&str>) -> Result<usize> {
+        // Ids are generated lowercase letters and digits; anything else cannot be one, and the LIKE pattern is bound.
+        if kb.is_empty() || !kb.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Ok(0);
+        }
+        let c = self.db();
+        let pattern = format!("%\"kb\":\"{kb}\"%");
+        let rows: Vec<(String, String)> = c
+            .prepare("SELECT id, json FROM replies WHERE json LIKE ?1")
+            .map_err(st)?
+            .query_map(params![pattern], |r| Ok((r.get(0)?, r.get(1)?)))
+            .map_err(st)?
+            .flatten()
+            .collect();
+        let mut changed = 0;
+        for (id, j) in rows {
+            let Ok(mut v) = serde_json::from_str::<Value>(&j) else {
+                continue;
+            };
+            let Some(src) = v.get_mut("sources").and_then(|x| x.as_array_mut()) else {
+                continue;
+            };
+            let before = src.len();
+            src.retain(|e| {
+                if e["kb"].as_str() != Some(kb) || e.get("kb_deleted").is_some() {
+                    return true;
+                }
+                match doc {
+                    None => false,
+                    Some(d) => !(e["doc_id"].as_str() == Some(d) || e.get("facts").is_some()),
+                }
+            });
+            if src.len() == before {
+                continue;
+            }
+            src.push(json!({
+                "note": "Passages from a knowledge base document that was deleted were removed from this record.",
+                "kb": kb,
+                "kb_deleted": true
+            }));
+            c.execute(
+                "UPDATE replies SET json = ?2 WHERE id = ?1",
+                params![id, v.to_string()],
+            )
+            .map_err(st)?;
+            changed += 1;
+        }
+        Ok(changed)
+    }
+
     /// Requests currently stored as running (used to mark interrupted runs on startup).
     pub fn mark_interrupted_runs(&self) -> Result<Vec<(String, Uuid)>> {
         let c = self.db();
@@ -1516,6 +1570,61 @@ mod tests {
             .unwrap();
         id
     }
+    /// SR-K12: deleting a knowledge base (or one document of it) removes the passages from the replies they answered,
+    /// and nothing of any other base.
+    #[test]
+    fn deleting_a_knowledge_base_scrubs_its_passages_from_stored_replies() {
+        let (st, dir) = tmp_store();
+        let put = |id: &str, sources: Value| {
+            let reply =
+                json!({"message": {"content": "an answer"}, "sources": sources}).to_string();
+            st.conn.lock().unwrap().execute(
+                "INSERT INTO replies (id,conversation_id,created_at,domain,mode,assurance,escalated,wall_ms,rule,backend,audit,ephemeral,json) VALUES (?1,NULL,'t','open','fast','unverified',0,1,'fixed','llama',0,0,?2)",
+                params![id, reply]).unwrap();
+        };
+        let text = |id: &str| -> String {
+            st.conn
+                .lock()
+                .unwrap()
+                .query_row("SELECT json FROM replies WHERE id=?1", params![id], |r| {
+                    r.get(0)
+                })
+                .unwrap()
+        };
+        put(
+            "a",
+            json!([{"kb": "base1", "doc_id": "d1", "text": "SECRET ONE"}, {"kb": "base1", "doc_id": "d2", "text": "SECRET TWO"},
+                        {"facts": [{"quote": "SECRET FACT"}], "kb": "base1"}, {"kb": "base2", "doc_id": "d9", "text": "OTHER BASE"}]),
+        );
+        put(
+            "b",
+            json!([{"kb": "base1", "doc_id": "d2", "text": "SECRET TWO"}]),
+        );
+        put(
+            "c",
+            json!([{"kb": "base2", "doc_id": "d9", "text": "OTHER BASE"}]),
+        );
+        // One document: its passages and the graph facts go; another document's passages and other bases stay.
+        assert_eq!(st.scrub_kb_sources("base1", Some("d1")).unwrap(), 1);
+        let a = text("a");
+        assert!(
+            !a.contains("SECRET ONE") && !a.contains("SECRET FACT"),
+            "{a}"
+        );
+        assert!(a.contains("SECRET TWO") && a.contains("OTHER BASE"), "{a}");
+        assert_eq!(text("b").matches("SECRET TWO").count(), 1);
+        // The whole base: everything of it goes, with a note, and a second pass finds nothing left to change.
+        assert_eq!(st.scrub_kb_sources("base1", None).unwrap(), 2);
+        assert!(!text("a").contains("SECRET") && !text("b").contains("SECRET"));
+        assert!(text("a").contains("OTHER BASE") && text("c").contains("OTHER BASE"));
+        assert!(text("b").contains("kb_deleted"));
+        assert_eq!(st.scrub_kb_sources("base1", None).unwrap(), 0);
+        // An id that is not one is refused, so a pattern cannot be smuggled in.
+        assert_eq!(st.scrub_kb_sources("%", None).unwrap(), 0);
+        assert_eq!(st.scrub_kb_sources("", None).unwrap(), 0);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
     #[test]
     fn room_names_are_normalised() {
         assert_eq!(

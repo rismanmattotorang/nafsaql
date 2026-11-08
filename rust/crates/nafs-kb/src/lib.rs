@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -41,6 +41,9 @@ pub enum KbError {
     TooLarge(String),
     #[error("{0}")]
     Unsupported(String),
+    /// Too much is already queued (SR-K11): try again shortly.
+    #[error("{0}")]
+    Busy(String),
     #[error("knowledge store error: {0}")]
     Store(String),
     #[error("file error: {0}")]
@@ -57,7 +60,36 @@ impl KbError {
             KbError::Conflict(_) => "conflict",
             KbError::TooLarge(_) => "too_large",
             KbError::Unsupported(_) => "unsupported_type",
+            KbError::Busy(_) => "busy",
             KbError::Store(_) | KbError::Io(_) => "internal",
+        }
+    }
+}
+
+/// Bounds on what one upload, one document and one base may cost (Phase 8, SR-K11, NFR-K07).
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    /// Documents one base may hold.
+    pub max_documents_per_base: u64,
+    /// Passages one document may make; a larger one is refused with a request to split it.
+    pub max_chunks_per_document: usize,
+    /// Jobs (reads, embeddings, graph builds) waiting at once; further uploads are told to try again.
+    pub max_queued_jobs: usize,
+    /// Seconds a parser may take before the document is given up on.
+    pub parse_timeout_s: u64,
+    /// Seconds a words search may take. At 50,000 passages a query with a very common term scores most of them (several
+    /// seconds, measured), so a hybrid search gives up on the words and answers by meaning, and says so.
+    pub search_timeout_s: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            max_documents_per_base: 2_000,
+            max_chunks_per_document: 6_000,
+            max_queued_jobs: 500,
+            parse_timeout_s: 180,
+            search_timeout_s: 10,
         }
     }
 }
@@ -82,6 +114,7 @@ pub struct KbConfig {
     /// FR-K56: relations kept per entity at the second hop, and the per-hop decay of a path's score.
     pub graph_beam: usize,
     pub graph_decay: f64,
+    pub limits: Limits,
 }
 
 /// How a search ranks passages (FR-K07).
@@ -262,8 +295,20 @@ impl Kb {
         bytes: &[u8],
     ) -> Result<Document, KbError> {
         self.ready().await?;
-        self.store.get_kb(kb).await?;
+        let base = self.store.get_kb(kb).await?;
         let filename = display_name(filename);
+        if self.pending.load(Ordering::Relaxed) >= self.cfg.limits.max_queued_jobs {
+            return Err(KbError::Busy(format!(
+                "{} jobs are already waiting; try again in a few minutes",
+                self.cfg.limits.max_queued_jobs
+            )));
+        }
+        if base.documents >= self.cfg.limits.max_documents_per_base {
+            return Err(KbError::TooLarge(format!(
+                "{filename}: this knowledge base already holds {} documents, which is the limit; start another one",
+                base.documents
+            )));
+        }
         if bytes.len() > self.cfg.max_upload_bytes {
             return Err(KbError::TooLarge(format!(
                 "{filename} is {:.1} MB; the limit is {} MB",
@@ -364,14 +409,31 @@ impl Kb {
         let kind = Kind::parse_str(&d.kind).ok_or_else(|| KbError::Unsupported(d.kind.clone()))?;
         let opts = self.cfg.chunk;
         // Parsing and chunking are CPU work: off the async threads.
-        let (parsed, chunks) = tokio::task::spawn_blocking(move || {
+        // A parser that never returns (a crafted PDF) must not hold the lane for ever. The blocking thread cannot be
+        // stopped, but the document is given up on and the queue moves on.
+        let limit = Duration::from_secs(self.cfg.limits.parse_timeout_s.max(1));
+        let work = tokio::task::spawn_blocking(move || {
             let p = parse(kind, &bytes)?;
             let c = chunk(&p, opts);
             Ok::<_, String>((p, c))
-        })
-        .await
-        .map_err(|e| KbError::BadInput(format!("the reader stopped unexpectedly: {e}")))?
-        .map_err(KbError::BadInput)?;
+        });
+        let (parsed, chunks) = tokio::time::timeout(limit, work)
+            .await
+            .map_err(|_| {
+                KbError::BadInput(format!(
+                    "the file took more than {} s to read and was given up on",
+                    limit.as_secs()
+                ))
+            })?
+            .map_err(|e| KbError::BadInput(format!("the reader stopped unexpectedly: {e}")))?
+            .map_err(KbError::BadInput)?;
+        if chunks.len() > self.cfg.limits.max_chunks_per_document {
+            return Err(KbError::BadInput(format!(
+                "the file makes {} passages, more than the limit of {}; split it into smaller files",
+                chunks.len(),
+                self.cfg.limits.max_chunks_per_document
+            )));
+        }
         let parse_ms = started.elapsed().as_millis() as u64;
         self.store.set_status(&d.id, "storing", None).await?;
         let title = parsed
@@ -996,14 +1058,34 @@ impl Kb {
             ),
             (SearchMode::Hybrid, Some((v, exact))) => {
                 let depth = (k * 3).max(20);
-                let lex = self.store.search_lexical(kb, query, depth).await?;
+                let limit = Duration::from_secs(self.cfg.limits.search_timeout_s.max(1));
                 let vec = self.store.search_vector(kb, &v, depth, exact).await?;
-                (fuse(lex, vec, k), SearchMode::Hybrid)
+                match tokio::time::timeout(limit, self.store.search_lexical(kb, query, depth)).await
+                {
+                    Ok(lex) => (fuse(lex?, vec, k), SearchMode::Hybrid),
+                    Err(_) => {
+                        fallback = Some(format!(
+                            "the search by words took more than {} s and was skipped",
+                            limit.as_secs()
+                        ));
+                        let mut vec = vec;
+                        vec.truncate(k);
+                        (vec, SearchMode::Vector)
+                    }
+                }
             }
-            _ => (
-                self.store.search_lexical(kb, query, k).await?,
-                SearchMode::Lexical,
-            ),
+            _ => {
+                let limit = Duration::from_secs(self.cfg.limits.search_timeout_s.max(1));
+                let hits = tokio::time::timeout(limit, self.store.search_lexical(kb, query, k))
+                    .await
+                    .map_err(|_| {
+                        KbError::Busy(format!(
+                            "the search by words took more than {} s; try fewer or rarer words",
+                            limit.as_secs()
+                        ))
+                    })??;
+                (hits, SearchMode::Lexical)
+            }
         };
         Ok(SearchResult {
             results,

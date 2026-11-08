@@ -225,6 +225,12 @@ Request body: `run_ids`, `min_n`, `apply` (* = required).
 
 Responses: `200`, `400`, `404`, `403`.
 
+### `GET /v1/gate/labels`
+
+The label stream (Phase 23) and the labelled gate samples the ledger holds, with the calibration's certified bins
+
+Responses: `200`.
+
 ### `DELETE /v1/gate/params`
 
 Discard measured parameters and use the configuration placeholders

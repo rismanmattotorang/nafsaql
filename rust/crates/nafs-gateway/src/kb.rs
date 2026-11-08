@@ -59,16 +59,23 @@ pub fn from_config(k: &KnowledgeCfg) -> Option<Arc<Kb>> {
         graph_weight: k.graph_weight,
         graph_beam: k.graph_beam.max(1),
         graph_decay: k.graph_decay,
+        limits: nafs_kb::Limits {
+            max_documents_per_base: k.max_documents_per_base.max(1),
+            max_chunks_per_document: k.max_chunks_per_document.max(1),
+            max_queued_jobs: k.max_queued_jobs.max(1),
+            parse_timeout_s: k.parse_timeout_s.max(1),
+            search_timeout_s: k.search_timeout_s.max(1),
+        },
     }))
 }
 
 /// The routes, with authentication and the same-origin guard applied here because they sit outside the main
 /// router's body limit.
 pub fn routes(state: AppState) -> Router<AppState> {
-    let upload_limit = state.cfg.knowledge.max_upload_mb.max(1)
-        * 1024
-        * 1024
-        * state.cfg.knowledge.max_files_per_request.max(1);
+    // SR-K11: the request as a whole is bounded by `max_request_mb`, not by files times file size (which let one
+    // request carry a gigabyte), and never below one full file.
+    let k = &state.cfg.knowledge;
+    let upload_limit = k.max_request_mb.max(k.max_upload_mb).max(1) * 1024 * 1024;
     // Room for multipart framing on top of the files themselves.
     let upload_limit = upload_limit + 1024 * 1024;
     let uploads = Router::new()
@@ -140,6 +147,7 @@ impl IntoResponse for KbApiError {
             KbError::Conflict(_) => StatusCode::CONFLICT,
             KbError::TooLarge(_) => StatusCode::PAYLOAD_TOO_LARGE,
             KbError::Unsupported(_) => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            KbError::Busy(_) => StatusCode::TOO_MANY_REQUESTS,
             KbError::Store(_) | KbError::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         if status.is_server_error() {
@@ -190,7 +198,11 @@ async fn status(State(s): State<AppState>) -> Json<Value> {
         // must not offer the mode while another one is active (FR-K23).
         "memory": s.knowledge_memory && s.orch.active().s1.kind == "smiley",
         "embedder": kb.embedder_status().await.map(|(model, reachable)| json!({ "model": model, "reachable": reachable, "url": c.embed_url })),
-        "limits": { "max_upload_mb": c.max_upload_mb, "max_files_per_request": c.max_files_per_request },
+        "limits": { "max_upload_mb": c.max_upload_mb, "max_files_per_request": c.max_files_per_request,
+            "max_request_mb": c.max_request_mb, "concurrent_uploads": c.concurrent_uploads,
+            "max_documents_per_base": c.max_documents_per_base, "max_chunks_per_document": c.max_chunks_per_document,
+            "max_queued_jobs": c.max_queued_jobs, "parse_timeout_s": c.parse_timeout_s, "search_timeout_s": c.search_timeout_s,
+            "max_concurrent_trainers": c.max_concurrent_trainers },
         "kinds": ["pdf", "docx", "pptx", "tex", "html", "md", "txt"],
     }))
 }
@@ -257,9 +269,23 @@ async fn update_kb(
 
 async fn delete_kb(State(s): State<AppState>, Path(id): Path<String>) -> KbResult<Json<Value>> {
     let kb = ready(&s).await?;
+    kb.store().get_kb(&id).await?;
+    // Nothing may keep working on a base that is going away: a trainer would run on for hours into a folder that is
+    // no longer there, and prepared documents would stay in memory.
+    let trainers = crate::memory_runs::stop_trainers(&s.cfg.knowledge.files_dir, &id);
     let (documents, chunks) = kb.delete_kb(&id).await?;
+    s.orch.forget_knowledge(&id);
+    // The ledger kept the passages each reply was answered from: they go too.
+    let store = s.store.clone();
+    let key = id.clone();
+    let replies = tokio::task::spawn_blocking(move || store.scrub_kb_sources(&key, None))
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .unwrap_or(0);
     Ok(Json(
-        json!({ "deleted": true, "documents": documents, "chunks": chunks }),
+        json!({ "deleted": true, "documents": documents, "chunks": chunks,
+            "trainers_stopped": trainers, "replies_scrubbed": replies }),
     ))
 }
 
@@ -283,6 +309,19 @@ async fn upload(
     let kb = ready(&s).await?;
     kb.store().get_kb(&id).await?;
     let max_files = kb.config().max_files_per_request;
+    let max_bytes = kb.config().max_upload_bytes;
+    // At most `concurrent_uploads` requests are received at once: each is held in memory while it arrives.
+    static GATE: std::sync::OnceLock<Arc<tokio::sync::Semaphore>> = std::sync::OnceLock::new();
+    let gate = GATE
+        .get_or_init(|| {
+            Arc::new(tokio::sync::Semaphore::new(
+                s.cfg.knowledge.concurrent_uploads.max(1),
+            ))
+        })
+        .clone();
+    let _slot = gate.try_acquire_owned().map_err(|_| {
+        KbError::Busy("other uploads are being received; try again in a moment".into())
+    })?;
     let mut documents = Vec::new();
     let mut refused = Vec::new();
     let mut seen = 0usize;
@@ -299,13 +338,35 @@ async fn upload(
             refused.push(json!({ "filename": filename, "reason": format!("at most {max_files} files per upload") }));
             continue;
         }
-        let bytes = match field.bytes().await {
-            Ok(b) => b,
-            Err(e) => {
-                refused.push(json!({ "filename": filename, "reason": format!("the file could not be received: {e}") }));
-                continue;
+        // Read in pieces and stop at the limit: a file far over it is refused without being held whole.
+        let mut buf: Vec<u8> = Vec::new();
+        let mut too_big = false;
+        let mut field = field;
+        let received = loop {
+            match field.chunk().await {
+                Ok(Some(c)) => {
+                    if buf.len() + c.len() > max_bytes {
+                        too_big = true;
+                        break Ok(());
+                    }
+                    buf.extend_from_slice(&c);
+                }
+                Ok(None) => break Ok(()),
+                Err(e) => break Err(e),
             }
         };
+        if too_big {
+            refused.push(
+                json!({ "filename": nafs_kb::display_name(&filename), "reason": format!(
+                "the file is larger than the limit of {} MB", max_bytes / 1_048_576) }),
+            );
+            continue;
+        }
+        if let Err(e) = received {
+            refused.push(json!({ "filename": filename, "reason": format!("the file could not be received: {e}") }));
+            continue;
+        }
+        let bytes = buf;
         match kb.upload(&id, &filename, &bytes).await {
             Ok(d) => documents.push(d),
             Err(e @ (KbError::TooLarge(_) | KbError::Unsupported(_) | KbError::BadInput(_))) => {
@@ -345,7 +406,17 @@ async fn delete_document(
 ) -> KbResult<Json<Value>> {
     let kb = ready(&s).await?;
     let chunks = kb.delete_document(&id, &doc).await?;
-    Ok(Json(json!({ "deleted": true, "chunks": chunks })))
+    s.orch.forget_knowledge(&id);
+    let store = s.store.clone();
+    let (key, doc_key) = (id.clone(), doc.clone());
+    let replies = tokio::task::spawn_blocking(move || store.scrub_kb_sources(&key, Some(&doc_key)))
+        .await
+        .ok()
+        .and_then(|r| r.ok())
+        .unwrap_or(0);
+    Ok(Json(
+        json!({ "deleted": true, "chunks": chunks, "replies_scrubbed": replies }),
+    ))
 }
 
 async fn reingest(
@@ -579,6 +650,7 @@ async fn graph_entity(
 pub struct ChatKnowledge {
     kb: Arc<Kb>,
     min_similarity: f64,
+    lexical_rescue: f64,
     graph_facts: usize,
     memory: Option<Arc<MemoryReader>>,
     /// FR-K24: the order `auto` tries modes in (`[knowledge] auto_order`).
@@ -697,6 +769,7 @@ impl ChatKnowledge {
     pub fn new(
         kb: Arc<Kb>,
         min_similarity: f64,
+        lexical_rescue: f64,
         graph_facts: usize,
         memory: Option<MemoryReader>,
         auto_order: Vec<String>,
@@ -704,6 +777,7 @@ impl ChatKnowledge {
         ChatKnowledge {
             kb,
             min_similarity,
+            lexical_rescue,
             graph_facts: graph_facts.max(1),
             memory: memory.map(Arc::new),
             auto_order,
@@ -755,22 +829,41 @@ pub fn auto_mode(order: &[String], has_memory: bool, has_graph: bool) -> String 
 }
 
 /// The relevance filter, separate so it can be tested without a store.
+///
+/// A passage is kept when its meaning similarity reaches `min_similarity`, **or** when its words match strongly
+/// (`lexical_rescue`, a BM25 score; 0 turns this off). The second rule exists because the vector arm misses some
+/// passages the words find first (measured on the paper corpus: vector search alone left 4 of 20 answering passages
+/// outside its top 20, and one of them, ranked first by the words, was dropped by the similarity test and the question
+/// went unanswered). Off-topic questions scored at most 8.0 on the same base against at least 10.8 for the answering
+/// passages, so the default sits between them.
 pub fn keep_for_chat(
     hits: Vec<nafs_kb::Hit>,
     mode: nafs_kb::SearchMode,
     min_similarity: f64,
+    lexical_rescue: f64,
     k: usize,
 ) -> Vec<nafs_kb::Hit> {
     hits.into_iter()
         .filter(|h| {
             mode == nafs_kb::SearchMode::Lexical
                 || h.vector_score.is_some_and(|v| v >= min_similarity)
+                || (lexical_rescue > 0.0 && h.lexical_score.is_some_and(|l| l >= lexical_rescue))
         })
         .take(k)
         .collect()
 }
 
 impl nafs_core::knowledge::Knowledge for ChatKnowledge {
+    fn forget(&self, kb: &str) {
+        if let Some(m) = &self.memory {
+            // The prepared documents are vectors read from the base's passages: gone with the base.
+            m.prepared
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(kb);
+        }
+    }
+
     /// FR-K24: `auto` takes the first mode of `[knowledge] auto_order` this base can actually serve.
     fn resolve_mode<'a>(
         &'a self,
@@ -828,7 +921,13 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                     .take(k)
                     .collect()
             } else {
-                keep_for_chat(r.results, r.mode, self.min_similarity, k)
+                keep_for_chat(
+                    r.results,
+                    r.mode,
+                    self.min_similarity,
+                    self.lexical_rescue,
+                    k,
+                )
             };
             let facts: Vec<nafs_core::knowledge::Fact> = facts
                 .iter()
@@ -1059,16 +1158,39 @@ mod tests {
             hit("c", Some(0.2)),
             hit("d", Some(0.5)),
         ];
-        let kept: Vec<String> = keep_for_chat(hits.clone(), SearchMode::Hybrid, 0.35, 4)
+        let kept: Vec<String> = keep_for_chat(hits.clone(), SearchMode::Hybrid, 0.35, 10.0, 4)
             .into_iter()
             .map(|h| h.chunk_id)
             .collect();
         assert_eq!(kept, ["a", "d"]);
         assert_eq!(
-            keep_for_chat(hits.clone(), SearchMode::Hybrid, 0.35, 1).len(),
+            keep_for_chat(hits.clone(), SearchMode::Hybrid, 0.35, 10.0, 1).len(),
             1
         );
         // Words only (no vectors): every match stays.
-        assert_eq!(keep_for_chat(hits, SearchMode::Lexical, 0.35, 4).len(), 4);
+        assert_eq!(
+            keep_for_chat(hits, SearchMode::Lexical, 0.35, 10.0, 4).len(),
+            4
+        );
+    }
+
+    /// A strong word match is kept although the vector arm missed it or scored it low; a weak one is not.
+    #[test]
+    fn chat_keeps_a_strong_word_match_the_meaning_search_missed() {
+        let mut strong = hit("s", None);
+        strong.lexical_score = Some(15.0);
+        let mut low_meaning = hit("m", Some(0.30));
+        low_meaning.lexical_score = Some(27.0);
+        let weak = hit("w", None);
+        let hits = vec![weak.clone(), strong, low_meaning, weak];
+        let kept: Vec<String> = keep_for_chat(hits.clone(), SearchMode::Hybrid, 0.45, 10.0, 8)
+            .into_iter()
+            .map(|h| h.chunk_id)
+            .collect();
+        assert_eq!(kept, ["s", "m"]);
+        assert!(
+            keep_for_chat(hits, SearchMode::Hybrid, 0.45, 0.0, 8).is_empty(),
+            "0 turns the rescue off"
+        );
     }
 }

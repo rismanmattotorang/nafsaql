@@ -52,9 +52,13 @@ Each item is a pure mechanism, each tested, none spending a model call.
 \item \textbf{An anchored token meter} (FR-H1). The harness transcript's size was bytes/4; it is now the server's reported \texttt{prompt\_tokens} of the
   last call plus bytes/3 of what was appended since, cleared by a prune or a compaction. On a CPU where prefill is the cost, the difference between an
   estimate and the server's count is the difference between compacting at the right step and the wrong one.
-\item \textbf{Prune, then compact} (FR-H2). Compaction was one step into a fresh task message, so a long test log took the whole transcript down with it.
+\item \textbf{Prune, then compact} (FR-H2). Compaction was one step into a fresh task message, so a long test log was thought to take the whole transcript down with it.
   Now older observations over 1,200 bytes are cut to a 600-byte head and a 200-byte tail (never the task, never the newest exchange, never an action apart
   from its observation), and only if the transcript is still over its budget is it compacted. Each step records whether it was pruned.
+  \emph{Measured, and inert.} Eight tasks whose failures print an element-by-element comparison, two repetitions each, prune against compact-at-once with
+  compaction forced at 1,400 estimated tokens: the largest observation the model is ever shown is about 930 bytes (the verifier's evidence is capped before
+  it reaches the transcript), so at the default threshold the prune fired in none of 16 runs, and at 600 bytes in 2 of 16 (one task). Eight of 16 runs were
+  solved in each arm in both pairs, with identical action sequences in all 16. It is kept on as insurance against a long \texttt{run} output; no gain is claimed.
 \item \textbf{No edit from a cut reply} (FR-H3). A patch or whole file in a reply that ended on the token budget is refused with an instruction to send a
   shorter edit; a \texttt{run} is still read. \texttt{dsh} drops every tool call from such a message.
 \item \textbf{The repeat notice} (FR-H4). The same action text sent a third time draws a gentle notice, a fifth a detailed one naming it. The stall guard

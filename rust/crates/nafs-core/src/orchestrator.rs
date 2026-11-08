@@ -286,6 +286,18 @@ fn judge_feedback_prompt(reason: &str) -> String {
 const REFUSAL: &str = "I can't help with that request. If you have a related question I can answer safely, I'm happy to help.";
 
 impl Orchestrator {
+    /// A knowledge base was deleted: let the knowledge service drop what it kept of it.
+    pub fn forget_knowledge(&self, kb: &str) {
+        if let Some(k) = self
+            .knowledge
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+        {
+            k.forget(kb);
+        }
+    }
+
     /// Attach knowledge-base retrieval (FR-K20); requests with `knowledge` are refused-free but answered without
     /// passages until this is set.
     pub fn set_knowledge(&self, k: Arc<dyn crate::knowledge::Knowledge>) {
@@ -1101,9 +1113,12 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             // lexical agreement there, so the samples would only slow the draft down.
             let open_ended = matches!(dom, Domain::Open | Domain::Other);
             let fixed_in_force = gs.mode == "fixed" || self.promotion(&cal).is_err();
-            let k = if req.force_mode.is_some()
-                || (verifiable && !cfg.gate.samples_on_verifiable)
-                || (open_ended && fixed_in_force && req.audit != Some(true))
+            // A gate probe (forced fast, `gate_probe`) draws the samples whatever else says to skip them: it exists to
+            // record the draft's gate features, and there is no System 2 call behind it to be slowed.
+            let probe = req.gate_probe == Some(true) && req.force_mode == Some(ReasoningMode::Fast);
+            let k = if (req.force_mode.is_some() && !probe)
+                || (verifiable && !cfg.gate.samples_on_verifiable && !probe)
+                || (open_ended && fixed_in_force && req.audit != Some(true) && !probe)
             {
                 0
             } else {
@@ -1188,6 +1203,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 && fixed_in_force
                 && req.fuse_samples.unwrap_or(cfg.gate.fuse_always_samples);
             let sequential = k > 0
+                && !probe
                 && cfg.gate.samples_when_uncertain
                 && fixed_in_force
                 && !fuse

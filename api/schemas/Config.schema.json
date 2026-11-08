@@ -825,9 +825,72 @@
             ]
           },
           "minItems": 1
+        },
+        "max_request_mb": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "concurrent_uploads": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_documents_per_base": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_chunks_per_document": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_queued_jobs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "parse_timeout_s": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_concurrent_trainers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rag_lexical_rescue": {
+          "type": "number",
+          "minimum": 0
+        },
+        "search_timeout_s": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "additionalProperties": false
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "dataset": {
+          "type": "string"
+        },
+        "poll_s": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "per_hour": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cursor_file": {
+          "type": "string"
+        }
+      }
     }
   },
   "additionalProperties": false,
