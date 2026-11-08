@@ -7,6 +7,19 @@ all-features = false
 [advisories]
 version = 2
 yanked = "deny"
+# Unmaintained notices, not vulnerabilities, on transitive crates we do not choose and cannot drop without replacing
+# the crate that pulls them in. Each is a compile-time or parsing dependency with no network or credential surface.
+# Reviewed 2026-11-08; re-check when the parent crate releases.
+ignore = [
+    # `paste`: a proc-macro the author archived. Reached through gemm -> candle-core (the Memorilla module's tensor
+    # library). It expands identifiers at compile time and is not in any running binary's attack surface.
+    { id = "RUSTSEC-2024-0436", reason = "proc-macro under candle-core's gemm; no runtime surface, no replacement upstream yet" },
+    # `ttf-parser`: unmaintained font parser reached through pdf_oxide, our pure-Rust PDF reader. It parses embedded
+    # fonts of uploaded PDFs, which is untrusted input, so this one is worth revisiting: the mitigation today is that
+    # parsing runs in the gateway's ingestion worker on a document the operator chose to upload, and a parse failure
+    # fails that document alone (SR-K02). Replace when pdf_oxide moves to a maintained parser.
+    { id = "RUSTSEC-2026-0192", reason = "font parser under pdf_oxide; revisit when pdf_oxide changes parser" },
+]
 
 [licenses]
 version = 2
