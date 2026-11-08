@@ -1,0 +1,307 @@
+[
+[
+"How much memory does the engine's prefix store keep per model?",
+[
+"768"
+]
+],
+[
+"How many decode threads beat four in all six interleaved pairs?",
+[
+"three",
+"3 threads"
+]
+],
+[
+"What bandwidth did the streaming read reach with one thread?",
+[
+"12.9"
+]
+],
+[
+"Which revision of the vendored Smiley Core did Phase 19 replace?",
+[
+"7cb6028"
+]
+],
+[
+"Which revision is the new Smiley Core that Phase 19 merged?",
+[
+"06c2b88"
+]
+],
+[
+"How many nanoseconds per row did the small-batch Q4_K kernel take in the slow build?",
+[
+"679"
+]
+],
+[
+"How many tests of the workspace passed after the Phase 19 merge?",
+[
+"370"
+]
+],
+[
+"What does LittleBit approximate a weight matrix as?",
+[
+"sign matrices",
+"signs"
+]
+],
+[
+"Which version of core Lean does the verifier run against?",
+[
+"4.35.0"
+]
+],
+[
+"What was the median time from the gate's decision to System 2's first reasoning token?",
+[
+"0.85"
+]
+],
+[
+"How long did the gate's own time take when escalating?",
+[
+"0.08"
+]
+],
+[
+"What median did llama.cpp take for the System 1 to System 2 switch in Phase 14?",
+[
+"1.5"
+]
+],
+[
+"By how much is cold prefill slower at three threads?",
+[
+"16"
+]
+],
+[
+"Which transform is the int8 key-value cache rotated by?",
+[
+"hadamard"
+]
+],
+[
+"Which model abstained on the proof of n plus zero equals n?",
+[
+"qwen3-4b-thinking",
+"4b-thinking",
+"qwen3-4b"
+]
+],
+[
+"How many megabytes per token does System 1 read at decode?",
+[
+"1,094",
+"1094"
+]
+],
+[
+"What share of decode time goes to the matmuls and the output head?",
+[
+"86"
+]
+],
+[
+"What did the prefix store bring a switch of request kind down to?",
+[
+"0.1"
+]
+],
+[
+"Which version of SurrealDB stores the knowledge base?",
+[
+"3.3.5"
+]
+],
+[
+"How many parameters does the memory module for System 1 have?",
+[
+"31.5"
+]
+],
+[
+"How many bits per weight did the LittleBit conversion of Qwen3-1.7B reach?",
+[
+"0.980"
+]
+],
+[
+"How many projections were converted to LittleBit factors?",
+[
+"196 projections"
+]
+],
+[
+"How long did the LittleBit conversion take on four cores?",
+[
+"13 minutes"
+]
+],
+[
+"What was the mean relative reconstruction error of the LittleBit weights?",
+[
+"0.752"
+]
+],
+[
+"How many of the twelve exact-answer prompts did the dense model answer correctly?",
+[
+"9 correctly"
+]
+],
+[
+"What decode speed did the model with a LittleBit sidecar reach?",
+[
+"20.1"
+]
+],
+[
+"Which function call inside the kernel made the slow build slow?",
+[
+"try_from_fn"
+]
+],
+[
+"What benchmark guards the kernel's speed against optimiser decisions elsewhere?",
+[
+"kbench"
+]
+],
+[
+"How many of the 44 textual merge conflicts remained after normalising the formatting?",
+[
+"to 14"
+]
+],
+[
+"How many dimensions do the passage vectors have?",
+[
+"1024"
+]
+],
+[
+"How many characters of overlap do consecutive passages share?",
+[
+"150"
+]
+],
+[
+"On which port does SurrealDB listen?",
+[
+"8300"
+]
+],
+[
+"Which licence is SurrealDB released under?",
+[
+"BSL 1.1"
+]
+],
+[
+"How many query-dependent soft tokens does Memorilla hand the frozen model?",
+[
+"16 query-dependent soft tokens"
+]
+],
+[
+"How many pre-training rows would the two Memorilla stages need?",
+[
+"3.3 M"
+]
+],
+[
+"How many TFLOP per example does fine-tuning through Qwen3-1.7B cost?",
+[
+"1.4 TFLOP"
+]
+],
+[
+"At what cosine do Smiley Core's Q8_0 embeddings agree with the Candle reference?",
+[
+"0.9991"
+]
+],
+[
+"How many entities did the twenty fixture passages give in the graph?",
+[
+"109 entities"
+]
+],
+[
+"Which wire format does the client use to talk to SurrealDB?",
+[
+"CBOR"
+]
+],
+[
+"Which core Lean version does the verifier run against?",
+[
+"4.35.0"
+]
+],
+[
+"What did the dense model get on the time-of-day sum that was first thought a regression?",
+[
+"6:15"
+]
+],
+[
+"How many bytes per token does System 2 read at decode?",
+[
+"2,503"
+]
+],
+[
+"How fast is the streaming read with four threads?",
+[
+"19.5"
+]
+],
+[
+"How much of decode time goes to the matmuls and the output head at most?",
+[
+"97"
+]
+],
+[
+"How much cold prefill does the prefix store save on System 2 when alternating request kinds?",
+[
+"0.2"
+]
+],
+[
+"How many kilobytes per position does a prefix-store snapshot take?",
+[
+"114"
+]
+],
+[
+"How long did the gate's decision to System 2's first reasoning token take at the median?",
+[
+"0.85"
+]
+],
+[
+"How many gate decisions of requests were escalated in the six-request timing?",
+[
+"six escalated requests"
+]
+],
+[
+"Which version of SurrealDB was chosen rather than 4.0.0?",
+[
+"3.3.5"
+]
+],
+[
+"How many tokens did the continuation prefill with the exact prefix, instead of 108?",
+[
+"5 tokens"
+]
+]
+]

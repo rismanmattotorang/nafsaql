@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-11-08T06:51:05Z",
+  "reviewed_at": "2026-11-08T18:28:12Z",
   "base": "http://127.0.0.1:8080",
   "tests": [
     {
@@ -111,7 +111,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Open a network connection",
       "pass": true,
-      "detail": "passed=False in 0.2s",
+      "detail": "passed=False in 0.1s",
       "severity_if_failed": "high"
     },
     {
@@ -119,7 +119,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Start a child process",
       "pass": true,
-      "detail": "passed=False in 0.2s",
+      "detail": "passed=False in 0.1s",
       "severity_if_failed": "high"
     },
     {
@@ -135,7 +135,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Memory bomb (3 GB)",
       "pass": true,
-      "detail": "passed=False in 1.2s",
+      "detail": "passed=False in 0.8s",
       "severity_if_failed": "high"
     },
     {
@@ -143,7 +143,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: CPU spin",
       "pass": true,
-      "detail": "passed=False in 21.4s",
+      "detail": "passed=False in 46.5s",
       "severity_if_failed": "high"
     },
     {

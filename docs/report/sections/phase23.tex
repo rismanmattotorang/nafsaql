@@ -1,0 +1,119 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 23 -- the three open measurements, the hardening that closes the knowledge track, and RAG at scale
+% ---------------------------------------------------------------------------
+\section{Phase 23: Three Open Measurements, a Hardening Review, and Retrieval at Scale}
+\label{sec:phase23}
+
+Phase~22 left three things unmeasured and the knowledge track's last phase unwritten. This section reports them (8 November 2026, shared host, load average
+6 to 130, so every time is a pessimistic bound). The records are \texttt{docs/decisions/016-knowledge-hardening-phase8.md},
+\texttt{docs/roadmap/machine\_bound\_plan.md} and the specification \texttt{docs/spec/knowledge\_base\_spec.md} (v1.9).
+
+\subsection{Certified gate bins on a live ledger}
+
+The ledger held 29 labelled drafts, too few for any bin. A \emph{probe} was added: a forced-fast draft that still draws its agreement samples
+(\texttt{gate\_probe}), so a labelled gate sample costs one draft and no System~2 call, with an evaluation system \texttt{fast\_probe} around it. Two hundred
+and four GSM8K and MBPP training items gave 203 labelled drafts (190 mathematics, 13 code), 51 of them wrong (25.1\,\%). A report
+(\texttt{nafs-eval} example \texttt{gate\_report}) fits the calibration, bins the held-out estimate and checks the certificate out of sample over 400 random 60/40
+splits.
+
+\begin{itemize}
+\item \textbf{The fit is well calibrated} (held-out ECE 0.024, Brier 0.117) but \textbf{cannot be promoted}: NFR-020 asks for 2,900 held-out samples.
+\item \textbf{The certificate holds.} With two bins of about 100 drafts the lower bin has 8 wrong of 101, so its bound is 0.150 and nothing is certified at the
+  default $\texttt{max\_risk}=0.15$ yet. Among about 1,300 held-out bin tests at $\texttt{max\_risk}$ 0.15 to 0.40, one broke its bound significantly (a
+  binomial tail of 0.01 or less). A first reading that compared observed rates with the bounds directly counted 5 to 12\,\% of bins as violations; that
+  comparison flags a bin of ten drafts for one unlucky error, and the tail test is the correct one.
+\item \textbf{At this size it costs coverage.} On the same held-out drafts the fixed rule keeps 78.2\,\% at 10.1\,\% wrong; the calibrated rule on expected loss alone
+  keeps 85.8\,\% at 16.6\,\% wrong; with certified bins it keeps 63.6\,\% at 9.5\,\% (\texttt{max\_risk} 0.40), 54.5\,\% at 9.9\,\% (0.25) and 5.4\,\% at 12.4\,\% (0.15).
+  Bounds of a hundred drafts are too wide to beat a rule that uses the samples' agreement. The number of bins was made to follow the sample size (about one per
+  hundred drafts, two to five), which moved the 0.25 row from 17\,\% to 55\,\% of drafts kept.
+\end{itemize}
+
+The fixed rule therefore stays in force. A \emph{label stream} (\texttt{[labels]}, off by default) fills the ledger: while no user request is in flight it
+answers verifiable tasks with the quick model alone and lets the exact verifier judge each draft; a user arriving cancels the draft in progress. At 90 an hour
+the floor of 2,900 is about 32 hours of idle time.
+
+\subsection{The harness's prune, measured}
+
+Eight tasks whose failures print an element-by-element comparison were run twice per arm, prune against compact-at-once with compaction forced at 1,400
+estimated tokens. The model is never shown more than about 930 bytes of the verifier's evidence, so at the default threshold (1,200 bytes) the prune fired in
+none of 16 runs, and at 600 bytes in 2 of 16. Eight of 16 runs were solved in each arm in both pairs, with identical action sequences throughout. It stays on as
+insurance against a long \texttt{run} output; no gain is claimed (Section~\ref{sec:phase22}).
+
+\subsection{Memory and hybrid, measured on an epoch-1 module}
+
+Memorilla was trained on the 66-passage sections base (234 examples; validation loss 8.77 to 1.46 after one epoch; the second epoch was abandoned). On the 20
+paper questions: closed-book 0 of 20, \texttt{rag} 18 of 20, \texttt{hybrid} 17 of 20, \texttt{memory} alone 0 of 20, with degenerate text (\texttt{0000\ldots},
+\texttt{None None\ldots}) where closed-book answers fluently. In the training decoder in f32 the claim accuracy with the module is 0.55 and without it 0.55: the
+module read no knowledge, as the paper predicts for a module with no pre-training. The memory arms are therefore a negative result at this scale, and the
+machine-bound plan makes the GPU pre-train the next step for them.
+
+\subsection{The hardening review}
+
+Eight gaps were found and closed (SR-K11 to SR-K13): a file was buffered whole before the size limit was applied and a request could carry a gigabyte; the zip
+budget summed header sizes that can lie; a web page's \texttt{javascript:} link survived into stored text; nothing bounded the queue, the documents in a base, the
+passages one file makes or a parser's running time; deleting a base left its training run going; the memory reader kept the deleted base's prepared documents; the
+ledger kept the passages every reply was answered from (93 replies on the reference machine); and training runs were unlimited across bases. A live security sweep
+on its own gateway with small limits passes 36 of 36 checks, including that deleting a document, then its base, removes the originals, the passages and the passages
+copied into stored replies. Two further defects came out of the same work: a vector write that met a transient transaction conflict failed its document, and the
+JSON schemas of Phase~22 omitted the three new gate rules, which a validating client would have rejected.
+
+\subsection{Retrieval}
+
+Ranking where the answering passage lands (\texttt{scripts/kb\_retrieval\_rank.py}) separates retrieval from generation, and 70 questions over two bases of the
+paper (50 that quote the passages, 20 heavily paraphrased) make small changes visible.
+
+\begin{itemize}
+\item \textbf{A strong word match is kept.} Vector search alone left 4 of 20 answering passages outside its top 20; one, ranked first by the words, was dropped by the
+  chat similarity test, so the question went unanswered. A passage whose BM25 score reaches 10.0 is now kept (off-topic questions scored at most 8.0, answering passages
+  at least 10.8).
+\item \textbf{Function words are left out of a words search.} Lexical MRR on the whole-paper base rose from 0.903 to 0.958 and, at 50,000 passages, one very common
+  word in the query had cost 18\,s against 1.4\,s for the rare word alone.
+\item \textbf{The meaning arm is weighted 0.1.} With equal weights the fused list was \emph{worse} than the words alone (MRR 0.885 and 0.854 against 0.913 and 0.895);
+  pooled over the 70 questions, weight 0.1 gave MRR 0.844 and 0.779 against 0.800 and 0.748, and kept the meaning arm's recall.
+\item \textbf{Measured and not adopted:} a model-written hypothetical passage as query expansion (8\,s a question; it cost 0.03 MRR on the quoted questions and gave
+  a mixed result on the paraphrased ones), near-duplicate removal (the answer is in the top four for 57 of 70 questions at every threshold), AND-first search (it
+  applies to one question in 70), and a reranker (the answer is in the hybrid top four for 19 of 20 questions).
+\end{itemize}
+
+\textbf{Passage size.} At the same 4,800 characters of prompt, passages of 600, 1,200 and 2,400 characters (8, 4 and 2 slots) put the answer in the prompt for 94, 94
+and 88\,\% of the 49 quoted questions and for 70, 70 and 50\,\% of the 20 paraphrased ones; the passage is first for 84, 90 and 84\,\% of the quoted questions. The
+shipped 1,200 characters ties for first on recall and is best on rank, so it stays (\texttt{scripts/kb\_chunk\_size\_experiment.py},
+\texttt{benchmarks/kb\_chunk\_size.json}; one base of six documents).
+
+\subsection{Scale: 1,000 documents, 50,000 passages}
+
+A synthetic base of 1,000 documents and 50,000 passages (skewed vocabulary, random unit vectors of 1,024 dimensions, built straight in the store;
+\texttt{rust/crates/nafs-kb/tests/scale\_it.rs}, \texttt{benchmarks/kb\_scale.json}) was timed on the shared host (load average 20 to 130). The
+steady-state numbers: listing the bases 0.15\,s, listing the 1,000 documents 0.28\,s, opening a document 0.37\,s, counting the base's vectors 0.06\,s, a
+search by meaning through the store's HNSW index 0.37\,s at the median (0.93\,s at the 95th percentile). The scale test found five defects, each fixed:
+
+\begin{itemize}
+\item Counting a base's vectors scanned every embedding (200\,MB) and every search asked: 181\,s under load. It now reads the documents' own counts, 0.06\,s.
+\item A words query is OR-ed and scored, so a word in every passage made the store score all 50,000: 18\,s to over 30\,s, and a client that gave up did not stop the
+  store, whose abandoned queries then starved the next ones. Function words are dropped; in bases of 4,000 passages or more the words that fill a capped probe (a fiftieth
+  of the base) are dropped too when rarer ones remain; the store stops a query itself at 10\,s (\texttt{TIMEOUT}), and a hybrid search then answers by meaning. A rare
+  word plus the commonest word now takes 2.2\,s at the median (7 of 10 had been stopped), a rare word plus a word in every title line 3.1\,s (5 of 5 had been
+  stopped); a query of common words alone is still stopped. A rare word alone takes 2 to 6\,s under load.
+\item A vector write that met a transient transaction conflict failed its document; it is retried.
+\item Deleting a base ran one statement over 50,000 passages and passed the client's 60\,s limit, leaving it half deleted. Passages now go in batches of 500 in the
+  background (a base leaves lists and searches at once, a restart resumes an interrupted deletion), at about 16 passages a second, under an hour for 50,000: removing a
+  passage from the HNSW index is the cost.
+\item A first reading put the HNSW query at 26 to 110\,s and led to an in-memory copy of the vectors. The reading was a cold start and queries made beside abandoned
+  heavy ones, and was withdrawn; the warm index is usable. The copy (exact search over a normalised array, 18 to 22\,ms, 100 of 100 planted vectors first, after a
+  164 to 296\,s load) is kept as an option (\texttt{vector\_cache\_mb}, off by default).
+\end{itemize}
+
+NFR-K07 is therefore met for listing, counting and search by meaning; search by words is usable but slow under load.
+
+\subsection{Validation}
+
+The workspace has 450 tests, all passing in release mode, with \texttt{rustfmt}, \texttt{clippy -D warnings} and \texttt{cargo deny} clean. The live sweep on the final
+binary (host load 15 to 50): contract tests passed, security 26 of 26, Rooms 10 of 10, end to end 68 of 68, the knowledge sweep 79 of 79 with chat on the paper base,
+the knowledge security sweep 36 of 36 with chat, harness 55 of 55 and acceptance 9 of 9. Not measured: the calibrated gate once the label stream has filled the ledger
+(it has begun), a scale run on a quiet host, and the memory arms beyond one epoch.
+
+\subsection{What this machine cannot do}
+
+Four things are blocked by the host, not by code, and each has a plan (\texttt{docs/roadmap/machine\_bound\_plan.md}): the gate's 2,900-sample floor (the label
+stream, no new hardware), release-scale evaluation (a quiet host or ten nights of slices), Memorilla's general reading ability (about ten GPU-hours of pre-training),
+and the speed studies that need an idle host.

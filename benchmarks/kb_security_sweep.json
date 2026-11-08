@@ -13,7 +13,7 @@
   {
    "check": "name: '..\\\\..\\\\windows\\\\system32\\\\x' is handled without an error",
    "result": "pass",
-   "detail": "(202, \"{'documents': [{'bytes': 25, 'created_at': '2026-11-08T11:32:03.886327Z', 'error': None, 'filename':\")"
+   "detail": "(202, \"{'documents': [{'bytes': 25, 'created_at': '2026-11-08T18:22:29.441014Z', 'error': None, 'filename':\")"
   },
   {
    "check": "name: 'a\\x00b.md' is handled without an error",
@@ -28,12 +28,12 @@
   {
    "check": "name: '.hidden.md' is handled without an error",
    "result": "pass",
-   "detail": "(202, \"{'documents': [{'bytes': 25, 'created_at': '2026-11-08T11:32:04.229709Z', 'error': None, 'filename':\")"
+   "detail": "(202, \"{'documents': [{'bytes': 25, 'created_at': '2026-11-08T18:22:30.165653Z', 'error': None, 'filename':\")"
   },
   {
    "check": "name: nothing was written outside the base's folder",
    "result": "pass",
-   "detail": "['xq0r7jkgl57vxag1zewx']"
+   "detail": "['7mjj3iaf4ab5g8jep21t']"
   },
   {
    "check": "type: text named .pdf is refused",
@@ -73,7 +73,7 @@
   {
    "check": "size: a request over 3 MB in all is refused as a whole",
    "result": "pass",
-   "detail": "(0, '<urlopen error [Errno 54] Connection reset by peer>')"
+   "detail": "(0, '<urlopen error [Errno 32] Broken pipe>')"
   },
   {
    "check": "size: ... and none of its parts was stored",
@@ -118,7 +118,7 @@
   {
    "check": "ledger: a chat answer stored the passages it was answered from",
    "result": "pass",
-   "detail": "(200, 'ae7359e6-d671-45c9-97c3-f9f933eca088')"
+   "detail": "(200, '785de41c-5c38-4829-af3f-794ab652807c')"
   },
   {
    "check": "delete: a document is deleted",
@@ -138,7 +138,7 @@
   {
    "check": "delete: the document's passages are gone from the stored reply",
    "result": "pass",
-   "detail": "{\"assurance\":\"unverified\",\"conversation_id\":\"2d674a29-0604-4b98-bb04-b22115879728\",\"decision\":{\"audit\":false,\"backend\":\""
+   "detail": "{\"assurance\":\"unverified\",\"conversation_id\":\"1e584196-83b7-4566-b4e0-427764d26c33\",\"decision\":{\"audit\":false,\"backend\":\""
   },
   {
    "check": "delete: the base is deleted",
@@ -163,7 +163,7 @@
   {
    "check": "delete: no passage of the base is left in the ledger",
    "result": "pass",
-   "detail": "{\"assurance\":\"unverified\",\"conversation_id\":\"2d674a29-0604-4b98-bb04-b22115879728\",\"decision\":{\"audit\":false,\"backend\":\""
+   "detail": "{\"assurance\":\"unverified\",\"conversation_id\":\"1e584196-83b7-4566-b4e0-427764d26c33\",\"decision\":{\"audit\":false,\"backend\":\""
   },
   {
    "check": "delete: deleting it again is a 404, not a second deletion",

@@ -40,6 +40,19 @@ relevance filter dropped a strong word match that the vector arm had missed (FR-
 | The relevance filter | Keep a passage by similarity **or** by a strong word match (`rag_lexical_rescue`, 10.0) | On the paper base vector search alone left 4 of 20 answering passages outside its top 20; the words ranked one of them first and the similarity test dropped it. Off-topic questions scored at most 8.0 against at least 10.8 |
 | A reranker (FR-K58) | Not built | On both paper bases the answering passage is in the hybrid top 4 for 19 of 20 questions (recall@1 0.90); a reranker could move one question of twenty, which no question set of this size can detect |
 
+## Retrieval and scale, measured the same day
+
+| Question | Decision | Why |
+|---|---|---|
+| Weight of the meaning arm in a hybrid search | 0.1 against the words' 1.0 (`vector_weight`) | 70 questions over two bases (50 quoted, 20 paraphrased): an equal weight was worse than the words alone (MRR 0.885 and 0.854 against 0.913 and 0.895); pooled, 0.1 gave 0.844 and 0.779 against 0.800 and 0.748 |
+| Query expansion by the quick model | Not built | 8 s a question; it cost 0.03 MRR on quoted questions and was mixed on paraphrased ones (R@4 0.70 to 0.80 on one base, 0.50 to 0.45 on the other) |
+| Near-duplicate removal, AND-first search | Not built | the answer is in the top four for 57 of 70 questions at every duplicate threshold; AND applies to one question in 70 |
+| Passage size | Stays 1,200 characters | equal 4,800-character budget: 94, 94 and 88 % recall for 600, 1,200 and 2,400 (quoted); 70, 70 and 50 % (paraphrased) |
+| Words search at 50,000 passages | Function words dropped; in bases of 4,000+ passages the words that fill a capped probe (a fiftieth of the base, at least 400) are dropped when rarer ones remain; the store stops the query at `search_timeout_s` (10) with `TIMEOUT`; a hybrid search then answers by meaning | the words are OR-ed and scored, so a word in half the passages made the store score half the base (18 s and 30 s and more against 1.4 to 2.4 s for the rare word); dropping the client's request did not stop the store, and abandoned queries starved later ones |
+| Vectors of a large base | The store's HNSW index stays the default; an in-memory exact copy is optional (`vector_cache_mb`) | at 50,000 passages the warm index took 0.37 s at the median (cold start and queries made beside abandoned heavy ones: 26 to 110 s, a reading first taken for the steady state and withdrawn); the copy took 18 to 22 ms, exactly, after a 164 to 296 s load |
+| Counting a base's vectors | From the documents' own counts | the passage scan read every embedding (200 MB at 50,000 passages: minutes) and every search asked |
+| Deleting a base | Out of use at once; its rows are removed in the background in batches of 500 and a restart resumes it | one statement for 50,000 passages ran past the 60-second client limit, and removing them one by one out of the HNSW index took 16 passages a second (under an hour for 50,000), too long for a request |
+
 ## Consequences
 
 - Eight `[knowledge]` settings with defaults (`max_request_mb`, `concurrent_uploads`, `max_documents_per_base`,

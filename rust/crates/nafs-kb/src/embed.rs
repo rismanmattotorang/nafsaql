@@ -154,10 +154,16 @@ pub fn passage_text(doc_title: &str, heading: &str, context: &str, text: &str) -
 
 /// Reciprocal-rank fusion (Cormack et al. 2009, k = 60): each list contributes 1 / (k + rank) for every item.
 pub fn rrf<'a>(lists: &[Vec<&'a str>], k: f64) -> Vec<(&'a str, f64)> {
+    rrf_weighted(lists, &vec![1.0; lists.len()], k)
+}
+
+/// Reciprocal-rank fusion with a weight per list: list `i` contributes `weights[i] / (k + rank)`. A weight of 1 for
+/// every list is the plain fusion.
+pub fn rrf_weighted<'a>(lists: &[Vec<&'a str>], weights: &[f64], k: f64) -> Vec<(&'a str, f64)> {
     let mut score: Vec<(&str, f64)> = Vec::new();
-    for list in lists {
+    for (list, w) in lists.iter().zip(weights) {
         for (rank, id) in list.iter().enumerate() {
-            let add = 1.0 / (k + rank as f64 + 1.0);
+            let add = w / (k + rank as f64 + 1.0);
             match score.iter_mut().find(|(x, _)| x == id) {
                 Some((_, s)) => *s += add,
                 None => score.push((id, add)),

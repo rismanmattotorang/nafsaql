@@ -215,6 +215,8 @@ exact_search_below = 5000              # vectors per base below which search sca
 rag_k = 4                              # chat: passages put in the prompt
 rag_max_chars = 4800                   # chat: their total size (about 1,200 tokens)
 rag_min_similarity = 0.45              # chat: weakest passage similarity still used (off-topic passages scored 0.38-0.40, relevant 0.45-0.77)
+vector_weight = 0.1                    # hybrid search: the meaning ranking counts this much against the words (1.0); measured on 70 questions, 1.0 was worse
+vector_cache_mb = 0                     # 0 = off: large bases use the store index (0.37 s median at 50,000 passages, warm). >0: exact in-memory search, 20 ms, 200 MB per 50,000 passages, minutes to load on first use
 rag_lexical_rescue = 10.0               # chat: a passage whose words match this strongly (BM25) is used even if the meaning search missed it; 0 = off (off-topic <= 8.0, answering >= 10.8)
 graph_llm_url = "http://127.0.0.1:8201/v1"   # Phase 3: the quick model extracts entities and relations ("" = graph off)
 graph_model = "system1"

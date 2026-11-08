@@ -148,6 +148,34 @@ Phase 21 (retrieval and graph upgrade; the gap analysis and the reasoning are in
   answering passages: vector search alone left 4 of 20 outside its top 20 on the paper base, and one of them, ranked
   first by the words, was dropped by the similarity test, so the question went unanswered. Off-topic questions scored
   at most 8.0 on that base, answering passages at least 10.8.
+- **FR-K63** (Phase 8) A hybrid search fuses the words' ranking and the meaning ranking by reciprocal rank with the
+  meaning arm weighted `[knowledge] vector_weight` (default 0.1) against the words' 1.0. Measured (`scripts/kb_retrieval_rank.py
+  --fusion-sweep`, 50 questions that quote the passages and 20 heavily paraphrased ones, two bases of the paper): the
+  words alone put the answering passage first for 86 to 88 % of the 50 and the meaning arm for 50 to 62 %, and an equal
+  weight pulled the fused list below the words alone (mean reciprocal rank 0.885 and 0.854 against 0.913 and 0.895).
+  Pooled over the 70 questions, weight 0.1 gave 0.844 and 0.779 against 0.800 and 0.748 at 1.0, and kept the meaning arm's
+  recall (recall@8 0.98 on both bases against 0.96). Because the fusion is flat near the top (1/61 against 1/63), the
+  small weight mostly breaks near-ties and reorders what the words rank far apart.
+- **FR-K64** (Phase 8) English function words are left out of a words search (the words are OR-ed, so each one makes the
+  store score every passage that holds it: at 50,000 passages a query with one very common word took 18 s against 1.4 s
+  for the rare word alone); the query as typed is kept when nothing else is left. A words search is bounded by
+  `[knowledge] search_timeout_s` (10): in a hybrid search the words are given up on and the answer is by meaning alone,
+  with a note; a words-only search is told to try fewer or rarer words (429). Deleting a base removes its passages in
+  batches of 500, in the background (one statement for 50,000 ran past the store client's 60-second limit; see SR-K12).
+- **FR-K65** (Phase 8, NFR-K07) Optional: with `[knowledge] vector_cache_mb` above 0, a base of `exact_search_below` (5,000)
+  vectors or more is searched exactly in memory. Its vectors (normalised, one contiguous array, 200 MB at 50,000
+  passages) are loaded in the background on first use from the store document by document (164 to 296 s at 50,000 on the
+  loaded reference machine) and searched by dot product: 18 to 22 ms median, 75 ms at worst, 100 of 100 planted vectors
+  found first. The store's own HNSW index, the default, answered in 0.37 s at the median (0.93 s at the 95th percentile)
+  once warm; its first queries after a cold start, and any made while other heavy queries ran, took 26 s to over 100 s.
+  Until the copy is ready a search answers by words and says so. The copy is dropped when the base's vectors change (a
+  document read again, vectors written, a fresh re-index, a delete) and checked against the base's vector count on every
+  use. Off by default because the warm index is usable; for far larger bases or a store shared with other work.
+- **FR-K66** (Phase 8, NFR-K07) In a base of 4,000 passages or more the words of a query that fill a capped probe (a fiftieth of
+  the base, at least 400 passages, no scoring, about a second at worst) are left out of the words search when rarer words
+  remain, and a words search is stopped by the store itself at `search_timeout_s`: with that, a rare word plus the
+  commonest word ran in 4 s at the median instead of being stopped at 10 s in 7 of 10 cases, and a rare word plus a word in
+  every passage's title line in 3 s instead of 5 of 5 stopped. A query of common words alone stays slow (13 s).
 - **FR-K61** (Phase 22) Ingestion runs on two lanes: parsing, chunking and storing on a fast lane that sets the
   document `ready` (words searchable at once); vectors and the graph on a slow lane, one job at a time. A new upload
   never waits behind another base's embedding or extraction. Found by the live sweep: a 187-byte upload waited five
@@ -168,7 +196,7 @@ Phase 21 (retrieval and graph upgrade; the gap analysis and the reasoning are in
 | NFR-K04 | Embedding throughput reported (chunks/s); query embedding < 0.5 s | Phase 2 |
 | NFR-K05 | `rag` adds < 3 s to the quick path's time to first token at 1,200 context tokens | Phase 2 A/B |
 | NFR-K06 | Ingestion never runs more than one heavy step at a time and yields to chat (lower priority) | Phase 2 |
-| NFR-K07 | A knowledge base of 1,000 documents / 50,000 chunks stays usable (list, search) | Phase 8 |
+| NFR-K07 | A knowledge base of 1,000 documents / 50,000 chunks stays usable (list, search) | Phase 8, `benchmarks/kb_scale.json` (shared machine, load 20 to 130): listing 1,000 documents 0.2 to 0.4 s, counting vectors 0.06 to 0.1 s (was minutes), opening a document 0.2 to 0.5 s, search by meaning 0.37 s through the store's index once warm (22 ms from the optional in-memory copy), search by words 2 to 8 s for a rare word and about 4 s with a common word, **met for listing, counting and meaning; search by words is usable but slow under load (2 to 6 s), and a query of common words alone is stopped** |
 | NFR-K08 | Memory module forward < 50 ms for N = 10,000 chunks on this CPU | Phase 4 bench: per question 49–54 ms up to 100 documents, 88 ms at 1,000, 436 ms at 10,000 (load 34); **not met at 10,000** |
 | NFR-K09 | Training time per example measured and shown before a job starts (estimate for the whole run) | Phase 6: 36–94 s per question on Qwen3-1.7B (shared machine), 8–11 s on Qwen3-0.6B; shown per run on the Knowledge page |
 
@@ -198,7 +226,9 @@ Phase 21 (retrieval and graph upgrade; the gap analysis and the reasoning are in
   `max_documents_per_base` (2,000) documents; a document makes at most `max_chunks_per_document` (6,000) passages
   (a larger one is refused with a request to split it); a parser that takes more than `parse_timeout_s` (180 s) is
   given up on; at most `max_concurrent_trainers` (1) training runs go at once across all bases.
-- **SR-K12** (Phase 8) Deleting a base removes it everywhere: its rows in SurrealDB (documents, passages, vectors, graph),
+- **SR-K12** (Phase 8) Deleting a base takes it out of use at once (it leaves lists and searches, and its name is freed) and removes
+  it everywhere: its rows in SurrealDB (documents, passages, vectors, graph; in the background, in batches, resumed after
+  a restart: about 16 passages a second on the loaded reference machine, so under an hour for 50,000),
   its folder (originals, training runs, activated modules), the prepared documents the memory reader keeps in
   memory, and the passages and graph quotes copied into the ledger's stored replies; a training run still going for it
   is stopped first. Deleting one document removes its originals, rows and its passages from stored replies (and the

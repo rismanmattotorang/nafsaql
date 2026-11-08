@@ -9,6 +9,7 @@ pub mod embed;
 pub mod graph;
 pub mod parse;
 pub mod store;
+pub mod vcache;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -111,6 +112,11 @@ pub struct KbConfig {
     pub graph: Option<GraphConfig>,
     /// FR-K50: how much the graph's ranking counts against the search's when the two are fused (1.0 = an equal arm).
     pub graph_weight: f64,
+    /// FR-K63: how much the vector arm counts against the words (1.0) when a hybrid search fuses the two by rank.
+    pub vector_weight: f64,
+    /// NFR-K07: the most memory (MB) the in-memory copies of large bases' vectors may use together; a base that would not
+    /// fit is searched through the store's index instead.
+    pub vector_cache_mb: u64,
     /// FR-K56: relations kept per entity at the second hop, and the per-hop decay of a path's score.
     pub graph_beam: usize,
     pub graph_decay: f64,
@@ -193,6 +199,8 @@ pub struct Kb {
     bootstrap_lock: Mutex<()>,
     embedder: Option<Embedder>,
     extractor: Option<Extractor>,
+    /// In-memory copies of large bases' vectors (NFR-K07).
+    vcache: vcache::VectorCache,
 }
 
 impl Kb {
@@ -200,6 +208,7 @@ impl Kb {
     pub fn start(cfg: KbConfig) -> Arc<Kb> {
         let (tx_fast, rx_fast) = mpsc::unbounded_channel();
         let (tx_slow, rx_slow) = mpsc::unbounded_channel();
+        let vector_cache_mb = cfg.vector_cache_mb;
         let embedder = cfg.embed.clone().map(Embedder::new);
         let extractor = cfg.graph.clone().map(Extractor::new);
         let kb = Arc::new(Kb {
@@ -213,6 +222,7 @@ impl Kb {
             bootstrap_lock: Mutex::new(()),
             embedder,
             extractor,
+            vcache: vcache::VectorCache::new(vector_cache_mb),
         });
         tokio::spawn(worker(Arc::downgrade(&kb), rx_fast));
         tokio::spawn(worker(Arc::downgrade(&kb), rx_slow));
@@ -220,6 +230,15 @@ impl Kb {
         tokio::spawn(async move {
             // Documents a previous run left half-done are read again once the store is reachable.
             if k.ready().await.is_ok() {
+                // Bases whose deletion a restart interrupted are finished in the background.
+                if let Ok(ids) = k.store.deleting_kbs().await {
+                    for id in ids {
+                        let store = k.store.clone();
+                        tokio::spawn(async move {
+                            let _ = store.finish_delete_kb(&id).await;
+                        });
+                    }
+                }
                 if let Ok(docs) = k.store.unfinished_documents().await {
                     for d in docs {
                         k.enqueue(&d.kb, &d.id, JobKind::Ingest);
@@ -378,6 +397,7 @@ impl Kb {
     pub async fn delete_document(&self, kb: &str, doc: &str) -> Result<u64, KbError> {
         self.ready().await?;
         let d = self.store.get_document(kb, doc).await?;
+        self.vcache.drop_kb(kb);
         let n = self.store.delete_document(kb, doc).await?;
         if self.store.prune_graph(kb).await.is_ok() {
             let _ = self.recompute_communities(kb).await;
@@ -389,9 +409,18 @@ impl Kb {
 
     pub async fn delete_kb(&self, kb: &str) -> Result<(u64, u64), KbError> {
         self.ready().await?;
-        let r = self.store.delete_kb(kb).await?;
+        self.vcache.drop_kb(kb);
+        let base = self.store.get_kb(kb).await?;
+        // Out of use at once; its rows go in the background (under an hour at 50,000 passages), and a restart resumes it.
+        self.store.mark_kb_deleting(kb).await?;
         let _ = tokio::fs::remove_dir_all(self.kb_dir(kb)).await;
-        Ok(r)
+        let (store, id) = (self.store.clone(), kb.to_string());
+        tokio::spawn(async move {
+            if let Err(e) = store.finish_delete_kb(&id).await {
+                tracing::warn!(kb = %id, error = %e, "deleting a knowledge base stopped; a restart resumes it");
+            }
+        });
+        Ok((base.documents, base.chunks))
     }
 
     async fn ingest(&self, job: &Job) -> Result<(), KbError> {
@@ -444,6 +473,8 @@ impl Kb {
         self.store
             .store_chunks(&job.kb, &d.id, &title, parsed.pages, parse_ms, &chunks)
             .await?;
+        // The base changed: a copy of its vectors made before no longer describes it.
+        self.vcache.drop_kb(&job.kb);
         // A re-read replaces the passages, so what the graph held about the old ones goes.
         if self.store.prune_graph(&job.kb).await.is_ok() {
             let _ = self.recompute_communities(&job.kb).await;
@@ -468,6 +499,8 @@ impl Kb {
             .chunks_without_vectors(doc)
             .await
             .map_err(|x| x.to_string())?;
+        // Vectors are about to be written for this base: a copy made before is stale from here on.
+        self.vcache.drop_kb(kb);
         if todo.is_empty() {
             return self
                 .store
@@ -539,6 +572,7 @@ impl Kb {
         if let Some(base) = kb {
             self.store.backfill_search_text(base).await?;
             if fresh {
+                self.vcache.drop_kb(base);
                 self.store.clear_vectors(base).await?;
             }
         }
@@ -1013,6 +1047,48 @@ impl Kb {
         Some((e.cfg.model.clone(), e.health().await))
     }
 
+    /// The nearest passages to a query vector. A base under `exact_search_below` vectors is scanned in the store; a larger one
+    /// is searched exactly in memory once its vectors are loaded (`vcache`), or through the store's index when it is too big
+    /// for the cache. `None` while the copy of a large base is still loading.
+    async fn vector_hits(
+        &self,
+        kb: &str,
+        v: &[f32],
+        k: usize,
+        exact: bool,
+        n: u64,
+    ) -> Result<Option<Vec<Hit>>, KbError> {
+        if exact {
+            return Ok(Some(self.store.search_vector(kb, v, k, true).await?));
+        }
+        let dims = self.embedder.as_ref().map_or(v.len(), |e| e.cfg.dims);
+        match self.vcache.lookup(&self.store, kb, n, dims) {
+            vcache::Lookup::TooBig => Ok(Some(self.store.search_vector(kb, v, k, false).await?)),
+            vcache::Lookup::Loading => Ok(None),
+            vcache::Lookup::Ready(l) => {
+                let top = l.top(v, k);
+                let ids: Vec<String> = top.iter().map(|t| t.0.clone()).collect();
+                let mut by_id: HashMap<String, Hit> = self
+                    .store
+                    .hits_by_id(&ids)
+                    .await?
+                    .into_iter()
+                    .map(|h| (h.chunk_id.clone(), h))
+                    .collect();
+                let mut out = Vec::with_capacity(top.len());
+                for (id, sim) in top {
+                    if let Some(mut h) = by_id.remove(&id) {
+                        h.score = sim as f64;
+                        h.vector_score = Some(sim as f64);
+                        h.rank = out.len() + 1;
+                        out.push(h);
+                    }
+                }
+                Ok(Some(out))
+            }
+        }
+    }
+
     /// Search a knowledge base (FR-K07). Hybrid fuses BM25 and vector ranks (RRF, k = 60); a vector or hybrid search
     /// without vectors or without the embedding server falls back to words, and says so.
     pub async fn search(
@@ -1039,7 +1115,7 @@ impl Kb {
                 match e.embed(&[query.to_string()], Some(QUERY_INSTRUCTION)).await {
                     Ok(mut v) => {
                         embed_ms = te.elapsed().as_millis() as u64;
-                        Some((v.remove(0), n < self.cfg.exact_search_below))
+                        Some((v.remove(0), n < self.cfg.exact_search_below, n))
                     }
                     Err(err) => {
                         fallback = Some(format!("the embedding server is not available ({err})"));
@@ -1052,23 +1128,47 @@ impl Kb {
             None
         };
         let (results, used) = match (mode, qv) {
-            (SearchMode::Vector, Some((v, exact))) => (
-                self.store.search_vector(kb, &v, k, exact).await?,
-                SearchMode::Vector,
-            ),
-            (SearchMode::Hybrid, Some((v, exact))) => {
+            (SearchMode::Vector, Some((v, exact, n))) => {
+                match self.vector_hits(kb, &v, k, exact, n).await? {
+                    Some(h) => (h, SearchMode::Vector),
+                    None => {
+                        fallback = Some(LOADING.to_string());
+                        (
+                            self.store.search_lexical(kb, query, k).await?,
+                            SearchMode::Lexical,
+                        )
+                    }
+                }
+            }
+            (SearchMode::Hybrid, Some((v, exact, n))) => {
                 let depth = (k * 3).max(20);
                 let limit = Duration::from_secs(self.cfg.limits.search_timeout_s.max(1));
-                let vec = self.store.search_vector(kb, &v, depth, exact).await?;
-                match tokio::time::timeout(limit, self.store.search_lexical(kb, query, depth)).await
-                {
-                    Ok(lex) => (fuse(lex?, vec, k), SearchMode::Hybrid),
-                    Err(_) => {
+                let vec = self.vector_hits(kb, &v, depth, exact, n).await?;
+                // The store stops the query itself at the limit (`TIMEOUT`); the timer here is only a backstop.
+                let words = tokio::time::timeout(
+                    limit + Duration::from_secs(2),
+                    self.store
+                        .search_lexical_within(kb, query, depth, limit.as_secs()),
+                )
+                .await;
+                match (words, vec) {
+                    (Ok(Ok(lex)), Some(vec)) => (
+                        fuse(lex, vec, k, self.cfg.vector_weight),
+                        SearchMode::Hybrid,
+                    ),
+                    // The meaning index of a large base is still being loaded: the words answer alone, and say so.
+                    (Ok(Ok(mut lex)), None) => {
+                        fallback = Some(LOADING.to_string());
+                        lex.truncate(k);
+                        (lex, SearchMode::Lexical)
+                    }
+                    (Ok(Err(e)), _) if !is_timeout(&e) => return Err(e),
+                    (_, vec) => {
                         fallback = Some(format!(
                             "the search by words took more than {} s and was skipped",
                             limit.as_secs()
                         ));
-                        let mut vec = vec;
+                        let mut vec = vec.unwrap_or_default();
                         vec.truncate(k);
                         (vec, SearchMode::Vector)
                     }
@@ -1076,14 +1176,24 @@ impl Kb {
             }
             _ => {
                 let limit = Duration::from_secs(self.cfg.limits.search_timeout_s.max(1));
-                let hits = tokio::time::timeout(limit, self.store.search_lexical(kb, query, k))
-                    .await
-                    .map_err(|_| {
-                        KbError::Busy(format!(
-                            "the search by words took more than {} s; try fewer or rarer words",
-                            limit.as_secs()
-                        ))
-                    })??;
+                let busy = || {
+                    KbError::Busy(format!(
+                        "the search by words took more than {} s; try fewer or rarer words",
+                        limit.as_secs()
+                    ))
+                };
+                let hits = match tokio::time::timeout(
+                    limit + Duration::from_secs(2),
+                    self.store
+                        .search_lexical_within(kb, query, k, limit.as_secs()),
+                )
+                .await
+                {
+                    Ok(Ok(h)) => h,
+                    Ok(Err(e)) if is_timeout(&e) => return Err(busy()),
+                    Ok(Err(e)) => return Err(e),
+                    Err(_) => return Err(busy()),
+                };
                 (hits, SearchMode::Lexical)
             }
         };
@@ -1124,12 +1234,17 @@ async fn worker(kb: std::sync::Weak<Kb>, mut rx: mpsc::UnboundedReceiver<Job>) {
 }
 
 /// Merge lexical and vector hits by reciprocal rank; each hit keeps both scores, `score` becomes the fused one.
-pub fn fuse(lex: Vec<Hit>, vec: Vec<Hit>, k: usize) -> Vec<Hit> {
+///
+/// The vector arm counts `vector_weight` against the words' 1.0 (FR-K63). Measured on 70 questions over two bases of the
+/// paper, an equal weight let the weaker arm (first place for 50 to 62 % of the questions against 86 to 88 % for the
+/// words) push the right passage down; 0.1 raised the mean reciprocal rank by 0.03 to 0.04 and kept the vector arm's
+/// recall.
+pub fn fuse(lex: Vec<Hit>, vec: Vec<Hit>, k: usize, vector_weight: f64) -> Vec<Hit> {
     let lists = [
         lex.iter().map(|h| h.chunk_id.as_str()).collect::<Vec<_>>(),
         vec.iter().map(|h| h.chunk_id.as_str()).collect::<Vec<_>>(),
     ];
-    let fused = embed::rrf(&lists, 60.0);
+    let fused = embed::rrf_weighted(&lists, &[1.0, vector_weight], 60.0);
     let mut out: Vec<Hit> = Vec::with_capacity(k);
     for (id, score) in fused.into_iter().take(k) {
         let l = lex.iter().find(|h| h.chunk_id == id);
@@ -1203,6 +1318,16 @@ pub fn fuse_graph(
     out
 }
 
+const LOADING: &str = "the meaning index of this large base is loading into memory (first use); answered by words for now";
+
+/// Whether the store stopped a query because it ran past its `TIMEOUT`.
+fn is_timeout(e: &KbError) -> bool {
+    matches!(e, KbError::Store(m) if {
+        let m = m.to_lowercase();
+        m.contains("timeout") || m.contains("timed out")
+    })
+}
+
 /// The client's file name, reduced to a display name (no directories, no control characters, at most 200 chars).
 pub fn display_name(name: &str) -> String {
     let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
@@ -1243,6 +1368,31 @@ mod tests {
             lexical_score: None,
             vector_score: None,
         }
+    }
+
+    /// FR-K63: a hybrid search lets the words lead. A passage the words rank tenth and the meaning arm ranks second beats
+    /// the words' first when the arms are equal; with the meaning arm at 0.1 the words' first place stays, and what only
+    /// the meaning arm found still enters the list. (RRF is flat near the top, so the small weight mostly breaks
+    /// near-ties and reorders what the words rank far apart.)
+    #[test]
+    fn the_words_lead_a_hybrid_search_when_the_meaning_arm_is_weighted_down() {
+        let mut lex: Vec<Hit> = (1..=9).map(|r| h(&format!("w{r}"), r)).collect();
+        lex.push(h("both", 10));
+        let vec = vec![h("v1", 1), h("both", 2), h("v3", 3)];
+        let ids = |v: Vec<Hit>| v.into_iter().map(|x| x.chunk_id).collect::<Vec<_>>();
+        assert_eq!(ids(fuse(lex.clone(), vec.clone(), 4, 1.0))[0], "both");
+        let weighted = ids(fuse(lex.clone(), vec.clone(), 12, 0.1));
+        assert_eq!(weighted[0], "w1", "{weighted:?}");
+        assert!(
+            weighted.contains(&"v1".to_string()),
+            "the meaning arm's finds are kept: {weighted:?}"
+        );
+        let words_only = ids(fuse(lex, vec, 10, 0.0));
+        assert_eq!(
+            &words_only[..3],
+            ["w1", "w2", "w3"],
+            "weight 0 is the words alone"
+        );
     }
 
     /// FR-K50: the graph is an arm, not an override. A passage the search ranked first stays ahead of one the graph

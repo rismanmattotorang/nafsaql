@@ -57,6 +57,8 @@ pub fn from_config(k: &KnowledgeCfg) -> Option<Arc<Kb>> {
             merge_similarity: k.entity_merge_similarity,
         }),
         graph_weight: k.graph_weight,
+        vector_weight: k.vector_weight,
+        vector_cache_mb: k.vector_cache_mb,
         graph_beam: k.graph_beam.max(1),
         graph_decay: k.graph_decay,
         limits: nafs_kb::Limits {
@@ -202,7 +204,7 @@ async fn status(State(s): State<AppState>) -> Json<Value> {
             "max_request_mb": c.max_request_mb, "concurrent_uploads": c.concurrent_uploads,
             "max_documents_per_base": c.max_documents_per_base, "max_chunks_per_document": c.max_chunks_per_document,
             "max_queued_jobs": c.max_queued_jobs, "parse_timeout_s": c.parse_timeout_s, "search_timeout_s": c.search_timeout_s,
-            "max_concurrent_trainers": c.max_concurrent_trainers },
+            "max_concurrent_trainers": c.max_concurrent_trainers, "vector_cache_mb": c.vector_cache_mb },
         "kinds": ["pdf", "docx", "pptx", "tex", "html", "md", "txt"],
     }))
 }
