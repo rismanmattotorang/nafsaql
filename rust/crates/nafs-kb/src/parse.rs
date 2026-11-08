@@ -148,13 +148,44 @@ pub fn parse(kind: Kind, bytes: &[u8]) -> Result<Parsed, String> {
     Ok(p)
 }
 
+/// The letters a typographic ligature stands for, and a no-break space as a space. A PDF typeset with ligatures
+/// extracts "verifier" as `veri` + U+FB01, which no word search matches: on the technical paper's own PDFs 472 of
+/// 724 passages carried at least one (found by the live sweep, and the cause of lexical misses on words like
+/// "first", "efficient" and "workflow").
+fn ligature(c: char) -> impl Iterator<Item = char> {
+    let s: &'static str = match c {
+        '\u{a0}' | '\u{202f}' => " ",
+        '\u{fb00}' => "ff",
+        '\u{fb01}' => "fi",
+        '\u{fb02}' => "fl",
+        '\u{fb03}' => "ffi",
+        '\u{fb04}' => "ffl",
+        '\u{fb05}' | '\u{fb06}' => "st",
+        _ => "",
+    };
+    // `s` is empty for an ordinary character, which is passed through as itself.
+    let (own, rest): (Option<char>, std::str::Chars<'static>) = if s.is_empty() {
+        (Some(c), "".chars())
+    } else {
+        (None, s.chars())
+    };
+    own.into_iter().chain(rest)
+}
+
 /// Normalise extracted text (FR-K14): control characters removed, words hyphenated across line ends joined,
 /// trailing spaces trimmed, runs of blank lines collapsed to one.
 pub fn clean(text: &str) -> String {
     let text: String = text
         .chars()
         .filter(|&c| c == '\n' || c == '\t' || !c.is_control())
-        .map(|c| if c == '\u{a0}' { ' ' } else { c })
+        // Zero-width and soft-hyphen characters carry no text and split a word for a word search.
+        .filter(|c| {
+            !matches!(
+                c,
+                '\u{ad}' | '\u{200b}' | '\u{200c}' | '\u{200d}' | '\u{feff}'
+            )
+        })
+        .flat_map(ligature)
         .collect();
     let mut out = String::with_capacity(text.len());
     let mut blank = 0;
@@ -873,6 +904,25 @@ fn strip_inline(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A PDF's typographic ligatures, soft hyphens and zero-width characters become the plain letters, so the words
+    /// of a PDF are found by a word search.
+    #[test]
+    fn ligatures_and_invisible_characters_become_plain_text() {
+        assert_eq!(
+            clean("Veri\u{fb01}er-Gated, e\u{fb03}cient work\u{fb02}ow, o\u{fb00}er"),
+            "Verifier-Gated, efficient workflow, offer"
+        );
+        assert_eq!(
+            clean("sof\u{ad}tware\u{200b} for\u{a0}all"),
+            "software for all"
+        );
+        assert_eq!(clean("\u{fb06}ill and \u{fb05}ill"), "still and still");
+        assert_eq!(
+            clean("plain text, with accents: caf\u{e9}"),
+            "plain text, with accents: caf\u{e9}"
+        );
+    }
     use std::io::Write;
 
     pub(crate) fn zip_of(parts: &[(&str, &str)]) -> Vec<u8> {

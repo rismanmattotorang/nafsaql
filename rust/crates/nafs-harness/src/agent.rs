@@ -298,14 +298,43 @@ pub enum Action {
 /// Shown when a patch arrives for a file the turn asked to be rewritten whole.
 const PATCH_NOT_OFFERED: &str = "A patch is not accepted for this file: reply with the whole new solution.py in one ```python block.";
 
+/// Shown when the reply ended at the token budget with an edit in it (after DeepSeek Harness, whose assembler drops
+/// every tool call from a message that finished on max-tokens): a patch or a file cut by the budget may still parse
+/// - the fence closed before the cut - and apply a truncated edit the model never meant to send.
+const CUT_AT_BUDGET: &str = "Your reply was cut at the token budget before it ended, so its edit was not applied. Reply with a shorter edit, or edit a smaller part of the file.";
+
 /// The action of a reply under the turn's rules. A grammar already makes an action the turn does not offer
 /// impossible; a host without one (Smiley Core, vLLM) lets the model write a patch for a short file it was asked to
 /// rewrite whole, and a patch assembled from a short file's lines often applies with the wrong indentation and
 /// repeats that mistake step after step, so it is refused with the instruction instead of applied.
-fn parse_allowed(reply: &str, allowed: &Allowed) -> Action {
-    match parse_action(reply) {
+fn parse_allowed(reply: &Reply, allowed: &Allowed) -> Action {
+    match parse_action(&reply.text) {
         Action::Patch(_) if !allowed.patch => Action::Disallowed(PATCH_NOT_OFFERED),
+        Action::Patch(_) | Action::WholeFile(_) if reply.usage.finish_reason == "length" => {
+            Action::Disallowed(CUT_AT_BUDGET)
+        }
         action => action,
+    }
+}
+
+/// The note added to an observation when the same action text has been sent `n` times: gentle at the third,
+/// detailed at the fifth, quiet otherwise (thresholds after DeepSeek Harness's 3 / 5 / 8; the eighth is the
+/// stall guard's business).
+pub fn repeat_notice(n: u32, action: &str) -> Option<String> {
+    let first = action
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or("")
+        .trim();
+    let first: String = first.chars().take(80).collect();
+    match n {
+        3 => Some(
+            "\nYou have sent this same action three times. Do something different.".to_string(),
+        ),
+        5 => Some(format!(
+            "\nThis is the fifth time you sent the action beginning \"{first}\". It has not changed the result; change the approach, not the wording."
+        )),
+        _ => None,
     }
 }
 
@@ -478,6 +507,8 @@ pub struct Step {
     pub usage: Option<Usage>,
     /// The transcript was compacted before this step's call.
     pub compacted: bool,
+    /// FR-H2: older observations were cut before this step's call (the model-free phase before compaction).
+    pub pruned: bool,
     /// The model the step went to.
     pub stage: Stage,
     /// Candidates judged on this step (1 outside a cascade step).
@@ -569,6 +600,8 @@ pub async fn run_agent(
     };
     let mut calls = 0u32;
     let mut repeats = 0u32;
+    // Actions sent so far, by their text, for the repeat notice; and prunes made before a compaction.
+    let mut sent: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
     let mut compact_next = false;
     let mut status = Status::Exhausted;
     // Atomics rather than Cells: the future that holds them must be Send.
@@ -617,7 +650,13 @@ pub async fn run_agent(
         let t = Instant::now();
         let steps_left = cfg.max_steps - step;
         let mut compacted = false;
+        let mut pruned = false;
         let messages = if append {
+            // Two phases (after DeepSeek Harness): first the model-free cut of older outputs, then, only if the
+            // transcript is still over its budget, the compaction into a fresh task message.
+            if transcript.estimated_tokens() > cfg.compact_at_tokens && !compact_next {
+                pruned = transcript.prune_older() > 0;
+            }
             if transcript.estimated_tokens() > cfg.compact_at_tokens || compact_next {
                 transcript.compact(task_message(task, &ws, &last, &attempts, cfg));
                 compacted = true;
@@ -671,6 +710,13 @@ pub async fn run_agent(
                 }
             }
         };
+        if let Ok(r) = &replies
+            && let Some(first) = r.first()
+            && let Some(pt) = first.usage.prompt_tokens
+            && append
+        {
+            transcript.anchor(pt as usize);
+        }
         let replies = match replies {
             Ok(r) => r,
             Err(e) => {
@@ -683,6 +729,7 @@ pub async fn run_agent(
                     ms: t.elapsed().as_millis() as u64,
                     usage: None,
                     compacted,
+                    pruned,
                     stage: turn.stage,
                     samples: 0,
                     retries,
@@ -705,7 +752,7 @@ pub async fn run_agent(
             let mut cands = vec![];
             let mut passed = 0u32;
             for r in &replies {
-                let action = parse_allowed(&r.text, &turn.allowed);
+                let action = parse_allowed(r, &turn.allowed);
                 let mut w = ws.clone();
                 let applied = apply_action(env, &action, &mut w, cfg, append, false).await;
                 lint_rejections.fetch_add(u32::from(applied.rejected), Ordering::Relaxed);
@@ -758,7 +805,7 @@ pub async fn run_agent(
             (reply, w, kind, obs, changed, files)
         } else {
             let reply = replies.into_iter().next().expect("one reply");
-            let action = parse_allowed(&reply.text, &turn.allowed);
+            let action = parse_allowed(&reply, &turn.allowed);
             let mut w = std::mem::take(&mut ws);
             let applied = apply_action(env, &action, &mut w, cfg, append, true).await;
             lint_rejections.fetch_add(u32::from(applied.rejected), Ordering::Relaxed);
@@ -773,6 +820,21 @@ pub async fn run_agent(
         };
         std::mem::swap(&mut ws, &mut ws_next);
         observation = truncate_middle(&observation, cfg.max_observation_bytes);
+        // The same action sent again (after DeepSeek Harness's repeat-tool reminder): counted whatever came of
+        // it, and named at the third and fifth time so the model sees what it keeps sending. The stall guard
+        // below reacts to the same *result*; this reacts to the same *attempt*.
+        // The notice is added after the stall guard has taken the step's signature, so a changed observation does
+        // not hide an identical failure from it.
+        let repeat_note = {
+            let key = reply.text.trim().to_string();
+            if key.is_empty() {
+                None
+            } else {
+                let n = sent.entry(key.clone()).or_insert(0);
+                *n += 1;
+                repeat_notice(*n, &key)
+            }
+        };
         let mut verdict = None;
         let mut rolled_back = false;
         if changed {
@@ -850,6 +912,9 @@ pub async fn run_agent(
         // instead of spending the rest of the budget (on this CPU a System 2 step is minutes).
         let repeated =
             failure_signature(kind, &verdict, &observation).map_or(0, |sig| stall.note(sig));
+        if let Some(note) = &repeat_note {
+            observation.push_str(note);
+        }
         if repeated >= 2 {
             observation.push_str(
                 "\nThe same failure as the previous step. Do not repeat that edit: try a different approach.",
@@ -876,6 +941,7 @@ pub async fn run_agent(
             ms: t.elapsed().as_millis() as u64,
             usage: Some(reply.usage.clone()),
             compacted,
+            pruned,
             stage: turn.stage,
             samples,
             retries,
@@ -1166,6 +1232,37 @@ pub fn ms(d: Duration) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_repeat_notice_names_the_action_at_the_fifth_time() {
+        assert!(repeat_notice(1, "x").is_none() && repeat_notice(2, "x").is_none());
+        assert!(repeat_notice(3, "x").unwrap().contains("three times"));
+        assert!(repeat_notice(4, "x").is_none());
+        let n = repeat_notice(5, "```python\nprint(1)\n```").unwrap();
+        assert!(n.contains("fifth") && n.contains("```python"), "{n}");
+        assert!(repeat_notice(6, "x").is_none());
+    }
+
+    /// A reply the token budget cut is not an edit, however complete its fence looks: the model never finished it.
+    #[test]
+    fn an_edit_cut_at_the_budget_is_refused_not_applied() {
+        let mut r = Reply::text("```python\nprint(1)\n```");
+        let allowed = Allowed {
+            patch: true,
+            whole: true,
+            run: true,
+        };
+        assert!(matches!(parse_allowed(&r, &allowed), Action::WholeFile(_)));
+        r.usage.finish_reason = "length".into();
+        assert!(matches!(
+            parse_allowed(&r, &allowed),
+            Action::Disallowed(CUT_AT_BUDGET)
+        ));
+        // A run is still read: nothing of it was lost to the cut that matters.
+        let mut run = Reply::text("```run\npython check.py\n```");
+        run.usage.finish_reason = "length".into();
+        assert!(matches!(parse_allowed(&run, &allowed), Action::Run(_)));
+    }
     use std::collections::VecDeque;
 
     struct Script {

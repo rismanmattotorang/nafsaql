@@ -480,6 +480,7 @@ impl Orchestrator {
             g.calibration_min_n,
             g.calibration_min_per_class,
             g.calibration_max_ece,
+            g.max_risk,
         )
     }
     pub fn promoted(&self) -> bool {
@@ -1407,6 +1408,13 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     draft_verdict = Some(v);
                 }
             }
+            // FR-R3: the question repeats the previous user turn, so the last answer did not satisfy.
+            let previous = history
+                .iter()
+                .rev()
+                .find(|m| m.role == "user")
+                .map(|m| m.content.as_str());
+            let reask = gate::is_reask(&user.content, previous, cfg.gate.reask_overlap);
             feats = gate::features(
                 &d,
                 &samples,
@@ -1415,6 +1423,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 draft_verdict.as_ref().map(|v| v.passed),
                 d.prompt_tokens,
                 cfg.gate.confidence_window as usize,
+                reask,
             );
             draft = Some(d);
         }

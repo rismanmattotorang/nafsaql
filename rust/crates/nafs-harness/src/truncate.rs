@@ -24,14 +24,14 @@ pub fn truncate_middle(s: &str, max_bytes: usize) -> String {
     )
 }
 
-fn floor_boundary(s: &str, mut i: usize) -> usize {
+pub fn floor_boundary(s: &str, mut i: usize) -> usize {
     while i > 0 && !s.is_char_boundary(i) {
         i -= 1;
     }
     i
 }
 
-fn ceil_boundary(s: &str, mut i: usize) -> usize {
+pub fn ceil_boundary(s: &str, mut i: usize) -> usize {
     while i < s.len() && !s.is_char_boundary(i) {
         i += 1;
     }

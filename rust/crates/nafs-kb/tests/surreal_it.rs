@@ -43,11 +43,16 @@ fn config(db: &str, dir: &std::path::Path) -> Option<KbConfig> {
     })
 }
 
+/// Ready by its words (the fast lane), and, when the embedder is up, by its vectors too (the slow lane, FR-K61):
+/// a document is `ready` as soon as it is stored and goes through `embedding` back to `ready` afterwards.
 async fn wait_ready(kb: &Kb, base: &str, doc: &str) -> nafs_kb::Document {
+    let embedding = matches!(kb.embedder_status().await, Some((_, true)));
     let t = Instant::now();
     loop {
         let d = kb.store().get_document(base, doc).await.unwrap();
-        if d.status == "ready" || d.status == "failed" || t.elapsed() > Duration::from_secs(30) {
+        let words_done = d.status == "ready" || d.status == "failed";
+        let vectors_done = !embedding || d.n_embedded >= d.n_chunks || d.error.is_some();
+        if (words_done && vectors_done) || t.elapsed() > Duration::from_secs(60) {
             return d;
         }
         tokio::time::sleep(Duration::from_millis(100)).await;

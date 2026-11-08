@@ -34,7 +34,7 @@
 \begin{document}
 \title{Nafs-Aql: A Verifier-Gated Dual-Process Architecture on Small Qwen Models for CPU-Only Deployment}
 \author{Dirac~R\&D~Team%
-\thanks{Manuscript prepared 18 October 2026 (version 2.0: design and implementation); version 2.1, 24 October 2026, adds the math and code harness (Section~\ref{sec:harness}); version 2.2, 26 October 2026, adds the Codex-style agent harness (Section~\ref{sec:harness2}); version 2.3, 29 October 2026, reports the end-to-end validation of the whole system (Section~\ref{sec:sweep}); version 2.4, 31 October 2026, adds parallel and concurrent inference (Section~\ref{sec:inference}); version 2.9, 5 November 2026, adds the multi-user engine (Section~\ref{sec:phase18}) and the engine update with LittleBit (Section~\ref{sec:phase19}). Contact: Dirac R\&D Team. Section~\ref{sec:impl} reports measured results of the implemented system; elsewhere, performance figures are targets or estimates unless marked as measured.}}
+\thanks{Manuscript prepared 18 October 2026 (version 2.0: design and implementation); version 2.1, 24 October 2026, adds the math and code harness (Section~\ref{sec:harness}); version 2.2, 26 October 2026, adds the Codex-style agent harness (Section~\ref{sec:harness2}); version 2.3, 29 October 2026, reports the end-to-end validation of the whole system (Section~\ref{sec:sweep}); version 2.4, 31 October 2026, adds parallel and concurrent inference (Section~\ref{sec:inference}); version 2.9, 5 November 2026, adds the multi-user engine (Section~\ref{sec:phase18}) and the engine update with LittleBit (Section~\ref{sec:phase19}); version 3.0, 8 November 2026, adds the knowledge base, the knowledge graph and memory tokens with the retrieval upgrade after OntoSmith (Section~\ref{sec:phase20}) and the gate and harness upgrade after vLLM Semantic Router and DeepSeek Harness (Section~\ref{sec:phase22}). Contact: Dirac R\&D Team. Section~\ref{sec:impl} reports measured results of the implemented system; elsewhere, performance figures are targets or estimates unless marked as measured.}}
 \markboth{Nafs-Aql Technical Report, v2.8, November 2026}{Dirac R\&D Team: Nafs-Aql}
 \maketitle
 
@@ -66,6 +66,8 @@ dual-process reasoning, test-time compute, routing, verification, small language
 \input{sections/phase17.tex}
 \input{sections/phase18.tex}
 \input{sections/phase19.tex}
+\input{sections/phase20.tex}
+\input{sections/phase22.tex}
 \input{sections/limitations.tex}
 \input{sections/conclusion.tex}
 

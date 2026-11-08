@@ -33,7 +33,22 @@ pub struct Transcript {
     system: String,
     messages: Vec<(String, String)>,
     pub compactions: u32,
+    /// The server's own count of the prompt tokens of the last call, and how many messages the transcript held
+    /// then (after DeepSeek Harness's token meter): the size estimate is that count plus a byte estimate of what
+    /// was appended since, instead of a byte estimate of everything. On a CPU, where prefill is the cost,
+    /// compacting one step early or late is the difference between a 3 s call and a 60 s one.
+    anchor: Option<(usize, usize)>,
+    /// Older observations cut short to stay under the budget before any compaction (model-free), with the
+    /// bytes it saved.
+    pub pruned_bytes: usize,
 }
+
+/// An observation longer than this is cut to `PRUNE_HEAD` + `PRUNE_TAIL` bytes when the transcript is over its
+/// budget and that observation is not the newest (DeepSeek Harness prunes at 8,192 / 4,096 / 1,024 characters;
+/// these are bytes, on a 2,600-token budget).
+pub const PRUNE_OVER: usize = 1_200;
+pub const PRUNE_HEAD: usize = 600;
+pub const PRUNE_TAIL: usize = 200;
 
 impl Transcript {
     pub fn new(system: &str, first_user: String) -> Self {
@@ -41,7 +56,50 @@ impl Transcript {
             system: system.to_string(),
             messages: vec![("user".into(), first_user)],
             compactions: 0,
+            anchor: None,
+            pruned_bytes: 0,
         }
+    }
+
+    /// The server reported `prompt_tokens` for a call made with the transcript as it is now: anchor the
+    /// estimate on it. Called after a reply and before its exchange is appended.
+    pub fn anchor(&mut self, prompt_tokens: usize) {
+        self.anchor = Some((self.messages.len(), prompt_tokens));
+    }
+
+    /// Older observations (every user message but the task and the newest exchange) longer than `PRUNE_OVER`
+    /// bytes are cut to their head and tail. Returns the bytes saved. The prefix cache is lost from the first
+    /// cut message on, as it would be by a compaction, but the model keeps its recent history instead of a
+    /// summary of it; the full text was already seen when it was fresh.
+    pub fn prune_older(&mut self) -> usize {
+        let n = self.messages.len();
+        if n < 4 {
+            return 0;
+        }
+        let mut saved = 0;
+        // Indices 1..n-2: after the task message, before the newest (assistant, user) exchange.
+        for i in 1..n.saturating_sub(2) {
+            let (role, content) = &self.messages[i];
+            if role != "user" || content.len() <= PRUNE_OVER || content.contains("…pruned…") {
+                continue;
+            }
+            let head_end = crate::truncate::floor_boundary(content, PRUNE_HEAD);
+            let tail_start = crate::truncate::ceil_boundary(content, content.len() - PRUNE_TAIL);
+            let removed = tail_start.saturating_sub(head_end);
+            let cut = format!(
+                "{}\n…pruned… ({removed} bytes of this older output left out)\n{}",
+                &content[..head_end],
+                &content[tail_start..]
+            );
+            saved += content.len().saturating_sub(cut.len());
+            self.messages[i].1 = cut;
+        }
+        if saved > 0 {
+            self.pruned_bytes += saved;
+            // The cut messages sit before the anchor, so the anchored count no longer describes them.
+            self.anchor = None;
+        }
+        saved
     }
 
     /// The request's messages: the system prompt, then the transcript in order.
@@ -56,19 +114,24 @@ impl Transcript {
     }
 
     pub fn estimated_tokens(&self) -> usize {
-        (self.system.len()
-            + self
-                .messages
+        let bytes = |from: usize| {
+            self.messages[from..]
                 .iter()
                 .map(|(_, c)| c.len() + 8)
-                .sum::<usize>())
-            / BYTES_PER_TOKEN
+                .sum::<usize>()
+                / BYTES_PER_TOKEN
+        };
+        match self.anchor {
+            Some((at, tokens)) if at <= self.messages.len() => tokens + bytes(at),
+            _ => self.system.len() / BYTES_PER_TOKEN + bytes(0),
+        }
     }
 
     /// Replace everything after the system prompt by one user message (the compacted state).
     pub fn compact(&mut self, first_user: String) {
         self.messages = vec![("user".into(), first_user)];
         self.compactions += 1;
+        self.anchor = None;
     }
 }
 
@@ -147,6 +210,46 @@ pub fn one_line(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The estimate follows the server's count once a call reported one, and only the appended part is estimated.
+    #[test]
+    fn the_meter_anchors_on_the_reported_count() {
+        let mut t = Transcript::new("sys", "task ".repeat(100));
+        let before = t.estimated_tokens();
+        assert!(before > 100);
+        t.anchor(40);
+        assert_eq!(t.estimated_tokens(), 40, "nothing appended since the count");
+        t.push("assistant", "a".repeat(300));
+        assert_eq!(t.estimated_tokens(), 40 + (300 + 8) / BYTES_PER_TOKEN);
+        t.compact("task".into());
+        assert!(t.estimated_tokens() < 40, "a compaction forgets the anchor");
+    }
+
+    /// Older long outputs are cut before any compaction; the task and the newest exchange stay whole.
+    #[test]
+    fn pruning_cuts_older_outputs_and_keeps_the_newest_exchange() {
+        let mut t = Transcript::new("sys", "task".into());
+        let long = "x".repeat(3_000);
+        t.push("assistant", "a1".into());
+        t.push("user", long.clone());
+        t.push("assistant", "a2".into());
+        t.push("user", long.clone());
+        let saved = t.prune_older();
+        assert!(saved > 2_000, "{saved}");
+        let m = t.messages();
+        assert_eq!(m[1].1, "task");
+        assert!(
+            m[3].1.contains("…pruned…") && m[3].1.len() < 1_000,
+            "the older output is cut"
+        );
+        assert_eq!(m[5].1, long, "the newest output is whole");
+        assert_eq!(
+            t.prune_older(),
+            0,
+            "a second pass finds nothing left to cut"
+        );
+        assert_eq!(Transcript::new("s", "t".into()).prune_older(), 0);
+    }
 
     fn ws() -> Workspace {
         [("solution.py".to_string(), "x = 1\n".to_string())].into()

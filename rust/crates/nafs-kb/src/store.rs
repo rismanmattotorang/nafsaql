@@ -341,7 +341,40 @@ impl Store {
         let db = ident(&self.cfg.database);
         self.rpc(&format!("DEFINE NAMESPACE IF NOT EXISTS {ns}; USE NS {ns}; DEFINE DATABASE IF NOT EXISTS {db};"), json!({}))
             .await?;
-        self.query(SCHEMA, json!({})).await.map(|_| ())
+        self.query(SCHEMA, json!({})).await?;
+        self.migrate_words_index().await
+    }
+
+    /// FR-K51: a database made before Phase 21 has its full-text index over `text`, and `DEFINE INDEX IF NOT
+    /// EXISTS` leaves it alone, so lexical search would fail with "no suitable index" on `search_text`. Found by the
+    /// live sweep on an existing database. The old index is dropped, every passage gets its `search_text`, and the
+    /// index is defined over it. A database already migrated (or new) is left as it is.
+    async fn migrate_words_index(&self) -> Result<(), KbError> {
+        let r = self.query("INFO FOR TABLE chunk;", json!({})).await?;
+        let def = r
+            .into_iter()
+            .last()
+            .and_then(|v| {
+                v.pointer("/indexes/chunk_text")
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+            .unwrap_or_default();
+        if def.is_empty() || def.contains("FIELDS search_text") {
+            return Ok(());
+        }
+        tracing::info!("migrating the full-text index to search_text (FR-K51)");
+        self.query("REMOVE INDEX IF EXISTS chunk_text ON chunk;", json!({}))
+            .await?;
+        for kb in self.list_kbs().await? {
+            self.backfill_search_text(&kb.id).await?;
+        }
+        self.query(
+            "DEFINE INDEX IF NOT EXISTS chunk_text ON chunk FIELDS search_text FULLTEXT ANALYZER kb_text BM25;",
+            json!({}),
+        )
+        .await
+        .map(|_| ())
     }
 
     // ------------------------------------------------------------ knowledge bases
@@ -966,8 +999,10 @@ impl Store {
                 .iter()
                 .map(|c| {
                     let s = |k: &str| c.get(k).and_then(Value::as_str).unwrap_or("");
-                    json!({ "id": s("id"),
-                        "st": crate::embed::passage_text(s("title"), s("heading"), s("context"), s("text")) })
+                    // Never empty: an empty `search_text` is what marks a passage as still to do, so a passage with
+                    // no text at all would be picked again for ever.
+                    let st = crate::embed::passage_text(s("title"), s("heading"), s("context"), s("text"));
+                    json!({ "id": s("id"), "st": if st.trim().is_empty() { " ".to_string() } else { st } })
                 })
                 .collect();
             done += rows_in.len();

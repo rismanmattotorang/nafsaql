@@ -55,6 +55,17 @@ A room is a shared chat. Everyone connected sees each question and the assistant
 
 Rooms are not removed by the 90-day retention purge: they stay until someone deletes them. There are no accounts, so anyone who can reach the service can read, rename or delete any room; run it with access keys (see the operator runbook) when that is not acceptable.
 
+## Your documents
+
+Open **Knowledge** in the left bar to give the assistant documents of your own. Everything stays on this machine.
+
+- **Create a knowledge base** with *New*, then drop files on it or choose them: PDF, Word, PowerPoint, LaTeX, web pages, Markdown and text, up to 50 MB each. A document is *Ready* within seconds and searchable by its words at once; its meaning index follows in the background (the row says *Words only* until then), and a bigger upload never holds a smaller one up.
+- **Search** the base by *Meaning and words* (the default), *Meaning* alone, or *Words* alone. Each hit shows its document, heading and page, with your words highlighted.
+- **Passages** opens a document's passages, each with the heading it sits under; the circular arrow reads a document again (after a parser or chunking change), and the cross removes it with its passages.
+- **The knowledge graph** card lists the things your documents name and how they relate. Build it with *Build the graph* (it reads every passage with the quick model, so it takes about a minute per passage on a 4-core CPU and runs in the background). Pick a thing to see its relations, each with the sentence that states it; a relation is kept only when that sentence really occurs in the passage. The list of types the graph is read under can be changed through the API (`PUT /v1/kb/{kb}/ontology`).
+- **Ask about a base** from Chat: pick it in the box under the composer, then choose *Passages* (the answer cites numbered passages), *Passages and graph* (relations are shown above the passages, and a question that needs two steps follows the chain), or *Choose for me*. Every answer says which searches ran and why any was skipped, and lists the passages it used, so a claim can be checked against its source.
+- **Memory** modes (experimental, *Advanced* only) use a module trained on the base's documents; they appear once a module has been trained and activated from the *Memory* card.
+
 ## Privacy
 
 Chats may be used to improve answers, after personal details are removed and a person has reviewed them. To keep a chat out, open the chat's menu (the three dots above it) and choose **Don't use to improve answers**. Chats are kept for 90 days by default.

@@ -1,7 +1,8 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.7, 2026-11-08. Status: Phases 0–7 implemented (6: training works; 7: `hybrid`, `auto` and the measured
-mode comparison), and Phase 21's retrieval and graph upgrade (FR-K50 to FR-K59, below); Phase 8 specified. Research:
+Version 1.8, 2026-11-08. Status: Phases 0–7 implemented (6: training works; 7: `hybrid`, `auto` and the measured
+mode comparison), Phase 21's retrieval and graph upgrade (FR-K50 to FR-K59, below) and Phase 22's two-lane
+ingestion (FR-K61); Phase 8 specified. Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -142,6 +143,11 @@ Phase 21 (retrieval and graph upgrade; the gap analysis and the reasoning are in
   scored by weight (normalised to the heaviest first-hop relation) times `graph_decay` per hop; a second-hop fact
   carries `via`, and the prompt shows the chain.
 - **FR-K59** Every knowledge reply carries a `sources` row naming the arms that ran and why any did not.
+- **FR-K61** (Phase 22) Ingestion runs on two lanes: parsing, chunking and storing on a fast lane that sets the
+  document `ready` (words searchable at once); vectors and the graph on a slow lane, one job at a time. A new upload
+  never waits behind another base's embedding or extraction. Found by the live sweep: a 187-byte upload waited five
+  minutes behind a 517-passage re-index. The queues are in memory, so a restart loses queued vector and graph jobs;
+  `reindex` and `graph/build` restart them.
 - **NFR-K11** `scripts/kb_modes_ab.py` gives every question exactly one fate (`answered`, `retrieved_not_used`,
   `not_retrieved`) and asserts the fates sum to the set.
 - Specified, not shipped: **FR-K57** community summaries, **FR-K58** a reranker, **FR-K60** a confidence per relation

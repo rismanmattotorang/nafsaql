@@ -97,25 +97,40 @@ def base_crud(base):
     return kb
 
 
-def ingest(base, kb):
+def wait_doc(base, kb, did, embedder, limit=300):
+    """Wait for a document to be ready by its words and, when the embedder is up, by its vectors (FR-K61: the
+    vectors follow on a slow lane after the document is already `ready`). Returns (document, seconds to ready)."""
+    doc, waited, ready_at = None, 0, None
+    while waited < limit:
+        s, r = call(base, "GET", f"/v1/kb/{kb}/documents/{did}")
+        doc = r if s == 200 else None
+        if doc and doc.get("status") in ("ready", "failed") and ready_at is None:
+            ready_at = waited
+        if doc and (doc.get("status") == "failed" or (ready_at is not None and (
+                not embedder or doc.get("error") or (doc.get("n_embedded") or 0) >= (doc.get("n_chunks") or 0)))):
+            break
+        time.sleep(3)
+        waited += 3
+    return doc, (ready_at if ready_at is not None else waited)
+
+
+def ingest(base, kb, embedder):
     """Upload the fixture, wait for it to be ready, and check what was stored. Returns the document, or None."""
     body, ctype = multipart([("sweep_fixture.md", DOC)])
     s, r = call(base, "POST", f"/v1/kb/{kb}/documents", raw=body, ctype=ctype)
     if not check("upload: accepted, with nothing refused",
                  s in (200, 201, 202) and (r.get("documents") or []) and not (r.get("refused") or []), r):
         return None
-    doc, waited = None, 0
-    while waited < 300:
-        s, r = call(base, "GET", f"/v1/kb/{kb}/documents")
-        docs = r.get("documents") or [] if s == 200 else []
-        doc = docs[0] if docs else None
-        if doc and doc.get("status") in ("ready", "failed"):
-            break
-        time.sleep(3)
-        waited += 3
+    doc, waited = wait_doc(base, kb, r["documents"][0]["id"], embedder)
     if not check("ingest: the document reaches ready", doc and doc["status"] == "ready",
                  (doc or {}).get("error") or (doc or {}).get("status")):
         return None
+    # FR-K61: parsing and storing run on their own lane, so a small upload is ready in seconds even while another
+    # base is being embedded or its graph built.
+    check("ingest: ready within 60 s whatever else is queued (FR-K61)", waited < 60, f"{waited} s")
+    if embedder:
+        check("ingest: the vectors follow on the slow lane", (doc.get("n_embedded") or 0) >= (doc.get("n_chunks") or 1),
+              {"n_chunks": doc.get("n_chunks"), "n_embedded": doc.get("n_embedded"), "note": doc.get("error")})
     check("ingest: it was split into passages", doc.get("n_chunks", 0) >= 1, doc.get("n_chunks"))
     check("ingest: the title came from the heading", doc.get("title") == "Sweep fixture", doc.get("title"))
     s, r = call(base, "GET", f"/v1/kb/{kb}/documents/{doc['id']}/chunks")
@@ -146,6 +161,55 @@ def search(base, kb, embedder):
     check("search: an unknown mode is refused", s == 400, (s, r))
     s, r = call(base, "POST", f"/v1/kb/{kb}/search", {"query": "x" * 2001})
     check("search: an over-long query is refused", s == 400, (s, str(r)[:120]))
+
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LIGATURES = "\ufb00\ufb01\ufb02\ufb03\ufb04\ufb05\ufb06"
+
+
+def pdf_checks(base, kb, embedder):
+    """A real PDF: the project's own results write-up. Metadata, clean text, and that a word search finds its words.
+
+    The first live run on the technical paper found 472 of 724 passages carrying typographic ligatures (veri + U+FB01),
+    which no word search matches; this check keeps that from coming back.
+    """
+    path = os.path.join(ROOT, "docs", "publication", "nafs_aql_lab_results.pdf")
+    if not os.path.exists(path):
+        return skip("pdf", "docs/publication/nafs_aql_lab_results.pdf is not in this checkout")
+    body, ctype = multipart([("nafs_aql_lab_results.pdf", open(path, "rb").read())])
+    s, r = call(base, "POST", f"/v1/kb/{kb}/documents", raw=body, ctype=ctype)
+    docs = r.get("documents") or [] if isinstance(r, dict) else []
+    if not check("pdf: the paper's PDF is accepted", s in (200, 201, 202) and docs and not r.get("refused"), r):
+        return
+    did = docs[0]["id"]
+    doc, _ = wait_doc(base, kb, did, embedder)
+    if not check("pdf: it reaches ready", doc and doc["status"] == "ready", (doc or {}).get("error")):
+        return
+    check("pdf: it is read as a PDF with its page count", doc.get("kind") == "pdf" and (doc.get("pages") or 0) >= 3,
+          {"kind": doc.get("kind"), "pages": doc.get("pages")})
+    check("pdf: its title came from the document, not the file name",
+          doc.get("title") and doc["title"] != "nafs_aql_lab_results" and ".pdf" not in doc["title"], doc.get("title"))
+    check("pdf: it was split into passages", (doc.get("n_chunks") or 0) >= 5, doc.get("n_chunks"))
+    chunks, off = [], 0
+    while True:
+        s, r = call(base, "GET", f"/v1/kb/{kb}/documents/{did}/chunks?offset={off}&limit=100")
+        part = r.get("chunks") or [] if s == 200 else []
+        chunks += part
+        off += len(part)
+        if not part or off >= r.get("total", 0):
+            break
+    check("pdf: no passage carries a typographic ligature", not any(c in t.get("text", "") for t in chunks for c in LIGATURES),
+          sum(any(c in t.get("text", "") for c in LIGATURES) for t in chunks))
+    check("pdf: no passage carries a replacement character", not any("\ufffd" in t.get("text", "") for t in chunks), len(chunks))
+    check("pdf: passages carry their page", any(t.get("page") for t in chunks), [t.get("page") for t in chunks[:4]])
+    # Words that a ligature used to hide: "verifier", "first", "efficient".
+    for word in ("verifier", "reflection"):
+        s, r = call(base, "POST", f"/v1/kb/{kb}/search", {"query": word, "k": 5, "mode": "lexical"})
+        hits = [h for h in (r.get("results") or []) if h.get("doc_id") == did] if s == 200 else []
+        check(f"pdf: a word search for \"{word}\" finds the PDF", bool(hits), (s, len(r.get("results") or [])))
+    if embedder:
+        s, r = call(base, "POST", f"/v1/kb/{kb}/search", {"query": "when should the slow model be consulted", "k": 8, "mode": "vector"})
+        check("pdf: a search by meaning finds the PDF", s == 200 and any(h.get("doc_id") == did for h in (r.get("results") or [])), s)
 
 
 def graph_checks(base, kb):
@@ -265,9 +329,10 @@ def main():
 
     scratch = base_crud(a.base)
     if scratch:
-        doc = ingest(a.base, scratch)
+        doc = ingest(a.base, scratch, embedder)
         if doc:
             search(a.base, scratch, embedder)
+        pdf_checks(a.base, scratch, embedder)
         memory_runs(a.base, scratch)
         ontology(a.base, scratch)
         if not a.keep:

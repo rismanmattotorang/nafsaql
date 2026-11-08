@@ -130,7 +130,7 @@ pub struct QueueStatus {
 /// What a queued job does to its document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum JobKind {
-    /// Parse, chunk, store and embed.
+    /// Parse, chunk and store (the fast lane); the vectors are queued as a `Vectors` job after it.
     Ingest,
     /// Only compute missing vectors (the passages are already stored).
     Vectors,
@@ -148,7 +148,12 @@ struct Job {
 pub struct Kb {
     store: Store,
     cfg: KbConfig,
-    tx: mpsc::UnboundedSender<Job>,
+    /// Two lanes (NFR-K06): parsing and storing a document takes milliseconds and goes first, so a new upload is
+    /// searchable by its words at once and never waits behind a long embedding or graph job of another base; the
+    /// model work (vectors, graph) queues on the slow lane, one job at a time. Found by the live sweep: with one
+    /// queue a 187-byte upload sat "queued" for five minutes behind a 517-passage re-index.
+    tx_fast: mpsc::UnboundedSender<Job>,
+    tx_slow: mpsc::UnboundedSender<Job>,
     pending: Arc<AtomicUsize>,
     running: Arc<AtomicUsize>,
     schema_ready: AtomicBool,
@@ -160,13 +165,15 @@ pub struct Kb {
 impl Kb {
     /// Create the service and start its worker (needs a Tokio runtime). Nothing touches SurrealDB until first use.
     pub fn start(cfg: KbConfig) -> Arc<Kb> {
-        let (tx, rx) = mpsc::unbounded_channel();
+        let (tx_fast, rx_fast) = mpsc::unbounded_channel();
+        let (tx_slow, rx_slow) = mpsc::unbounded_channel();
         let embedder = cfg.embed.clone().map(Embedder::new);
         let extractor = cfg.graph.clone().map(Extractor::new);
         let kb = Arc::new(Kb {
             store: Store::new(cfg.store.clone()),
             cfg,
-            tx,
+            tx_fast,
+            tx_slow,
             pending: Arc::new(AtomicUsize::new(0)),
             running: Arc::new(AtomicUsize::new(0)),
             schema_ready: AtomicBool::new(false),
@@ -174,7 +181,8 @@ impl Kb {
             embedder,
             extractor,
         });
-        tokio::spawn(worker(Arc::downgrade(&kb), rx));
+        tokio::spawn(worker(Arc::downgrade(&kb), rx_fast));
+        tokio::spawn(worker(Arc::downgrade(&kb), rx_slow));
         let k = kb.clone();
         tokio::spawn(async move {
             // Documents a previous run left half-done are read again once the store is reachable.
@@ -226,8 +234,11 @@ impl Kb {
 
     fn enqueue(&self, kb: &str, doc: &str, kind: JobKind) {
         self.pending.fetch_add(1, Ordering::Relaxed);
-        if self
-            .tx
+        let lane = match kind {
+            JobKind::Ingest => &self.tx_fast,
+            JobKind::Vectors | JobKind::Graph => &self.tx_slow,
+        };
+        if lane
             .send(Job {
                 kb: kb.into(),
                 doc: doc.into(),
@@ -375,11 +386,12 @@ impl Kb {
         if self.store.prune_graph(&job.kb).await.is_ok() {
             let _ = self.recompute_communities(&job.kb).await;
         }
-        let vectors = self.embed_document(&job.kb, &d.id, &title).await;
-        self.store
-            .set_status(&d.id, "ready", vectors.err().as_deref())
-            .await?;
+        // Ready by its words now; the vectors follow on the slow lane (the page shows "Words only" until then).
+        self.store.set_status(&d.id, "ready", None).await?;
         tracing::info!(doc = %d.id, kind = %d.kind, chunks = chunks.len(), parse_ms, "knowledge document ready");
+        if self.embedder.is_some() {
+            self.enqueue(&job.kb, &d.id, JobKind::Vectors);
+        }
         Ok(())
     }
 

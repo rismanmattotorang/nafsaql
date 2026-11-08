@@ -1,0 +1,405 @@
+{
+  "date": "2026-11-08 13:50",
+  "base": "http://127.0.0.1:8080",
+  "kb": "exnbgaoul5q9zd5a9oyp",
+  "host_load_average": [
+    5.5,
+    6.0,
+    10.7
+  ],
+  "passed": 78,
+  "failed": 0,
+  "skipped": 0,
+  "checks": [
+    {
+      "check": "status: 200 and knowledge enabled",
+      "result": "pass",
+      "detail": ""
+    },
+    {
+      "check": "status: the store is reachable",
+      "result": "pass",
+      "detail": "None"
+    },
+    {
+      "check": "status: upload limits are reported",
+      "result": "pass",
+      "detail": "{'max_files_per_request': 20, 'max_upload_mb': 50}"
+    },
+    {
+      "check": "status: the file kinds are reported",
+      "result": "pass",
+      "detail": "['pdf', 'docx', 'pptx', 'tex', 'html', 'md', 'txt']"
+    },
+    {
+      "check": "status: memory is a boolean",
+      "result": "pass",
+      "detail": "True"
+    },
+    {
+      "check": "create: 201 with an id",
+      "result": "pass",
+      "detail": "{'chars': 0, 'chunks': 0, 'created_at': '2026-11-08T06:48:35.110885Z', 'description': 'temporary', 'documents': 0, 'id': 'pj678v17lx97wuccehbz', 'name': 'Sweep scratch', 'updated_at': '2026-11-08T06:48:35.110887Z'}"
+    },
+    {
+      "check": "read: the base comes back with its name",
+      "result": "pass",
+      "detail": "{'chars': 0, 'chunks': 0, 'created_at': '2026-11-08T06:48:35.110885Z', 'description': 'temporary', 'documents': 0, 'id': 'pj678v17lx97wuccehbz', 'name': 'Sweep scratch', 'updated_at': '2026-11-08T06:48:35.110887Z'}"
+    },
+    {
+      "check": "rename: 200",
+      "result": "pass",
+      "detail": "{'chars': 0, 'chunks': 0, 'created_at': '2026-11-08T06:48:35.110885Z', 'description': 'temporary', 'documents': 0, 'id': 'pj678v17lx97wuccehbz', 'name': 'Sweep renamed', 'updated_at': '2026-11-08T06:48:35.298610Z'}"
+    },
+    {
+      "check": "list: the renamed base is listed",
+      "result": "pass",
+      "detail": "['exnbgaoul5q9zd5a9oyp', 'zvazrb4a326upn05d2ke', 'pj678v17lx97wuccehbz']"
+    },
+    {
+      "check": "list: every base says whether it has a memory module",
+      "result": "pass",
+      "detail": "[{'chars': 33853, 'chunks': 66, 'created_at': '2026-11-08T04:27:28.790121Z', 'description': 'Five sections of the paper, for the graph', 'documents': 5, 'id': 'exnbgaoul5q9zd5a9oyp', 'memory': False, 'name': 'Nafs-Aql paper sections', 'updated_at': '2026-11-08T04:54:16.893058Z'}]"
+    },
+    {
+      "check": "read: an unknown base is 404",
+      "result": "pass",
+      "detail": "(404, {'code': 'not_found', 'message': 'knowledge base not found'})"
+    },
+    {
+      "check": "upload: accepted, with nothing refused",
+      "result": "pass",
+      "detail": "{'documents': [{'bytes': 187, 'created_at': '2026-11-08T06:48:35.581300Z', 'error': None, 'filename': 'sweep_fixture.md', 'id': 'mbqhuz5wjwp16scvhg33', 'kb': 'pj678v17lx97wuccehbz', 'kind': 'md', 'n_chars': 0, 'n_chunks': 0, 'n_embedded': 0, 'n_graphed': 0, 'pages': None, 'parse_ms': None, 'sha256':"
+    },
+    {
+      "check": "ingest: the document reaches ready",
+      "result": "pass",
+      "detail": "ready"
+    },
+    {
+      "check": "ingest: ready within 60 s whatever else is queued (FR-K61)",
+      "result": "pass",
+      "detail": "3 s"
+    },
+    {
+      "check": "ingest: the vectors follow on the slow lane",
+      "result": "pass",
+      "detail": "{'n_chunks': 1, 'n_embedded': 1, 'note': None}"
+    },
+    {
+      "check": "ingest: it was split into passages",
+      "result": "pass",
+      "detail": "1"
+    },
+    {
+      "check": "ingest: the title came from the heading",
+      "result": "pass",
+      "detail": "Sweep fixture"
+    },
+    {
+      "check": "passages: the text is stored",
+      "result": "pass",
+      "detail": "1"
+    },
+    {
+      "check": "upload: the same file again is reported as a duplicate",
+      "result": "pass",
+      "detail": "{'bytes': 187, 'created_at': '2026-11-08T06:48:35.581300Z', 'duplicate': True, 'error': None, 'filename': 'sweep_fixture.md', 'id': 'mbqhuz5wjwp16scvhg33', 'kb': 'pj678v17lx97wuccehbz', 'kind': 'md', 'n_chars': 186, 'n_chunks': 1, 'n_embedded': 1, 'n_graphed': 0, 'pages': None, 'parse_ms': 5, 'sha25"
+    },
+    {
+      "check": "search (lexical): the fixture passage is found",
+      "result": "pass",
+      "detail": "(200, 1)"
+    },
+    {
+      "check": "search (vector): the fixture passage is found",
+      "result": "pass",
+      "detail": "(200, 1)"
+    },
+    {
+      "check": "search (hybrid): the fixture passage is found",
+      "result": "pass",
+      "detail": "(200, 1)"
+    },
+    {
+      "check": "search: k below the range is brought into it",
+      "result": "pass",
+      "detail": "(200, {'embed_ms': 219, 'mode': 'hybrid', 'results': [{'chunk_id': 'yy7k7kywixp231p3ti20', 'doc_id': 'mbqhuz5wjwp16scvhg33', 'doc_title': 'Sweep fixture', 'heading': 'Sweep fixture', 'lexical_score': 10.858147621154785, 'ord': 0, 'page': None, 'rank': 1, 'score': 0.03278688524590164, 'text': '# Swee"
+    },
+    {
+      "check": "search: k above the range is capped",
+      "result": "pass",
+      "detail": "(200, 1)"
+    },
+    {
+      "check": "search: an unknown mode is refused",
+      "result": "pass",
+      "detail": "(400, {'code': 'bad_request', 'message': 'unknown search mode \"nonsense\" (lexical, vector or hybrid)'})"
+    },
+    {
+      "check": "search: an over-long query is refused",
+      "result": "pass",
+      "detail": "(400, \"{'code': 'bad_request', 'message': 'the query is longer than 2,000 characters'}\")"
+    },
+    {
+      "check": "pdf: the paper's PDF is accepted",
+      "result": "pass",
+      "detail": "{'documents': [{'bytes': 47735, 'created_at': '2026-11-08T06:48:40.621524Z', 'error': None, 'filename': 'nafs_aql_lab_results.pdf', 'id': 'rmmgwx0dirogs3f8fugp', 'kb': 'pj678v17lx97wuccehbz', 'kind': 'pdf', 'n_chars': 0, 'n_chunks': 0, 'n_embedded': 0, 'n_graphed': 0, 'pages': None, 'parse_ms': None"
+    },
+    {
+      "check": "pdf: it reaches ready",
+      "result": "pass",
+      "detail": "None"
+    },
+    {
+      "check": "pdf: it is read as a PDF with its page count",
+      "result": "pass",
+      "detail": "{'kind': 'pdf', 'pages': 4}"
+    },
+    {
+      "check": "pdf: its title came from the document, not the file name",
+      "result": "pass",
+      "detail": "When should reflection restrain the first impulse?"
+    },
+    {
+      "check": "pdf: it was split into passages",
+      "result": "pass",
+      "detail": "15"
+    },
+    {
+      "check": "pdf: no passage carries a typographic ligature",
+      "result": "pass",
+      "detail": "0"
+    },
+    {
+      "check": "pdf: no passage carries a replacement character",
+      "result": "pass",
+      "detail": "15"
+    },
+    {
+      "check": "pdf: passages carry their page",
+      "result": "pass",
+      "detail": "[1, 1, 1, 2]"
+    },
+    {
+      "check": "pdf: a word search for \"verifier\" finds the PDF",
+      "result": "pass",
+      "detail": "(200, 5)"
+    },
+    {
+      "check": "pdf: a word search for \"reflection\" finds the PDF",
+      "result": "pass",
+      "detail": "(200, 5)"
+    },
+    {
+      "check": "pdf: a search by meaning finds the PDF",
+      "result": "pass",
+      "detail": "200"
+    },
+    {
+      "check": "memory runs: the list is served",
+      "result": "pass",
+      "detail": "(200, {'active': None, 'runs': [], 'trainer': True})"
+    },
+    {
+      "check": "memory runs: the list says whether the trainer is built",
+      "result": "pass",
+      "detail": "True"
+    },
+    {
+      "check": "memory runs: an unknown kind is refused",
+      "result": "pass",
+      "detail": "(400, {'code': 'bad_request', 'message': 'kind is \"train\" or \"finetune\"'})"
+    },
+    {
+      "check": "memory runs: stopping an unknown run is 404",
+      "result": "pass",
+      "detail": "(404, {'code': 'not_found', 'message': 'training run not found'})"
+    },
+    {
+      "check": "memory runs: activating a run with no checkpoint is refused",
+      "result": "pass",
+      "detail": "(400, {'code': 'bad_request', 'message': 'this run has no checkpoint yet'})"
+    },
+    {
+      "check": "memory runs: an unknown base is 404",
+      "result": "pass",
+      "detail": "(404, {'code': 'not_found', 'message': 'knowledge base not found'})"
+    },
+    {
+      "check": "ontology: the default is served with a hash",
+      "result": "pass",
+      "detail": "(200, {'default': True, 'hash': 'd79e60786821003a', 'types': [{'definition': 'a program, service or piece of software', 'name': 'system'}, {'definition': 'a trained model or model family', 'name': 'model'}, {'definition': 'a technique, algorithm or procedure', 'name': 'method'}, {'definition': 'a na"
+    },
+    {
+      "check": "ontology: every default type carries a definition",
+      "result": "pass",
+      "detail": "['system', 'model', 'method', 'dataset', 'metric', 'person', 'organization', 'concept']"
+    },
+    {
+      "check": "ontology: a custom one is accepted and is no longer the default",
+      "result": "pass",
+      "detail": "(200, {'default': False, 'hash': '8cfaca6bd51e923d', 'note': 'applies to passages read from now on; rebuild the graph with fresh=true to re-read the rest', 'types': [{'definition': 'a named vessel', 'name': 'ship'}, {'definition': 'a harbour', 'name': 'port'}]})"
+    },
+    {
+      "check": "ontology: its hash differs from the default's",
+      "result": "pass",
+      "detail": "('d79e60786821003a', '8cfaca6bd51e923d')"
+    },
+    {
+      "check": "ontology: a bad type name is refused",
+      "result": "pass",
+      "detail": "(400, {'code': 'bad_request', 'message': 'type name \"Bad Name\" must be lower-case letters, digits, _ or -, starting with a letter'})"
+    },
+    {
+      "check": "ontology: an empty list restores the default",
+      "result": "pass",
+      "detail": "(200, {'default': True, 'hash': 'd79e60786821003a', 'note': 'applies to passages read from now on; rebuild the graph with fresh=true to re-read the rest', 'types': [{'definition': 'a program, service or piece of software', 'name': 'system'}, {'definition': 'a trained model or model family', 'name': "
+    },
+    {
+      "check": "delete: the scratch base is removed with its documents and passages",
+      "result": "pass",
+      "detail": "(200, {'chunks': 16, 'deleted': True, 'documents': 2})"
+    },
+    {
+      "check": "delete: it is gone afterwards",
+      "result": "pass",
+      "detail": "404"
+    },
+    {
+      "check": "graph: the view carries nodes, edges and counts",
+      "result": "pass",
+      "detail": "{'nodes': 20, 'stats': {'communities': 177, 'entities': 271, 'relations': 100}}"
+    },
+    {
+      "check": "graph: an entity can be looked up by name",
+      "result": "pass",
+      "detail": "(200, 'memory', 5)"
+    },
+    {
+      "check": "graph: one entity's relations come with the passages that state them",
+      "result": "pass",
+      "detail": "(200, ['facts', 'passages'])"
+    },
+    {
+      "check": "graph: an unknown entity is 404 or empty",
+      "result": "pass",
+      "detail": "(200, \"{'facts': [], 'passages': []}\")"
+    },
+    {
+      "check": "chat (off): 200 with an answer",
+      "result": "pass",
+      "detail": "(200, \"{'reply_id': 'dad9373c-1794-46be-89c5-db3938ae34c3', 'conversation_id': None, 'decision_id': '4c9185c7-a04b-4be4-b6fe-dcff5c80b5a7', 'reasoning_mode': 'fast', 'assurance': 'unverified', 'trace_state':\")"
+    },
+    {
+      "check": "chat (off): no sources are claimed",
+      "result": "pass",
+      "detail": "[]"
+    },
+    {
+      "check": "chat (off): the quick path answered",
+      "result": "pass",
+      "detail": "fast"
+    },
+    {
+      "check": "chat (rag): 200 with an answer",
+      "result": "pass",
+      "detail": "(200, \"{'reply_id': '6163b314-50b0-4af8-8f56-20e2f0ab2141', 'conversation_id': None, 'decision_id': 'c79bf717-4144-4b28-86f4-08d22e34d7c9', 'reasoning_mode': 'fast', 'assurance': 'unverified', 'trace_state':\")"
+    },
+    {
+      "check": "chat (rag): passages or a reason are reported",
+      "result": "pass",
+      "detail": "[{'chunk_id': '18ha6qmjzlslksnwr1hg', 'doc_id': 'nkcur1886s5s6vxcc6uh', 'doc_title': 'Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)', 'heading': 'Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20) > Decision', 'kb"
+    },
+    {
+      "check": "chat (rag): the reply names the arms that ran (FR-K59)",
+      "result": "pass",
+      "detail": "{'arm_notes': [], 'arms': ['lexical', 'vector'], 'embed_ms': 238, 'kb': 'exnbgaoul5q9zd5a9oyp', 'search_ms': 377}"
+    },
+    {
+      "check": "chat (rag): the quick path answered",
+      "result": "pass",
+      "detail": "fast"
+    },
+    {
+      "check": "chat (graph): 200 with an answer",
+      "result": "pass",
+      "detail": "(200, \"{'reply_id': 'f4b90e05-8806-4a45-8bb8-867847851edf', 'conversation_id': None, 'decision_id': 'd0b63d81-b068-4d42-8e64-480c108c20c3', 'reasoning_mode': 'fast', 'assurance': 'unverified', 'trace_state':\")"
+    },
+    {
+      "check": "chat (graph): passages or a reason are reported",
+      "result": "pass",
+      "detail": "[{'chunk_id': '5n61e6ggo19v0mjo5qy1', 'doc_id': 'nkcur1886s5s6vxcc6uh', 'doc_title': 'Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)', 'heading': 'Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)', 'kb': 'exnbgao"
+    },
+    {
+      "check": "chat (graph): the reply names the arms that ran (FR-K59)",
+      "result": "pass",
+      "detail": "{'arm_notes': [], 'arms': ['lexical', 'vector', 'graph'], 'embed_ms': 257, 'kb': 'exnbgaoul5q9zd5a9oyp', 'search_ms': 397}"
+    },
+    {
+      "check": "chat (graph): every fact carries a hop and the quotes are strings (FR-K55/56)",
+      "result": "pass",
+      "detail": "[{'hop': 1, 'predicate': 'stayed attached to', 'quote': 'a deleted base stayed attached to chat with no way to detach it', 'source': 'checkpoint', 'target': 'deleted base', 'weight': 1}]"
+    },
+    {
+      "check": "chat (graph): the quick path answered",
+      "result": "pass",
+      "detail": "fast"
+    },
+    {
+      "check": "chat (auto): 200 with an answer",
+      "result": "pass",
+      "detail": "(200, \"{'reply_id': '0deb2a2f-fd03-456c-b614-11b77205cd85', 'conversation_id': None, 'decision_id': '20611854-ef32-4ca1-a360-2c8ccf198213', 'reasoning_mode': 'fast', 'assurance': 'unverified', 'trace_state':\")"
+    },
+    {
+      "check": "chat (auto): passages or a reason are reported",
+      "result": "pass",
+      "detail": "[{'chunk_id': '18ha6qmjzlslksnwr1hg', 'doc_id': 'nkcur1886s5s6vxcc6uh', 'doc_title': 'Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)', 'heading': 'Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20) > Decision', 'kb"
+    },
+    {
+      "check": "chat (auto): the reply names the arms that ran (FR-K59)",
+      "result": "pass",
+      "detail": "{'arm_notes': [], 'arms': ['lexical', 'vector'], 'embed_ms': 255, 'kb': 'exnbgaoul5q9zd5a9oyp', 'search_ms': 402}"
+    },
+    {
+      "check": "chat (auto): the quick path answered",
+      "result": "pass",
+      "detail": "fast"
+    },
+    {
+      "check": "chat (memory): 200 with an answer",
+      "result": "pass",
+      "detail": "(200, \"{'reply_id': 'e9cb664f-91bb-4d9c-97f6-f0113e5c063a', 'conversation_id': None, 'decision_id': '6e92f6c2-42a6-4512-9f8d-14df5790e411', 'reasoning_mode': 'fast', 'assurance': 'unverified', 'trace_state':\")"
+    },
+    {
+      "check": "chat (memory): memory tokens were read, or it fell back and said so",
+      "result": "pass",
+      "detail": "['Memory could not be read (no memory module for this knowledge base: train one on the Knowledge page); the passages were used instead.']"
+    },
+    {
+      "check": "chat (memory): the quick path answered",
+      "result": "pass",
+      "detail": "fast"
+    },
+    {
+      "check": "chat (hybrid): 200 with an answer",
+      "result": "pass",
+      "detail": "(200, \"{'reply_id': 'bcd750de-821a-4134-8cc8-c9fd2c7f4241', 'conversation_id': None, 'decision_id': '946fd651-8bcf-4a5e-acc9-33c23e380de2', 'reasoning_mode': 'fast', 'assurance': 'unverified', 'trace_state':\")"
+    },
+    {
+      "check": "chat (hybrid): memory tokens were read, or it fell back and said so",
+      "result": "pass",
+      "detail": "['Memory could not be read (no memory module for this knowledge base: train one on the Knowledge page); the passages were used instead.']"
+    },
+    {
+      "check": "chat (hybrid): the quick path answered",
+      "result": "pass",
+      "detail": "fast"
+    },
+    {
+      "check": "chat: an unknown base is reported in the sources, not a 500",
+      "result": "pass",
+      "detail": "(200, ['The knowledge base could not be searched: knowledge base not found'])"
+    }
+  ]
+}

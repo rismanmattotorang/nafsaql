@@ -4,307 +4,125 @@
 
 ### Fast when it can. Careful when it must.
 
-**A verifier-gated dual-process AI that runs on a CPU.**
-A small model answers at once. A reasoning model deliberates only when it pays. Exact checkers, not model agreement, decide what counts as correct.
+**An AI assistant that runs on your own computer, answers from your own documents, and tells you how sure it is.**
+No GPU. No API key. Nothing leaves your machine.
 
 [![CI](https://github.com/rismanmattotorang/nafsaql/actions/workflows/ci.yml/badge.svg)](https://github.com/rismanmattotorang/nafsaql/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Rust 1.96+](https://img.shields.io/badge/rust-1.96%2B-orange.svg)](rust/Cargo.toml)
-[![CPU only](https://img.shields.io/badge/inference-CPU--only-teal.svg)](#measured-results)
-[![Status: research preview](https://img.shields.io/badge/status-research%20preview-8A2BE2.svg)](docs/roadmap/STATUS.md)
+[![Runs on CPU](https://img.shields.io/badge/runs%20on-CPU-teal.svg)](docs/features_and_results.md)
 [![Built by Dirac R&D Team](https://img.shields.io/badge/built%20by-Dirac%20R%26D%20Team-111827.svg)](https://dirac.id)
 
-[Technical report](docs/report/nafs_aql_report.pdf) ·
-[Slides](docs/slides/nafs_aql_slides.pdf) ·
-[Specification](docs/spec/nafs_aql_spec.pdf) ·
-[Roadmap](docs/roadmap/nafs_aql_roadmap.pdf) ·
-[Status](docs/roadmap/STATUS.md) ·
-[User guide](docs/user_guide.md)
+[Quick start](#quick-start) ·
+[Your documents](#ask-your-own-documents) ·
+[How it works](#how-it-works) ·
+[Numbers](#the-numbers) ·
+[Docs](docs/index.md) ·
+[Technical report](docs/report/nafs_aql_report.pdf)
 
 <br>
 
-<img src="docs/shared/screenshots/chat.png" alt="Nafs-Aql chat: System 2 deliberation, judged answer, and the gate's decision record" width="920">
+<img src="docs/shared/screenshots/chat.png" alt="Nafs-Aql answering a question and showing how the answer was checked" width="920">
 
 </div>
 
 ---
 
-## Why Nafs-Aql
+## What you get
 
-Reasoning models get hard questions right by spending inference compute, and waste it on easy ones. On a laptop-class CPU the waste is not abstract: Qwen3-4B-Thinking decodes at roughly 6–8 tokens/s on four cores, so one long chain of thought is minutes. Nafs-Aql asks a single question and answers it with measurements:
+- **Answers you can trust, or an honest "I'm not sure".** A small model answers straight away. A reasoning model steps in only when a question is hard enough to be worth the wait. When a problem has a checkable answer (maths, code that must pass tests, data that must match a schema), a checker, not the model, decides if it is right.
+- **Your documents, searchable and quotable.** Drop in PDFs, Word files, slides, LaTeX, web pages or notes. Ask questions in plain language and get answers with numbered sources, and a map of who and what your documents talk about.
+- **Runs on an ordinary laptop or desktop.** Built and tested on a 4-core Intel CPU with no graphics card. Your data stays on your machine.
+- **Shows its work.** Every answer says whether it was *verified*, a *consensus*, or *unverified*, how long each step took, and what the gate decided.
+- **Built for teams.** Shared chat rooms, a research lab for comparing settings, drift alerts, an audit trail, and a documented API.
 
-> **When is deliberation worth its cost, and who decides that it worked?**
+## Ask your own documents
 
-Three design rules follow.
+Upload files, and Nafs-Aql reads them into a private knowledge base on your machine. Ask a question and it finds the passages that answer it, writes the answer, and cites them.
 
-| Rule | What it means in the code |
+<table>
+<tr>
+<td width="50%"><img src="docs/shared/screenshots/knowledge.png" alt="The Knowledge page: documents ready, with passages and search"><br><sub><b>Your library.</b> PDF, Word, PowerPoint, LaTeX, web pages, Markdown and text. Search by words, by meaning, or both.</sub></td>
+<td width="50%"><img src="docs/shared/screenshots/knowledge_chat.png" alt="A chat answer with numbered sources from the knowledge base"><br><sub><b>Answers with sources.</b> Every claim points at the passage that states it.</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/shared/screenshots/knowledge_graph.png" alt="The knowledge graph of a set of documents" width="100%"><br><sub><b>A map of your documents.</b> The things they name and how they relate, each relation carrying the sentence that states it, checked against the passage word for word.</sub></td>
+</tr>
+</table>
+
+What is under it, in plain terms:
+
+| | |
 |---|---|
-| **Cheap first** | System 1 (Qwen3-1.7B) drafts immediately. The *Aql Gate* escalates to System 2 (Qwen3-4B-Thinking-2507) only when the expected error saved outweighs the price of the extra latency: `L·(ê₁ − ê₂) > λ·Δc`. |
-| **Evidence, not agreement** | Where an exact checker exists (math references, Python unit tests in a sandbox, JSON Schema) its verdict is final. Agreement between samples is a *flag*, never proof. Everything else is labelled *consensus* or *unverified*, and the system can *abstain*. |
-| **Measure, then keep** | Every speed-up has to survive an interleaved A/B on the reference machine. The rejected ones are published next to the adopted ones. |
+| **Finds the right passage** | Searches by exact words and by meaning together, and indexes each passage with its title, heading and a one-line summary so a passage that says "it" is still found by what it is about. |
+| **Reads, not just retrieves** | The answer is built from the sentences that matter, whole, rather than from the first characters of each passage. |
+| **A graph you can check** | Entities and relations are read from your documents under a type list you can edit. A relation is kept only if the sentence behind it really appears in the passage. |
+| **Follows connections** | Questions that need two steps ("what did the engine that merged in Phase 19 expose?") walk the graph two hops and show the chain. |
+| **Says which searches ran** | Each answer lists the searches it used and why any were skipped. |
+
+## Quick start
+
+You need Rust 1.96+, Python 3.10+, and about 4 GB of disk for the models.
+
+```bash
+git clone https://github.com/rismanmattotorang/nafsaql.git && cd nafsaql
+make models      # downloads the two models (about 3.6 GB)
+make up          # builds everything, starts the models and the app
+```
+
+Open **http://127.0.0.1:8080**. Try the *Verified math* example, then press **Think harder** on the answer. `make down` stops everything.
+
+To use your documents, open **Knowledge**, create a library, drag files in, then pick it from the chat box. The full set-up notes, including other serving options, are in [docs/serving_and_operations.md](docs/serving_and_operations.md).
 
 ## How it works
 
 ```mermaid
 flowchart LR
-  U["Client · Web UI"] --> G["Rust gateway · axum"]
-  G --> O[Orchestrator]
-  O -->|"draft + log-probs"| S1["System 1<br/>Qwen3-1.7B"]
-  S1 --> V1{Exact verifier}
-  V1 -->|"passes"| T[Accepted · verified]
-  V1 -->|"fails, or the gate says so"| S2["System 2<br/>Qwen3-4B-Thinking<br/>draft-blind, budget-forced"]
-  S2 -->|"adaptive exit:<br/>probe, then verify"| V2{Verifier or judge}
-  V2 -->|"passes"| T
-  V2 -->|"no candidate in budget"| X["Abstain, with a notice"]
-  O --> L[("Muhasaba ledger<br/>audits · drift · calibration")]
+  Q["Your question"] --> S1["Small model<br/>answers at once"]
+  S1 --> C{"Checker"}
+  C -->|"passes"| A["Answer<br/>verified"]
+  C -->|"fails, or the gate is unsure"| S2["Reasoning model<br/>thinks it through"]
+  S2 --> C2{"Checker or judge"}
+  C2 -->|"passes"| A
+  C2 -->|"nothing earned acceptance"| X["Says it is not sure"]
+  K[("Your documents")] -.->|"passages and graph"| S1
 ```
 
-Every request moves through a small, bounded automaton and the reply says where it ended up:
+The gate escalates only when the expected error saved is worth the extra waiting time, and once it has learned from enough checked answers it keeps a quick answer only in a confidence band whose error rate is certified, not averaged. Where a checker exists its verdict is final; agreement between samples is a hint, never proof. A question asked twice is treated as a sign the first answer missed. Everything else is labelled honestly, and the system can decline to answer.
 
-| State | Meaning | Design vocabulary |
-|:--:|---|---|
-| **A** | System 1 drafts (fast, no reasoning) | *nafs*: the first impulse |
-| **L** | The gate or a verifier flags the draft | *lawwāma*: self-reproach |
-| **M** | System 2 deliberates, never seeing the draft, within a token budget | *ʿaql*: reflection |
-| **T** | Accepted with an assurance level: *verified*, *consensus* or *unverified* | *muṭmaʾinna*: at rest |
-| **X** | Abstain: no candidate earned acceptance | *tawaqquf*: withholding judgement |
+## The numbers
 
-> The Islamic vocabulary of the self is a **design analogy**, not a theological claim. Engineering names are primary in code and documents; the analogy text is awaiting scholar review (gate G6, SR-005).
-
-## What is inside
+Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so absolute speeds are lower bounds. Every figure comes from a stored run in [`benchmarks/`](benchmarks/).
 
 | | |
 |---|---|
-| 🧠 **Aql Gate** | A threshold rule derived from a decision-theoretic model, with a fixed-rule mode, a held-out *calibrated* mode (promoted only if ECE ≤ 0.05) and a *budget* mode with a target escalation rate. Early escalation stops a doomed draft after 32 tokens. |
-| ✅ **Verifier Hub** | Numeric and SymPy math, code tests in an OS sandbox (macOS `sandbox-exec`, Linux namespaces plus seccomp), JSON Schema. True- and false-accept rates are *measured* with a mutation harness and shown on every verdict. |
-| ⏱ **Adaptive reasoning exit** | System 2's reasoning is probed for its answer at reflection points; on verifiable tasks the exact checker decides whether to stop. The final answer is still generated after the reasoning, as on the standard path. |
-| 🔬 **Research lab in the browser** | Paired experiments with bootstrap CIs, exact McNemar tests and Bonferroni correction; a pooled *policy map* of the best System 1 / System 2 policy per domain and price of latency; human *Both* trials; resumable runs. |
-| 📈 **Latency attribution** | Every reply records where its time went: queue, prefill, decode and KV-cache reuse per model stage, straight from llama-server's timings. |
-| 🛡 **Operations built in** | Drift monitor (CUSUM with a shuffled negative control), alerts with a drill mode, Prometheus metrics, audit stream, retention purge, secure-by-default bind, token auth, TLS recipes. |
-| 🔁 **Distillation loop (Tazkiya)** | Verified System 2 traces become System 1 training data under a promotion gate with one-command rollback. The GPU training run itself is deferred. |
-| 👥 **Rooms** | Shared chats over WebSocket: everyone sees each question and the assistant's answer as it is written. Create, rename, search, share a link, export, and delete for good (the room, its messages and every ledger row made from it, in one transaction). Presence, typing, a queue of assistant turns, unique display names, automatic reconnection, and a join snapshot that delivers every turn exactly once however late you arrive. |
-| 🧭 **Sequential evidence (Phase 8)** | The rules that read a *stream* of evidence come from sequential analysis and decision neuroscience: a lowest-window confidence signal whose early crossing *is* the full-draft decision (a running minimum), a posterior stopping rule with a collapsing bound for the adaptive exit, Wald's bound on what an early escalation can promise, and the optimal probe interval. A review of quantum theories of consciousness is included as a negative result, with the test each idea failed. |
-| 🧮 **Math and code harness (Phase 10)** | Mechanisms taken from two open agent harnesses, as pure Rust in `nafs-harness`. From [Open Math Harness](https://github.com/openmathmodel/open-math-harness): **Lean 4 as an exact verifier** under its frozen-statement protocol (no `sorry`, no axioms, the elaborated type must match), and **best-first repair** over a tree of candidates scored by the verifier, with per-assert credit on code. From [OpenAI Codex](https://github.com/openai/codex): **`apply_patch` repairs** with its fuzzy matcher, head-and-tail evidence, and a **code agent** (`POST /v1/harness/code`) that patches and runs its workspace in the sandbox and stops only when the hidden tests pass. |
-| 🤖 **Codex-style agent harness (Phase 11)** | The code agent's loop rebuilt on the mechanisms of Codex's agent core, adapted to a 1.7B/4B model on four CPU cores: an **append-only transcript** so llama-server's prompt cache reuses every earlier exchange (a cold 1,969-token prompt prefilled in 64 s, the same prompt plus one exchange in 3 s), harness-written **compaction**, Codex's `apply_patch` grammar as a **per-step GBNF grammar** that keeps the reasoning span free and stops decoding at the end of the action, a **whole-file edit policy** for short files, budget reminders, the run's cap enforced inside a model call, and the run's net diff. |
-| ⚡ **Parallel inference on four cores (Phase 13)** | Measured first, then built where it pays: llama-server batches 4 streams at **2.3–2.7×** the tokens per second at short context but only **1.5×** at the 1,600 tokens of a repair prompt. So the cores are used *before* the expensive model: agreement samples share the draft's batch (**−24 %** time to the gate's decision), a failed draft gets 4 concurrent System 1 samples, each verified as it finishes, before System 2 is used, and rounds go out as one request with `n` choices so the prompt is prefilled once. Hedged candidates on System 2 are implemented and **off**: they did not pay. System 2 has 4 slots. |
-| 🪜 **Engine knobs, the model switch, a cascade in the harness (Phase 14)** | Measured on the reference machine: the engine's own flags (flash attention, micro-batch, threads, polling) were **inconclusive on a shared host** and stay unchanged; co-scheduling the two servers showed **nothing to arbitrate** on four cores (the pair writes 7.1–7.8 tokens/s in every variant); the switch from System 1 to System 2 inside a request costs **about 1.5 s** and no System 1 slot survives the decision. Built: a **cascade in the code agent** (four System 1 candidates in one request, each judged by the exact verifier; System 2 only when none passes: **−26 % wall time**, six of ten tasks never reach System 2), **retries with Codex's backoff**, and a **warm-first backend switch** (the new pair is primed before the atomic swap). |
-| 🦀 **Smiley Core, the Rust engine, as the default backend (Phase 15)** | The owner's Rust CPU engine is vendored into the workspace and served behind the gateway as a third backend. Measured against llama.cpp: **1.13× decode** on both models alone and **131 s vs 303 s** for twelve checked prompts through the whole gateway (9/9 on both, faster in 10 of 12), so it is the **default** (`make up`); llama.cpp stays one command away (`make up-llama`) for several concurrent users, since Smiley Core decodes one stream per model. A hardening fix came out of it: the code agent now accepts a patch that omits its `*** Begin Patch` line. |
-| 🧭 **The code agent against modern harnesses (Phase 16)** | Research on SWE-agent, Agentless, observation masking, Anthropic's context engineering, Gemini CLI, Claude Code and DeepSeek-V3.2 against the agent's loop. Built what mattered on four CPU cores: a **compile check before the verifier** (an edit that does not compile is refused, with the error and the lines around it, and costs no verifier run), **rollback to the best version**, a **stall guard** that nudges on the second identical failure and ends the run as `stuck` on the fourth, and **caller guidelines** (the AGENTS.md / CLAUDE.md / GEMINI.md role). Measured interleaved over ten tasks on both models: **no change in verified count, calls or time** (the check costs 37 ms per edit); the guards are justified by the research and by a 900 s run lost to repeated `IndentationError`s, and the A/B found and fixed a stall-guard blind spot. Not closed, with reasons: self-generated tests, reasoning persistence, sub-agents. |
-| ⚙️ **Smiley Core's speed, the model switch, the harness's cost (Phase 17)** | The engine is within **60-95 % of the machine's memory bandwidth** (measured ceiling 19.5 GB/s), so the gains were in repeated work, not in more parallelism. **Three decode threads beat four** on this shared host (+4 % / +8 %; six of six interleaved pairs). A **prefix store** keeps finished conversations' caches and restores the longest shared beginning: switching between chat, agent and arithmetic prompts fell from **5.8 s (System 1) and 14 s (System 2) of prefill to 0.1 s and 0.2 s**, equal to llama.cpp's slots, with **byte-identical** answers. The reasoning budget's continuation had been **re-prefilling the reasoning it had just computed** (a stray newline broke the cache match): now 5 tokens, 0.2 s; cold prefill per escalated request −70 %, mean request time 182 s → 133 s. The System 1 → System 2 handoff is 0.08 s of gate time and 0.4-1.4 s to the first reasoning token, with nothing to freeze. The harness's guards cost nothing (compile check 37 ms). |
-| 👥 **Smiley Core serves several users at once (Phase 18)** | vLLM's serving design read from source, then built in Rust where it pays on four cores: the forward pass now takes **a position and a cache per row**, so several users share one read of the weights; a scheduler with slots, **chunked prefill** and a **prefix store shared by every slot**; the server owns one engine thread instead of a session behind a mutex. Measured alone on the machine: **14.2 / 20.2 / 24.9 tok/s at 1 / 2 / 4 users** (it had no concurrency at all before), against llama.cpp's 14.4 / 14.4 / 32.4 — level at one, **1.40× at two**, behind at four. **Every user's text was identical to what they would have been told alone, at every concurrency**; llama.cpp's was not at four. The gateway still sends one request at a time: it reads `max_in_flight` as the `n`-choice width too, and this server refuses `n > 1`, so that is the next small step. Not claimed: parity with vLLM, which does not run on this machine. |
-| 🔄 **Smiley Core updated, LittleBit integrated (Phase 19)** | The owner's new engine (06c2b88: grouped attention, rotated int8 KV, position-keyed sampling) is merged into the vendored copy with every Nafs-Aql addition re-applied; **370 tests pass in release mode** and every live suite passes again (contract, security 26/26, Rooms 59/59, end-to-end 65/65, harness 53/53, acceptance 9/9). **LittleBit** (1-bit-class weights, `--littlebit`) is integrated and measured honestly: Qwen3-1.7B at 0.98 bits per weight (4.9× smaller) answers **0 of 12** exact-answer prompts against **9** for the dense model, so it is **off by default** until trained factors exist; the weights in use are shown on the Status page. The integration also exposed and fixed a **fourfold decode slowdown** (4.5 → 19 tok/s) that came from the compiler no longer inlining `array::from_fn` in an unchanged kernel; old and new engine now decode alike (18.7 vs 19.2 tok/s) and answer alike. |
-| 📚 **Knowledge Base (Phase 20, in progress)** | Upload PDF, Word, PowerPoint, LaTeX, web pages, Markdown and text; Nafs-Aql reads them into passages in **SurrealDB** with full-text and vector indexes (Qwen3-Embedding-0.6B on Smiley Core), searches them by words, meaning or both, and answers chat questions from them with numbered sources. A knowledge graph (entities and relations read by the quick model, grounded in the passages) adds GraphRAG to chat and a browsable graph to the page. Next: **Memorilla** memory tokens. Pure-Rust parsers, a CBOR client, one document read at a time. Plan and specification: `docs/prompts/MEMORILLA_KB_PROMPT.md`, `docs/spec/knowledge_base_spec.md`. |
-| 🔌 **Three serving profiles** | llama.cpp on bare metal (the reference), vLLM's CPU backend in Docker, and **Smiley Core**, the project owner's own Rust CPU engine (vendored in `rust/crates/smiley-core`, served by `nafs-smiley-server`), behind one OpenAI-compatible gateway; the switch between them is warm-first. |
+| Hard questions: same accuracy at **36 %** of the cost of always thinking | gate with a visible checker, 6 mixed tasks |
+| Reasoning that stops when the checker is satisfied | **−52 %** reasoning tokens, **−44 %** time |
+| The built-in engine against llama.cpp | **131 s vs 303 s** for twelve checked prompts, same accuracy |
+| Several people at once | **14 → 25 tokens/s** from 1 to 4 users, each answer identical to what they would get alone |
+| Passage retrieval with the right context | closed-book answers **2 of 20** held-out questions; with passages, **18 of 20** |
+| Security and quality | **436** Rust tests, **26/26** security probes, **67/67** end-to-end checks |
 
-<table>
-<tr>
-<td width="50%"><img src="docs/shared/screenshots/lab_insights.png" alt="Lab: the policy map answering when System 2 should be consulted"><br><sub><b>Lab.</b> Which policy wins, per domain and price of latency.</sub></td>
-<td width="50%"><img src="docs/shared/screenshots/performance_stages.png" alt="Performance: where the time goes, per stage"><br><sub><b>Performance.</b> Where every second goes, with prefill, decode and cache reuse.</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/shared/screenshots/muhasaba_drift_alerts.png" alt="Muhasaba: drift monitor and alerts"><br><sub><b>Muhasaba.</b> Drift per domain, alert rules over live traffic.</sub></td>
-<td width="50%"><img src="docs/shared/screenshots/lab_gates.png" alt="Roadmap gates computed from stored evidence"><br><sub><b>Gates.</b> Go / no-go computed from stored runs, never typed in by hand.</sub></td>
-</tr>
-<tr>
-<td width="50%"><img src="docs/shared/screenshots/rooms.png" alt="Rooms: three people in a shared chat with the assistant's answers"><br><sub><b>Rooms.</b> Presence, per-person bubbles, live answers, search and unread markers.</sub></td>
-<td width="50%"><img src="docs/shared/screenshots/rooms_delete.png" alt="Rooms: confirmation before deleting a room for everyone"><br><sub><b>Delete.</b> A room can be deleted for good; the dialog says what is lost.</sub></td>
-</tr>
-</table>
+We also publish what did not work: speculative decoding, 1-bit weights, concurrent hedging and more. See [features and measured results](docs/features_and_results.md).
 
-## Measured results
+## Status
 
-> **Read this first.** All numbers come from one Intel Core i3-8100 (4 cores, AVX2, 32 GB) that was *shared* with other workloads (load average 5–40), with tens of items per comparison. They show direction, not release-grade statistics; absolute speeds are lower bounds. Each figure is generated from stored runs (`benchmarks/`, `docs/publication/`), and the release gates need 700–6,200 paired items.
-
-**What worked**
-
-| Change | Effect | Evidence |
-|---|---|---|
-| Gate with the exact verifier visible, vs always deliberating | Same accuracy (6/6 each) at **36 % of the cost** | Lab run on 6 mixed tasks |
-| Adaptive reasoning exit (System 2) | **−52 % reasoning tokens, −44 % mean time**, 11/11 correct in both arms | paired run, 12 GSM8K items |
-| Cheap samples only when the draft is uncertain | Factual fast path **12.6 s → 4.3 s** median; first token 1.37 s → 0.14 s | `benchmarks/samples_ab_factual.json` |
-| Skip samples when an exact verifier decides | Draft median **13.4 s → 7.9 s** | `benchmarks/reference-machine/samples_skip_ab_SHARED_MACHINE.txt` |
-| Early escalation of unconfident drafts | 100 % agreement with full-draft decisions on 40 prompts; ~116 tokens saved per early escalation | `benchmarks/early_escalation_study.json` |
-| Prompt-cache and verifier warm-up | First token 9.8 s → ~1 s; first verification 0.45 s → 3 ms | `docs/roadmap/STATUS.md` |
-| Agreement samples on unverified math drafts (Phase 8) | wrong drafts flagged with AUROC **0.76** (token confidence 0.56–0.65); "any disagreement" catches **8 of 12** wrong drafts at 25 % escalation, expected accuracy **0.80 → 0.91–0.93** | `benchmarks/confidence_signal_study.json` (60 drafts with samples) |
-| Agreement samples drawn **with** the draft, not after it (Phase 13) | time to the gate's decision **23.1 s → 17.9 s (−24 %)**, faster in 23 of 28 pairs (p = 0.0005); escalation 7 vs 5 of 28 (noise) | `benchmarks/fuse_ab.json` |
-| Four System 1 samples verified before a failed draft is escalated (Phase 13) | 22 → 20 escalations over 40 items (3 avoided, 1 the other way); **+14.5 s median** when it runs, break-even 106 s against 250–580 s per escalation; 6 of 32 failed drafts rescued offline | `benchmarks/rescue_ab.json`, `s1_rescue.json` |
-| One request with `n` choices instead of `n` requests (Phase 13) | 703-token prompt: **39.1 s vs 124.5 s** for four candidates (the prompt is prefilled once) | `benchmarks/prefill_share.json` |
-| A cascade in the code agent: four System 1 candidates judged first, System 2 only when none passes (Phase 14) | 10 tasks interleaved: 10/10 verified in both arms, **1,467 s vs 1,987 s (−26 %)**, faster in 7 of 10 pairs (p = 0.17), 6 of 10 verified by System 1 alone (median 34 s vs 85 s) | `benchmarks/harness_ab_cascade.json` |
-| The switch inside a request, System 1 to System 2 (Phase 14) | decision to System 2's first token **1.1–4.7 s** (median 1.5 s); gate 0.8–0.9 s without the rescue; no System 1 slot busy after the decision | `benchmarks/handoff_latency.json` |
-| Engine flags and co-scheduling (Phase 14) | flag matrix inconclusive on a shared host (per-round ratios 0.07×–3.8×); both servers decoding keep 47–65 % each and write 7.1–7.8 tokens/s together in every variant | `benchmarks/engine_tuning.json`, `cosched_ab.json` |
-| Smiley Core vs llama.cpp, engine alone and through the gateway (Phase 15) | decode 14.3 vs 12.6 (System 1) and 7.4 vs 6.6 (System 2) tokens/s; 12 prompts 131 s vs 303 s, 9/9 checked on both, Smiley Core faster in 10 of 12 pairs (p = 0.02, median 1.59×); shared host | `benchmarks/smiley_ab.json`, `benchmarks/backend_ab.json` |
-| The code agent's new guards, off against on (Phase 16) | 10 tasks interleaved: System 2 **10/10 vs 10/10** (747 s vs 772 s), System 1 **4/10 vs 4/10** and **5/10 vs 5/10** in two rounds (307 s vs 297 s, 350 s vs 347 s); the compile check costs **37 ms** per edit; the guards fired once in 60 runs | `benchmarks/harness_ab_p16*.json` |
-| Switching between kinds of request, before and after the prefix store (Phase 17) | agent prompt after a chat prompt: **266 tokens, 5.8 s → 1 token, 0.1 s** (System 1); **262 tokens, 14.1 s → 1 token, 0.2 s** (System 2); llama.cpp's slots 0.1-0.2 s; answers byte-identical with the store on and off | `benchmarks/switch_cost.json` |
-| Decode threads and the engine's phase split (Phase 17) | 3 threads beat 4 in 6 of 6 pairs (System 1 11.3 vs 10.8, System 2 5.0 vs 4.6 tok/s); memory ceiling 12.9 / 17.2 / 18.4 / 19.5 GB/s at 1-4 threads; matmul + head 86-97 % of decode, sampling 0.1-0.3 % | `benchmarks/engine_profile.json`, `scripts/membw.c` |
-| The reasoning continuation, before and after the exact prefix (Phase 17) | six escalated requests: cold prefill **700-1,160 → 350-390 tokens** (45-78 s → 22-24 s); mean request **182 s → 133 s** | `benchmarks/handoff_latency_smiley*.json` |
-| Concurrent users, Smiley Core against llama.cpp (Phase 18) | each engine alone, 2 rounds, long answers: **14.2 / 20.2 / 24.9** vs **14.4 / 14.4 / 32.4** tok/s at 1 / 2 / 4 users; answers identical to solo **4/4** vs **0/4** at four users; engine primitive 1.56× / 2.57× / 2.27× at 2 / 4 / 8 rows | `benchmarks/concurrency_ab.json`, `examples/batch_bench.rs` |
-| The engine update and LittleBit (Phase 19) | decode 18.7 (previous) vs 19.2 (new) tok/s, median of five interleaved rounds; exact-answer prompts 9/12 on both; LittleBit at 0.98 bpw 0/12 vs dense 9/12, 20.1 tok/s; Q4_K kernel 679 → 96 ns per row after the inlining fix | `benchmarks/engine_update_ab.json`, `benchmarks/littlebit_ab.json`, `examples/kbench.rs` |
-
-**Verifier quality** (true-accept *r*, false-accept φ with 95 % upper bound)
-
-| Verifier | Correct / mutants | r | φ (upper) |
-|---|---|---|---|
-| Math (numeric + SymPy) | 2,000 / 2,800 | 1.000 | 0.000 (≤ 0.001) |
-| JSON Schema | 24 / 53 | 1.000 | 0.000 (≤ 0.067) |
-| Code tests, EvalPlus | 364 / 754 | 0.995 | 0.109 (≤ 0.133)¹ |
-| Rubric judge (System 2) | 23 / 22 | 1.000 | 0.045 (≤ 0.23) |
-
-<sub>¹ An upper bound inflated by behaviourally equivalent mutants that also pass the far larger EvalPlus suites.</sub>
-
-**What we tried and did *not* adopt** (kept in the repo, because a negative result is a result)
-
-| Idea | Measured | Verdict |
-|---|---|---|
-| EAGLE-3 speculative heads (both models) | 1.04× / 0.99× decode at ~50 % acceptance; 8 draft tokens slower | verifying drafts costs real compute on 4 cores; opt-in only |
-| Draft-model and n-gram speculative decoding | 6.5 vs 7.3 tok/s | not adopted |
-| Flash attention, q8_0 KV cache, thread polling | no difference once runs were interleaved | a sequential run had shown a fake 30 % gain |
-| Q4_0 / IQ4_NL repacked weights | 17–18 vs 18.8 tok/s | Q4_K_M stays |
-| System 1 as the rubric judge | false-accept 0.27 vs 0.045 | a judge that accepts a quarter of wrong answers is not a verifier |
-| Qwen3.5-2B as System 1 | **+17 points** accuracy (95 % CI +7 to +30, n = 30) but **3.7× slower** | adoption rule allows ≤ 1.3×; revisit on a faster host |
-| Token-confidence escalation on unverified math (Phase 8) | best signal (lowest token) AUROC 0.65, lowest-window 0.58 on 150 drafts with exact labels; precision ≤ 0.47 against the 0.65 the gate's theorem needs at the default price | mechanism kept (exact, tested), threshold off; the study also showed the mean-log-prob rule escalates **0 of 31** wrong math drafts |
-| Posterior exit rule for non-verifiable deliberation (Phase 8) | same answers on 6 factual prompts, **382 vs 357** reasoning tokens (more cautious when probes disagree first) | an option, not the default: `benchmarks/exit_rule_run.json` |
-| A sequential test on the mean-log-prob early escalation | Wald's bound: ≥ 260 tokens to separate the threshold from its 0.04 margin at 5 % error; drafts are 47–291 tokens | kept as a measured heuristic, never made more aggressive |
-| Quantum-consciousness mechanisms (Orch OR and descendants) | decoherence 10⁻¹³ s against 10⁻³ s dynamics; a CPU can follow at most ~30 two-level systems | nothing transfers as an algorithm; negative result, `docs/research/quantum_neuro_review.md` |
-| Concurrent hedged candidates on System 2 (Phase 13) | batched decode gain falls from **2.7× to 1.5×** between short context and 1,600 tokens, so a round of four costs 2.2–3.4 single attempts; 8 hard code items: 4/8 and 3/8 verified by the sequential loop (two runs) against 4/8 hedged, no faster on failing items | implemented and tested, **off by default** (`deliberation.parallel`): `benchmarks/parallel_ab.json`, `batch_scaling_system2_depth*.json` |
-| n-gram self-speculation (llama.cpp `ngram-simple`, `-map-k`, `-mod`) | best **1.12×** (code repair, 71 % of drafts accepted), worst **0.84×** (JSON) | not adopted: `benchmarks/ngram_ab_system1.json` |
-| q8_0 KV cache with flash attention, for batched decode | 6.36 vs 6.14 tok/s at 1,600 tokens; worse at 800 | f16 cache stays: `benchmarks/batch_scaling_system2_kvq8_*.json` |
-
-**Quality of the build** (final validation run, 31 October 2026, one quiet host; `benchmarks/harness_sweep.json`, `benchmarks/e2e_sweep.json`):
-
-| Suite | Result |
-|---|---|
-| Rust unit and integration tests (nine crates, real Lean 4.35.0 included) | **206 / 206** |
-| 9 Python tests, `clippy -D warnings`, `rustfmt` | clean |
-| Security probes (`scripts/security_tests.py`; one real sandbox escape found and fixed earlier) | **26 / 26**, 0 open high findings |
-| End-to-end sweep over every endpoint and UI page, incl. phone-width layout (`scripts/e2e_sweep.py`) | **65 / 65** |
-| Rooms with simulated members (`scripts/rooms_test.py`) | **59 / 59** |
-| Math and code harness sweep: real Lean, 6 attacks, code credit, validation, code agent, rescue, parallel settings (`scripts/harness_sweep.py`) | **50 / 50** |
-| MVP acceptance A1–A9 (`scripts/mvp_acceptance.py`) | **9 / 9** (slow path 49 s against the 240 s target; A5's call bound includes the rescue samples) |
-
-The sweep found and fixed three defects in the Lean integration (an inconsistent 400 between `/v1/chat` and `/v1/verify`, Lean tasks classified as open questions with no retries, and a prompt that did not say Mathlib is absent). **One honest limit it exposed:** Qwen3-4B-Thinking (4-bit, CPU) cannot yet write valid Lean 4, even for `n + 0 = n`, so Lean tasks end in a labelled *abstain* unless a stronger prover is used. The Lean verifier itself is exact: it accepts real proofs and rejects a hidden `sorryAx`, a user axiom, `native_decide`, `#eval`, a changed statement and a shadowed `HAdd` instance.
-
-## Quick start
-
-**Requirements:** Rust 1.96+, Python 3.10+, and a CPU build of llama.cpp (tested with commit `797de63`).
-
-```bash
-git clone https://github.com/rismanmattotorang/nafsaql.git && cd nafsaql
-
-# 1. llama.cpp, built CPU-only into third_party/ (about 5 minutes)
-git clone https://github.com/ggml-org/llama.cpp third_party/llama.cpp
-git -C third_party/llama.cpp checkout 797de63
-cmake -S third_party/llama.cpp -B third_party/llama.cpp/build -DGGML_METAL=OFF -DLLAMA_CURL=OFF -DCMAKE_BUILD_TYPE=Release
-cmake --build third_party/llama.cpp/build -j4 --target llama-server llama-bench
-
-# 2. Models (Qwen3-1.7B and Qwen3-4B-Thinking-2507, GGUF Q4_K_M, about 3.6 GB)
-make models
-
-# 3. Build the Rust gateway, start both model servers and the gateway
-make up
-```
-
-Open **http://127.0.0.1:8080**. Try the *Verified math* example, then press **Think harder** on the answer to watch System 2 deliberate. `make down` stops everything.
-
-```bash
-make test        # Rust tests: gate modes, calibration, judge, audits, cancellation, verifiers, sandbox
-scripts/live_sweep.sh   # every live suite against the running stack: contract, security, Rooms, end to end, harness, MVP acceptance (about 45 min)
-make contract    # live SSE events and stored records against the JSON Schemas
-make acceptance  # MVP acceptance tests A1–A9 against the running stack
-python3 scripts/e2e_sweep.py   # every endpoint and every UI page, in headless Chrome
-python3 -I scripts/harness_sweep.py   # Lean, code credit, validation and the code agent (add --no-models for the fast part)
-```
-
-<details>
-<summary><b>vLLM backend in Docker</b> (second serving profile)</summary>
-
-```bash
-scripts/serve_vllm_docker.sh start && scripts/serve_vllm_docker.sh wait   # vLLM CPU image on :8101
-python3 scripts/vllm_check.py                                              # drives every request path through the gateway
-```
-
-Switch with *Use this backend* on the System page. The recipe was built and debugged against a vLLM 0.30 x86 CPU image (override with `VLLM_IMAGE`). Facts worth knowing: on an AVX2-only VM oneDNN has no BF16 kernels, so the model runs in FP32; vLLM's three processes cost about 3 GB beyond the weights, so Qwen3-1.7B needs an 11–12 GiB Docker VM. The gateway-side check was **not yet completed** on the reference host because it was too short of memory (see `docs/roadmap/STATUS.md`, P7-T10).
-
-</details>
-
-<details>
-<summary><b>Smiley Core backend</b> (the default serving profile since Phase 15)</summary>
-
-```bash
-make up                 # the default: builds nafs-smiley-server, serves Qwen3-1.7B on :8201 and Qwen3-4B-Thinking on :8202, starts the gateway
-make up-llama           # starts llama-server on :8001/:8002 and switches the gateway to it (four slots, grammar, n-choice rescue)
-make down-llama         # switches back to Smiley Core and stops llama-server
-```
-
-The engine is the owner's Smiley Core (vendored as `rust/crates/smiley-core` with two marked additions: a continuation prefix for the reasoning budget and per-token log-probabilities for the gate). It decodes one stream per model, so the gateway runs it without the grammar, the `n`-choice rescue and the raw-continuation exit (the standard path, as for vLLM). **It is the default backend:** the engine alone decodes 14.3 vs 12.6 tokens/s (System 1) and 7.4 vs 6.6 (System 2), and through the whole gateway the same twelve checked prompts took **131 s against 303 s** (9/9 checked on both, faster in 10 of 12 pairs, p = 0.02); the code agent verifies on both. The price is one stream per model: a second concurrent request waits, and the rescue and the cascade have one candidate. `make up-llama` switches to llama.cpp (four slots, grammar) for a shared deployment. Details: [docs/research/smiley_backend.md](docs/research/smiley_backend.md).
-
-<details>
-<summary><b>Configuration, security and deployment</b></summary>
-
-- Config lives in `config/nafs-aql.toml`; `rust/target/release/nafs-gateway --check` validates it and the bind policy.
-- The gateway refuses a non-loopback bind without tokens (`NAFS_AUTH_TOKENS` or `NAFS_AUTH_TOKENS_FILE`, 16+ characters each) unless `NAFS_ALLOW_INSECURE=1`. Browser requests must be same-origin.
-- Code is verified in a network-denied sandbox with CPU, memory and wall-clock limits; `python3 -I scripts/security_tests.py` runs 26 live probes (sandbox escape, injection, auth, limits).
-- **Platform notes.** macOS uses a `sandbox-exec` profile. Linux builds the same guarantees from namespaces and seccomp: new user, network, mount and PID namespaces; user data (`/home`, `/root`, `/tmp`, `/mnt`, `/media`, `/srv`, `/run/secrets` and others) replaced by empty mounts; every other mount read-only; no capabilities; a seccomp filter that denies `fork`, process spawning and mount-table changes; plus CPU, memory and wall-clock limits. The same escape tests run on both. What the Linux sandbox cannot hide is the gateway's own install, config and data directories (they stay readable, never writable), so keep those mode 0700 under a dedicated user (A-054). Linux needs unprivileged user namespaces (Ubuntu 24.04: `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`), `unshare` and `setpriv` from util-linux, and a python3 with ctypes; in Docker it also needs `seccomp=unconfined` and `apparmor=unconfined`, which the compose file sets. `nafs-gateway --check` runs the whole stack and reports whether it works.
-- Recipes for docker compose, systemd, launchd, Caddy and nginx TLS, Prometheus alerts and a Grafana dashboard are in `deploy/`; `scripts/verify_deploy.sh --live` checks them. The operator runbook is [docs/operations/operator_runbook.md](docs/operations/operator_runbook.md).
-
-</details>
-
-## Architecture
-
-A Rust workspace of nine crates:
-
-| Crate | Role |
-|---|---|
-| `nafs-gateway` | axum HTTP/SSE/WebSocket API (53 documented endpoints, OpenAPI 3.1), auth, metrics, background workers |
-| `nafs-core` | orchestrator and automaton, Aql Gate, calibration, drift, backends (llama.cpp, vLLM) |
-| `nafs-verify` | exact verifiers (numeric, SymPy, code tests, JSON Schema, Lean) and the sandbox, rubric judge support, mutation harness |
-| `nafs-harness` | derived from Open Math Harness and Codex: Lean protocol, scoring and candidate tree, `apply_patch` and its grammar (GBNF), truncation, the append-only transcript and compaction, the code agent loop |
-| `nafs-memory` | SQLite ledger, traces, retrieval memory (BM25), preferences |
-| `nafs-eval` | datasets, paired statistics, policy map, resumable evaluation runs |
-| `nafs-bench` | load-test protocol, latency breakdown |
-| `nafs-web` | the embedded web UI (vanilla JS, no build step) |
-| `nafs-types` | shared types and the error taxonomy |
-
-The mathematics behind the gate (threshold rule, verifier-bounded precision, Beta-prior stopping, sizes of the release gates) is in the [technical report](docs/report/nafs_aql_report.pdf); the 100 requirements and 45 tasks are in the [specification](docs/spec/nafs_aql_spec.pdf) and [roadmap](docs/roadmap/nafs_aql_roadmap.pdf).
-
-## Where the project stands
-
-Phases 0–13 of the roadmap are implemented on the CPU reference machine; GPU training and scale-out are deliberately deferred. Gates are computed from stored evidence, and today they say:
-
-| Gate | Status | Why |
-|:--:|:--:|---|
-| G1 MVP and latency | ❌ | acceptance 8/9: the deliberate path took 354 s against the 240 s target while the host was shared |
-| G4 evaluation suite | ❌ | NFR-007: median 4-session p95 is 2.15× the single-session value (target ≤ 2×) |
-| G5 security and deployment | ✅ | 26/26 security probes, 0 open high findings, deployment checks pass |
-| G0, G2, G3, G6 | ⏳ | need release-scale runs (thousands of items), the first GPU training cycle, and the scholar review |
-
-**Next:** evidence at scale on a faster host, the first Tazkiya (distillation) cycle, adaptive early exit across more domains, a learned router built from the policy map and human preferences, and the scholar review. The details, with estimates, are in the [roadmap](docs/roadmap/nafs_aql_roadmap.pdf).
+A research preview, built in the open. It runs end to end on a CPU today. The release-scale evaluation (thousands of paired items) and the first model-distillation cycle need a faster machine and are not done yet; the current gate status is in [docs/roadmap/STATUS.md](docs/roadmap/STATUS.md).
 
 ## Documentation
 
 | | |
 |---|---|
-| [Technical report](docs/report/nafs_aql_report.pdf) | the model, the proofs, the implementation and its measured results |
-| [Slides](docs/slides/nafs_aql_slides.pdf) | the same story in 40 slides |
-| [Specification](docs/spec/nafs_aql_spec.pdf) | 100 requirements with identifiers, interfaces and a traceability matrix |
-| [Roadmap](docs/roadmap/nafs_aql_roadmap.pdf) · [Status](docs/roadmap/STATUS.md) | phases, gates, what is done and what is not |
-| [Assumptions](ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-099) |
-| [Results write-up](docs/publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
-| [Quantum consciousness and neuroscience review](docs/research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
-| [Parallel and concurrent inference](docs/research/parallel_inference.md) · [Decision 007](docs/decisions/007-parallel-inference.md) | Phase 13: batch scaling at depth, what was adopted (fused samples, System 1 rescue, `n`-choice rounds, 4 slots) and what was measured and left off |
-| [Engine knobs, the model switch, the harness cascade](docs/research/engine_switching_harness.md) · [Decision 008](docs/decisions/008-engine-switching-harness.md) | Phase 14: the flag matrix and co-scheduling measured (unchanged), the switch timed, the cascade and retries built and measured, the warm-first backend switch |
-| [Smiley Core as the third backend](docs/research/smiley_backend.md) · [Decision 009](docs/decisions/009-smiley-backend.md) | Phase 15: the owner's Rust CPU engine vendored and served behind the gateway; the engines compared alone and the whole service compared on each backend; which one is the default and why |
-| [Smiley Core 06c2b88 and LittleBit](docs/research/smiley_core_update.md) · [Decision 013](docs/decisions/013-smiley-core-littlebit.md) | Phase 19: the merge, the two defects it exposed (a crash and a compiler-dependent 4× slowdown), LittleBit measured |
-| [Serving many users from Smiley Core](docs/research/smiley_multiuser.md) · [Decision 012](docs/decisions/012-multiuser-engine.md) | Phase 18: what vLLM does, what applies on four cores, the batched multi-user engine and what it measures |
-| [Smiley Core's speed, switching and the harness's cost](docs/research/smiley_engine_perf.md) · [Decision 011](docs/decisions/011-engine-switching-costs.md) | Phase 17: the engine against the machine's bandwidth, threads, the prefix store, the exact continuation, the handoff |
-| [The code agent against modern harnesses](docs/research/harness_gaps.md) · [Decision 010](docs/decisions/010-harness-gaps.md) | Phase 16: what current harnesses and papers do, the gaps in Nafs-Aql's, what was built and measured, and what was not adopted and why |
-| [End-to-end code review](docs/research/code_review_2026-11.md) | Nov 2026: what four independent reviews found across the crates, scripts, deployment files and CI, what was fixed and tested, and what was left and why |
-| [Math and code harness](docs/research/harness_integration.md) · [Decision 005](docs/decisions/005-harness-integration.md) | Phase 10: what was taken from Open Math Harness and Codex, what was not, and why |
-| [Codex-style harness](docs/research/harness_integration.md#5-phase-11-the-codex-agent-harness-adapted-to-small-models-on-a-cpu) · [Decision 006](docs/decisions/006-codex-harness.md) | Phase 11: the Codex agent-core mechanisms ported, the measured A/B against the Phase 10 loop, and the defaults it set |
-| [User guide](docs/user_guide.md) · [Runbook](docs/operations/operator_runbook.md) · [API reference](docs/api/api_reference.md) | using, operating and integrating |
+| [User guide](docs/user_guide.md) | using the app, rooms, the lab, your documents |
+| [Technical report](docs/report/nafs_aql_report.pdf) | the model, the proofs, the implementation and every measurement |
+| [Features and measured results](docs/features_and_results.md) | everything built, phase by phase, with evidence |
+| [Serving and operations](docs/serving_and_operations.md) · [Runbook](docs/operations/operator_runbook.md) | other serving profiles, configuration, security, deployment |
+| [API reference](docs/api/api_reference.md) | the documented endpoints (OpenAPI 3.1) |
+| [Specification](docs/spec/nafs_aql_spec.pdf) · [Knowledge specification](docs/spec/knowledge_base_spec.md) | requirements and interfaces |
+| [All documents](docs/index.md) | research notes, decisions, assumptions |
 
 ## Contributing
 
-Issues and pull requests are welcome. The house rules are few: run `make test`, keep `cargo fmt` and `cargo clippy -D warnings` clean, back every performance claim with an interleaved A/B (the scripts in `scripts/` show how), and record a judgement call in `ASSUMPTIONS.md` rather than burying it in code.
+Issues and pull requests are welcome. Run `make test`, keep `cargo fmt` and `cargo clippy -D warnings` clean, back every performance claim with an interleaved comparison (the scripts in `scripts/` show how), and record a judgement call in `ASSUMPTIONS.md` rather than burying it in code.
 
 ## Cite
 
