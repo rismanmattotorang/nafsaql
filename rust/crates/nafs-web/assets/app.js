@@ -564,7 +564,7 @@ const EXAMPLES = [
 
 function settingsBar() { return { s: PREFS, save: savePrefs }; }
 
-routes.chat = { title: 'Chat', async render(view) {
+routes.chat = { title: 'Chat', async render(view, alive) {
   const cfg = settingsBar(); const S = cfg.s;
   view.innerHTML = `<div class="chat noinspect" id="chatGrid">
     <aside class="convs"><div class="head" style="flex-direction:column;align-items:stretch;gap:8px"><button class="btn" id="newConv" style="justify-content:center" title="New chat (Ctrl/Cmd+K)">${icon.plus}New chat</button>
@@ -585,7 +585,7 @@ routes.chat = { title: 'Chat', async render(view) {
         <div class="controls">
           <div class="seg" id="modeSeg" role="group" aria-label="Answer mode"><button data-m="auto" title="Auto: answers quickly, and thinks it through when the question needs it">${icon.shield}Auto</button><button data-m="fast" title="Quick: always answer at once">${icon.bolt}Quick</button><button data-m="slow" title="Thorough: always think it through first (slower)">${icon.brain}Thorough</button><button data-m="both" class="adv-only" title="Compare: see a quick and a thorough answer side by side and pick the better one">${icon.compare}Compare</button></div>
           <span class="chip" id="verifyChip" role="button" tabindex="0" title="Give the expected answer, tests or a format, so the reply can be checked">${icon.shield}<span>Add a check</span></span>
-          <label class="chip kb-pick" id="kbChip" hidden title="Answer from the passages of one of your knowledge bases">${icon.book}<select id="kbSel" aria-label="Answer from a knowledge base"><option value="">No knowledge base</option></select><select id="kbMode" aria-label="How to use the knowledge base" hidden><option value="rag">Passages</option><option value="graph">Passages and graph</option><option value="memory" hidden>Memory (experimental)</option></select></label>
+          <label class="chip kb-pick" id="kbChip" hidden title="Answer from the passages of one of your knowledge bases">${icon.book}<select id="kbSel" aria-label="Answer from a knowledge base"><option value="">No knowledge base</option></select><select id="kbMode" aria-label="How to use the knowledge base" hidden><option value="auto">Choose for me</option><option value="rag">Passages</option><option value="graph">Passages and graph</option><option value="memory" hidden>Memory (experimental)</option><option value="hybrid" hidden>Memory and passages (experimental)</option></select></label>
           <span class="sp"></span><button class="btn ghost sm adv-only" id="inspBtn" title="Show how each answer was produced (Ctrl/Cmd+I)">${icon.search}Details</button>
         </div><div class="privacy">Answers can be wrong; look for <b>Checked</b> on answers that were verified. <button type="button" class="linkbtn" id="privBtn">Privacy</button></div></div></div></div>
     <aside class="inspector" id="insp"></aside></div>`;
@@ -605,16 +605,24 @@ routes.chat = { title: 'Chat', async render(view) {
   const segBtns = $$('#modeSeg button'); const setMode = (m) => { S.mode = m; segBtns.forEach(b => b.classList.toggle('on', b.dataset.m === m)); cfg.save(); };
   segBtns.forEach(b => b.onclick = () => setMode(b.dataset.m)); setMode(S.mode);
   // Knowledge picker: shown when the server has knowledge bases; the choice is remembered.
-  (async () => { try { const st = await api.get('/v1/kb/status'); if (!st.enabled || !st.reachable) return; const r = await api.get('/v1/kb'); const sel = $('#kbSel'); if (!sel || !r.bases.length) return;
+  (async () => { try { const st = await api.get('/v1/kb/status'); if (!alive()) return;
+    // A base chosen earlier and since deleted (or a store that is gone) must be forgotten here: the chip stays
+    // hidden below, so there would be no control left to clear it and every message would carry a dead base.
+    const forget = () => { if (PREFS.kb) { PREFS.kb = null; savePrefs(); } };
+    if (!st.enabled || !st.reachable) { forget(); return; }
+    const r = await api.get('/v1/kb'); if (!alive()) return;   // the view may have been left while this loaded
+    if (!r.bases.some(b => b.id === PREFS.kb)) forget();
+    const sel = $('#kbSel'); if (!sel || !r.bases.length) return;
     sel.innerHTML = `<option value="">No knowledge base</option>` + r.bases.map(b => `<option value="${esc(b.id)}">${esc(b.name)}</option>`).join('');
-    if (!r.bases.some(b => b.id === PREFS.kb)) { PREFS.kb = null; savePrefs(); } sel.value = PREFS.kb || ''; $('#kbChip').hidden = false; $('#kbChip').classList.toggle('on', !!PREFS.kb);
-    const ms = $('#kbMode'); const memOpt = ms.querySelector('option[value=memory]');
-    // Memory mode needs a module for the chosen base: the server says which bases have one.
-    const syncMode = () => { const b = r.bases.find(x => x.id === PREFS.kb);
-      memOpt.hidden = !(st.memory && advanced() && b && b.memory);
-      if (memOpt.hidden && PREFS.kbMode === 'memory') { PREFS.kbMode = 'rag'; savePrefs(); }
-      ms.value = PREFS.kbMode || 'rag'; ms.hidden = !PREFS.kb; };
+    sel.value = PREFS.kb || ''; $('#kbChip').hidden = false; $('#kbChip').classList.toggle('on', !!PREFS.kb);
+    const ms = $('#kbMode'); const memOpts = $$('option[value=memory], option[value=hybrid]', ms);
+    // Memory modes need a module for the chosen base: the server says which bases have one.
+    const syncMode = () => { const b = r.bases.find(x => x.id === PREFS.kb), on = !!(st.memory && advanced() && b && b.memory);
+      memOpts.forEach(o => o.hidden = !on);
+      if (!on && ['memory', 'hybrid'].includes(PREFS.kbMode)) { PREFS.kbMode = 'auto'; savePrefs(); }
+      ms.value = PREFS.kbMode || 'auto'; ms.hidden = !PREFS.kb; };
     syncMode(); ms.onchange = () => { PREFS.kbMode = ms.value; savePrefs(); };
+    ms.title = 'Choose for me: the best way this knowledge base can answer.';
     sel.onchange = () => { PREFS.kb = sel.value || null; savePrefs(); $('#kbChip').classList.toggle('on', !!PREFS.kb); syncMode(); input.placeholder = PREFS.kb ? `Ask about ${sel.selectedOptions[0].text}` : 'Ask anything'; };
     if (PREFS.kb) input.placeholder = `Ask about ${sel.selectedOptions[0].text}`; } catch {} })();
   const tbPop = $('#tbPop'); $('#tbMenu').onclick = (e) => { e.stopPropagation(); tbPop.hidden = !tbPop.hidden; $('#tbMenu').setAttribute('aria-expanded', String(!tbPop.hidden)); };
@@ -680,7 +688,7 @@ routes.chat = { title: 'Chat', async render(view) {
     if (mode === 'both') return trial(text, v);
     const body = { conversation_id: convId, messages: [{ role: 'user', content: text }], lambda: S.lambda, thinking_budget: S.budget > 0 ? S.budget : undefined, show_reasoning: S.reason,
       force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined,
-      knowledge: PREFS.kb ? { kb: PREFS.kb, mode: PREFS.kbMode || 'rag' } : undefined };
+      knowledge: PREFS.kb ? { kb: PREFS.kb, mode: PREFS.kbMode || 'auto' } : undefined };
     const turn = new Turn(inner, { onSelect: select, onRetry: retry, prompt: text, request: body, onVerify }); turns.push(turn); select(turn);
     turn.onUpdate = (t) => { if (selected === t) insp.innerHTML = inspectorHTML(t); const near = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 160; if (near) scrollDown(); };
     scrollDown(); const ctrl = new AbortController(); setBusy(ctrl);
@@ -1216,7 +1224,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     const t = $('#kbTrain', box), f = $('#kbTune', box);
     const go = async (kind) => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs`, { kind, epochs: 3 }); toast(kind === 'finetune' ? 'Fine-tuning started' : 'Training started'); loadMemory(); } catch (e) { toast(e.message, 5000); } };
     if (t) t.onclick = () => go('train'); if (f) f.onclick = () => go('finetune');
-    $$('[data-stop]', box).forEach(b => b.onclick = async () => { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.stop}/stop`); toast('The run stops after its current step'); loadMemory(); });
+    $$('[data-stop]', box).forEach(b => b.onclick = async () => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.stop}/stop`); toast('The run stops after its current step'); } catch (e) { toast(e.message, 4000); } loadMemory(); });
     $$('[data-use]', box).forEach(b => b.onclick = async () => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.use}/activate`); toast('Memory questions now use this module'); loadMemory(); } catch (e) { toast(e.message, 4000); } });
     clearTimeout(S.mtimer); if (busy && !S.dead) S.mtimer = setTimeout(loadMemory, 5000);
   }

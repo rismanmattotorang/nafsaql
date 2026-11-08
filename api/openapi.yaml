@@ -2543,6 +2543,7 @@ paths:
                   type: integer
                   minimum: 1
                   maximum: 100
+                  description: passages to return; a value outside the range is brought into it, not refused
                 mode:
                   type: string
                   enum:
@@ -2871,6 +2872,20 @@ components:
           type: boolean
           description: 'FR-095: draw the always-drawn agreement samples of an unverified maths draft together with the draft
             in one batch instead of after it. Default from configuration.'
+        knowledge:
+          type: object
+          description: 'FR-K20: answer from a knowledge base (Phase 20).'
+          required: [kb]
+          properties:
+            kb: {type: string, description: knowledge base id}
+            mode:
+              type: string
+              enum: [auto, rag, graph, memory, hybrid, off]
+              default: rag
+              description: 'auto: the best mode this base can serve (FR-K24); rag: the best passages as numbered sources;
+                graph: relations around the question''s entities before the passages; memory: Memorilla''s memory tokens
+                read from the whole base (quick model only); hybrid: those tokens and the top passages; off: none.'
+            k: {type: integer, minimum: 1, maximum: 12, description: 'passages used in rag and graph modes (default from [knowledge] rag_k)'}
     Message:
       type: object
       required:
@@ -3011,6 +3026,15 @@ components:
         retrieved:
           type: array
           description: Earlier verified answers used as reference (reply_id, score, created_at, question)
+          items:
+            type: object
+        sources:
+          type: array
+          description: 'FR-K21: what the knowledge base contributed. A passage row carries n (its number in the
+            prompt), kb, kb_name, chunk_id, doc_id, doc_title, heading, page, text, score and mode, where mode is how
+            the passage was *searched for* (lexical, vector or hybrid); a graph row carries facts; a memory row
+            carries memory {tokens, documents, prepare_ms, read_ms, mode}, where that mode is the *chat* mode
+            (memory or hybrid) that auto resolved to; a row with note alone says why nothing was used.'
           items:
             type: object
     VerifierResult:

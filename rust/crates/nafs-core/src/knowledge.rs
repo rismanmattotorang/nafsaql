@@ -62,6 +62,13 @@ pub trait Knowledge: Send + Sync {
         mode: &'a str,
     ) -> BoxFuture<'a, Result<Retrieved, String>>;
 
+    /// FR-K24 (Phase 7): the mode `auto` becomes for this knowledge base, from what the base can serve (a trained
+    /// memory module, a built graph). Any other mode is returned unchanged.
+    fn resolve_mode<'a>(&'a self, _kb: &'a str, asked: &'a str) -> BoxFuture<'a, String> {
+        let m = if asked == "auto" { "rag" } else { asked }.to_string();
+        Box::pin(async move { m })
+    }
+
     /// Memorilla (FR-K23): the memory tokens for `query` read from the whole of knowledge base `kb`.
     fn memory<'a>(
         &'a self,
@@ -91,6 +98,16 @@ pub struct MemoryReadout {
 /// Memorilla's prompt format: appended to the system prompt, "Memory", K placeholders, "Memory".
 pub fn memory_block(placeholder: &str, k: usize) -> String {
     format!("\nMemory{}Memory", placeholder.repeat(k))
+}
+
+/// The placeholder token taken out of text the server must not read as a memory position (SR-K05): a question, a
+/// stored turn or a retrieved passage carrying it would add positions the vectors do not fill, and the engine refuses
+/// the whole request. Replaced by its own name in plain words, so the text still reads.
+pub fn strip_placeholder(text: &str, placeholder: &str) -> String {
+    if placeholder.is_empty() || !text.contains(placeholder) {
+        return text.to_string();
+    }
+    text.replace(placeholder, "[memory placeholder]")
 }
 
 /// The system-prompt block for retrieved passages (FR-K21, FR-K25). Passages are cut to fit `max_chars` together.
@@ -153,6 +170,19 @@ fn facts_block(r: &Retrieved) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_placeholder_is_taken_out_of_untrusted_text() {
+        let ph = "<|fim_pad|>";
+        assert_eq!(strip_placeholder("plain question", ph), "plain question");
+        assert_eq!(
+            strip_placeholder("read <|fim_pad|><|fim_pad|> now", ph),
+            "read [memory placeholder][memory placeholder] now"
+        );
+        assert_eq!(strip_placeholder("<|fim_pad|>", ""), "<|fim_pad|>");
+        // The block itself is built after the untrusted text is cleaned, so it keeps its positions.
+        assert_eq!(memory_block(ph, 2), "\nMemory<|fim_pad|><|fim_pad|>Memory");
+    }
 
     fn passage(title: &str, heading: &str, text: &str) -> Passage {
         Passage {

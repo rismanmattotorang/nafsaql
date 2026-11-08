@@ -160,8 +160,9 @@ impl VerificationInputs {
 pub struct KnowledgeRequest {
     /// Knowledge base id.
     pub kb: String,
-    /// `rag` (default): the best passages go into the prompt as numbered sources; `off`: none. `graph` and `memory`
-    /// arrive in later phases.
+    /// How the knowledge base answers: `auto` (the best mode this base can serve, FR-K24), `rag` (the best passages
+    /// as numbered sources), `graph` (relations around the question's entities first), `memory` (Memorilla's memory
+    /// tokens, quick model only), `hybrid` (memory tokens and the top passages), `off` (none). Default `rag`.
     #[serde(default)]
     pub mode: Option<String>,
     /// Passages to use (default from `[knowledge] rag_k`).

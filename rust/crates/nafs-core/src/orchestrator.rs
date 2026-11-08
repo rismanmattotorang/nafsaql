@@ -190,6 +190,18 @@ fn is_lean_identifier(s: &str) -> bool {
         && chars.all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '\''))
 }
 
+/// The `sources` rows of a chat reply for retrieved passages (FR-K21), numbered as the prompt numbers them.
+fn passage_sources(kb: &str, found: &crate::knowledge::Retrieved) -> Vec<Value> {
+    found
+        .passages
+        .iter()
+        .enumerate()
+        .map(|(i, p)| json!({"n": i + 1, "kb": kb, "kb_name": found.kb_name, "chunk_id": p.chunk_id, "doc_id": p.doc_id,
+            "doc_title": p.doc_title, "heading": p.heading, "page": p.page, "text": p.text, "score": p.score,
+            "lexical_score": p.lexical_score, "vector_score": p.vector_score, "mode": found.mode}))
+        .collect()
+}
+
 /// SR-001: observed content fed back to a model is truncated, stripped of control characters and of
 /// anything that could close the data block, and wrapped with a fixed instruction to treat it as data.
 pub fn delimit(tag: &str, content: &str, max_chars: usize) -> String {
@@ -832,7 +844,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     .map(|e| e.load(Ordering::Relaxed))
                     .unwrap_or(false)
         }));
-        let user = req
+        let mut user = req
             .messages
             .iter()
             .rev()
@@ -846,7 +858,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         let conditioned = req.ablation_draft_conditioned == Some(true);
 
         // Context (FR-003): stored history for persistent conversations; the client's history for ephemeral ones.
-        let (conv, history) = if ephemeral {
+        let (conv, mut history) = if ephemeral {
             (
                 req.conversation_id,
                 req.messages[..req.messages.len().saturating_sub(1)].to_vec(),
@@ -909,64 +921,88 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         }
         // FR-K20..K25: passages of a knowledge base, numbered and delimited as data (Phase 20).
         let mut sources: Vec<Value> = vec![];
-        // FR-K23: memory tokens for every quick-model request of this turn (Phase 20).
+        // FR-K23: memory tokens for every quick-model request of this turn, and the token that marks their
+        // positions in the prompt (Phase 20).
         let mut memory: Option<Arc<Vec<Vec<f32>>>> = None;
+        let mut memory_ph: Option<String> = None;
         if let Some(kq) = req
             .knowledge
             .as_ref()
             .filter(|k| k.mode.as_deref().unwrap_or("rag") != "off")
         {
-            let kmode = kq.mode.as_deref().unwrap_or("rag");
             let tk = Instant::now();
             let retriever = self
                 .knowledge
                 .read()
                 .unwrap_or_else(|e| e.into_inner())
                 .clone();
+            // FR-K24: `auto` becomes the best mode this base can serve, decided by the retriever.
+            let asked = kq.mode.as_deref().unwrap_or("rag");
+            let kmode: String = match &retriever {
+                Some(r) => r.resolve_mode(&kq.kb, asked).await,
+                None => asked.to_string(),
+            };
+            let kmode = kmode.as_str();
             let k = kq.k.unwrap_or(cfg.knowledge.rag_k).clamp(1, 12);
-            if kmode == "memory" {
-                // FR-K23: Memorilla's memory tokens for the quick model (the module is trained for its embedding space;
-                // the thorough model would see placeholders without vectors, so the request stays on the quick path).
+            let want_memory = kmode == "memory" || kmode == "hybrid";
+            // FR-K23: Memorilla's memory tokens for the quick model (the module is trained for its embedding space;
+            // the thorough model would see placeholders without vectors, so the request stays on the quick path).
+            if want_memory {
                 match (&retriever, self.active().s1.kind.as_str()) {
                     (Some(r), "smiley") => match r.memory(&kq.kb, &user.content).await {
                         Ok(mr) => {
-                            // The prompt the module was trained with, not the assistant's usual one.
+                            // The prompt the module was trained with, not the assistant's usual one. The earlier
+                            // answers of FR-061 go with it, so the reply must not claim them either.
                             system = format!(
                                 "{}{}",
                                 mr.system,
                                 crate::knowledge::memory_block(&mr.placeholder, mr.vectors.len())
                             );
-                            sources.push(json!({"memory": {"tokens": mr.vectors.len(), "documents": mr.documents, "prepare_ms": mr.prepare_ms, "read_ms": mr.read_ms}, "kb": kq.kb, "kb_name": mr.kb_name}));
+                            retrieved.clear();
+                            memory_ph = Some(mr.placeholder.clone());
+                            sources.push(json!({"memory": {"tokens": mr.vectors.len(), "documents": mr.documents, "prepare_ms": mr.prepare_ms, "read_ms": mr.read_ms, "mode": kmode}, "kb": kq.kb, "kb_name": mr.kb_name}));
                             memory = Some(Arc::new(mr.vectors));
+                            // A4: the memory module reads for the quick model alone, so this turn cannot escalate.
+                            // Said out loud, because it overrides a "Thorough" choice.
+                            if req.force_mode != Some(ReasoningMode::Fast) {
+                                sources.push(json!({"note": "Memory tokens are read for the quick model, so this answer was not thought through.", "kb": kq.kb}));
+                            }
                             req.force_mode = Some(ReasoningMode::Fast);
                         }
-                        Err(e) => sources.push(
-                            json!({"note": format!("Memory could not be read: {e}"), "kb": kq.kb}),
-                        ),
+                        Err(e) => sources.push(json!({"note": format!("Memory could not be read ({e}); the passages were used instead."), "kb": kq.kb})),
                     },
-                    (Some(_), _) => sources.push(
-                        json!({"note": "Memory tokens need the Smiley Core engine.", "kb": kq.kb}),
-                    ),
+                    (Some(_), _) => sources.push(json!({"note": "Memory tokens need the Smiley Core engine; the passages were used instead.", "kb": kq.kb})),
                     (None, _) => sources.push(
                         json!({"note": "Knowledge is turned off on this server.", "kb": kq.kb}),
                     ),
                 }
-            } else {
-                match retriever {
-                    Some(r) => match r.retrieve(&kq.kb, &user.content, k, kmode).await {
+            }
+            // Passages: the asked mode, the few that go beside the memory tokens in `hybrid`, or the whole of `rag`
+            // when the memory could not be read (an answer from the passages beats an answer from nothing).
+            let with_memory = memory.is_some();
+            // `memory` alone takes no passages; `hybrid` always does, and so does a memory read that failed.
+            let serve_passages = !want_memory || !with_memory || kmode == "hybrid";
+            {
+                let pk = if with_memory {
+                    cfg.knowledge.hybrid_k.clamp(1, 12)
+                } else {
+                    k
+                };
+                let pmode = if want_memory { "rag" } else { kmode };
+                match (&retriever, serve_passages) {
+                    (Some(r), true) => match r.retrieve(&kq.kb, &user.content, pk, pmode).await {
                         Ok(found) => {
-                            system.push_str(&crate::knowledge::prompt_block(
-                                &found,
-                                cfg.knowledge.rag_max_chars,
+                            // SR-K05: nothing outside the memory block may carry the placeholder token, or the engine
+                            // counts more memory positions than there are vectors and refuses the request. The whole
+                            // block is cleaned, not only the passage text: the base's name, a document title and a
+                            // heading all reach the prompt, and a crafted document would break the base for everyone.
+                            let block =
+                                crate::knowledge::prompt_block(&found, cfg.knowledge.rag_max_chars);
+                            system.push_str(&crate::knowledge::strip_placeholder(
+                                &block,
+                                memory_ph.as_deref().unwrap_or(""),
                             ));
-                            sources = found
-                            .passages
-                            .iter()
-                            .enumerate()
-                            .map(|(i, p)| json!({"n": i + 1, "kb": kq.kb, "kb_name": found.kb_name, "chunk_id": p.chunk_id, "doc_id": p.doc_id,
-                                "doc_title": p.doc_title, "heading": p.heading, "page": p.page, "text": p.text, "score": p.score,
-                                "lexical_score": p.lexical_score, "vector_score": p.vector_score, "mode": found.mode}))
-                            .collect();
+                            sources.extend(passage_sources(&kq.kb, &found));
                             if !found.facts.is_empty() {
                                 sources.push(json!({"facts": found.facts, "kb": kq.kb, "kb_name": found.kb_name}));
                             }
@@ -981,9 +1017,11 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                             sources.push(json!({"note": format!("The knowledge base could not be searched: {e}"), "kb": kq.kb}));
                         }
                     },
-                    None => sources.push(
+                    // `want_memory` has already said so.
+                    (None, _) if !want_memory => sources.push(
                         json!({"note": "Knowledge is turned off on this server.", "kb": kq.kb}),
                     ),
+                    _ => {}
                 }
             }
             stages.push(StageTiming {
@@ -991,6 +1029,15 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 ms: tk.elapsed().as_millis() as u64,
                 ..Default::default()
             });
+        }
+        if let Some(ph) = memory_ph.as_deref().filter(|_| memory.is_some()) {
+            // SR-K05: only the memory block may carry the placeholder. A question, an earlier turn or a retrieved
+            // passage holding it would add positions the memory vectors do not fill, and the engine refuses the
+            // request; a crafted document would do it to everyone asking that base.
+            user.content = crate::knowledge::strip_placeholder(&user.content, ph);
+            for m in history.iter_mut() {
+                m.content = crate::knowledge::strip_placeholder(&m.content, ph);
+            }
         }
         let prompt = assemble_prompt(
             &system,
@@ -1084,6 +1131,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             .then_some(early);
             let dreq = GenRequest {
                 memory_embeds: memory.clone(),
+                memory_placeholder: memory_ph.clone(),
                 messages: prompt.clone(),
                 early_stop,
                 max_tokens: req.max_tokens.unwrap_or(cfg.deliberation.draft_max_tokens),
@@ -1098,6 +1146,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             let sreq = GenRequest {
                 early_stop: None,
                 memory_embeds: memory.clone(),
+                memory_placeholder: memory_ph.clone(),
                 grammar: None,
                 stop_after: None,
                 max_tokens: if hard {
@@ -1139,6 +1188,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 let s = GenRequest {
                     seed: Some(1000 + i as u64),
                     memory_embeds: memory.clone(),
+                    memory_placeholder: memory_ph.clone(),
                     ..sreq.clone()
                 };
                 let b = pair.s1.clone();
@@ -1181,6 +1231,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                         let s = GenRequest {
                             seed: Some(1000 + i as u64),
                             memory_embeds: memory.clone(),
+                            memory_placeholder: memory_ph.clone(),
                             ..sreq.clone()
                         };
                         let b = pair.s1.clone();
@@ -1261,6 +1312,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 });
                 let rreq = GenRequest {
                     memory_embeds: memory.clone(),
+                    memory_placeholder: memory_ph.clone(),
                     messages: prompt.clone(),
                     max_tokens: req.max_tokens.unwrap_or(cfg.deliberation.draft_max_tokens),
                     temperature: cfg.gate.rescue_temperature,
@@ -1742,6 +1794,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                             let mut local: Vec<StageTiming> = vec![];
                             let sreq = GenRequest {
                                 memory_embeds: None,
+                                memory_placeholder: None,
                                 messages: msgs.clone(),
                                 max_tokens: budget
                                     .saturating_add(cfg.deliberation.answer_max_tokens),
@@ -1818,6 +1871,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     let mut driver: futures::future::BoxFuture<'_, Result<u32>> = if n_mode {
                         let sreq_n = GenRequest {
                             memory_embeds: None,
+                            memory_placeholder: None,
                             messages: msgs.clone(),
                             max_tokens: budget.saturating_add(cfg.deliberation.answer_max_tokens),
                             temperature: cfg.deliberation.slow_temperature,

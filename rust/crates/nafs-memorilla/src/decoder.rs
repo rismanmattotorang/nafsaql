@@ -147,13 +147,6 @@ impl Decoder {
         self.embed.index_select(&idx, 0)
     }
 
-    /// One row of the embedding matrix (its statistics set the memory projection's initial scale).
-    pub fn embedding_std(&self) -> Result<f32> {
-        let rows = self.embed.narrow(0, 0, 4096.min(self.cfg.vocab_size))?;
-        let mean = rows.mean_all()?.to_scalar::<f32>()?;
-        Ok(((rows.sqr()?.mean_all()?.to_scalar::<f32>()? - mean * mean).max(0.0)).sqrt())
-    }
-
     /// Final hidden states [1, T, H] (after the output norm) for input embeddings [1, T, H], causal attention.
     pub fn hidden(&self, x: &Tensor) -> Result<Tensor> {
         let c = &self.cfg;

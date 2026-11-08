@@ -91,6 +91,12 @@ pub struct KnowledgeCfg {
     pub memory_trainer: String,
     pub memory_decoder: String,
     pub memory_gguf: String,
+    /// Phase 7, FR-K24: passages put in the prompt beside the memory tokens in `hybrid` mode.
+    pub hybrid_k: usize,
+    /// Phase 7, FR-K24: the order `auto` tries modes in; the first one this knowledge base can serve wins
+    /// ("memory" and "hybrid" need a module, "graph" needs a built graph). The last entry should be one that
+    /// always works ("rag").
+    pub auto_order: Vec<String>,
 }
 impl Default for KnowledgeCfg {
     fn default() -> Self {
@@ -125,6 +131,8 @@ impl Default for KnowledgeCfg {
             memory_trainer: "rust/target/release/memorilla-train".into(),
             memory_decoder: "models/hf/Qwen3-1.7B".into(),
             memory_gguf: "models/Qwen3-1.7B-Q4_K_M.gguf".into(),
+            hybrid_k: 2,
+            auto_order: vec!["rag".into()],
         }
     }
 }

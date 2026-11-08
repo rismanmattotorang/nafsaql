@@ -1,6 +1,7 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.5, 2026-11-07. Status: Phases 0–6 implemented (6: training works; a useful 1.7B module needs an overnight CPU run or a GPU); Phases 7–8 specified. Research:
+Version 1.6, 2026-11-08. Status: Phases 0–7 implemented (6: training works; 7: `hybrid`, `auto` and the measured
+mode comparison); Phase 8 specified. Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -75,7 +76,13 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
   Memorilla's format; the turn is answered by the quick model only. Needs a module for that base: its own activated
   training run (Phase 6) or `[knowledge] memory_checkpoint`. Offered in Advanced mode as experimental, and only for a
   base that has one (`GET /v1/kb` reports `memory` per base).
-- **FR-K24** `hybrid`: `memory` plus the top 2 passages of `rag`. `auto`: chosen by the measured policy of Phase 7.
+- **FR-K24** `hybrid`: `memory` plus the top `[knowledge] hybrid_k` passages of `rag` (default 2), so the answer can
+  quote what the memory recalls; quick model only, like `memory`. `auto`: the first mode of `[knowledge] auto_order`
+  the base can serve — `memory`/`hybrid` need a module, `graph` needs relations in the graph, `rag` always works. The
+  default order is `["rag"]`, from the Phase 7 measurement (§16 of the research note: on 20 held-out questions
+  `graph` answered 15 against `rag`'s 18, winning none of the three discordant pairs, and took 28 % longer).
+  When the memory cannot be read — no module, a width mismatch, an engine that does not take supplied input vectors —
+  `memory` and `hybrid` fall back to `rag` and say so in `sources`, rather than answering with no knowledge at all.
 - **FR-K25** When no chunk scores above `min_score` and mode is not `memory`, the assistant says the knowledge base
   does not cover the question, and answers from general knowledge only if the person asked for it.
 
@@ -318,6 +325,8 @@ memory_placeholder = "<|fim_pad|>"
 memory_trainer = "rust/target/release/memorilla-train"   # Phase 6
 memory_decoder = "models/hf/Qwen3-1.7B"
 memory_gguf = "models/Qwen3-1.7B-Q4_K_M.gguf"
+hybrid_k = 2                           # Phase 7: passages beside the memory tokens in "hybrid"
+auto_order = ["rag"]                   # Phase 7: the modes "auto" tries, in order (measured)
 ```
 
 ## 10. Frontend (Knowledge page, `#/knowledge`)

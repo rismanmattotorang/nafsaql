@@ -194,13 +194,15 @@
         "mode": {
           "type": "string",
           "enum": [
+            "auto",
             "rag",
             "graph",
             "memory",
+            "hybrid",
             "off"
           ],
           "default": "rag",
-          "description": "rag: passages; graph: passages plus relations around the question's entities; memory: Memorilla's 16 memory tokens read from the whole knowledge base (quick model only)"
+          "description": "auto: the best mode this knowledge base can serve; rag: passages; graph: passages plus relations around the question's entities; memory: Memorilla's 16 memory tokens read from the whole knowledge base (quick model only); hybrid: those tokens and the top passages"
         },
         "k": {
           "type": "integer",

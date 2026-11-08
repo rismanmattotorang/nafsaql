@@ -182,7 +182,9 @@ async fn status(State(s): State<AppState>) -> Json<Value> {
         "error": version.as_ref().err().map(|e| e.to_string()).or(schema.err()),
         "url": c.url,
         "queue": kb.queue(),
-        "memory": s.knowledge_memory,
+        // Memory tokens need Smiley Core: no other engine takes caller-supplied input vectors, so the chat page
+        // must not offer the mode while another one is active (FR-K23).
+        "memory": s.knowledge_memory && s.orch.active().s1.kind == "smiley",
         "embedder": kb.embedder_status().await.map(|(model, reachable)| json!({ "model": model, "reachable": reachable, "url": c.embed_url })),
         "limits": { "max_upload_mb": c.max_upload_mb, "max_files_per_request": c.max_files_per_request },
         "kinds": ["pdf", "docx", "pptx", "tex", "html", "md", "txt"],
@@ -531,11 +533,16 @@ pub struct ChatKnowledge {
     kb: Arc<Kb>,
     min_similarity: f64,
     graph_facts: usize,
-    memory: Option<MemoryReader>,
+    memory: Option<Arc<MemoryReader>>,
+    /// FR-K24: the order `auto` tries modes in (`[knowledge] auto_order`).
+    auto_order: Vec<String>,
 }
 
 /// One knowledge base's prepared documents: (stamp of the base when prepared, the preparation, passages read).
 type Prepared = (String, Arc<nafs_memorilla::memory::PreparedDocs>, usize);
+
+/// A checkpoint directory and the time its weights were last written.
+type Key = (std::path::PathBuf, u128);
 
 /// Memorilla's reader (FR-K23): the module, and per knowledge base its prepared documents, kept until the base's
 /// vectors change (count or last update).
@@ -545,11 +552,12 @@ pub struct MemoryReader {
     files_dir: String,
     embed_dims: usize,
     placeholder: String,
-    /// Modules loaded so far, by checkpoint directory.
-    loaded: std::sync::Mutex<
-        std::collections::HashMap<std::path::PathBuf, Arc<nafs_memorilla::MemoryModule>>,
-    >,
+    /// Modules loaded so far, by checkpoint directory and write time.
+    loaded: std::sync::Mutex<std::collections::HashMap<Key, Arc<nafs_memorilla::MemoryModule>>>,
     prepared: std::sync::Mutex<std::collections::HashMap<String, Prepared>>,
+    /// Held while a base's documents are prepared: the work costs seconds of CPU and the whole base's memory, so two
+    /// questions arriving together must not each do it.
+    preparing: tokio::sync::Mutex<()>,
 }
 
 impl MemoryReader {
@@ -581,22 +589,35 @@ impl MemoryReader {
             placeholder: k.memory_placeholder.clone(),
             loaded: Default::default(),
             prepared: Default::default(),
+            preparing: Default::default(),
         })
     }
 
-    /// The module for a knowledge base: its activated run, else the global checkpoint.
-    fn module_for(
-        &self,
-        kb: &str,
-    ) -> Result<(std::path::PathBuf, Arc<nafs_memorilla::MemoryModule>), String> {
+    /// How a loaded module is named: its directory and the moment its weights were written. The time is part of the
+    /// key because a path can be given new weights (the same run activated again after more training), and both this
+    /// cache and the prepared-document cache would otherwise keep serving the old ones.
+    fn stamp(p: &std::path::Path) -> Key {
+        let t = std::fs::metadata(p.join("weights.safetensors"))
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        (p.to_path_buf(), t)
+    }
+
+    /// The module for a knowledge base: its activated run, else the global checkpoint. Loading one reads hundreds of
+    /// megabytes, so it must not run on a runtime thread; the caller hands this to `spawn_blocking`.
+    fn module_for(&self, kb: &str) -> Result<(Key, Arc<nafs_memorilla::MemoryModule>), String> {
         if let Some(p) = crate::memory_runs::active_checkpoint(&self.files_dir, kb) {
+            let key = Self::stamp(&p);
             if let Some(m) = self
                 .loaded
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
-                .get(&p)
+                .get(&key)
             {
-                return Ok((p.clone(), m.clone()));
+                return Ok((key, m.clone()));
             }
             let m = nafs_memorilla::MemoryModule::load_cpu(&p)?;
             if m.cfg.embedding_dim != self.embed_dims {
@@ -606,15 +627,22 @@ impl MemoryReader {
                 ));
             }
             let m = Arc::new(m);
-            self.loaded
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .insert(p.clone(), m.clone());
-            return Ok((p, m));
+            let mut loaded = self.loaded.lock().unwrap_or_else(|e| e.into_inner());
+            // A module is tens of megabytes and only the current one is ever asked for; keeping every module a long
+            // run of activations produced would grow the gateway without bound.
+            if loaded.len() >= 2 {
+                loaded.clear();
+            }
+            loaded.insert(key.clone(), m.clone());
+            return Ok((key, m));
         }
-        self.global.clone().ok_or_else(|| {
-            "no memory module for this knowledge base: train one on the Knowledge page".to_string()
-        })
+        self.global
+            .clone()
+            .map(|(p, m)| (Self::stamp(&p), m))
+            .ok_or_else(|| {
+                "no memory module for this knowledge base: train one on the Knowledge page"
+                    .to_string()
+            })
     }
 }
 
@@ -624,13 +652,34 @@ impl ChatKnowledge {
         min_similarity: f64,
         graph_facts: usize,
         memory: Option<MemoryReader>,
+        auto_order: Vec<String>,
     ) -> ChatKnowledge {
         ChatKnowledge {
             kb,
             min_similarity,
             graph_facts: graph_facts.max(1),
-            memory,
+            memory: memory.map(Arc::new),
+            auto_order,
         }
+    }
+
+    /// Whether this knowledge base has a memory module to read (its own activated run, or the global checkpoint).
+    /// Only the checkpoint's presence is checked: loading one takes seconds and `auto` runs on every request.
+    fn has_memory(&self, kb: &str) -> bool {
+        self.memory.as_ref().is_some_and(|m| {
+            m.global.is_some() || crate::memory_runs::active_checkpoint(&m.files_dir, kb).is_some()
+        })
+    }
+
+    /// Whether this knowledge base has a built graph to search.
+    async fn has_graph(&self, kb: &str) -> bool {
+        self.kb.graph_enabled()
+            && self
+                .kb
+                .store()
+                .graph_stats(kb)
+                .await
+                .is_ok_and(|v| v["relations"].as_u64().unwrap_or(0) > 0)
     }
 
     pub fn memory_enabled(&self) -> bool {
@@ -641,6 +690,21 @@ impl ChatKnowledge {
     pub fn memory_global(&self) -> bool {
         self.memory.as_ref().is_some_and(|m| m.global.is_some())
     }
+}
+
+/// FR-K24: the mode `auto` becomes, given the configured order and what the base can serve. Separate from the store
+/// so it can be tested.
+pub fn auto_mode(order: &[String], has_memory: bool, has_graph: bool) -> String {
+    order
+        .iter()
+        .find(|m| match m.as_str() {
+            "memory" | "hybrid" => has_memory,
+            "graph" => has_graph,
+            "rag" => true,
+            _ => false,
+        })
+        .cloned()
+        .unwrap_or_else(|| "rag".to_string())
 }
 
 /// The relevance filter, separate so it can be tested without a store.
@@ -660,6 +724,24 @@ pub fn keep_for_chat(
 }
 
 impl nafs_core::knowledge::Knowledge for ChatKnowledge {
+    /// FR-K24: `auto` takes the first mode of `[knowledge] auto_order` this base can actually serve.
+    fn resolve_mode<'a>(
+        &'a self,
+        kb: &'a str,
+        asked: &'a str,
+    ) -> nafs_core::knowledge::BoxFuture<'a, String> {
+        Box::pin(async move {
+            if asked != "auto" {
+                return asked.to_string();
+            }
+            // Both checks are cheap (a file test and one count query), and `graph` is only asked for when the order
+            // reaches it.
+            let memory = self.has_memory(kb);
+            let graph = self.auto_order.iter().any(|m| m == "graph") && self.has_graph(kb).await;
+            auto_mode(&self.auto_order, memory, graph)
+        })
+    }
+
     fn retrieve<'a>(
         &'a self,
         kb: &'a str,
@@ -754,7 +836,13 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 .memory
                 .as_ref()
                 .ok_or("searching by meaning is turned off, so memory cannot be read")?;
-            let (ckpt, module) = reader.module_for(kb)?;
+            // Loading a module reads hundreds of megabytes from disk, so it never runs on a runtime thread.
+            let (ckpt, module) = {
+                let (r, base) = (reader.clone(), kb.to_string());
+                tokio::task::spawn_blocking(move || r.module_for(&base))
+                    .await
+                    .map_err(|e| e.to_string())??
+            };
             let base = self
                 .kb
                 .store()
@@ -772,7 +860,14 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 .vector_count(kb)
                 .await
                 .map_err(|e| e.to_string())? as usize;
-            let stamp = format!("{}|{n_vec}|{}", base.updated_at, ckpt.display());
+            // The prepared keys and values come from the module's own weights, so the checkpoint's write time is
+            // part of the stamp: re-activating a run after more training reuses the same directory.
+            let stamp = format!(
+                "{}|{n_vec}|{}|{}",
+                base.updated_at,
+                ckpt.0.display(),
+                ckpt.1
+            );
             let cached = reader
                 .prepared
                 .lock()
@@ -784,26 +879,42 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
             let (prepared, documents, prepare_ms) = match cached {
                 Some((p, n)) => (p, n, 0),
                 None => {
-                    let (rows, n) = self
-                        .kb
-                        .store()
-                        .vectors_of(kb, dims)
-                        .await
-                        .map_err(|e| e.to_string())?;
-                    if n == 0 {
-                        return Err("this knowledge base has no meaning index yet".into());
-                    }
-                    let m = module.clone();
-                    let p = tokio::task::spawn_blocking(move || m.prepare_rows(&rows, n))
-                        .await
-                        .map_err(|e| e.to_string())??;
-                    let p = Arc::new(p);
-                    reader
+                    // One preparation at a time: it costs seconds of CPU and the whole base's vectors in memory, and
+                    // two questions arriving together would otherwise each do all of it.
+                    let _one_at_a_time = reader.preparing.lock().await;
+                    // The guard is dropped at the end of this statement, before any await below.
+                    let hit = reader
                         .prepared
                         .lock()
                         .unwrap_or_else(|e| e.into_inner())
-                        .insert(kb.to_string(), (stamp, p.clone(), n));
-                    (p, n, t0.elapsed().as_millis() as u64)
+                        .get(kb)
+                        .filter(|c| c.0 == stamp)
+                        .map(|c| (c.1.clone(), c.2));
+                    if let Some((p, n)) = hit {
+                        (p, n, 0)
+                    } else {
+                        let (rows, n) = self
+                            .kb
+                            .store()
+                            .vectors_of(kb, dims)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        if n == 0 {
+                            return Err("this knowledge base has no meaning index yet".into());
+                        }
+                        let m = module.clone();
+                        let p = tokio::task::spawn_blocking(move || m.prepare_rows(&rows, n))
+                            .await
+                            .map_err(|e| e.to_string())??;
+                        let p = Arc::new(p);
+                        let mut map = reader.prepared.lock().unwrap_or_else(|e| e.into_inner());
+                        // Only the base being asked about is worth keeping: each entry holds every passage's keys and
+                        // values (about 20 KB per passage), so a few bases would be the gateway's whole memory.
+                        map.clear();
+                        map.insert(kb.to_string(), (stamp, p.clone(), n));
+                        drop(map);
+                        (p, n, t0.elapsed().as_millis() as u64)
+                    }
                 }
             };
             let q = self
@@ -833,6 +944,24 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
 mod tests {
     use super::*;
     use nafs_kb::{Hit, SearchMode};
+
+    #[test]
+    fn auto_takes_the_first_mode_the_base_can_serve() {
+        let order = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let o = order(&["hybrid", "graph", "rag"]);
+        assert_eq!(auto_mode(&o, true, true), "hybrid");
+        assert_eq!(auto_mode(&o, false, true), "graph");
+        assert_eq!(auto_mode(&o, false, false), "rag");
+        // A base with a module but no graph skips straight past graph.
+        assert_eq!(
+            auto_mode(&order(&["graph", "memory", "rag"]), true, false),
+            "memory"
+        );
+        // Nothing configured, or nothing the base can serve: passages, which always work.
+        assert_eq!(auto_mode(&[], false, false), "rag");
+        assert_eq!(auto_mode(&order(&["memory"]), false, false), "rag");
+        assert_eq!(auto_mode(&order(&["nonsense", "rag"]), true, true), "rag");
+    }
 
     fn hit(id: &str, v: Option<f64>) -> Hit {
         Hit {

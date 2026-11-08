@@ -1,6 +1,6 @@
 # Decision 014: Knowledge Base on SurrealDB, GraphRAG, and Memorilla memory tokens (Phase 20)
 
-Date 2026-11-07. Status: **adopted; Phases 0–6 implemented, 7–8 planned.** Research note:
+Date 2026-11-07, updated 2026-11-08. Status: **adopted; Phases 0–7 implemented, 8 planned.** Research note:
 [`docs/research/memorilla_knowledge.md`](../research/memorilla_knowledge.md). Specification:
 [`docs/spec/knowledge_base_spec.md`](../spec/knowledge_base_spec.md). Prompt: [`docs/prompts/MEMORILLA_KB_PROMPT.md`](../prompts/MEMORILLA_KB_PROMPT.md).
 
@@ -61,3 +61,20 @@ served by Smiley Core, implemented with Candle.
   gives NaN gradients (0 x inf). On Qwen3-0.6B 80 questions take the check loss from 3.46 to 0.70. On Qwen3-1.7B a
   question costs 36–94 s here (shared machine), so a useful module is an overnight run, or a GPU pre-train
   (`training/memorilla/GPU_RECIPE.md`, about 8–10 H100-hours estimated).
+- Phase 7 (2026-11-08): `hybrid` (memory tokens and the top passages) and `auto` (the first mode of
+  `[knowledge] auto_order` the base can serve) are built, and the modes are measured against each other on 20 held-out
+  questions over the fixture base (`benchmarks/kb_modes_ab.json`, shared machine at load 85–101): `rag` 18/20,
+  `graph` 15/20 and 28 % slower, closed-book 2/20. `graph` won none of the three discordant pairs, so the default
+  `auto_order` is **`["rag"]`** and `graph` stays a mode to choose, not a default. `memory` and `hybrid` now fall back
+  to `rag` when the memory cannot be read, instead of answering with nothing. Two code reviews of the Phase 6 and 7
+  code found and closed: two requests could both start a trainer into one directory; activating a run still training
+  pinned a checkpoint that was then overwritten and could be read half-written (a module is now copied out, and saves
+  are atomic); a run stopped before its first step saved an untrained module as `best/`; a trainer killed for memory
+  reported "Failed" with no reason; a reused pid could lock a base out of training for ever; fine-tuning from a
+  checkpoint whose K differed from the command line trained against the wrong prompt or panicked; a passage mentioning
+  the placeholder token broke the base's memory answers for everyone; the prepared-document cache ignored the
+  module's weights; a deleted base stayed attached to chat with no way to detach it. New live sweep
+  `scripts/kb_sweep.py` (36 checks) covers the `/v1/kb/*` routes, which no suite had reached. The `memory` and
+  `hybrid` arms are **not measured**: the 1.7B run costs 137-272 s per example on this host (three epochs is 11-34 h)
+  and the machine restarted at step 3. It learns from the first step, and the untrained module reads exactly like no
+  module (claim accuracy 0.692 with and without), so the path is right; the numbers wait for an overnight run.

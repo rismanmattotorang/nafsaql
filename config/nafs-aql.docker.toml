@@ -183,6 +183,8 @@ memory_placeholder = "<|fim_pad|>"     # the token at the 16 memory positions of
 memory_trainer = "rust/target/release/memorilla-train"   # Phase 6: cargo build --release -p nafs-memorilla
 memory_decoder = "models/hf/Qwen3-1.7B"       # f32 decoder the module is trained through (System 1's model)
 memory_gguf = "models/Qwen3-1.7B-Q4_K_M.gguf"  # its tokenizer and chat template make the training prompts
+hybrid_k = 2                                 # Phase 7: passages put beside the memory tokens in "hybrid" mode
+auto_order = ["rag"]                         # Phase 7: the modes "auto" tries in order; graph measured no better
 
 [storage]
 sqlite_path = "data/runtime/nafs.sqlite"

@@ -495,20 +495,25 @@ impl MemoryModule {
             .map_err(|x| x.to_string())
     }
 
-    /// Write `config.json` and `weights.safetensors` (the format `load` reads).
+    /// Write `config.json` and `weights.safetensors` (the format `load` reads). Each file is written beside its
+    /// place and renamed over it, so a reader never sees a half-written checkpoint: the serving gateway may load
+    /// `best/` while the next epoch is saving it.
     pub fn save(
         vm: &candle_nn::VarMap,
         cfg: &MemoryConfig,
         dir: &std::path::Path,
     ) -> std::result::Result<(), String> {
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        let e = |x: std::io::Error| x.to_string();
+        std::fs::create_dir_all(dir).map_err(e)?;
+        let (ctmp, wtmp) = (dir.join("config.json.part"), dir.join("weights.part"));
         std::fs::write(
-            dir.join("config.json"),
-            serde_json::to_vec_pretty(cfg).map_err(|e| e.to_string())?,
+            &ctmp,
+            serde_json::to_vec_pretty(cfg).map_err(|x| x.to_string())?,
         )
-        .map_err(|e| e.to_string())?;
-        vm.save(dir.join("weights.safetensors"))
-            .map_err(|e| e.to_string())
+        .map_err(e)?;
+        vm.save(&wtmp).map_err(|x| x.to_string())?;
+        std::fs::rename(&ctmp, dir.join("config.json")).map_err(e)?;
+        std::fs::rename(&wtmp, dir.join("weights.safetensors")).map_err(e)
     }
 }
 
