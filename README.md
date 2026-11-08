@@ -56,6 +56,7 @@ What is under it, in plain terms:
 | **Finds the right passage** | Searches by exact words and by meaning together, and indexes each passage with its title, heading and a one-line summary so a passage that says "it" is still found by what it is about. |
 | **Reads, not just retrieves** | The answer is built from the sentences that matter, whole, rather than from the first characters of each passage. |
 | **A graph you can check** | Entities and relations are read from your documents under a type list you can edit. A relation is kept only if the sentence behind it really appears in the passage. |
+| **Safe to point at strangers' files** | Uploads are streamed and capped, a hostile archive, page or PDF ends as a document error, and deleting a library stops its training, forgets what was derived from it and removes its passages from the saved answers. |
 | **Follows connections** | Questions that need two steps ("what did the engine that merged in Phase 19 expose?") walk the graph two hops and show the chain. |
 | **Says which searches ran** | Each answer lists the searches it used and why any were skipped. |
 
@@ -100,7 +101,8 @@ Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so abs
 | The built-in engine against llama.cpp | **131 s vs 303 s** for twelve checked prompts, same accuracy |
 | Several people at once | **14 → 25 tokens/s** from 1 to 4 users, each answer identical to what they would get alone |
 | Passage retrieval with the right context | closed-book answers **2 of 20** held-out questions; with passages, **18 of 20** |
-| Security and quality | **436** Rust tests, **26/26** security probes, **67/67** end-to-end checks |
+| Your documents at scale | 1,000 documents / 50,000 passages: search by meaning in **0.4 s**, listing under **0.3 s**; a security sweep of uploads and deletion passes **36/36** |
+| Security and quality | **450** Rust tests, **26/26** security probes, **67/67** end-to-end checks |
 
 We also publish what did not work: speculative decoding, 1-bit weights, concurrent hedging and more. See [features and measured results](docs/features_and_results.md).
 

@@ -1,0 +1,22 @@
+[
+ ["What is the width, in numbers, of each stored passage vector?", ["1024"]],
+ ["How much text, in characters, is shared between neighbouring chunks?", ["150"]],
+ ["Which network port does the graph database listen on locally?", ["8300"]],
+ ["Under what licence is the graph database offered?", ["BSL 1.1"]],
+ ["How many learned memory vectors are given to the language model for each question?", ["16 query-dependent soft tokens"]],
+ ["How much computation per training example does passing through the 1.7B decoder require?", ["1.4 TFLOP"]],
+ ["How similar to the reference are the quantised embeddings, measured by cosine?", ["0.9991"]],
+ ["Which binary encoding replaced JSON when talking to the store?", ["CBOR"]],
+ ["Which release of the proof assistant core does the checker use?", ["4.35.0"]],
+ ["How much disk space do the compressed-weight factors need?", ["172.7"]],
+ ["How many layers' weight matrices were converted by the extreme-quantisation tool?", ["196 projections"]],
+ ["How long did compressing the weights of the 1.7B model take on the four-core machine?", ["13 minutes"]],
+ ["How many correct answers did the uncompressed model give on the twelve prompts?", ["9 correctly"]],
+ ["How quickly does the compressed model generate text?", ["20.1"]],
+ ["What error, relative to the weights' size, did the compression leave on average?", ["0.752"]],
+ ["How many seconds pass between the decision to think harder and the first reasoning token, typically?", ["0.85"]],
+ ["How many bytes of weights must be read for every generated token on the larger model?", ["2,503"]],
+ ["What is the biggest memory throughput the machine reached with four threads?", ["19.5"]],
+ ["How much memory may the engine devote to remembered prompt caches for each model?", ["768"]],
+ ["How many tests of the whole codebase passed after the engine swap?", ["370"]]
+]

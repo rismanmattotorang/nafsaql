@@ -6,7 +6,8 @@ cd "$(dirname "$0")/.."
 BIN=rust/target/release/nafs-gateway; PID=run/gateway.pid; mkdir -p run logs
 case "${1:-status}" in
   start) [ -x "$BIN" ] || (cd rust && cargo build --release -p nafs-gateway)
-         if [ -f $PID ] && kill -0 "$(cat $PID)" 2>/dev/null; then echo "gateway already running (pid $(cat $PID))"; exit 0; fi
+         # The pid must be a gateway: after a reboot the pid file names whatever was given that number (seen 2026-11-08).
+         if [ -f $PID ] && ps -p "$(cat $PID)" -o command= 2>/dev/null | grep -q "nafs-gateway"; then echo "gateway already running (pid $(cat $PID))"; exit 0; fi
          nohup "$BIN" --config "${NAFS_CONFIG:-config/nafs-aql.toml}" > logs/gateway.log 2>&1 & echo $! > $PID
          for i in $(seq 1 30); do curl -sf localhost:8080/healthz >/dev/null && break; sleep 0.5; done
          echo "gateway on http://127.0.0.1:8080 (pid $(cat $PID))"; curl -s localhost:8080/healthz; echo ;;

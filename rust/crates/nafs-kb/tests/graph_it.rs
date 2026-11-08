@@ -125,6 +125,8 @@ async fn graph_build_search_and_prune() {
             merge_similarity: 0.92,
         }),
         graph_weight: 1.0,
+        vector_weight: 1.0,
+        vector_cache_mb: 64,
         graph_beam: 8,
         graph_decay: 0.6,
         limits: nafs_kb::Limits::default(),
@@ -254,7 +256,13 @@ async fn graph_build_search_and_prune() {
     assert_eq!(stats["relations"], 1, "{stats}");
     let _ = db_;
 
+    // The base leaves use at once and its rows are removed in the background: wait for them.
     kb.delete_kb(&base.id).await.unwrap();
+    assert!(store.get_kb(&base.id).await.is_err());
+    let t = std::time::Instant::now();
+    while store.graph_stats(&base.id).await.unwrap()["entities"] != 0 && t.elapsed().as_secs() < 60 {
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
     assert_eq!(store.graph_stats(&base.id).await.unwrap()["entities"], 0);
     let _ = store
         .query(&format!("REMOVE DATABASE {db};"), serde_json::json!({}))

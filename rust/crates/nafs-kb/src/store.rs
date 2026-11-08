@@ -42,6 +42,7 @@ DEFINE FIELD IF NOT EXISTS embedder    ON kb TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS dims        ON kb TYPE option<int>;
 -- FR-K54: the ontology a base's graph is built under, as JSON; "" means the default types.
 DEFINE FIELD IF NOT EXISTS ontology ON kb TYPE string DEFAULT "";
+DEFINE FIELD IF NOT EXISTS deleting ON kb TYPE bool DEFAULT false;
 DEFINE INDEX IF NOT EXISTS kb_name     ON kb FIELDS name UNIQUE;
 DEFINE TABLE IF NOT EXISTS document SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS kb         ON document TYPE record<kb>;
@@ -263,21 +264,36 @@ impl Store {
 
     /// Run SurrealQL with bound variables in this store's namespace and database; returns each statement's result.
     pub async fn query(&self, sql: &str, vars: Value) -> Result<Vec<Value>, KbError> {
+        self.query_within(sql, vars, None).await
+    }
+
+    /// `query` with its own client limit in seconds, for work that is slow by nature (deleting passages one by one out
+    /// of an HNSW index).
+    pub async fn query_within(
+        &self,
+        sql: &str,
+        vars: Value,
+        secs: Option<u64>,
+    ) -> Result<Vec<Value>, KbError> {
         let full = format!(
             "USE NS {} DB {};\n{sql}",
             ident(&self.cfg.namespace),
             ident(&self.cfg.database)
         );
-        let mut res = self.rpc(&full, vars).await?;
+        let mut res = self.rpc(&full, vars, secs).await?;
         res.remove(0); // the USE statement
         Ok(res)
     }
 
-    async fn rpc(&self, sql: &str, vars: Value) -> Result<Vec<Value>, KbError> {
+    async fn rpc(&self, sql: &str, vars: Value, secs: Option<u64>) -> Result<Vec<Value>, KbError> {
         let body = cbor::encode(&json!({ "id": 1, "method": "query", "params": [sql, vars] }));
-        let resp = self
+        let mut req = self
             .http
-            .post(format!("{}/rpc", self.cfg.url.trim_end_matches('/')))
+            .post(format!("{}/rpc", self.cfg.url.trim_end_matches('/')));
+        if let Some(secs) = secs {
+            req = req.timeout(Duration::from_secs(secs));
+        }
+        let resp = req
             .basic_auth(&self.cfg.user, Some(&self.cfg.password))
             .header("Content-Type", "application/cbor")
             .header("Accept", "application/cbor")
@@ -364,7 +380,7 @@ impl Store {
     pub async fn bootstrap(&self) -> Result<(), KbError> {
         let ns = ident(&self.cfg.namespace);
         let db = ident(&self.cfg.database);
-        self.rpc(&format!("DEFINE NAMESPACE IF NOT EXISTS {ns}; USE NS {ns}; DEFINE DATABASE IF NOT EXISTS {db};"), json!({}))
+        self.rpc(&format!("DEFINE NAMESPACE IF NOT EXISTS {ns}; USE NS {ns}; DEFINE DATABASE IF NOT EXISTS {db};"), json!({}), None)
             .await?;
         self.query(SCHEMA, json!({})).await?;
         self.migrate_words_index().await
@@ -412,7 +428,7 @@ impl Store {
                  (SELECT VALUE count() FROM document WHERE kb = $parent.id GROUP ALL)[0] ?? 0 AS documents, \
                  (SELECT VALUE math::sum(n_chunks) FROM document WHERE kb = $parent.id GROUP ALL)[0] ?? 0 AS chunks, \
                  (SELECT VALUE math::sum(n_chars) FROM document WHERE kb = $parent.id GROUP ALL)[0] ?? 0 AS chars \
-                 FROM kb ORDER BY name ASC;",
+                 FROM kb WHERE deleting != true ORDER BY name ASC;",
                 json!({}),
             )
             .await?;
@@ -491,9 +507,61 @@ impl Store {
         self.get_kb(id).await
     }
 
-    /// Delete a knowledge base with its documents and chunks; returns (documents, chunks) removed.
+    /// Delete a knowledge base with its documents and chunks, and return when it is gone; returns (documents, chunks)
+    /// removed. A large base takes long (each passage leaves the HNSW index: about 16 passages a second on the
+    /// reference machine, under an hour for 50,000), so the service uses `mark_kb_deleting` and finishes in the background.
     pub async fn delete_kb(&self, id: &str) -> Result<(u64, u64), KbError> {
         let kb = self.get_kb(id).await?;
+        self.mark_kb_deleting(id).await?;
+        self.finish_delete_kb(id).await?;
+        Ok((kb.documents, kb.chunks))
+    }
+
+    /// Take a base out of use at once: it disappears from lists and searches, and its name is freed for a new base. Its
+    /// rows go in `finish_delete_kb`, which a restart resumes (`deleting_kbs`).
+    pub async fn mark_kb_deleting(&self, id: &str) -> Result<(), KbError> {
+        self.query(
+            "UPDATE type::record('kb', $id) SET deleting = true, name = string::concat(name, ' (deleting ', $id, ')');",
+            json!({ "id": id }),
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Bases marked for deletion whose rows are not all gone yet.
+    pub async fn deleting_kbs(&self) -> Result<Vec<String>, KbError> {
+        let r = self
+            .query(
+                "SELECT VALUE record::id(id) FROM kb WHERE deleting = true;",
+                json!({}),
+            )
+            .await?;
+        Ok(r.into_iter()
+            .next()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+            .into_iter()
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect())
+    }
+
+    /// Remove a base's rows. The passages go in batches (one statement for 50,000 ran past the client's limit, and a
+    /// base half deleted is worse than a slow delete); the rest is small. Safe to repeat.
+    pub async fn finish_delete_kb(&self, id: &str) -> Result<(), KbError> {
+        loop {
+            let r = self
+                .query_within(
+                    "LET $ids = SELECT VALUE id FROM chunk WHERE kb = type::record('kb', $id) LIMIT 500; \
+                     DELETE $ids; RETURN array::len($ids);",
+                    json!({ "id": id }),
+                    Some(600),
+                )
+                .await?;
+            let left = r.last().and_then(|v| v.as_u64()).unwrap_or(0);
+            if left < 500 {
+                break;
+            }
+        }
         self.query(
             "LET $k = type::record('kb', $id); DELETE related WHERE kb = $k; DELETE mentions WHERE kb = $k; \
              DELETE entity WHERE kb = $k; DELETE community WHERE kb = $k; DELETE chunk WHERE kb = $k; \
@@ -501,7 +569,7 @@ impl Store {
             json!({ "id": id }),
         )
         .await?;
-        Ok((kb.documents, kb.chunks))
+        Ok(())
     }
 
     // ------------------------------------------------------------ documents
@@ -653,6 +721,19 @@ impl Store {
         query: &str,
         k: usize,
     ) -> Result<Vec<Hit>, KbError> {
+        self.search_lexical_within(kb, query, k, 10).await
+    }
+
+    /// A words search the store itself stops after `secs` seconds (`TIMEOUT`): dropping the client's request does not
+    /// stop the store's work, and in the scale test ten abandoned queries on very common words kept it busy for
+    /// minutes and starved the searches that followed.
+    pub async fn search_lexical_within(
+        &self,
+        kb: &str,
+        query: &str,
+        k: usize,
+        secs: u64,
+    ) -> Result<Vec<Hit>, KbError> {
         let q = query.trim();
         if q.is_empty() {
             return Ok(Vec::new());
@@ -660,11 +741,13 @@ impl Store {
         // Function words score next to nothing and, because the words are OR-ed, make the store score every passage
         // that holds one; they are left out of what is sent (the query as typed is kept when nothing else is left).
         let q = content_words(q);
+        let q = self.without_common_terms(kb, &q).await;
         let r = self
             .query(
-                "SELECT record::id(id) AS chunk_id, record::id(doc) AS doc_id, doc.title AS doc_title, ord, heading, page, text, \
+                &"SELECT record::id(id) AS chunk_id, record::id(doc) AS doc_id, doc.title AS doc_title, ord, heading, page, text, \
                    search::score(1) AS score FROM chunk WHERE kb = type::record('kb', $kb) AND search_text @1,OR@ $q \
-                   ORDER BY score DESC LIMIT $k;",
+                   ORDER BY score DESC LIMIT $k TIMEOUT {secs}s;"
+                    .replace("{secs}", &secs.clamp(1, 600).to_string()),
                 json!({ "kb": kb, "q": q, "k": k.clamp(1, 100) }),
             )
             .await?;
@@ -674,6 +757,57 @@ impl Store {
             h.lexical_score = Some(h.score);
         }
         Ok(hits)
+    }
+
+    /// Passages in a base, from its documents' own counts (one row per document through the `document_kb` index).
+    pub async fn passage_count(&self, kb: &str) -> Result<u64, KbError> {
+        let r = self
+            .query(
+                "RETURN (SELECT VALUE math::sum(n_chunks) FROM document WHERE kb = type::record('kb', $kb) GROUP ALL)[0] ?? 0;",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        Ok(r.last()
+            .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|x| x as u64)))
+            .unwrap_or(0))
+    }
+
+    /// In a large base, the words that most passages hold are left out of a words query when rarer words remain. The words
+    /// are OR-ed and scored, so a word in half the passages makes the store score half the base: at 50,000 passages
+    /// that was 30 s and more, against 2 s for the rare word alone. A word is common when a capped probe (`LIMIT`, no
+    /// scoring, about a second at worst) fills its cap, which is a fiftieth of the base and at least 400 passages. Bases
+    /// under 4,000 passages are searched whole, as every word there costs little.
+    pub async fn without_common_terms(&self, kb: &str, query: &str) -> String {
+        let terms: Vec<&str> = query.split_whitespace().collect();
+        if terms.len() < 2 {
+            return query.to_string();
+        }
+        let Ok(total) = self.passage_count(kb).await else {
+            return query.to_string();
+        };
+        if total < 4_000 {
+            return query.to_string();
+        }
+        let cap = (total / 50).max(400);
+        let mut rare: Vec<&str> = Vec::new();
+        for t in &terms {
+            let probe = self
+                .query(
+                    "SELECT VALUE id FROM chunk WHERE kb = type::record('kb', $kb) AND search_text @1@ $t LIMIT $cap TIMEOUT 5s;",
+                    json!({ "kb": kb, "t": t, "cap": cap }),
+                )
+                .await;
+            // A probe that fails or times out says nothing: the word is kept, as it would have been before.
+            let common = matches!(&probe, Ok(r) if r.first().and_then(|v| v.as_array()).is_some_and(|a| a.len() as u64 >= cap));
+            if !common {
+                rare.push(t);
+            }
+        }
+        if rare.is_empty() {
+            query.to_string()
+        } else {
+            rare.join(" ")
+        }
     }
 
     // ------------------------------------------------------------ vectors (Phase 2)
@@ -812,12 +946,46 @@ impl Store {
     /// Passages of a knowledge base that have a vector.
     pub async fn vector_count(&self, kb: &str) -> Result<u64, KbError> {
         let r = self
+            // The documents carry their own count (`finish_vectors`, `clear_vectors`), so this reads one row per document
+            // through the `document_kb` index. Counting `embedding != NONE` over the passages read every vector of the base
+            // (200 MB at 50,000 passages: minutes under load), and every search asked.
             .query(
-                "RETURN (SELECT VALUE count() FROM chunk WHERE kb = type::record('kb', $kb) AND embedding != NONE GROUP ALL)[0] ?? 0;",
+                "RETURN (SELECT VALUE math::sum(n_embedded) FROM document WHERE kb = type::record('kb', $kb) GROUP ALL)[0] ?? 0;",
                 json!({ "kb": kb }),
             )
             .await?;
-        Ok(r.last().and_then(Value::as_u64).unwrap_or(0))
+        Ok(r.last()
+            .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|x| x as u64)))
+            .unwrap_or(0))
+    }
+
+    /// The vectors of one document's passages: (passage id, vector). Read through the `chunk_doc` index (70 ms for 50
+    /// passages at 50,000). Keyset paging over the whole base sorted every passage again for each page, and `doc IN [...]`
+    /// scanned the table; neither finished in twenty minutes.
+    pub async fn vectors_of_doc(&self, doc: &str) -> Result<Vec<(String, Vec<f32>)>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(id) AS id, embedding FROM chunk \
+                 WHERE doc = type::record('document', $doc) AND embedding != NONE;",
+                json!({ "doc": doc }),
+            )
+            .await?;
+        let mut out = Vec::new();
+        for row in r
+            .into_iter()
+            .next()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+        {
+            let (Some(id), Some(e)) = (row["id"].as_str(), row["embedding"].as_array()) else {
+                continue;
+            };
+            out.push((
+                id.to_string(),
+                e.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect(),
+            ));
+        }
+        Ok(out)
     }
 
     /// Nearest passages by cosine similarity. `exact` scans the knowledge base's vectors (exact, and fast for a few

@@ -88,6 +88,13 @@ pub struct KnowledgeCfg {
     pub rag_max_chars: usize,
     /// Chat: a passage is used only when its hybrid rank fuses both lists or its similarity reaches this.
     pub rag_min_similarity: f64,
+    /// A hybrid search fuses the words' ranking (weight 1) and the meaning ranking by reciprocal rank; this is the
+    /// meaning's weight. 0.1 measured best on two bases of the paper (1.0 let the weaker arm push answers down).
+    pub vector_weight: f64,
+    /// The most memory (MB) the in-memory copies of large bases' vectors may use together (a base of 50,000 passages takes
+    /// 200 MB). 0 (the default) turns the copies off and large bases use the store's index, which answered in 0.37 s at the
+    /// median at 50,000 passages once warm; a copy answers exactly in 20 ms but takes minutes to load.
+    pub vector_cache_mb: u64,
     /// Chat: a passage whose words match this strongly (a BM25 score) is used even if the meaning search missed it or
     /// scored it low; 0 turns it off. Off-topic questions scored at most 8.0, answering passages at least 10.8.
     pub rag_lexical_rescue: f64,
@@ -155,6 +162,8 @@ impl Default for KnowledgeCfg {
             rag_k: 4,
             rag_max_chars: 4800,
             rag_min_similarity: 0.45,
+            vector_weight: 0.1,
+            vector_cache_mb: 0,
             rag_lexical_rescue: 10.0,
             graph_llm_url: String::new(),
             graph_model: "system1".into(),
