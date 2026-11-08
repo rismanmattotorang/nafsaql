@@ -126,13 +126,24 @@ impl Embedder {
     }
 }
 
-/// The text a passage is embedded as: its document title and heading path, then the passage (a contextual header,
-/// so a passage that says "it" still carries what it is about).
-pub fn passage_text(doc_title: &str, heading: &str, text: &str) -> String {
+/// The text a passage is embedded and searched as (FR-K51, FR-K53): its document title and heading path, then the
+/// context line the extractor wrote for it, then the passage. A passage that says "it" still carries what it is
+/// about, and the same text backs both the vectors and the words, so neither arm is blind to the context the other
+/// can see.
+///
+/// The context line is empty until the graph pass has read the passage (it comes free from that call); a base
+/// indexed before it, or with the graph off, keeps the title-and-heading header alone.
+pub fn passage_text(doc_title: &str, heading: &str, context: &str, text: &str) -> String {
     let mut head = doc_title.trim().to_string();
     if !heading.trim().is_empty() && heading.trim() != doc_title.trim() {
         head.push_str(" > ");
         head.push_str(heading.trim());
+    }
+    if !context.trim().is_empty() {
+        if !head.is_empty() {
+            head.push('\n');
+        }
+        head.push_str(context.trim());
     }
     if head.is_empty() {
         text.to_string()
@@ -174,10 +185,16 @@ mod tests {
     #[test]
     fn passage_headers() {
         assert_eq!(
-            passage_text("Paper", "Intro", "Body"),
+            passage_text("Paper", "Intro", "", "Body"),
             "Paper > Intro\n\nBody"
         );
-        assert_eq!(passage_text("Paper", "Paper", "Body"), "Paper\n\nBody");
-        assert_eq!(passage_text("", "", "Body"), "Body");
+        assert_eq!(passage_text("Paper", "Paper", "", "Body"), "Paper\n\nBody");
+        assert_eq!(passage_text("", "", "", "Body"), "Body");
+        // FR-K53: the context line sits under the heading path, above the body.
+        assert_eq!(
+            passage_text("Paper", "Intro", "What the method is.", "Body"),
+            "Paper > Intro\nWhat the method is.\n\nBody"
+        );
+        assert_eq!(passage_text("", "", " ctx ", "Body"), "ctx\n\nBody");
     }
 }

@@ -3389,6 +3389,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "fresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "FR-K53: embed every passage again, so the vectors carry the context lines the graph pass wrote; the words index is filled for passages stored before Phase 21 either way"
           }
         ],
         "responses": {
@@ -3653,6 +3663,100 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/kb/{kb}/ontology": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "getOntology",
+        "summary": "The ontology the base's graph is built under (FR-K54) - the entity types and their definitions, as data, with the hash recorded on every extraction",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "types, hash, default (true when no ontology was set and the built-in types apply)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ontology"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "putOntology",
+        "summary": "Replace the ontology (an empty list restores the default). Passages read from now on use it; rebuild the graph with fresh=true to re-read the rest",
+        "parameters": [
+          {
+            "name": "kb",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "types": {
+                    "type": "array",
+                    "maxItems": 24,
+                    "items": {
+                      "$ref": "#/components/schemas/OntoType"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ontology now in force",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ontology"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -4128,6 +4232,52 @@
             "type": "boolean",
             "description": "a Memorilla module can answer this base's questions (its own activated run",
             "or the configured global checkpoint)": null
+          }
+        }
+      },
+      "OntoType": {
+        "type": "object",
+        "required": [
+          "name",
+          "definition"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,31}$",
+            "description": "the type as the extractor writes it"
+          },
+          "definition": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "the one-line definition the extraction prompt carries"
+          }
+        }
+      },
+      "Ontology": {
+        "type": "object",
+        "required": [
+          "types",
+          "hash",
+          "default"
+        ],
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OntoType"
+            }
+          },
+          "hash": {
+            "type": "string",
+            "description": "sha256 prefix of the types as the prompt sees them"
+          },
+          "default": {
+            "type": "boolean",
+            "description": "true when the built-in types apply because none was set"
+          },
+          "note": {
+            "type": "string"
           }
         }
       },
@@ -4757,7 +4907,7 @@
           },
           "sources": {
             "type": "array",
-            "description": "FR-K21: what the knowledge base contributed. A passage row carries n (its number in the prompt), kb, kb_name, chunk_id, doc_id, doc_title, heading, page, text, score and mode, where mode is how the passage was *searched for* (lexical, vector or hybrid); a graph row carries facts; a memory row carries memory {tokens, documents, prepare_ms, read_ms, mode}, where that mode is the *chat* mode (memory or hybrid) that auto resolved to; a row with note alone says why nothing was used.",
+            "description": "FR-K21: what the knowledge base contributed. A passage row carries n (its number in the prompt), kb, kb_name, chunk_id, doc_id, doc_title, heading, page, text, score and mode, where mode is how the passage was *searched for* (lexical, vector or hybrid); a graph row carries facts; a memory row carries memory {tokens, documents, prepare_ms, read_ms, mode}, where that mode is the *chat* mode (memory or hybrid) that auto resolved to; a row with arms lists the retrieval arms that ran (lexical, vector, graph) with arm_notes saying why any did not (FR-K59); a row with note alone says why nothing was used. Each fact carries source, predicate, target, weight, quote (the verified sentence that states it, FR-K55), hop (1 or 2) and, at hop 2, via (FR-K56).",
             "items": {
               "type": "object"
             }

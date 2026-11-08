@@ -1,0 +1,22 @@
+[
+  ["How much memory does the engine's prefix store keep per model?", ["768"]],
+  ["How many decode threads beat four in all six interleaved pairs?", ["three", "3 threads"]],
+  ["What bandwidth did the streaming read reach with one thread?", ["12.9"]],
+  ["Which revision of the vendored Smiley Core did Phase 19 replace?", ["7cb6028"]],
+  ["Which revision is the new Smiley Core that Phase 19 merged?", ["06c2b88"]],
+  ["How many nanoseconds per row did the small-batch Q4_K kernel take in the slow build?", ["679"]],
+  ["How many tests of the workspace passed after the Phase 19 merge?", ["370"]],
+  ["What does LittleBit approximate a weight matrix as?", ["sign matrices", "signs"]],
+  ["Which version of core Lean does the verifier run against?", ["4.35.0"]],
+  ["What was the median time from the gate's decision to System 2's first reasoning token?", ["0.85"]],
+  ["How long did the gate's own time take when escalating?", ["0.08"]],
+  ["What median did llama.cpp take for the System 1 to System 2 switch in Phase 14?", ["1.5"]],
+  ["By how much is cold prefill slower at three threads?", ["16"]],
+  ["Which transform is the int8 key-value cache rotated by?", ["hadamard"]],
+  ["Which model abstained on the proof of n plus zero equals n?", ["qwen3-4b-thinking", "4b-thinking", "qwen3-4b"]],
+  ["How many megabytes per token does System 1 read at decode?", ["1,094", "1094"]],
+  ["What share of decode time goes to the matmuls and the output head?", ["86"]],
+  ["What did the prefix store bring a switch of request kind down to?", ["0.1"]],
+  ["Which version of SurrealDB stores the knowledge base?", ["3.3.5"]],
+  ["How many parameters does the memory module for System 1 have?", ["31.5"]]
+]

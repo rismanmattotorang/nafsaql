@@ -46,11 +46,13 @@ async fn mock_llm() -> String {
                 }
                 let body = String::from_utf8_lossy(&buf);
                 let content = if body.contains("PagedAttention") {
-                    r#"{"entities":[{"name":"vLLM","type":"system"},{"name":"PagedAttention","type":"algorithm"},{"name":"virtual memory","type":"concept"}],"relations":[{"source":"vLLM","predicate":"uses","target":"PagedAttention"},{"source":"PagedAttention","predicate":"inspired_by","target":"virtual memory"}]}"#
+                    // FR-K53/55: a context line, and quotes that occur in the passage; one relation carries an
+                    // invented quote and must be dropped by the gate.
+                    r#"{"context":"What vLLM is built on and where that idea came from.","entities":[{"name":"vLLM","type":"system"},{"name":"PagedAttention","type":"algorithm"},{"name":"virtual memory","type":"concept"}],"relations":[{"source":"vLLM","predicate":"uses","target":"PagedAttention","quote":"vLLM builds on PagedAttention, which is inspired by virtual memory in operating systems."},{"source":"PagedAttention","predicate":"inspired_by","target":"virtual memory","quote":"vLLM builds on PagedAttention, which is inspired by virtual memory in operating systems."},{"source":"virtual memory","predicate":"replaces","target":"vLLM","quote":"Virtual memory replaces vLLM in every serving system."}]}"#
                 } else if body.contains("Orca") {
-                    r#"{"entities":[{"name":"the vLLM","type":"system"},{"name":"Orca","type":"system"}],"relations":[{"source":"the vLLM","predicate":"compared to","target":"Orca"}]}"#
+                    r#"{"context":"How vLLM compares with Orca.","entities":[{"name":"the vLLM","type":"system"},{"name":"Orca","type":"system"}],"relations":[{"source":"the vLLM","predicate":"compared to","target":"Orca","quote":"Against Orca, the vLLM system serves more requests per second at equal latency."}]}"#
                 } else if body.contains("Memorilla") {
-                    r#"{"entities":[{"name":"Memorilla","type":"method"},{"name":"Qwen3-8B","type":"model"}],"relations":[{"source":"Memorilla","predicate":"uses","target":"Qwen3-8B"}]}"#
+                    r#"{"context":"What Memorilla does with documents.","entities":[{"name":"Memorilla","type":"method"},{"name":"Qwen3-8B","type":"model"}],"relations":[{"source":"Memorilla","predicate":"uses","target":"Qwen3-8B","quote":"Memorilla compresses documents into sixteen memory tokens for a frozen Qwen3-8B decoder."}]}"#
                 } else {
                     "I cannot do that."
                 };
@@ -122,6 +124,9 @@ async fn graph_build_search_and_prune() {
             max_tokens: 300,
             merge_similarity: 0.92,
         }),
+        graph_weight: 1.0,
+        graph_beam: 8,
+        graph_decay: 0.6,
     });
     match kb.ready().await {
         Err(KbError::Unavailable(e)) => {
@@ -161,8 +166,32 @@ async fn graph_build_search_and_prune() {
     let stats = store.graph_stats(&base.id).await.unwrap();
     // vLLM ("vLLM" and "the vLLM" share a key), PagedAttention, virtual memory, Orca, Memorilla, Qwen3-8B.
     assert_eq!(stats["entities"], 6, "{stats}");
-    assert_eq!(stats["relations"], 4, "{stats}");
+    assert_eq!(
+        stats["relations"], 4,
+        "{stats}: the relation with an invented quote was dropped"
+    );
     assert!(stats["communities"].as_u64().unwrap() >= 2, "{stats}");
+    // FR-K55: every stored relation carries the sentence that states it; FR-K53: the passage got its context line
+    // and the words index carries it.
+    let facts = store
+        .facts_for(&base.id, &[nafs_kb::graph::entity_id(&base.id, "vllm")], 20)
+        .await
+        .unwrap();
+    assert!(!facts.is_empty());
+    assert!(
+        facts
+            .iter()
+            .all(|f| f["quote"].as_str().is_some_and(|q| q.len() > 20)),
+        "{facts:?}"
+    );
+    let lex = store
+        .search_lexical(&base.id, "idea came from", 5)
+        .await
+        .unwrap();
+    assert!(
+        lex.iter().any(|h| h.text.contains("PagedAttention")),
+        "the context line is searchable by its words: {lex:?}"
+    );
 
     let ents = store.graph_entities(&base.id).await.unwrap();
     let vllm = ents

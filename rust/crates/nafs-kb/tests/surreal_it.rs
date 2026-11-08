@@ -37,6 +37,9 @@ fn config(db: &str, dir: &std::path::Path) -> Option<KbConfig> {
         }),
         exact_search_below: 5000,
         graph: None,
+        graph_weight: 1.0,
+        graph_beam: 8,
+        graph_decay: 0.6,
     })
 }
 

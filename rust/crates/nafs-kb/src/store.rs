@@ -40,6 +40,8 @@ DEFINE FIELD IF NOT EXISTS created_at  ON kb TYPE datetime;
 DEFINE FIELD IF NOT EXISTS updated_at  ON kb TYPE datetime;
 DEFINE FIELD IF NOT EXISTS embedder    ON kb TYPE option<string>;
 DEFINE FIELD IF NOT EXISTS dims        ON kb TYPE option<int>;
+-- FR-K54: the ontology a base's graph is built under, as JSON; "" means the default types.
+DEFINE FIELD IF NOT EXISTS ontology ON kb TYPE string DEFAULT "";
 DEFINE INDEX IF NOT EXISTS kb_name     ON kb FIELDS name UNIQUE;
 DEFINE TABLE IF NOT EXISTS document SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS kb         ON document TYPE record<kb>;
@@ -71,7 +73,12 @@ DEFINE FIELD IF NOT EXISTS chars     ON chunk TYPE int;
 DEFINE FIELD IF NOT EXISTS embedding ON chunk TYPE option<array<float>>;
 DEFINE INDEX IF NOT EXISTS chunk_kb   ON chunk FIELDS kb;
 DEFINE INDEX IF NOT EXISTS chunk_doc  ON chunk FIELDS doc;
-DEFINE INDEX IF NOT EXISTS chunk_text ON chunk FIELDS text FULLTEXT ANALYZER kb_text BM25;
+-- FR-K51 (contextual BM25): the words are searched over the same text the passage is embedded as - its document
+-- title, its heading path, its context line, then the body - so a passage that says "it" is still found by what it
+-- is about. `search_text` falls back to the body for a base indexed before Phase 21; `reindex` fills it.
+DEFINE FIELD IF NOT EXISTS search_text ON chunk TYPE string DEFAULT "";
+DEFINE FIELD IF NOT EXISTS context ON chunk TYPE string DEFAULT "";
+DEFINE INDEX IF NOT EXISTS chunk_text ON chunk FIELDS search_text FULLTEXT ANALYZER kb_text BM25;
 DEFINE FIELD IF NOT EXISTS graph_done ON chunk TYPE bool DEFAULT false;
 DEFINE FIELD IF NOT EXISTS n_graphed ON document TYPE int DEFAULT 0;
 DEFINE TABLE IF NOT EXISTS entity SCHEMAFULL;
@@ -92,6 +99,8 @@ DEFINE FIELD IF NOT EXISTS kb        ON related TYPE record<kb>;
 DEFINE FIELD IF NOT EXISTS predicate ON related TYPE string;
 DEFINE FIELD IF NOT EXISTS weight    ON related TYPE int DEFAULT 0;
 DEFINE FIELD IF NOT EXISTS evidence  ON related TYPE array<record<chunk>> DEFAULT [];
+-- FR-K55: the sentence of the passage that states the relation, checked to occur in it verbatim before it is kept.
+DEFINE FIELD IF NOT EXISTS quote ON related TYPE string DEFAULT "";
 DEFINE INDEX IF NOT EXISTS related_kb ON related FIELDS kb;
 DEFINE TABLE IF NOT EXISTS community SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS kb      ON community TYPE record<kb>;
@@ -116,6 +125,16 @@ pub struct KbSummary {
     pub chunks: u64,
     #[serde(default)]
     pub chars: u64,
+}
+
+/// What the embedding pass needs of a passage: its id and the text it is embedded as (FR-K53).
+#[derive(Debug, Clone)]
+pub struct ChunkForEmbedding {
+    pub id: String,
+    pub heading: String,
+    /// The context line the extractor wrote, empty until the graph pass has read the passage.
+    pub context: String,
+    pub text: String,
 }
 
 /// A document record (IF-K01 `Document`).
@@ -511,12 +530,14 @@ impl Store {
         for batch in chunks.chunks(500) {
             let rows: Vec<Value> = batch
                 .iter()
-                .map(|c| json!({ "ord": c.ord, "text": c.text, "heading": c.heading, "page": c.page, "chars": c.chars }))
+                .map(|c| json!({ "ord": c.ord, "text": c.text, "heading": c.heading, "page": c.page, "chars": c.chars,
+                    // FR-K51: the words are indexed over the same text the passage is embedded as.
+                    "search_text": crate::embed::passage_text(title, &c.heading, "", &c.text) }))
                 .collect();
             self.query(
                 "LET $k = type::record('kb', $kb); LET $d = type::record('document', $doc); \
                  FOR $r IN $rows { CREATE chunk CONTENT { kb: $k, doc: $d, ord: $r.ord, text: $r.text, heading: $r.heading, \
-                 page: $r.page ?? NONE, chars: $r.chars }; };",
+                 page: $r.page ?? NONE, chars: $r.chars, search_text: $r.search_text }; };",
                 json!({ "kb": kb, "doc": doc, "rows": rows }),
             )
             .await?;
@@ -581,7 +602,7 @@ impl Store {
         let r = self
             .query(
                 "SELECT record::id(id) AS chunk_id, record::id(doc) AS doc_id, doc.title AS doc_title, ord, heading, page, text, \
-                   search::score(1) AS score FROM chunk WHERE kb = type::record('kb', $kb) AND text @1,OR@ $q \
+                   search::score(1) AS score FROM chunk WHERE kb = type::record('kb', $kb) AND search_text @1,OR@ $q \
                    ORDER BY score DESC LIMIT $k;",
                 json!({ "kb": kb, "q": q, "k": k.clamp(1, 100) }),
             )
@@ -610,10 +631,10 @@ impl Store {
     pub async fn chunks_without_vectors(
         &self,
         doc: &str,
-    ) -> Result<Vec<(String, String, String)>, KbError> {
+    ) -> Result<Vec<ChunkForEmbedding>, KbError> {
         let r = self
             .query(
-                "SELECT record::id(id) AS id, heading, text, ord FROM chunk \
+                "SELECT record::id(id) AS id, heading, context, text, ord FROM chunk \
                  WHERE doc = type::record('document', $doc) AND embedding = NONE ORDER BY ord ASC;",
                 json!({ "doc": doc }),
             )
@@ -623,7 +644,12 @@ impl Store {
             .into_iter()
             .map(|v| {
                 let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
-                (s("id"), s("heading"), s("text"))
+                ChunkForEmbedding {
+                    id: s("id"),
+                    heading: s("heading"),
+                    context: s("context"),
+                    text: s("text"),
+                }
             })
             .collect())
     }
@@ -851,13 +877,132 @@ impl Store {
              }; \
              FOR $r IN $rels { \
                INSERT RELATION INTO related { id: type::record('related', $r.id), in: type::record('entity', $r.s), \
-                 out: type::record('entity', $r.t), kb: $k, predicate: $r.p, weight: 1, evidence: [$c] } \
-               ON DUPLICATE KEY UPDATE weight += 1, evidence += $input.evidence; \
+                 out: type::record('entity', $r.t), kb: $k, predicate: $r.p, weight: 1, evidence: [$c], quote: $r.quote } \
+               ON DUPLICATE KEY UPDATE weight += 1, evidence += $input.evidence, \
+                 quote = IF quote = '' THEN $input.quote ELSE quote END; \
              }; \
              UPDATE $c SET graph_done = true; \
              LET $d = type::record('document', $doc); \
              UPDATE $d SET n_graphed = (SELECT VALUE count() FROM chunk WHERE doc = $d AND graph_done = true GROUP ALL)[0] ?? 0;",
             json!({ "kb": kb, "doc": doc, "chunk": chunk, "ents": ents, "rels": rels }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// FR-K54: the ontology a knowledge base's graph is built under; `None` means the default types.
+    pub async fn get_ontology(&self, kb: &str) -> Result<Option<crate::graph::Ontology>, KbError> {
+        let r = self
+            .query(
+                "SELECT ontology FROM type::record('kb', $kb);",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        let row: Vec<Value> = rows(r.into_iter().next())?;
+        let raw = row
+            .first()
+            .and_then(|v| v.get("ontology"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if raw.trim().is_empty() {
+            return Ok(None);
+        }
+        serde_json::from_str(raw)
+            .map(Some)
+            .map_err(|e| KbError::Store(format!("the stored ontology could not be read: {e}")))
+    }
+
+    /// FR-K54: set a knowledge base's ontology (an empty one restores the default).
+    pub async fn set_ontology(
+        &self,
+        kb: &str,
+        ontology: Option<&crate::graph::Ontology>,
+    ) -> Result<(), KbError> {
+        let raw = match ontology {
+            Some(o) => serde_json::to_string(o).unwrap_or_default(),
+            None => String::new(),
+        };
+        self.query(
+            "UPDATE type::record('kb', $kb) SET ontology = $o, updated_at = time::now();",
+            json!({ "kb": kb, "o": raw }),
+        )
+        .await
+        .map(|_| ())
+    }
+
+    /// FR-K53: forget a knowledge base's vectors so a reindex embeds every passage again - with the context lines
+    /// the graph pass has written since. Returns how many passages were cleared.
+    pub async fn clear_vectors(&self, kb: &str) -> Result<u64, KbError> {
+        let r = self
+            .query(
+                "LET $k = type::record('kb', $kb); \
+                 LET $n = (SELECT VALUE count() FROM chunk WHERE kb = $k AND embedding != NONE GROUP ALL)[0] ?? 0; \
+                 UPDATE chunk SET embedding = NONE WHERE kb = $k; \
+                 UPDATE document SET n_embedded = 0 WHERE kb = $k; \
+                 RETURN $n;",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        Ok(r.into_iter().last().and_then(|v| v.as_u64()).unwrap_or(0))
+    }
+
+    /// FR-K51: fill `search_text` for passages stored before the words index moved to it, in batches. Returns how
+    /// many were filled.
+    pub async fn backfill_search_text(&self, kb: &str) -> Result<usize, KbError> {
+        let mut done = 0usize;
+        loop {
+            let r = self
+                .query(
+                    "SELECT record::id(id) AS id, doc.title AS title, heading, context, text FROM chunk \
+                     WHERE kb = type::record('kb', $kb) AND search_text = '' LIMIT 200;",
+                    json!({ "kb": kb }),
+                )
+                .await?;
+            let batch: Vec<Value> = rows(r.into_iter().next())?;
+            if batch.is_empty() {
+                return Ok(done);
+            }
+            let rows_in: Vec<Value> = batch
+                .iter()
+                .map(|c| {
+                    let s = |k: &str| c.get(k).and_then(Value::as_str).unwrap_or("");
+                    json!({ "id": s("id"),
+                        "st": crate::embed::passage_text(s("title"), s("heading"), s("context"), s("text")) })
+                })
+                .collect();
+            done += rows_in.len();
+            self.query(
+                "FOR $r IN $rows { UPDATE type::record('chunk', $r.id) SET search_text = $r.st; };",
+                json!({ "rows": rows_in }),
+            )
+            .await?;
+        }
+    }
+
+    /// FR-K53: the context line the extractor wrote for a passage, with the words index refreshed to the same text
+    /// the passage would now be embedded as. The vector itself is left alone — it is refreshed by a reindex, so a
+    /// passage keeps the vector it was embedded with until the owner asks for one.
+    pub async fn set_chunk_context(
+        &self,
+        chunk: &str,
+        context: &str,
+        doc_title: &str,
+    ) -> Result<(), KbError> {
+        let r = self
+            .query(
+                "SELECT heading, text FROM type::record('chunk', $chunk);",
+                json!({ "chunk": chunk }),
+            )
+            .await?;
+        let row: Vec<Value> = rows(r.into_iter().next())?;
+        let Some(c) = row.first() else {
+            return Ok(());
+        };
+        let s = |k: &str| c.get(k).and_then(Value::as_str).unwrap_or("");
+        let search_text = crate::embed::passage_text(doc_title, s("heading"), context, s("text"));
+        self.query(
+            "UPDATE type::record('chunk', $chunk) SET context = $ctx, search_text = $st;",
+            json!({ "chunk": chunk, "ctx": context, "st": search_text }),
         )
         .await
         .map(|_| ())
@@ -1031,7 +1176,7 @@ impl Store {
             .query(
                 "LET $s = $seeds.map(|$x| type::record('entity', $x)); \
                  SELECT record::id(id) AS id, record::id(in) AS source_id, in.name AS source, predicate, \
-                   record::id(out) AS target_id, out.name AS target, weight, evidence.map(|$c| record::id($c)) AS evidence \
+                   record::id(out) AS target_id, out.name AS target, weight, quote, evidence.map(|$c| record::id($c)) AS evidence \
                  FROM related WHERE kb = type::record('kb', $kb) AND (in IN $s OR out IN $s) ORDER BY weight DESC LIMIT $limit;",
                 json!({ "kb": kb, "seeds": seeds, "limit": limit.clamp(1, 200) }),
             )

@@ -56,6 +56,21 @@ Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 7 done (0–2 b8da406
 | 00:34 | 1.7B training run started on the fixture base (3 epochs, 150 train / 14 check questions, 164 rows; 73 true and 73 false claims). It learns from step 1 (loss 8.50 -> 3.60 -> 4.08, gradient norm 6,969 -> 1,200) and the untrained module reads exactly like no module (claim accuracy 0.692 with and without memory, A-118). Per example 137/211/272 s as the host filled up, against Phase 6's 36-94 s: three epochs is 11-34 h here | run `20261108-003441` |
 | 08:35 | The machine restarted and took the gateway and the trainer with it at step 3. The run now reports "the trainer stopped when the server did (the machine restarted?)" instead of a bare "Failed" - the review's finding 1.4, confirmed in the field. **`memory` and `hybrid` are therefore still unmeasured**; the script and the question set are ready for them | `scripts/kb_modes_ab.py --modes off,rag,graph,memory,hybrid` |
 
+## Phase 21 (Knowledge): retrieval and graph upgrade after reading OntoSmith (2026-11-08)
+
+Research: `docs/research/ontosmith_comparison.md`. Specification: `docs/spec/graph_rag_upgrade_spec.md` (FR-K50 to
+FR-K60, NFR-K10 to K12, SR-K10).
+
+| When | Unit of work | Evidence |
+|---|---|---|
+| 08:45 | Three read-only deep reads of `third_party/ontosmith` (pipeline, retrieval, verification) and the 2026 retrieval literature; comparison note written: ahead on BM25, chunking, HNSW, RRF, the served API; behind on sentence units, graph-as-candidate-supplier, verified quotes, ontology-as-data; three places where OntoSmith's prose outruns its code recorded | research note §2–§6 |
+| 09:00 | Gap table and specification: twelve gaps, nine closed now, three specified and deferred with the reason (reranker needs a model download and an adoption measurement; community summaries cost a call per community; the review band needs its thresholds measured) | `graph_rag_upgrade_spec.md` |
+| 09:20 | **FR-K50** `Kb::fuse_graph`: the graph ranks the whole candidate pool and is fused by reciprocal rank with the search (`graph_weight`); the old sort-by-mentions is gone. The first test wrote caught a real flaw: a short graph list let a one-mention passage leapfrog the search's best, fixed by ranking the whole population | `lib.rs` test `the_graph_arm_moves_passages_without_overriding_the_search` |
+| 09:30 | **FR-K51/53** `search_text` (title, heading, context line, body) is what BM25 indexes; the context line comes from the extraction call; `reindex?fresh=true` re-embeds with it and fills `search_text` for older bases | `store.rs`, `embed::passage_text` |
+| 09:40 | **FR-K52** `pack_units`: sentences and passages on one z-scale, whole units under one budget, skip-not-stop; the answering sentence of a long, last-ranked passage reaches the prompt whole | `knowledge.rs` tests |
+| 09:50 | **FR-K54/55** `Ontology` as data with `GET/PUT /v1/kb/{kb}/ontology`, the prompt built from it, a stray type mapped onto its last type; a verified quote per relation with drops counted. Two defects the tests caught: the worked example named a type a custom ontology lacks (now typed with the ontology's own first type); the context-line guard compared fixed word counts and missed a shorter line | `graph.rs` tests, `graph_it.rs` live |
+| 10:00 | **FR-K56** two-hop walk with a path score (weight x decay per hop), `via` on second-hop facts, the chain shown in the prompt; **FR-K59** every reply names its arms; quotes and chains in the Sources box and the Graph card; **NFR-K11** one fate per question in the A/B script | `lib.rs::walk`, `app.js` |
+
 ### Next three actions (Phase 8)
 1. Start the 1.7B run again on a quiet host (11-34 h at the measured rate; `caffeinate` it, and remember the machine
    restarted once mid-run), activate it, and add the `memory` and `hybrid` arms to the A/B with the same question set

@@ -69,10 +69,12 @@ function toolcardsHTML(t, live) {
 }
 // Knowledge-base passages the answer was given (numbered as the model cites them), or why there were none.
 function kbSourcesHTML(sources) {
-  const notes = sources.filter(x => x.note), facts = sources.filter(x => x.facts).flatMap(x => x.facts), mem = sources.filter(x => x.memory), hits = sources.filter(x => !x.note && !x.facts && !x.memory);
+  const notes = sources.filter(x => x.note), facts = sources.filter(x => x.facts).flatMap(x => x.facts), mem = sources.filter(x => x.memory), arms = sources.find(x => x.arms), hits = sources.filter(x => x.chunk_id);
   let out = notes.map(n => `<div class="sources">${icon.book}<span>${esc(n.note)}</span></div>`).join('');
+  // FR-K59: which searches ran, and why any did not (Advanced).
+  if (arms && advanced()) out += `<div class="sources tiny faint">${icon.search}<span>Searched by ${esc((arms.arms || []).join(', ') || 'nothing')}${(arms.arm_notes || []).length ? ' · ' + esc(arms.arm_notes.join('; ')) : ''}${arms.search_ms != null ? ` · ${fmtMs((arms.embed_ms || 0) + (arms.search_ms || 0))}` : ''}</span></div>`;
   out += mem.map(m => `<div class="sources">${icon.book}<span>Answered with a memory of <b>${esc(m.kb_name || 'your knowledge base')}</b>: ${m.memory.tokens} memory tokens read from ${plural(m.memory.documents, 'passage')} (experimental)${advanced() ? ` · ${fmtMs((m.memory.prepare_ms || 0) + (m.memory.read_ms || 0))}` : ''}.</span></div>`).join('');
-  if (facts.length) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.book}<span>Used ${plural(facts.length, 'relation')} from the knowledge graph</span></summary><ul class="kb-facts">${facts.map(f => `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b></li>`).join('')}</ul></details>`;
+  if (facts.length) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.book}<span>Used ${plural(facts.length, 'relation')} from the knowledge graph</span></summary><ul class="kb-facts">${facts.map(f => `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b>${f.via ? ` <span class="faint">via ${esc(f.via)}</span>` : ''}${f.quote ? `<div class="tiny muted">“${esc(f.quote)}”</div>` : ''}</li>`).join('')}</ul></details>`;
   if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src"><summary><span class="kb-n">${x.n}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${x.page ? ` <span class="faint">· page ${x.page}</span>` : ''}</span>${advanced() && x.vector_score != null ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
   return out;
 }
@@ -1281,7 +1283,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/graph/entities/${encodeURIComponent(id)}`); if (!alive()) return;
     const pass = new Map((r.passages || []).map(p => [p.chunk_id, p]));
     box.innerHTML = `<h4>${esc(node?.name || '')} <span class="tiny faint">${esc(node?.type || '')}</span></h4><div class="tiny faint">Mentioned in ${plural(node?.mentions || 0, 'passage')}.</div>`
-      + (r.facts.length ? `<ul class="kb-facts">${r.facts.map(f => { const p = pass.get((f.evidence || [])[0]); return `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b>${f.weight > 1 ? ` <span class="tiny faint">(${f.weight} passages)</span>` : ''}${p ? `<details><summary class="tiny">Where it says so: ${esc(p.doc_title)}${p.page ? `, page ${p.page}` : ''}</summary><div class="kb-ptext">${esc(p.text.replace(/^#{1,6} /gm, ''))}</div></details>` : ''}</li>`; }).join('')}</ul>` : '<div class="tiny faint">No relation recorded.</div>');
+      + (r.facts.length ? `<ul class="kb-facts">${r.facts.map(f => { const p = pass.get((f.evidence || [])[0]); return `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b>${f.weight > 1 ? ` <span class="tiny faint">(${f.weight} passages)</span>` : ''}${f.quote ? `<div class="tiny muted">“${esc(f.quote)}”</div>` : ''}${p ? `<details><summary class="tiny">Where it says so: ${esc(p.doc_title)}${p.page ? `, page ${p.page}` : ''}</summary><div class="kb-ptext">${esc(p.text.replace(/^#{1,6} /gm, ''))}</div></details>` : ''}</li>`; }).join('')}</ul>` : '<div class="tiny faint">No relation recorded.</div>');
   }
 
   async function upload(files) {

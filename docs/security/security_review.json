@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-11-05T00:48:45Z",
+  "reviewed_at": "2026-11-08T01:47:28Z",
   "base": "http://127.0.0.1:8080",
   "tests": [
     {
@@ -143,7 +143,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: CPU spin",
       "pass": true,
-      "detail": "passed=False in 20.2s",
+      "detail": "passed=False in 23.3s",
       "severity_if_failed": "high"
     },
     {

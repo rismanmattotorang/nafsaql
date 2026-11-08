@@ -98,10 +98,15 @@ def summarise(rows, modes, reference):
         n = len(d)
         acc = sum(1 for r in d.values() if r["ok"])
         secs = sorted(r["seconds"] for r in d.values())
+        anatomy = {}
+        for r in d.values():
+            f = r.get("fate") or ("answered" if r["ok"] else "not_retrieved")
+            anatomy[f] = anatomy.get(f, 0) + 1
+        assert sum(anatomy.values()) == n, "every question has exactly one fate"
         s = {"n": n, "correct": acc, "accuracy": round(acc / max(1, n), 3),
              "median_seconds": round(statistics.median(secs), 1) if secs else None,
              "mean_seconds": round(statistics.fmean(secs), 1) if secs else None,
-             "errors": sum(1 for r in d.values() if r.get("error"))}
+             "errors": sum(1 for r in d.values() if r.get("error")), "anatomy": anatomy}
         if m != reference and ref:
             pairs = [(d[q]["ok"], ref[q]["ok"]) for q in d if q in ref]
             b = sum(1 for x, y in pairs if x and not y)
@@ -124,10 +129,14 @@ def main():
     ap.add_argument("--reference", default="rag", help="arm the others are compared with")
     ap.add_argument("--force-mode", default="fast",
                     help="fast (comparable with memory, which is quick-model only), slow, auto or '' for the gate")
+    ap.add_argument("--questions", default="",
+                    help="a JSON file of [question, [phrases]] pairs replacing the built-in set")
     ap.add_argument("--out", default="")
     ap.add_argument("--regrade", default="",
                     help="score the answers of an earlier run again (no model calls) and write them to --out")
     a = ap.parse_args()
+    if a.questions:
+        QUESTIONS[:] = [(q, p) for q, p in json.load(open(a.questions))]
     if a.regrade:
         return regrade(a)
     modes = [m.strip() for m in a.modes.split(",") if m.strip()]
@@ -146,7 +155,13 @@ def main():
                 r = http(a.base, "/v1/chat", body)
                 took, text = time.time() - t, r.get("message", {}).get("content", "")
                 src = r.get("sources", []) or []
-                row = {"question": q, "mode": mode, "ok": correct(text, phrases), "seconds": round(took, 2),
+                # NFR-K11: one fate per question. answered; retrieved_not_used (the fact reached the prompt and
+                # not the reply); not_retrieved (no retrieved passage states it). Closed-book has no retrieval, so
+                # its only fates are answered and not_retrieved.
+                ok = correct(text, phrases)
+                in_prompt = any(correct(s.get("text", ""), phrases) for s in src if "chunk_id" in s)
+                fate = "answered" if ok else ("retrieved_not_used" if in_prompt else "not_retrieved")
+                row = {"question": q, "mode": mode, "ok": ok, "fate": fate, "seconds": round(took, 2),
                        "reasoning_mode": r.get("reasoning_mode"), "passages": sum(1 for s in src if "chunk_id" in s),
                        "memory_tokens": next((s["memory"]["tokens"] for s in src if "memory" in s), 0),
                        "resolved": next((s["memory"]["mode"] for s in src if "memory" in s),
@@ -162,7 +177,8 @@ def main():
     for m, st in summary.items():
         print(f"== {m:7} {st['correct']}/{st['n']}  median {st['median_seconds']}s"
               + (f"  vs {a.reference}: {st['delta_points']:+} points, p {st['mcnemar_p']}, "
-                 f"time x{st['median_time_ratio']}" if "vs_reference" in st else ""))
+                 f"time x{st['median_time_ratio']}" if "vs_reference" in st else "")
+              + f"  fates {st['anatomy']}")
     load = os.getloadavg()
     out = {"what": "Knowledge modes in chat, paired on one question set (Phase 20, Phase 7)",
            "date": time.strftime("%Y-%m-%d %H:%M"), "kb": a.kb, "questions": len(qs), "modes": modes,

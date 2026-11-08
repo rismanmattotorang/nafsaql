@@ -170,6 +170,26 @@ def graph_checks(base, kb):
           s == 404 or (s == 200 and not (r4.get("facts") or [])), (s, str(r4)[:120]))
 
 
+def ontology(base, kb):
+    """FR-K54: the ontology is data a reader can print and change, and the default comes back on an empty list."""
+    s, r = call(base, "GET", f"/v1/kb/{kb}/ontology")
+    if not check("ontology: the default is served with a hash", s == 200 and r.get("default") is True
+                 and len(r.get("types") or []) == 8 and len(r.get("hash", "")) == 16, (s, r)):
+        return
+    names = [t["name"] for t in r["types"]]
+    check("ontology: every default type carries a definition",
+          all(t.get("definition") for t in r["types"]), names)
+    mine = {"types": [{"name": "ship", "definition": "a named vessel"}, {"name": "port", "definition": "a harbour"}]}
+    s, r2 = call(base, "PUT", f"/v1/kb/{kb}/ontology", mine)
+    check("ontology: a custom one is accepted and is no longer the default",
+          s == 200 and r2.get("default") is False and [t["name"] for t in r2["types"]] == ["ship", "port"], (s, r2))
+    check("ontology: its hash differs from the default's", r2.get("hash") != r.get("hash"), (r.get("hash"), r2.get("hash")))
+    s, r3 = call(base, "PUT", f"/v1/kb/{kb}/ontology", {"types": [{"name": "Bad Name", "definition": "x"}]})
+    check("ontology: a bad type name is refused", s == 400, (s, r3))
+    s, r4 = call(base, "PUT", f"/v1/kb/{kb}/ontology", {"types": []})
+    check("ontology: an empty list restores the default", s == 200 and r4.get("default") is True, (s, r4))
+
+
 def memory_runs(base, kb):
     s, r = call(base, "GET", f"/v1/kb/{kb}/memory/runs")
     if not check("memory runs: the list is served", s == 200 and "runs" in r and "trainer" in r, (s, r)):
@@ -204,6 +224,15 @@ def chat_modes(base, kb, st):
         elif mode in ("rag", "graph", "auto"):
             check(f"chat ({mode}): passages or a reason are reported",
                   any("chunk_id" in x for x in src) or notes, src[:1])
+            arms = next((x for x in src if "arms" in x), None)
+            check(f"chat ({mode}): the reply names the arms that ran (FR-K59)",
+                  arms is not None and isinstance(arms.get("arms"), list), arms)
+            if mode == "graph":
+                facts = next((x["facts"] for x in src if "facts" in x), [])
+                if facts:
+                    check("chat (graph): every fact carries a hop and the quotes are strings (FR-K55/56)",
+                          all(f.get("hop") in (1, 2) and isinstance(f.get("quote", ""), str) for f in facts),
+                          facts[:1])
         else:
             mem = next((x["memory"] for x in src if "memory" in x), None)
             check(f"chat ({mode}): memory tokens were read, or it fell back and said so",
@@ -240,6 +269,7 @@ def main():
         if doc:
             search(a.base, scratch, embedder)
         memory_runs(a.base, scratch)
+        ontology(a.base, scratch)
         if not a.keep:
             s, r = call(a.base, "DELETE", f"/v1/kb/{scratch}")
             check("delete: the scratch base is removed with its documents and passages",
