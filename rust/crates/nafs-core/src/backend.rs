@@ -50,6 +50,9 @@ pub struct GenRequest {
     /// Memorilla's memory tokens (Phase 20): vectors for the placeholder token's positions in the prompt. Only the
     /// Smiley Core server reads them.
     pub memory_embeds: Option<std::sync::Arc<Vec<Vec<f32>>>>,
+    /// The token that marks those positions (`[knowledge] memory_placeholder`). The server defaults to
+    /// `<|fim_pad|>`, so it must be told whenever the gateway was configured with another one.
+    pub memory_placeholder: Option<String>,
 }
 
 /// Early-escalation thresholds on the draft's token log-probs. `below_mean` is the P7-T03 rule (running
@@ -336,6 +339,9 @@ impl Backend {
         }
         if let Some(m) = &req.memory_embeds {
             b["memory_embeds"] = json!({"vectors": m.as_ref()});
+            if let Some(p) = &req.memory_placeholder {
+                b["memory_embeds"]["placeholder"] = json!(p);
+            }
         }
         if let Some(budget) = req.thinking_budget {
             // Server-side budget forcing (Prop. 9): llama-server closes the reasoning span at the budget;

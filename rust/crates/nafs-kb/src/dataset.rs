@@ -85,8 +85,16 @@ pub fn answer_text(text: &str, max: usize) -> String {
         return body;
     }
     let cut: String = body.chars().take(max).collect();
-    match cut.rfind(['.', '!', '?']) {
-        Some(i) if i > max / 3 => cut[..=i].to_string(),
+    // The last sentence end, as a character position: `rfind` gives bytes, and comparing those with a character
+    // count would let a sentence end a sixth of the way into a non-ASCII passage pass the "not too short" guard.
+    let end = cut
+        .char_indices()
+        .enumerate()
+        .filter(|(_, (_, c))| matches!(c, '.' | '!' | '?'))
+        .map(|(n, (b, c))| (n, b + c.len_utf8()))
+        .last();
+    match end {
+        Some((n, b)) if n > max / 3 => cut[..b].to_string(),
         _ => cut
             .rsplit_once(' ')
             .map(|(a, _)| a.to_string())
@@ -218,10 +226,14 @@ pub async fn build(kb: &Kb, base: &str, opts: DatasetOpts) -> Result<DatasetInfo
         });
         claims += 1;
         // A false claim: the first entity of the same type (by a hash of the claim) that makes an unknown relation.
-        let pool = by_type
-            .get(&s(r, "t"))
-            .filter(|p| p.len() > 1)
-            .or_else(|| by_type.values().max_by_key(|p| p.len()));
+        // The same type when it has another entity to offer; otherwise the largest type, chosen by name on a tie so
+        // the dataset (and with it the train/validation split) is the same from one run to the next.
+        let pool = by_type.get(&s(r, "t")).filter(|p| p.len() > 1).or_else(|| {
+            by_type
+                .iter()
+                .max_by_key(|(t, p)| (p.len(), std::cmp::Reverse(t.as_str())))
+                .map(|(_, p)| p)
+        });
         if let Some(pool) = pool {
             let start = (hash(&format!("{subj}|{pred}|{obj}")) as usize) % pool.len();
             let pick = (0..pool.len())

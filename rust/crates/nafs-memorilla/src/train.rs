@@ -6,8 +6,9 @@
 //! `chat_prompt` the server uses, thinking off); the decoder runs over prompt + answer; cross-entropy on the answer and
 //! its end-of-turn token. AdamW (weight decay 0.01), linear warm-up over 10 % of the steps then cosine to 10 % of the
 //! peak, global-norm clipping at 1.0, gradient accumulation. `retrieval_init` from scratch (the paper's FactKG recipe;
-//! no pre-trained module exists for Qwen3-1.7B), or a checkpoint to fine-tune. The memory projection starts at the
-//! decoder's embedding scale, so untrained memory tokens do not swamp the prompt.
+//! no pre-trained module exists for Qwen3-1.7B), or a checkpoint to fine-tune, whose own K and widths then decide the
+//! prompt. From scratch the memory projection starts at zero with the placeholder token's own embedding as its bias,
+//! so the untrained module hands the decoder exactly the prompt it would read without memory.
 //!
 //! Progress goes to `<out>/progress.jsonl`; a file `<out>/stop` ends the run after the current step; every epoch is
 //! saved under `<out>/epoch-NN/`, the lowest validation loss under `<out>/best/`.
@@ -44,6 +45,14 @@ pub struct TrainOpts {
     pub init: Option<PathBuf>,
     pub num_memories: usize,
     pub seed: u64,
+    /// The token the memory positions carry. Must be the one the server puts there (`[knowledge]
+    /// memory_placeholder`): the prompt around the memory block has to match between training and serving.
+    #[serde(default = "default_placeholder")]
+    pub placeholder: String,
+}
+
+fn default_placeholder() -> String {
+    PLACEHOLDER.to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -80,6 +89,7 @@ fn load_matrix(path: &Path) -> Result<Tensor, String> {
 
 /// Linear warm-up over the first `warm` steps, then cosine from the peak to 10 % of it.
 pub fn lr_at(step: usize, total: usize, warm: usize, peak: f64) -> f64 {
+    let warm = warm.clamp(1, total.max(1));
     if step < warm {
         return peak * (step + 1) as f64 / warm as f64;
     }
@@ -143,6 +153,8 @@ pub struct Trainer {
     val: Vec<Example>,
     opts: TrainOpts,
     kb_name: String,
+    /// True and false claims in the dataset: all-true claims make `claim_accuracy` meaningless.
+    claims: (usize, usize),
 }
 
 impl Trainer {
@@ -161,20 +173,63 @@ impl Trainer {
         let tk = smiley_core::tokenizer::Tokenizer::from_gguf(&g)?;
         let template = smiley_core::template::Template::detect(&g)?;
         let ph = tk
-            .id_of(PLACEHOLDER)
+            .id_of(&opts.placeholder)
             .ok_or("the placeholder is not a token of this model")?;
         let end = tk.id_of("<|im_end|>").unwrap_or(tk.eos);
         let decoder = Decoder::load(&opts.decoder)?;
-        let k = opts.num_memories;
-        let system = format!("{SYSTEM_PROMPT}\nMemory{}Memory", PLACEHOLDER.repeat(k));
+        // The module decides how many memory positions the prompt has. When fine-tuning, that is the checkpoint's
+        // own K, not the command line's: a mismatch would train against a prompt the server never sends (K smaller)
+        // or slice past the end of an example (K larger).
+        let cfg = match &opts.init {
+            Some(dir) => serde_json::from_slice::<MemoryConfig>(
+                &std::fs::read(dir.join("config.json")).map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())?,
+            None => MemoryConfig {
+                retrieval_init: true,
+                num_memories: opts.num_memories,
+                ..MemoryConfig::paper(file.dims, decoder.cfg.hidden_size)
+            },
+        };
+        if cfg.embedding_dim != file.dims {
+            return Err(format!(
+                "the module reads {}-wide vectors; this knowledge base's are {}-wide",
+                cfg.embedding_dim, file.dims
+            ));
+        }
+        if cfg.output_dim != decoder.cfg.hidden_size {
+            return Err(format!(
+                "the module writes {}-wide memory tokens; {} takes {}",
+                cfg.output_dim,
+                opts.decoder.display(),
+                decoder.cfg.hidden_size
+            ));
+        }
+        let k = cfg.num_memories;
+        let system = format!(
+            "{SYSTEM_PROMPT}\nMemory{}Memory",
+            opts.placeholder.repeat(k)
+        );
         let mut train = Vec::new();
         let mut val = Vec::new();
+        // SR-K05: a passage mentioning the placeholder token (an ML knowledge base easily does) would add memory
+        // positions the module does not fill. The server cleans the same text at serve time, so cleaning it here
+        // keeps the two prompts identical as well as keeping the run alive.
+        let clean = |t: &str| t.replace(&opts.placeholder, "[memory placeholder]");
+        let mut claims = (0usize, 0usize);
         for (i, r) in file.rows.iter().enumerate() {
+            let (question, answer) = (clean(&r.question), clean(&r.answer));
+            if r.kind == "claim" {
+                match answer.trim() {
+                    "True" => claims.0 += 1,
+                    _ => claims.1 += 1,
+                }
+            }
             let prompt = smiley_core::serve::chat_prompt(
                 template,
                 Some(&system),
                 &[],
-                &r.question,
+                &question,
                 false,
                 None,
             );
@@ -192,7 +247,7 @@ impl Trainer {
                 ));
             }
             let answer_from = ids.len();
-            ids.extend(tk.encode(&r.answer));
+            ids.extend(tk.encode(&answer));
             ids.push(end);
             let ex = Example {
                 ids,
@@ -207,19 +262,8 @@ impl Trainer {
                 train.push(ex);
             }
         }
-        // The module: from a checkpoint, or retrieval_init from scratch with the projection at the decoder's scale.
+        // The module: from a checkpoint, or retrieval_init from scratch (its config was read above).
         let mut vars = VarMap::new();
-        let cfg = match &opts.init {
-            Some(dir) => serde_json::from_slice::<MemoryConfig>(
-                &std::fs::read(dir.join("config.json")).map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?,
-            None => MemoryConfig {
-                retrieval_init: true,
-                num_memories: k,
-                ..MemoryConfig::paper(file.dims, decoder.cfg.hidden_size)
-            },
-        };
         let module = MemoryModule::new(
             cfg,
             VarBuilder::from_varmap(&vars, DType::F32, &Device::Cpu),
@@ -278,6 +322,7 @@ impl Trainer {
             val,
             opts,
             kb_name: file.kb_name,
+            claims,
         })
     }
 
@@ -328,7 +373,16 @@ impl Trainer {
 
     /// The answer-token loss of one example (a scalar tensor in the autograd graph).
     fn loss(&self, ex: &Example) -> candle_core::Result<Tensor> {
-        let mem = self.memory(ex)?; // [K, H]
+        self.loss_from(ex, self.memory(ex)?)
+    }
+
+    /// The same loss with the memory detached first: nothing before the decoder is tracked, so validation does not
+    /// hold a 1.7B model's activations (about 1 GB) for a number it only reads.
+    fn eval_loss(&self, ex: &Example) -> candle_core::Result<Tensor> {
+        self.loss_from(ex, self.memory(ex)?.detach())
+    }
+
+    fn loss_from(&self, ex: &Example, mem: Tensor) -> candle_core::Result<Tensor> {
         let k = mem.dim(0)?;
         let before = self.decoder.embed_ids(&ex.ids[..ex.mem_at])?;
         let after = self.decoder.embed_ids(&ex.ids[ex.mem_at + k..])?;
@@ -348,7 +402,7 @@ impl Trainer {
         }
         let mut s = 0.0;
         for ex in &self.val {
-            s += self.loss(ex)?.detach().to_scalar::<f32>()? as f64;
+            s += self.eval_loss(ex)?.to_scalar::<f32>()? as f64;
         }
         Ok(s / self.val.len() as f64)
     }
@@ -386,7 +440,12 @@ impl Trainer {
         let mut best = f64::INFINITY;
         let v0 = self.validate().map_err(|e| e.to_string())?;
         let a0 = self.claim_accuracy().map_err(|e| e.to_string())?;
-        self.log(json!({"event": "start", "claim_accuracy": a0.0, "claim_accuracy_without_memory": a0.1, "claims": a0.2, "kb_name": self.kb_name, "train": self.train.len(), "validation": self.val.len(), "steps": total, "val_loss": v0}));
+        self.log(json!({"event": "start", "claim_accuracy": a0.0, "claim_accuracy_without_memory": a0.1, "claims": a0.2,
+            "claims_true": self.claims.0, "claims_false": self.claims.1, "kb_name": self.kb_name, "train": self.train.len(),
+            "validation": self.val.len(), "steps": total, "val_loss": v0}));
+        if self.claims.1 == 0 && self.claims.0 > 0 {
+            self.log(json!({"event": "warning", "message": "every claim in this dataset is true (the graph had no                 second entity of a type to swap in), so claim accuracy only says how often the model answers True"}));
+        }
         'epochs: for epoch in 0..self.opts.epochs {
             // A seeded shuffle per epoch.
             let mut order: Vec<usize> = (0..self.train.len()).collect();
@@ -448,11 +507,19 @@ impl Trainer {
             let v = self.validate().map_err(|e| e.to_string())?;
             let dir = self.opts.out.join(format!("epoch-{epoch:02}"));
             MemoryModule::save(&self.vars, &self.module.cfg, &dir)?;
-            if v < best || v.is_nan() {
+            if v < best && v.is_finite() {
                 best = v;
                 MemoryModule::save(&self.vars, &self.module.cfg, &self.opts.out.join("best"))?;
             }
             self.log(json!({"event": "epoch", "epoch": epoch, "val_loss": v, "best": best, "saved": dir}));
+        }
+        if step == 0 {
+            // Stopped before the first step: the module is still its initialisation and must not be offered as a
+            // checkpoint, or it would be activated and answer every question with memory that learnt nothing.
+            self.log(json!({"event": "stopped", "step": 0}));
+            self.log(json!({"event": "done", "steps": 0, "examples": 0, "val_loss": v0, "start_val_loss": v0,
+                "error": "the run was stopped before it had trained on anything, so no module was saved"}));
+            return Ok(v0);
         }
         if step < total && self.opts.out.join("stop").exists() {
             MemoryModule::save(&self.vars, &self.module.cfg, &self.opts.out.join("stopped"))?;
@@ -461,7 +528,7 @@ impl Trainer {
         let v = self.validate().map_err(|e| e.to_string())?;
         // The module as it ends, always (a run cut short by --max-examples never reaches an epoch's end).
         MemoryModule::save(&self.vars, &self.module.cfg, &self.opts.out.join("last"))?;
-        if !self.opts.out.join("best").exists() || v < best {
+        if !self.opts.out.join("best").exists() || (v < best && v.is_finite()) {
             MemoryModule::save(&self.vars, &self.module.cfg, &self.opts.out.join("best"))?;
         }
         let a = self.claim_accuracy().map_err(|e| e.to_string())?;

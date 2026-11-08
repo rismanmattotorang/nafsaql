@@ -337,3 +337,74 @@ The early loss drop is the answer format (exactly `True` + end of turn), not kno
 does not beat the model without memory, as expected. A first attempt with four examples' graphs held at once stalled the
 machine in swap; one graph at a time runs. **A useful 1.7B module needs the full run** (3 epochs of 150 questions: about
 5–12 hours here) or a GPU pre-train (`training/memorilla/GPU_RECIPE.md`). Synthetic QA rows are not built yet.
+
+## 16. Phase 7 results (2026-11-08): routing, hybrid, and the modes measured against each other
+
+**What was built.** Two more knowledge modes and the machinery to choose between them.
+
+- **`hybrid`** (FR-K24): the memory tokens *and* the best `[knowledge] hybrid_k` passages (default 2), so an answer
+  from memory can still quote a source. Like `memory` it is held on the quick model, because the module lives in that
+  decoder's embedding space.
+- **`auto`** (FR-K24): the retriever is asked what the base can serve (`Knowledge::resolve_mode`), and the first mode
+  of `[knowledge] auto_order` that fits wins — `memory`/`hybrid` need a module for that base, `graph` needs relations
+  in its graph, `rag` always works. Both checks are cheap (a file test and one count query), so `auto` costs nothing
+  measurable per request.
+- **A fallback instead of an empty prompt.** When the memory cannot be read — no module, a width mismatch, an engine
+  that does not take supplied input vectors — the turn now falls back to `rag` and says so in `sources`, rather than
+  answering from nothing. Before this, a `memory` request on a llama.cpp backend produced a confident answer with no
+  knowledge at all.
+- **`scripts/kb_modes_ab.py`**: the modes answered on one question set, the arms interleaved per question so a drifting
+  host load does not favour one, scored by whether the answer contains the fact, compared with an exact McNemar test on
+  the paired verdicts and a paired median time ratio. `--regrade` scores a stored run again without calling the model.
+- **`scripts/kb_sweep.py`**: the live sweep the `/v1/kb/*` routes never had — status, the base's life cycle, ingestion
+  end to end, the three search modes, the graph routes, the training routes, and one chat answer per knowledge mode.
+  It is in `scripts/live_sweep.sh` (without the chat checks, which cost minutes per mode).
+
+**The question set.** Twenty questions written from the fixture base's own five documents (the architecture section,
+the Knowledge Base design note, the slides, the upload limits, the plain notes), paraphrased so that an arm has to read
+the base rather than repeat its words, and held out from training: the trainer sees reconstruction and claim rows, never
+these questions. A question counts as answered when the reply contains the fact.
+
+**Measured (shared machine, load average 85–101: the owner's other work and another project's build were running; the
+times are lower bounds). Twenty questions, quick model, `benchmarks/kb_modes_ab.json`.**
+
+| Mode | Answered | Median wall | Against `rag` (paired) |
+|---|---|---|---|
+| `off` (no knowledge) | 2/20 | 8.8 s | −80 points, p = 3.1e-5, 0.28x the time |
+| `rag` | 18/20 | 33.7 s | — |
+| `graph` | 15/20 | 35.5 s | −15 points, p = 0.25, 1.28x the time |
+
+What this says:
+
+- **The questions need the base.** Closed-book answers 2 of 20, and both of those are facts the model could guess
+  ("deleting a knowledge base removes its files", "the conversation store uses SQLite"). The set measures retrieval,
+  not the model's general knowledge.
+- **`graph` is not better than `rag` here, and costs more.** Of the three discordant pairs, all three are questions
+  `rag` answered and `graph` did not; there is no question the graph won. On n = 20 that is p = 0.25, so the
+  *difference* is not established, but there is no sign of a gain to weigh against the 28 % extra time. The graph puts
+  relations before the passages, which pushed the passage carrying the answer out of the prompt on the three it lost
+  (cross-attention blocks, hops in local search, the conversation store).
+- **The default `auto_order` is therefore `["rag"]`**, with `graph` left as a mode the operator or the person can
+  choose. A base whose questions are about how things relate, rather than what a passage says, is the case the graph
+  was built for, and this question set is not that; the order is configuration, not a code change.
+
+**A defect in the measurement itself.** The first scoring normalised punctuation away, so `nafs-core` could never match
+`nafs core` in an answer and three questions were marked wrong in every arm. The grader now keeps the punctuation that
+carries meaning (`-`, `.`, `%`) and normalises the expected phrase the same way; `--regrade` re-scored the stored
+answers without another run (18/20 and 15/20 above; the paired graph-versus-rag verdict did not change).
+
+**The 1.7B run, and why `memory` and `hybrid` have no numbers yet.** A three-epoch run was started on the fixture base
+(150 training and 14 check questions, 114 steps of four examples, starting validation loss 10.26). The module learns
+from the first step — loss 8.50, 3.60, 4.08 over steps 1 to 3, gradient norm falling from 6,969 to about 1,200 — and
+the zero initialisation does exactly what A-118 claims: claim accuracy *with* the untrained memory equals claim
+accuracy *without* it, 0.692 on both, so the module starts from the plain prompt rather than derailing it. The
+dataset came out balanced, 73 true and 73 false claims.
+
+The cost is the problem. Per example the run measured 137 s, 211 s and 272 s as the host filled up, against the
+36–94 s of Phase 6 on a quieter machine; the trainer holds about one core and 12 GB. Three epochs is therefore
+11–34 hours here, not the 5–12 estimated in Phase 6. The run ended at step 3 when the machine restarted, which
+validated one of the review fixes in the field: the gateway and the trainer died together, so no exit marker was
+written and the owner is gone, and the run now reports "the trainer stopped when the server did (the machine
+restarted?); start a new run" instead of a bare "Failed". **The `memory` and `hybrid` arms of the table above are
+therefore not measured.** They need the overnight run, and the question set and the script are ready for them:
+`scripts/kb_modes_ab.py --modes off,rag,graph,memory,hybrid` on the same base.

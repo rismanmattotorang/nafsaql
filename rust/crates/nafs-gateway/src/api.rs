@@ -84,6 +84,7 @@ pub fn new_state(
             cfg.knowledge.rag_min_similarity,
             cfg.knowledge.graph_facts,
             crate::kb::MemoryReader::from_config(&cfg.knowledge),
+            cfg.knowledge.auto_order.clone(),
         );
         knowledge_memory = ck.memory_enabled();
         knowledge_memory_global = ck.memory_global();

@@ -66,6 +66,7 @@ impl Env<'_> {
         };
         let req = GenRequest {
             memory_embeds: None,
+            memory_placeholder: None,
             messages: messages
                 .into_iter()
                 .map(|(role, content)| Message { role, content })

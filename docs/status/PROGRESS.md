@@ -2,7 +2,7 @@
 
 ## Phase 20 (Knowledge): Knowledge Base, GraphRAG and Memorilla (started 2026-11-07)
 
-Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 6 done (0–2 b8da406, 3 f5dfd63, 4 e148c3b, 5 8c0e2f9, on feat/phase20-knowledge-base); next is Phase 7.
+Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 7 done (0–2 b8da406, 3 f5dfd63, 4 e148c3b, 5 8c0e2f9, 6 5dff48b, on feat/phase20-knowledge-base); next is Phase 8. Phase 7's `memory` and `hybrid` arms wait on the 1.7B training run (hours on this host).
 
 | When | Unit of work | Evidence |
 |---|---|---|
@@ -42,12 +42,28 @@ Prompt: `docs/prompts/MEMORILLA_KB_PROMPT.md`. Phases 0 to 6 done (0–2 b8da406
 | 16:50 | 0.6B: check loss 3.46 -> 0.70 in 80 questions; 1.7B: 36–94 s per question, check loss 10.26 -> 1.82 in 8 | research note §15 |
 | 2026-11-08 06:30 | Phase 6 review before the commit: two defects fixed. A run interrupted while its dataset was being built stayed `building` for ever and refused every later run for that base (the gateway's own pid is now recorded and checked); chat offered `memory` mode for bases with no module (`GET /v1/kb` now reports `memory` per base, and the composer hides the option). Two clippy lints in `dataset.rs`; `GET /v1/kb`'s `memory` field and `ChatRequest.knowledge` / `ChatReply.sources` added to OpenAPI (they had never been documented) | 418 Rust tests, fmt and clippy clean, artefacts valid |
 
-### Next three actions (Phase 7)
-1. An overnight 1.7B run on the fixture base (3 epochs, about 5–12 h here; needs 8–11 GB free), then activate it.
-2. A held-out question set from real documents; memory vs rag vs graph vs hybrid (quality and latency, paired), with the
-   noise-documents control from the paper (does the module use the evidence?).
-3. Synthetic QA rows by System 2 if claims and reconstruction alone do not teach recall; an `auto` knowledge mode from the
-   measurements.
+## Phase 20 (Knowledge), Phase 7: routing, hybrid and the modes measured (2026-11-08)
+
+| When | Unit of work | Evidence |
+|---|---|---|
+| 06:30 | Phase 6 committed (5dff48b) after a review of the uncommitted work: a run interrupted mid-dataset blocked every later run; chat offered memory mode for bases with no module; two clippy lints; `ChatRequest.knowledge` and `ChatReply.sources` had never been in the OpenAPI | 418 Rust tests, fmt and clippy clean |
+| 06:40 | `hybrid` (memory tokens + the top `hybrid_k` passages) and `auto` (`Knowledge::resolve_mode`, `[knowledge] auto_order`) built; chat picker offers both; `auto` checked live (resolved to `graph`, right answer in 48 s) | `kb.rs::auto_mode` + its test |
+| 07:12 | Paired A/B of `off`, `rag`, `graph` on 20 held-out questions over the fixture base, arms interleaved per question (shared machine, load 85–101): `rag` 18/20, `graph` 15/20 (28 % slower, 0 of 3 discordant pairs won), closed-book 2/20 | `benchmarks/kb_modes_ab.json`, `scripts/kb_modes_ab.py` |
+| 07:20 | Grader defect found: punctuation was normalised away, so `nafs-core` could never match; fixed, and `--regrade` re-scored the stored answers without another run (6 verdicts changed) | same file |
+| 07:30 | Two read-only reviews (training code; gateway, chat and UI) returned 20 findings; the real ones fixed, listed in decision 014 | this commit |
+| 07:40 | `scripts/kb_sweep.py`: the live sweep the `/v1/kb/*` routes never had — status, base life cycle, ingestion, three search modes, graph routes, training routes, one chat answer per mode; added to `scripts/live_sweep.sh` | 36 passed, 0 failed |
+| 07:45 | `auto_order` default set to `["rag"]` from the measurement; spec 1.6, decision 014, A-120 to A-122 | docs |
+| 00:34 | 1.7B training run started on the fixture base (3 epochs, 150 train / 14 check questions, 164 rows; 73 true and 73 false claims). It learns from step 1 (loss 8.50 -> 3.60 -> 4.08, gradient norm 6,969 -> 1,200) and the untrained module reads exactly like no module (claim accuracy 0.692 with and without memory, A-118). Per example 137/211/272 s as the host filled up, against Phase 6's 36-94 s: three epochs is 11-34 h here | run `20261108-003441` |
+| 08:35 | The machine restarted and took the gateway and the trainer with it at step 3. The run now reports "the trainer stopped when the server did (the machine restarted?)" instead of a bare "Failed" - the review's finding 1.4, confirmed in the field. **`memory` and `hybrid` are therefore still unmeasured**; the script and the question set are ready for them | `scripts/kb_modes_ab.py --modes off,rag,graph,memory,hybrid` |
+
+### Next three actions (Phase 8)
+1. Start the 1.7B run again on a quiet host (11-34 h at the measured rate; `caffeinate` it, and remember the machine
+   restarted once mid-run), activate it, and add the `memory` and `hybrid` arms to the A/B with the same question set
+   and script; decide then whether synthetic QA rows by System 2 are needed, and whether `auto_order` should start
+   with `hybrid`.
+2. Phase 8 hardening: upload security (size, type sniffing, zip bombs, path traversal, HTML scripts), retention and
+   deletion everywhere (SurrealDB, files, embeddings, checkpoints), operator runbook, report section, CI.
+3. NFR-K07 (1,000 documents / 50,000 chunks stays usable) and NFR-K08 at 10,000 passages, which Phase 4 did not meet.
 
 ### Open questions
 - Whether the live gateway on :8080 should be restarted to serve the Knowledge page and knowledge in chat (it runs the pre-Phase-20 binary).

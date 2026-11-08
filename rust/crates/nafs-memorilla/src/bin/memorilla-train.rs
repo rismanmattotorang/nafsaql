@@ -2,7 +2,7 @@
 //!
 //! memorilla-train --data <dataset dir> --out <run dir> [--decoder models/hf/Qwen3-1.7B]
 //!   [--gguf models/Qwen3-1.7B-Q4_K_M.gguf] [--epochs 3] [--lr 3e-4] [--accumulation 4] [--max-examples 0]
-//!   [--init <checkpoint dir>] [--seed 23]
+//!   [--init <checkpoint dir>] [--seed 23] [--placeholder "<|fim_pad|>"]
 use std::path::PathBuf;
 
 use nafs_memorilla::train::{TrainOpts, Trainer};
@@ -36,6 +36,8 @@ fn main() {
         init: get("--init").map(PathBuf::from),
         num_memories: num("--memories", 16.0) as usize,
         seed: num("--seed", 23.0) as u64,
+        placeholder: get("--placeholder")
+            .unwrap_or_else(|| nafs_memorilla::train::PLACEHOLDER.to_string()),
     };
     match Trainer::new(opts).and_then(|mut t| t.run()) {
         Ok(v) => println!("{{\"ok\": true, \"val_loss\": {v}}}"),

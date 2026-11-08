@@ -45,9 +45,33 @@ fn alive(pid: u64) -> bool {
     pid > 0 && unsafe { libc::kill(pid as i32, 0) } == 0
 }
 
+/// Whether the trainer of this run is still running. The reaper writes `out/exit` the moment it ends, and that is
+/// trusted over `kill(pid, 0)`: once a child is reaped the system is free to give its pid to anything else, and a
+/// reused pid would leave the run "training" for ever and refuse every later run for the base.
+fn running(dir: &Path, pid: u64) -> bool {
+    !dir.join("out").join("exit").exists() && alive(pid)
+}
+
+/// How the trainer ended, as the reaper recorded it (`out/exit`): "ok", "exit 1", "signal 9".
+fn exit_status(dir: &Path) -> Option<String> {
+    std::fs::read_to_string(dir.join("out").join("exit"))
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
 /// A run as the API reports it: what was asked, its state, and the progress so far.
 fn describe(dir: &Path) -> Option<Value> {
-    let mut run: Value = serde_json::from_slice(&std::fs::read(dir.join("run.json")).ok()?).ok()?;
+    let id = dir.file_name()?.to_string_lossy().to_string();
+    let raw = std::fs::read(dir.join("run.json")).ok()?;
+    // A run whose record cannot be read still exists on disk and may still have a trainer: say so rather than
+    // letting it disappear from the list.
+    let Ok(mut run) = serde_json::from_slice::<Value>(&raw) else {
+        return Some(
+            json!({ "id": id, "state": "failed", "created_at": "", "kind": "train", "has_checkpoint": false,
+                "error": "this run's record could not be read" }),
+        );
+    };
     let lines: Vec<Value> = std::fs::read_to_string(dir.join("out").join("progress.jsonl"))
         .unwrap_or_default()
         .lines()
@@ -74,7 +98,7 @@ fn describe(dir: &Path) -> Option<Value> {
         }
     } else if run["error"].is_string() {
         "failed"
-    } else if alive(pid) {
+    } else if running(dir, pid) {
         if steps.is_empty() {
             "preparing"
         } else {
@@ -112,24 +136,57 @@ fn describe(dir: &Path) -> Option<Value> {
         run["error"] = json!("the server stopped while the questions were being prepared");
     }
     if run["error"].is_null() && state == "failed" {
-        run["error"] = json!(std::fs::read_to_string(dir.join("trainer.log"))
-            .ok()
-            .and_then(|l| l
-                .lines()
-                .rev()
-                .find(|x| x.contains("failed"))
-                .map(str::to_string)));
+        // The trainer's own message if it printed one, else its last words, else how the system ended it: a run
+        // killed for memory writes nothing at all, and "Failed" with no reason tells the operator nothing.
+        let log = std::fs::read_to_string(dir.join("trainer.log")).unwrap_or_default();
+        let said = log
+            .lines()
+            .rev()
+            .find(|x| x.contains("failed") || x.contains("panicked"))
+            .or_else(|| {
+                log.lines()
+                    .rev()
+                    .find(|x| !x.trim().is_empty() && !x.trim_start().starts_with('{'))
+            })
+            .map(str::to_string);
+        let how = exit_status(dir)
+            .or_else(|| {
+                // No exit marker and no owner: the gateway and the trainer went down together, which on this host
+                // means the machine restarted. Seen for real on 2026-11-08, three steps into a run.
+                (pid > 0 && !alive(run["owner"].as_u64().unwrap_or(0)))
+                    .then(|| "no end".to_string())
+            })
+            .map(|s| match s.as_str() {
+                "no end" => {
+                    "the trainer stopped when the server did (the machine restarted?); start a new run".to_string()
+                }
+                "signal 9" => {
+                    "the trainer was killed, most likely for memory (it needs about 8-11 GB free)"
+                        .to_string()
+                }
+                other => format!("the trainer ended with {other}"),
+            });
+        run["error"] = json!(match (said, how) {
+            (Some(a), Some(b)) => Some(format!("{b}: {a}")),
+            (a, b) => a.or(b),
+        });
     }
     Some(run)
 }
 
-pub async fn list(State(s): State<AppState>, UrlPath(kb): UrlPath<String>) -> R<Json<Value>> {
+/// The knowledge base, or the error that says why it cannot be reached.
+async fn base(s: &AppState, kb: &str) -> R<()> {
     let k = s
         .kb
         .as_ref()
         .ok_or_else(|| KbApiError::from(KbError::Unavailable("Knowledge is turned off".into())))?;
     k.ready().await?;
-    k.store().get_kb(&kb).await?;
+    k.store().get_kb(kb).await?;
+    Ok(())
+}
+
+pub async fn list(State(s): State<AppState>, UrlPath(kb): UrlPath<String>) -> R<Json<Value>> {
+    base(&s, &kb).await?;
     let dir = base_dir(&s, &kb);
     let mut runs: Vec<Value> = std::fs::read_dir(dir.join("runs"))
         .map(|r| {
@@ -143,6 +200,15 @@ pub async fn list(State(s): State<AppState>, UrlPath(kb): UrlPath<String>) -> R<
     Ok(Json(
         json!({ "runs": runs, "active": active, "trainer": trainer_path(&s).exists() }),
     ))
+}
+
+#[cfg(unix)]
+fn signal_of(st: &std::process::ExitStatus) -> Option<i32> {
+    std::os::unix::process::ExitStatusExt::signal(st)
+}
+#[cfg(not(unix))]
+fn signal_of(_: &std::process::ExitStatus) -> Option<i32> {
+    None
 }
 
 fn trainer_path(s: &AppState) -> PathBuf {
@@ -199,24 +265,43 @@ pub async fn start(
         None
     };
     let dir = base_dir(&s, &kb);
-    if let Ok(rd) = std::fs::read_dir(dir.join("runs")) {
-        for e in rd.filter_map(|e| e.ok()) {
-            if let Some(r) = describe(&e.path()) {
-                if matches!(
-                    r["state"].as_str(),
-                    Some("building" | "preparing" | "training")
-                ) {
-                    return Err(KbError::Conflict(
-                        "a training run is already in progress for this knowledge base".into(),
-                    )
-                    .into());
+    // One run at a time per base. The check and the run's directory are taken together under one lock and with a
+    // directory that must not already exist: the dataset takes minutes to build, and two requests arriving inside
+    // that window would otherwise both pass the check and both start a trainer, writing into one directory.
+    static STARTING: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let (id, run_dir) = {
+        let _one_at_a_time = STARTING.lock().unwrap_or_else(|e| e.into_inner());
+        if let Ok(rd) = std::fs::read_dir(dir.join("runs")) {
+            for e in rd.filter_map(|e| e.ok()) {
+                if let Some(r) = describe(&e.path()) {
+                    if matches!(
+                        r["state"].as_str(),
+                        Some("building" | "preparing" | "training")
+                    ) {
+                        return Err(KbError::Conflict(
+                            "a training run is already in progress for this knowledge base".into(),
+                        )
+                        .into());
+                    }
                 }
             }
         }
-    }
-    let id = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
-    let run_dir = dir.join("runs").join(&id);
-    std::fs::create_dir_all(&run_dir).map_err(|e| KbError::Io(e.to_string()))?;
+        std::fs::create_dir_all(dir.join("runs")).map_err(|e| KbError::Io(e.to_string()))?;
+        let now = chrono::Utc::now();
+        let mut taken = None;
+        for n in 0..1000 {
+            let id = match n {
+                0 => now.format("%Y%m%d-%H%M%S").to_string(),
+                _ => format!("{}-{n}", now.format("%Y%m%d-%H%M%S")),
+            };
+            let p = dir.join("runs").join(&id);
+            if std::fs::create_dir(&p).is_ok() {
+                taken = Some((id, p));
+                break;
+            }
+        }
+        taken.ok_or_else(|| KbError::Io("no free run directory".into()))?
+    };
     let lr =
         b.lr.unwrap_or(if b.kind == "finetune" { 1e-4 } else { 3e-4 });
     let mut run = json!({ "id": id, "kb": kb, "kind": b.kind, "epochs": b.epochs.clamp(1, 20), "max_examples": b.max_examples, "lr": lr,
@@ -229,6 +314,8 @@ pub async fn start(
     let trainer = trainer_path(&s);
     let decoder = s.cfg.knowledge.memory_decoder.clone();
     let gguf = s.cfg.knowledge.memory_gguf.clone();
+    // The trainer must put the memory tokens where the server will: the same placeholder token (FR-K42).
+    let placeholder = s.cfg.knowledge.memory_placeholder.clone();
     let mut started = run.clone();
     started["state"] = json!("building");
     tokio::spawn(async move {
@@ -241,6 +328,12 @@ pub async fn start(
         .await;
         match res {
             Err(e) => run["error"] = json!(format!("the dataset could not be built: {e}")),
+            Ok(rows) if run_dir.join("out").join("stop").exists() => {
+                // Stopped while the questions were being prepared: the trainer is never started, so nothing spends
+                // hours on a run the operator has already called off.
+                run["rows"] = json!(rows);
+                run["error"] = json!("the run was stopped before training began");
+            }
             Ok(rows) => {
                 run["rows"] = json!(rows);
                 let log = std::fs::File::create(run_dir.join("trainer.log")).ok();
@@ -252,6 +345,7 @@ pub async fn start(
                     &run_dir.join("out").to_string_lossy(),
                 ])
                 .args(["--decoder", &decoder, "--gguf", &gguf])
+                .args(["--placeholder", &placeholder])
                 .args([
                     "--epochs",
                     &run["epochs"].to_string(),
@@ -269,10 +363,25 @@ pub async fn start(
                     Ok(child) => {
                         run["pid"] = json!(child.id());
                         run["state"] = json!("training");
-                        // Reap it when it ends, so it does not stay a zombie that `kill -0` still finds.
+                        // Written before anything else: a gateway killed in the next instant would otherwise leave a
+                        // trainer running for hours that no run.json names, so nothing could report or stop it.
+                        let _ = std::fs::write(run_dir.join("run.json"), run.to_string());
+                        // Reap it when it ends, so it does not stay a zombie that `kill -0` still finds, and record
+                        // how it ended: a run killed for memory says nothing on stderr.
+                        let out = run_dir.join("out");
                         std::thread::spawn(move || {
                             let mut c = child;
-                            let _ = c.wait();
+                            let how = match c.wait() {
+                                Ok(st) if st.success() => "ok".to_string(),
+                                Ok(st) => match (st.code(), signal_of(&st)) {
+                                    (Some(c), _) => format!("exit {c}"),
+                                    (None, Some(s)) => format!("signal {s}"),
+                                    _ => "an unknown end".to_string(),
+                                },
+                                Err(e) => format!("an unknown end ({e})"),
+                            };
+                            let _ = std::fs::create_dir_all(&out);
+                            let _ = std::fs::write(out.join("exit"), how);
                         });
                     }
                     Err(e) => run["error"] = json!(format!("the trainer could not start: {e}")),
@@ -289,6 +398,7 @@ pub async fn stop(
     State(s): State<AppState>,
     UrlPath((kb, run)): UrlPath<(String, String)>,
 ) -> R<Json<Value>> {
+    base(&s, &kb).await?;
     let dir = base_dir(&s, &kb)
         .join("runs")
         .join(run.replace(['/', '.'], ""));
@@ -301,21 +411,34 @@ pub async fn stop(
     Ok(Json(describe(&dir).unwrap_or(Value::Null)))
 }
 
-/// Make a run's best checkpoint the knowledge base's module for `memory` mode.
+/// Make a run's best checkpoint the knowledge base's module for `memory` mode. The checkpoint is **copied** out of
+/// the run: a run that is still training rewrites `out/best/` at every improving epoch, and the serving gateway
+/// keys its loaded module on the path, so pointing at the live directory would both change the answers under the
+/// reader and have it read a file as it is written.
 pub async fn activate(
     State(s): State<AppState>,
     UrlPath((kb, run)): UrlPath<(String, String)>,
 ) -> R<Json<Value>> {
-    let base = base_dir(&s, &kb);
-    let dir = base.join("runs").join(run.replace(['/', '.'], ""));
-    let out = dir.join("out");
-    let ckpt = ["best", "stopped"]
+    base(&s, &kb).await?;
+    let id = run.replace(['/', '.'], "");
+    let home = base_dir(&s, &kb);
+    let out = home.join("runs").join(&id).join("out");
+    let ckpt = ["best", "stopped", "last"]
         .iter()
         .map(|d| out.join(d))
         .find(|p| p.join("weights.safetensors").exists())
         .ok_or_else(|| KbError::BadInput("this run has no checkpoint yet".into()))?;
-    let abs = std::fs::canonicalize(&ckpt).map_err(|e| KbError::Io(e.to_string()))?;
-    std::fs::write(base.join("active"), abs.to_string_lossy().as_bytes())
-        .map_err(|e| KbError::Io(e.to_string()))?;
-    Ok(Json(json!({ "active": abs })))
+    let io = |e: std::io::Error| KbError::Io(e.to_string());
+    let dest = home.join("modules").join(&id);
+    let tmp = home.join("modules").join(format!("{id}.part"));
+    let _ = std::fs::remove_dir_all(&tmp);
+    std::fs::create_dir_all(&tmp).map_err(io)?;
+    for f in ["config.json", "weights.safetensors"] {
+        std::fs::copy(ckpt.join(f), tmp.join(f)).map_err(io)?;
+    }
+    let _ = std::fs::remove_dir_all(&dest);
+    std::fs::rename(&tmp, &dest).map_err(io)?;
+    let abs = std::fs::canonicalize(&dest).map_err(io)?;
+    std::fs::write(home.join("active"), abs.to_string_lossy().as_bytes()).map_err(io)?;
+    Ok(Json(json!({ "active": abs, "from": ckpt })))
 }

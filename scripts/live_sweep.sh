@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Every live suite against the running stack, one after the other (about 45 minutes with the 4B model on the reference
-# machine): contract, security, Rooms, end to end, harness sweep, MVP acceptance. Logs go to logs/sweep_<name>.log and a
-# summary line per suite is printed. Start the stack first (`make up`). Usage: scripts/live_sweep.sh [name ...]
+# machine): contract, security, Rooms, end to end, the Knowledge Base, harness sweep, MVP acceptance. The knowledge
+# sweep runs without its chat checks here (minutes per mode); run it with them by hand: scripts/kb_sweep.py --kb <id>.
+# Logs go to logs/sweep_<name>.log and a summary line per suite is printed. Start the stack first (`make up`).
+# Usage: scripts/live_sweep.sh [name ...]
 set -uo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p logs
@@ -10,6 +12,7 @@ declare -a SUITES=(
   "security:python3 -I scripts/security_tests.py"
   "rooms:python3 -I scripts/rooms_test.py"
   "e2e:python3 -I scripts/e2e_sweep.py"
+  "kb:python3 -I scripts/kb_sweep.py --no-chat"
   "harness:python3 -I scripts/harness_sweep.py"
   "acceptance:python3 -I scripts/mvp_acceptance.py"
 )
