@@ -423,11 +423,29 @@ Parameters: `kb` (path, required), `run` (path, required).
 
 Responses: `200`, `403`, `404`, `503`.
 
+### `GET /v1/kb/{kb}/ontology`
+
+The ontology the base's graph is built under (FR-K54) - the entity types and their definitions, as data, with the hash recorded on every extraction
+
+Parameters: `kb` (path, required).
+
+Responses: `200`, `403`, `404`.
+
+### `PUT /v1/kb/{kb}/ontology`
+
+Replace the ontology (an empty list restores the default). Passages read from now on use it; rebuild the graph with fresh=true to re-read the rest
+
+Parameters: `kb` (path, required).
+
+Request body: `types` (* = required).
+
+Responses: `200`, `400`, `403`, `404`.
+
 ### `POST /v1/kb/{kb}/reindex`
 
 Give vectors to the passages that lack them (stored before the embedder ran, or while it was down)
 
-Parameters: `kb` (path, required).
+Parameters: `kb` (path, required), `fresh` (query).
 
 Responses: `202`, `404`, `403`, `503`.
 
@@ -696,6 +714,8 @@ Responses: `202`, `404`, `403`.
 ## Schemas
 
 - `KbSummary`
+- `OntoType`
+- `Ontology`
 - `KbDocument`
 - `KbHit`
 - `Error`

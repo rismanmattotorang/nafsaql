@@ -12,15 +12,22 @@ use sha2::{Digest, Sha256};
 
 use crate::KbError;
 
-/// The extraction prompt. Measured on the quick model (Qwen3-1.7B): objects with one worked example on an unrelated
-/// topic give valid, faithful JSON; descriptions per item cost 2.4x the output tokens, arrays and line formats made it
-/// copy the template.
-pub const EXTRACTION_PROMPT: &str = r#"You extract a knowledge graph from one passage and reply with one JSON object only.
-
-Example passage: "The Rust compiler, maintained by the Rust Foundation, uses LLVM to generate machine code."
-Example reply: {"entities":[{"name":"Rust compiler","type":"system"},{"name":"Rust Foundation","type":"organization"},{"name":"LLVM","type":"system"}],"relations":[{"source":"Rust Foundation","predicate":"maintains","target":"Rust compiler"},{"source":"Rust compiler","predicate":"uses","target":"LLVM"}]}
-
-Rules: entities are the specific things the passage names (system, model, method, dataset, metric, person, organization, concept); type is one of those words. Each relation joins two listed entities with a short lower-case verb phrase. Only facts stated in the passage. At most 10 entities and 10 relations."#;
+/// The default ontology (FR-K54): the entity types a knowledge base starts from, each with the one-line definition
+/// that reaches the extraction prompt. A base may replace it; the types are data, not a branch in the code.
+///
+/// Measured on the quick model (Qwen3-1.7B) in Phase 3: objects with one worked example on an unrelated topic give
+/// valid, faithful JSON; a description per extracted item costs 2.4x the output tokens, and arrays or line formats
+/// made the model copy the template.
+pub const DEFAULT_TYPES: [(&str, &str); 8] = [
+    ("system", "a program, service or piece of software"),
+    ("model", "a trained model or model family"),
+    ("method", "a technique, algorithm or procedure"),
+    ("dataset", "a named collection of data"),
+    ("metric", "a measure or score"),
+    ("person", "a named individual"),
+    ("organization", "a company, institution or group"),
+    ("concept", "anything else the passage names specifically"),
+];
 
 /// The entity types kept; anything else the model writes is mapped onto them (`algorithm` -> `method`).
 pub const TYPES: [&str; 8] = [
@@ -33,6 +40,121 @@ pub const TYPES: [&str; 8] = [
     "organization",
     "concept",
 ];
+
+/// One entity type of an ontology: its name as the model writes it, and the definition the prompt carries.
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
+pub struct OntoType {
+    pub name: String,
+    pub definition: String,
+}
+
+/// FR-K54: the ontology of one knowledge base — the types a build runs under, as data.
+#[derive(Debug, Clone, PartialEq, Serialize, serde::Deserialize)]
+pub struct Ontology {
+    /// In the order they reach the prompt; the last one is the catch-all a stray type is mapped onto.
+    pub types: Vec<OntoType>,
+}
+
+impl Default for Ontology {
+    fn default() -> Self {
+        Ontology {
+            types: DEFAULT_TYPES
+                .iter()
+                .map(|(t, d)| OntoType {
+                    name: t.to_string(),
+                    definition: d.to_string(),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl Ontology {
+    /// The sha256 of the ontology as the prompt sees it, recorded with every extraction so a graph says what it was
+    /// built under.
+    pub fn hash(&self) -> String {
+        let joined = self
+            .types
+            .iter()
+            .map(|t| format!("{}={}", t.name, t.definition))
+            .collect::<Vec<_>>()
+            .join(";");
+        hex(&Sha256::digest(joined.as_bytes()))[..16].to_string()
+    }
+
+    /// Whether a type the model wrote is one of ours.
+    pub fn has(&self, t: &str) -> bool {
+        self.types.iter().any(|x| x.name == t)
+    }
+
+    /// What an ontology a person submits must satisfy: 1 to 24 types, each a short lower-case name (letters, digits,
+    /// `_`, `-`) that is unique, with a definition of at most 200 characters.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.types.is_empty() || self.types.len() > 24 {
+            return Err("an ontology has between 1 and 24 types".into());
+        }
+        let mut seen = std::collections::HashSet::new();
+        for t in &self.types {
+            let ok_name = !t.name.is_empty()
+                && t.name.len() <= 32
+                && t.name
+                    .chars()
+                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+                && t.name
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_ascii_lowercase());
+            if !ok_name {
+                return Err(format!(
+                    "type name \"{}\" must be lower-case letters, digits, _ or -, starting with a letter",
+                    t.name
+                ));
+            }
+            if !seen.insert(t.name.as_str()) {
+                return Err(format!("type \"{}\" is listed twice", t.name));
+            }
+            if t.definition.trim().is_empty() || t.definition.chars().count() > 200 {
+                return Err(format!(
+                    "type \"{}\" needs a definition of 1 to 200 characters",
+                    t.name
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// The extraction prompt built from this ontology (FR-K53, FR-K54, FR-K55): the types and their definitions, a
+    /// worked example on an unrelated topic, a context line, and a quote per relation.
+    pub fn extraction_prompt(&self) -> String {
+        let types = self
+            .types
+            .iter()
+            .map(|t| format!("{} ({})", t.name, t.definition.trim()))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let names = self
+            .types
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        // The worked example is typed with this ontology's own first type: an example naming a type the ontology
+        // does not declare teaches the model to write one we would have to map away.
+        let any = self
+            .types
+            .first()
+            .map(|t| t.name.as_str())
+            .unwrap_or("concept");
+        format!(
+            r#"You extract a knowledge graph from one passage and reply with one JSON object only.
+
+Example passage: "The Rust compiler, maintained by the Rust Foundation, uses LLVM to generate machine code."
+Example reply: {{"context":"How the Rust compiler is maintained and what it generates code with.","entities":[{{"name":"Rust compiler","type":"{any}"}},{{"name":"Rust Foundation","type":"{any}"}},{{"name":"LLVM","type":"{any}"}}],"relations":[{{"source":"Rust Foundation","predicate":"maintains","target":"Rust compiler","quote":"The Rust compiler, maintained by the Rust Foundation, uses LLVM to generate machine code."}}]}}
+
+Rules: "context" is one sentence saying what this passage is about, in the document's own terms. Entities are the specific things the passage names; "type" is one of: {names}. The types mean: {types}. Each relation joins two listed entities with a short lower-case verb phrase, and "quote" is the sentence of the passage that states it, copied word for word. Only facts stated in the passage. At most 10 entities and 10 relations."#
+        )
+    }
+}
 
 /// The JSON Schema every extraction must satisfy before it is stored (FR-K30).
 pub fn extraction_schema() -> &'static Value {
@@ -48,7 +170,9 @@ pub fn extraction_schema() -> &'static Value {
                 "relations": { "type": "array", "maxItems": 40, "items": {
                     "type": "object", "required": ["source", "predicate", "target"],
                     "properties": { "source": { "type": "string", "minLength": 1 }, "predicate": { "type": "string", "minLength": 1 },
-                                    "target": { "type": "string", "minLength": 1 } } } }
+                                    "target": { "type": "string", "minLength": 1 },
+                                    "quote": { "type": "string" } } } },
+                "context": { "type": "string" }
             }
         })
     })
@@ -66,12 +190,20 @@ pub struct ExtractedRelation {
     pub source: String,
     pub predicate: String,
     pub target: String,
+    /// FR-K55: the sentence of the passage that states it, checked to occur verbatim before it is kept. Empty only
+    /// for a relation written by a model that did not supply one, which the quote gate drops.
+    pub quote: String,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct Extraction {
     pub entities: Vec<ExtractedEntity>,
     pub relations: Vec<ExtractedRelation>,
+    /// FR-K53: one sentence saying what the passage is about, in the document's own terms. Indexed with the passage
+    /// so a passage that says "it" is still found by what it is about; never shown to the person.
+    pub context: String,
+    /// FR-K55: relations dropped because their quote is not in the passage. Recorded, not hidden.
+    pub quote_drops: usize,
 }
 
 /// The matching key of an entity name: lower case, letters and digits only, words joined by one space, a leading
@@ -151,6 +283,16 @@ pub fn extraction_input(text: &str) -> String {
 /// whose endpoint was not listed adds that endpoint as a concept (if grounded); self-relations are dropped. At most 12
 /// of each.
 pub fn parse_extraction(reply: &str, passage: &str) -> Result<Extraction, String> {
+    parse_extraction_under(reply, passage, &Ontology::default())
+}
+
+/// The same, under one knowledge base's ontology (FR-K54): a type the model wrote that the ontology does not declare
+/// is mapped onto one that it does, and the last declared type is the catch-all.
+pub fn parse_extraction_under(
+    reply: &str,
+    passage: &str,
+    ontology: &Ontology,
+) -> Result<Extraction, String> {
     let words: std::collections::HashSet<String> =
         entity_key(passage).split(' ').map(str::to_string).collect();
     let start = reply.find('{').ok_or("no JSON object in the reply")?;
@@ -176,9 +318,21 @@ pub fn parse_extraction(reply: &str, passage: &str) -> Result<Extraction, String
         }
         if !by_key.contains_key(&key) && out.entities.len() < 12 {
             by_key.insert(key.clone(), out.entities.len());
+            let mapped = kind_of(kind);
+            let fallback = || {
+                ontology
+                    .types
+                    .last()
+                    .map(|t| t.name.clone())
+                    .unwrap_or_else(|| "concept".to_string())
+            };
             out.entities.push(ExtractedEntity {
                 name,
-                kind: kind_of(kind),
+                kind: if ontology.has(&mapped) {
+                    mapped
+                } else {
+                    fallback()
+                },
                 key: key.clone(),
             });
         }
@@ -218,13 +372,67 @@ pub fn parse_extraction(reply: &str, passage: &str) -> Result<Extraction, String
         {
             continue;
         }
+        // FR-K55, SR-K10: a relation is kept only with a quote that occurs in the passage verbatim. A model that
+        // writes a plausible sentence the passage does not contain loses the relation, and the drop is counted.
+        let quote = match verified_quote(r["quote"].as_str().unwrap_or(""), passage) {
+            Some(q) => q,
+            None => {
+                out.quote_drops += 1;
+                continue;
+            }
+        };
         out.relations.push(ExtractedRelation {
             source: s,
             predicate: p,
             target: t,
+            quote,
         });
     }
+    out.context = context_line(v["context"].as_str().unwrap_or(""), passage);
     Ok(out)
+}
+
+/// FR-K55: the quote as the passage states it, or `None`. The claimed sentence must occur in the passage after
+/// whitespace is normalised on both sides; the stored form is the passage's own spacing, cut to 400 characters.
+pub fn verified_quote(claimed: &str, passage: &str) -> Option<String> {
+    let norm = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ");
+    let (q, p) = (norm(claimed), norm(passage));
+    if q.len() < 12 || !p.contains(&q) {
+        return None;
+    }
+    Some(q.chars().take(400).collect())
+}
+
+/// FR-K53: the extractor's context line, kept only when it says something of its own. One sentence, cut to 200
+/// characters; a line that merely repeats the passage's first words adds nothing to the index and is dropped.
+pub fn context_line(claimed: &str, passage: &str) -> String {
+    let line: String = claimed
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(200)
+        .collect();
+    if line.chars().count() < 12 {
+        return String::new();
+    }
+    // A line that opens the way the passage opens is the passage, not a description of it. Comparing the line's
+    // first words against the passage's own opening catches it whether the line is shorter or longer.
+    let opening: String = line
+        .split_whitespace()
+        .take(6)
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+    let passage_open = passage
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+    if !opening.is_empty() && passage_open.starts_with(&opening) {
+        return String::new();
+    }
+    line
 }
 
 /// A stable record key for an entity of a knowledge base (so the same entity is upserted, never duplicated).
@@ -263,6 +471,9 @@ pub struct GraphConfig {
 pub struct Extractor {
     http: reqwest::Client,
     pub cfg: GraphConfig,
+    /// FR-K54: the types this extractor runs under, and the prompt built from them.
+    ontology: Ontology,
+    prompt: String,
 }
 
 /// One extraction call's result and cost.
@@ -274,21 +485,49 @@ pub struct ExtractCall {
 
 impl Extractor {
     pub fn new(cfg: GraphConfig) -> Extractor {
+        Extractor::with_ontology(cfg, Ontology::default())
+    }
+
+    /// FR-K54: the extractor built for one knowledge base's ontology; its prompt is built from the types.
+    pub fn with_ontology(cfg: GraphConfig, ontology: Ontology) -> Extractor {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(2))
             .timeout(Duration::from_secs(900))
             .build()
             .expect("HTTP client");
-        Extractor { http, cfg }
+        let prompt = ontology.extraction_prompt();
+        Extractor {
+            http,
+            cfg,
+            ontology,
+            prompt,
+        }
     }
 
-    /// Extract one passage (greedy, thinking off). Network errors are `Err`; a reply that fails the schema is an
-    /// `Ok` call whose `result` is the reason (the passage is then skipped, not retried).
+    pub fn ontology(&self) -> &Ontology {
+        &self.ontology
+    }
+
+    /// Extract one passage (greedy, thinking off) under the ontology this extractor was built with. Network errors
+    /// are `Err`; a reply that fails the schema is an `Ok` call whose `result` is the reason (the passage is then
+    /// skipped, not retried).
     pub async fn extract(&self, passage: &str) -> Result<ExtractCall, KbError> {
+        self.extract_with(passage, &self.ontology, &self.prompt)
+            .await
+    }
+
+    /// FR-K54: extract under a knowledge base's own ontology. The prompt is built by the caller once per document
+    /// (`Ontology::extraction_prompt`), not once per passage.
+    pub async fn extract_with(
+        &self,
+        passage: &str,
+        ontology: &Ontology,
+        prompt: &str,
+    ) -> Result<ExtractCall, KbError> {
         let t0 = std::time::Instant::now();
         let body = json!({
             "model": self.cfg.model,
-            "messages": [{"role": "system", "content": EXTRACTION_PROMPT}, {"role": "user", "content": format!("Passage:\n{}", extraction_input(passage))}],
+            "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": format!("Passage:\n{}", extraction_input(passage))}],
             "temperature": 0, "max_tokens": self.cfg.max_tokens,
             "chat_template_kwargs": {"enable_thinking": false},
         });
@@ -320,7 +559,7 @@ impl Extractor {
             .and_then(Value::as_str)
             .unwrap_or("");
         Ok(ExtractCall {
-            result: parse_extraction(text, passage),
+            result: parse_extraction_under(text, passage, ontology),
             completion_tokens: v
                 .pointer("/usage/completion_tokens")
                 .and_then(Value::as_u64)
@@ -461,7 +700,13 @@ mod tests {
 
     #[test]
     fn extraction_from_the_measured_reply() {
-        let reply = r#"Here: {"entities":[{"name":"PagedAttention","type":"algorithm"},{"name":"vLLM","type":"system"},{"name":"vllm","type":"system"},{"name":"Orca","type":"model"}],"relations":[{"source":"PagedAttention","predicate":"inspired_by","target":"virtual memory and paging techniques"},{"source":"vLLM","predicate":"uses","target":"PagedAttention"},{"source":"vLLM","predicate":"compared_to","target":"Orca"},{"source":"vLLM","predicate":"uses","target":"PagedAttention"},{"source":"vLLM","predicate":"is","target":"vLLM"}]} trailing"#;
+        let q1 =
+            "To address this, PagedAttention is inspired by virtual memory and paging techniques.";
+        let q2 = "vLLM uses it and is compared to Orca.";
+        let reply = format!(
+            r#"Here: {{"context":"How PagedAttention came about and what uses it.","entities":[{{"name":"PagedAttention","type":"algorithm"}},{{"name":"vLLM","type":"system"}},{{"name":"vllm","type":"system"}},{{"name":"Orca","type":"model"}}],"relations":[{{"source":"PagedAttention","predicate":"inspired_by","target":"virtual memory and paging techniques","quote":"{q1}"}},{{"source":"vLLM","predicate":"uses","target":"PagedAttention","quote":"{q2}"}},{{"source":"vLLM","predicate":"compared_to","target":"Orca","quote":"{q2}"}},{{"source":"vLLM","predicate":"uses","target":"PagedAttention","quote":"{q2}"}},{{"source":"vLLM","predicate":"is","target":"vLLM","quote":"{q2}"}}]}} trailing"#
+        );
+        let reply = reply.as_str();
         let passage = "To address this, PagedAttention is inspired by virtual memory and paging techniques. vLLM uses it \
                        and is compared to Orca. The system is fast.";
         let x = parse_extraction(reply, passage).unwrap();
@@ -483,6 +728,108 @@ mod tests {
             x.relations[0].target,
             "virtual memory and paging techniques"
         );
+        // FR-K53, FR-K55: the context line and a quote the passage really contains.
+        assert_eq!(x.context, "How PagedAttention came about and what uses it.");
+        assert_eq!(x.relations[0].quote, q1);
+        assert_eq!(x.quote_drops, 0);
+    }
+
+    /// FR-K55, SR-K10: a relation is kept only with a sentence the passage states, and a drop is counted.
+    #[test]
+    fn a_relation_without_a_real_quote_is_dropped_and_counted() {
+        let passage = "The gateway reaches SurrealDB over HTTP on port 8300.";
+        let reply = r#"{"entities":[{"name":"gateway","type":"system"},{"name":"SurrealDB","type":"system"}],
+            "relations":[{"source":"gateway","predicate":"reaches","target":"SurrealDB","quote":"The gateway reaches SurrealDB over HTTP on port 8300."},
+                         {"source":"SurrealDB","predicate":"stores","target":"gateway","quote":"SurrealDB stores every passage of the knowledge base."},
+                         {"source":"gateway","predicate":"uses","target":"SurrealDB"}]}"#;
+        let x = parse_extraction(reply, passage).unwrap();
+        assert_eq!(x.relations.len(), 1, "{:?}", x.relations);
+        assert_eq!(x.relations[0].predicate, "reaches");
+        assert_eq!(x.quote_drops, 2, "an invented quote and a missing one");
+
+        // Whitespace differs, the words do not: that is the same sentence.
+        assert_eq!(
+            verified_quote(
+                "The  gateway\n reaches SurrealDB over HTTP on port 8300.",
+                passage
+            ),
+            Some("The gateway reaches SurrealDB over HTTP on port 8300.".to_string())
+        );
+        assert_eq!(verified_quote("short", passage), None);
+        assert_eq!(verified_quote("", passage), None);
+    }
+
+    /// FR-K53: a context line that only repeats the passage's opening adds nothing to the index.
+    #[test]
+    fn a_context_line_must_say_something_of_its_own() {
+        let passage = "The gateway reaches SurrealDB over HTTP on port 8300.";
+        assert_eq!(
+            context_line("What the gateway talks to.", passage),
+            "What the gateway talks to."
+        );
+        assert_eq!(
+            context_line("The gateway reaches SurrealDB over HTTP", passage),
+            ""
+        );
+        assert_eq!(context_line("too short", passage), "");
+    }
+
+    /// FR-K54: the types are data; the prompt is built from them and a type outside them is mapped onto one inside.
+    #[test]
+    fn the_ontology_builds_the_prompt_and_bounds_the_types() {
+        let o = Ontology::default();
+        assert!(o
+            .extraction_prompt()
+            .contains("system (a program, service or piece of software)"));
+        assert!(o.extraction_prompt().contains("\"quote\""));
+        assert_eq!(o.hash().len(), 16);
+        let mine = Ontology {
+            types: vec![
+                OntoType {
+                    name: "ship".into(),
+                    definition: "a named vessel".into(),
+                },
+                OntoType {
+                    name: "port".into(),
+                    definition: "a place a ship calls at".into(),
+                },
+            ],
+        };
+        assert!(mine.validate().is_ok());
+        assert!(Ontology { types: vec![] }.validate().is_err());
+        assert!(Ontology {
+            types: vec![OntoType {
+                name: "Bad Name".into(),
+                definition: "x".into()
+            }]
+        }
+        .validate()
+        .is_err());
+        assert!(Ontology {
+            types: vec![
+                OntoType {
+                    name: "a".into(),
+                    definition: "x".into()
+                },
+                OntoType {
+                    name: "a".into(),
+                    definition: "y".into()
+                }
+            ]
+        }
+        .validate()
+        .is_err());
+        assert_ne!(mine.hash(), o.hash());
+        assert!(mine.extraction_prompt().contains("ship (a named vessel)"));
+        assert!(!mine.extraction_prompt().contains("organization"));
+        // "system" is not in this ontology, so it falls to the last declared type.
+        let x = parse_extraction_under(
+            r#"{"entities":[{"name":"Endeavour","type":"system"}],"relations":[]}"#,
+            "Endeavour sailed in 1768.",
+            &mine,
+        )
+        .unwrap();
+        assert_eq!(x.entities[0].kind, "port");
     }
 
     #[test]
@@ -503,7 +850,7 @@ mod tests {
     #[test]
     fn entities_must_be_in_the_passage_and_specific() {
         let reply = r#"{"entities":[{"name":"LLVM","type":"system"},{"name":"Rust compiler","type":"system"},{"name":"SurrealDB","type":"system"},{"name":"system","type":"concept"},{"name":"the gateway","type":"system"}],
-            "relations":[{"source":"gateway","predicate":"reaches","target":"SurrealDB"},{"source":"Rust compiler","predicate":"uses","target":"LLVM"}]}"#;
+            "relations":[{"source":"gateway","predicate":"reaches","target":"SurrealDB","quote":"The gateway reaches SurrealDB over HTTP."},{"source":"Rust compiler","predicate":"uses","target":"LLVM","quote":"The gateway reaches SurrealDB over HTTP."}]}"#;
         let x = parse_extraction(
             reply,
             "The gateway reaches SurrealDB over HTTP. The system is local.",

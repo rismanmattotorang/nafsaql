@@ -56,6 +56,9 @@ pub fn from_config(k: &KnowledgeCfg) -> Option<Arc<Kb>> {
             max_tokens: k.graph_max_tokens.max(64),
             merge_similarity: k.entity_merge_similarity,
         }),
+        graph_weight: k.graph_weight,
+        graph_beam: k.graph_beam.max(1),
+        graph_decay: k.graph_decay,
     }))
 }
 
@@ -91,6 +94,7 @@ pub fn routes(state: AppState) -> Router<AppState> {
         .route("/v1/kb/{kb}/graph/build", post(graph_build))
         .route("/v1/kb/{kb}/graph/entities", get(graph_entities))
         .route("/v1/kb/{kb}/graph/entities/{entity}", get(graph_entity))
+        .route("/v1/kb/{kb}/ontology", get(get_ontology).put(put_ontology))
         .route(
             "/v1/kb/{kb}/memory/runs",
             get(crate::memory_runs::list).post(crate::memory_runs::start),
@@ -413,14 +417,25 @@ async fn search(
 
 /// Give vectors to the documents of a knowledge base that lack them (stored before the embedder ran, or while it was
 /// down).
+#[derive(Deserialize)]
+struct ReindexQuery {
+    /// Embed every passage again, so the vectors carry the context lines the graph pass wrote (FR-K53).
+    #[serde(default)]
+    fresh: bool,
+}
+
 async fn reindex(
     State(s): State<AppState>,
     Path(id): Path<String>,
+    Query(q): Query<ReindexQuery>,
 ) -> KbResult<(StatusCode, Json<Value>)> {
     let kb = ready(&s).await?;
     kb.store().get_kb(&id).await?;
-    let queued = kb.reindex(Some(&id)).await?;
-    Ok((StatusCode::ACCEPTED, Json(json!({ "queued": queued }))))
+    let queued = kb.reindex_fresh(Some(&id), q.fresh).await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({ "queued": queued, "fresh": q.fresh })),
+    ))
 }
 
 /// Start reading the documents of a knowledge base for its graph (FR-K30); long-running, in the background.
@@ -478,6 +493,38 @@ async fn graph_view(
     view["progress"] = json!({ "passages_read": read, "passages": total,
         "building": docs.iter().any(|d| d.status == "extracting" || (d.status == "queued" && d.n_graphed < d.n_chunks)) });
     Ok(Json(view))
+}
+
+/// FR-K54: the ontology a base's graph is built under, as data a reader can print.
+async fn get_ontology(State(s): State<AppState>, Path(id): Path<String>) -> KbResult<Json<Value>> {
+    let kb = ready(&s).await?;
+    let (o, is_default) = kb.ontology(&id).await?;
+    Ok(Json(
+        json!({ "types": o.types, "hash": o.hash(), "default": is_default }),
+    ))
+}
+
+#[derive(Deserialize)]
+struct PutOntology {
+    #[serde(default)]
+    types: Vec<nafs_kb::graph::OntoType>,
+}
+
+/// FR-K54: replace it (an empty list restores the default). Passages read from now on use it; a graph already
+/// built is rebuilt with `graph/build?fresh=true`.
+async fn put_ontology(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Json(b): Json<PutOntology>,
+) -> KbResult<Json<Value>> {
+    let kb = ready(&s).await?;
+    let o = (!b.types.is_empty()).then_some(nafs_kb::graph::Ontology { types: b.types });
+    kb.set_ontology(&id, o).await?;
+    let (o, is_default) = kb.ontology(&id).await?;
+    Ok(Json(
+        json!({ "types": o.types, "hash": o.hash(), "default": is_default,
+        "note": "applies to passages read from now on; rebuild the graph with fresh=true to re-read the rest" }),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -792,6 +839,9 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                         predicate: f["predicate"].as_str()?.to_string(),
                         target: f["target"].as_str()?.to_string(),
                         weight: f["weight"].as_u64().unwrap_or(1),
+                        quote: f["quote"].as_str().unwrap_or("").to_string(),
+                        hop: f["hop"].as_u64().unwrap_or(1) as u8,
+                        via: f["via"].as_str().unwrap_or("").to_string(),
                     })
                 })
                 .collect();
@@ -809,6 +859,26 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                     vector_score: h.vector_score,
                 })
                 .collect();
+            // FR-K59: the arms that ran, and a note for each that did not, so a reply never implies a search it
+            // did not make. The search names its own fallback; the graph arm is named only when it ran.
+            let mut arms: Vec<String> = match r.mode {
+                nafs_kb::SearchMode::Lexical => vec!["lexical".into()],
+                nafs_kb::SearchMode::Vector => vec!["vector".into()],
+                nafs_kb::SearchMode::Hybrid => vec!["lexical".into(), "vector".into()],
+            };
+            let mut notes: Vec<String> = Vec::new();
+            if let Some(why) = &r.fallback {
+                notes.push(format!("vector: {why}"));
+            }
+            if graph {
+                if facts.is_empty() {
+                    notes.push("graph: no entity of the question is in the graph".into());
+                } else {
+                    arms.push("graph".into());
+                }
+            } else if mode == "graph" {
+                notes.push("graph: the knowledge graph is turned off on this server".into());
+            }
             Ok(nafs_core::knowledge::Retrieved {
                 kb_name: base.name,
                 passages,
@@ -821,6 +891,8 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 embed_ms: r.embed_ms,
                 search_ms: r.took_ms,
                 facts,
+                arms,
+                notes,
             })
         })
     }

@@ -77,6 +77,11 @@ pub struct KbConfig {
     pub exact_search_below: u64,
     /// Phase 3: entity and relation extraction by the quick model; `None` turns the graph off.
     pub graph: Option<GraphConfig>,
+    /// FR-K50: how much the graph's ranking counts against the search's when the two are fused (1.0 = an equal arm).
+    pub graph_weight: f64,
+    /// FR-K56: relations kept per entity at the second hop, and the per-hop decay of a path's score.
+    pub graph_beam: usize,
+    pub graph_decay: f64,
 }
 
 /// How a search ranks passages (FR-K07).
@@ -404,7 +409,7 @@ impl Kb {
         for batch in todo.chunks(e.cfg.batch.max(1)) {
             let texts: Vec<String> = batch
                 .iter()
-                .map(|(_, h, t)| embed::passage_text(title, h, t))
+                .map(|c| embed::passage_text(title, &c.heading, &c.context, &c.text))
                 .collect();
             let vecs = match e.embed(&texts, None).await {
                 Ok(v) => v,
@@ -416,11 +421,8 @@ impl Kb {
                     return Err(format!("Searching by meaning is not available for this document yet ({err}); it is searchable by its words and will be indexed when the embedding server is back."));
                 }
             };
-            let rows: Vec<(String, Vec<f32>)> = batch
-                .iter()
-                .map(|(id, _, _)| id.clone())
-                .zip(vecs)
-                .collect();
+            let rows: Vec<(String, Vec<f32>)> =
+                batch.iter().map(|c| c.id.clone()).zip(vecs).collect();
             self.store
                 .set_vectors(&rows)
                 .await
@@ -447,11 +449,24 @@ impl Kb {
 
     /// Queue every ready document (of one knowledge base, or all) whose passages are not all embedded.
     pub async fn reindex(&self, kb: Option<&str>) -> Result<usize, KbError> {
+        self.reindex_fresh(kb, false).await
+    }
+
+    /// The same, and with `fresh` every passage of the base is embedded again (FR-K53: the vectors then carry the
+    /// context lines the graph pass wrote) and the words index is filled for passages stored before Phase 21
+    /// (FR-K51). `fresh` needs one base.
+    pub async fn reindex_fresh(&self, kb: Option<&str>, fresh: bool) -> Result<usize, KbError> {
         self.ready().await?;
         if self.embedder.is_none() {
             return Err(KbError::Unavailable(
                 "searching by meaning is turned off ([knowledge] embed_url is empty)".into(),
             ));
+        }
+        if let Some(base) = kb {
+            self.store.backfill_search_text(base).await?;
+            if fresh {
+                self.store.clear_vectors(base).await?;
+            }
         }
         let docs = self.store.documents_missing_vectors(kb).await?;
         for d in &docs {
@@ -502,10 +517,26 @@ impl Kb {
             .map_err(|e| e.to_string())?;
         let t0 = Instant::now();
         let (mut ok, mut skipped, mut tokens, mut merged) = (0usize, 0usize, 0u64, 0usize);
+        // FR-K55: relations whose quote is not in the passage, counted rather than hidden.
+        let mut quote_drops = 0usize;
+        // FR-K54: the base's own ontology, read once per document; the prompt is built from it once.
+        let ontology = self
+            .store
+            .get_ontology(kb)
+            .await
+            .map_err(|e| e.to_string())?
+            .unwrap_or_default();
+        let prompt = ontology.extraction_prompt();
+        let doc_title = self
+            .store
+            .get_document(kb, doc)
+            .await
+            .map(|d| d.title)
+            .unwrap_or_default();
         // Keys resolved in this job, so a name is embedded and matched once.
         let mut resolved: HashMap<String, String> = HashMap::new();
         for (chunk_id, _heading, text) in &todo {
-            let call = x.extract(text).await.map_err(|e| {
+            let call = x.extract_with(text, &ontology, &prompt).await.map_err(|e| {
                 format!("The knowledge graph could not be built: {e}. Passages read so far are kept; build again to continue.")
             })?;
             tokens += call.completion_tokens;
@@ -590,13 +621,22 @@ impl Kb {
                 .iter()
                 .filter_map(|r| {
                     let (s, t) = (rec.get(&r.source)?, rec.get(&r.target)?);
-                    (s != t).then(|| json!({ "id": graph::relation_id(kb, s, &r.predicate, t), "s": s, "t": t, "p": r.predicate }))
+                    (s != t).then(|| json!({ "id": graph::relation_id(kb, s, &r.predicate, t), "s": s, "t": t, "p": r.predicate, "quote": r.quote }))
                 })
                 .collect();
             self.store
                 .store_extraction(kb, doc, chunk_id, &ents, &rels)
                 .await
                 .map_err(|e| e.to_string())?;
+            // FR-K53: the context line the same call wrote, stored and folded into the words index. Its vector is
+            // refreshed only by a reindex, so a passage keeps the vector it was embedded with until then.
+            if !ex.context.is_empty() {
+                self.store
+                    .set_chunk_context(chunk_id, &ex.context, &doc_title)
+                    .await
+                    .map_err(|e| e.to_string())?;
+            }
+            quote_drops += ex.quote_drops;
             ok += 1;
         }
         let _ = self.recompute_communities(kb).await;
@@ -606,6 +646,7 @@ impl Kb {
             ok,
             skipped,
             merged,
+            quote_drops,
             tokens,
             ms = t0.elapsed().as_millis() as u64,
             "knowledge graph read"
@@ -664,8 +705,14 @@ impl Kb {
     }
 
     /// Graph search for chat (FR-K22, local search): entities nearest the question (by meaning and by name), the
-    /// relations around them, and passages, with passages that mention those entities or carry the strongest facts
-    /// ranked first. Returns (facts, passages).
+    /// relations around them, and passages. Returns (facts, passages).
+    ///
+    /// FR-K50: the graph **supplies candidates**; it does not reorder the search's. A passage a fact cites is added
+    /// to the pool when the search missed it, every candidate gets a graph signal (seed entities it mentions, and the
+    /// weight of the facts citing it), and the two are fused by rank, as the lexical and vector arms are. The earlier
+    /// version sorted the passages by that signal alone, which dropped a passage holding the answer below passages
+    /// that merely named the question's entities: measured in Phase 7, where `graph` answered 15 of 20 against
+    /// `rag`'s 18 and won none of the three discordant pairs.
     pub async fn graph_search(
         &self,
         kb: &str,
@@ -701,37 +748,162 @@ impl Kb {
             base.results.truncate(k);
             return Ok((Vec::new(), base));
         }
-        let facts = self.store.facts_for(kb, &seeds, 12).await?;
+        let facts = self.walk(kb, &seeds).await?;
         let mentioning = self.store.chunks_mentioning(kb, &seeds).await?;
-        // Evidence of the strongest facts joins the candidates when the search missed it.
-        let mut evidence: Vec<String> = Vec::new();
-        for f in facts.iter().take(4) {
-            if let Some(e) = f["evidence"]
-                .as_array()
-                .and_then(|a| a.first())
-                .and_then(Value::as_str)
-            {
-                if !base.results.iter().any(|h| h.chunk_id == e) && !evidence.iter().any(|x| x == e)
-                {
-                    evidence.push(e.to_string());
+        // Every passage a fact cites joins the candidates when the search missed it, so the graph widens the pool.
+        let mut cited: HashMap<String, f64> = HashMap::new();
+        for f in &facts {
+            let w = f["weight"].as_f64().unwrap_or(1.0).max(1.0);
+            for e in f["evidence"].as_array().into_iter().flatten() {
+                if let Some(id) = e.as_str() {
+                    *cited.entry(id.to_string()).or_insert(0.0) += w;
                 }
             }
         }
-        let mut hits = base.results;
-        hits.extend(self.store.hits_by_id(&evidence).await?);
-        // Stable re-rank: passages mentioning more seed entities first, then the search order.
-        let mut ranked: Vec<(usize, usize, Hit)> = hits
-            .into_iter()
-            .enumerate()
-            .map(|(i, h)| (mentioning.get(&h.chunk_id).copied().unwrap_or(0), i, h))
+        let extra: Vec<String> = cited
+            .keys()
+            .filter(|id| !base.results.iter().any(|h| &&h.chunk_id == id))
+            .cloned()
             .collect();
-        ranked.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
-        let mut results: Vec<Hit> = ranked.into_iter().map(|x| x.2).take(k).collect();
-        for (i, h) in results.iter_mut().enumerate() {
-            h.rank = i + 1;
-        }
-        base.results = results;
+        let mut hits = base.results;
+        hits.extend(self.store.hits_by_id(&extra).await?);
+        base.results = fuse_graph(hits, &mentioning, &cited, k, self.cfg.graph_weight);
         Ok((facts, base))
+    }
+
+    /// FR-K54: the ontology a knowledge base's graph is built under (the default when none was set).
+    pub async fn ontology(&self, kb: &str) -> Result<(graph::Ontology, bool), KbError> {
+        self.store.get_kb(kb).await?;
+        Ok(match self.store.get_ontology(kb).await? {
+            Some(o) => (o, false),
+            None => (graph::Ontology::default(), true),
+        })
+    }
+
+    /// FR-K54: set it. It applies to passages read from now on; a graph built under the old one is rebuilt with
+    /// `graph/build?fresh=true`.
+    pub async fn set_ontology(
+        &self,
+        kb: &str,
+        ontology: Option<graph::Ontology>,
+    ) -> Result<(), KbError> {
+        self.store.get_kb(kb).await?;
+        if let Some(o) = &ontology {
+            o.validate().map_err(KbError::BadInput)?;
+        }
+        self.store.set_ontology(kb, ontology.as_ref()).await
+    }
+
+    /// FR-K56: the facts around the seed entities, two hops out, each scored by the path that reached it.
+    ///
+    /// Hop 1 is every relation of a seed. Hop 2 keeps, per entity the first hop reached, the best `graph_beam`
+    /// relations, and `graph_beam * 3` in all. A path's score is the product over its hops of the relation's weight
+    /// (normalised to the heaviest first-hop relation) and `graph_decay` raised to the hop, so a second-hop fact
+    /// must be well attested to outrank a first-hop one. Each fact carries `hop`, and a second-hop fact carries
+    /// `via`, the entity it came through, so the prompt can show the chain. Deliberately not a cosine beam with no
+    /// path score (what OntoSmith ships): this graph carries weights, so it uses them.
+    async fn walk(&self, kb: &str, seeds: &[String]) -> Result<Vec<Value>, KbError> {
+        let beam = self.cfg.graph_beam.max(1);
+        let decay = self.cfg.graph_decay.clamp(0.0, 1.0);
+        let seed_set: std::collections::HashSet<&str> = seeds.iter().map(String::as_str).collect();
+        let mut first = self.store.facts_for(kb, seeds, 12).await?;
+        let top = first
+            .iter()
+            .filter_map(|f| f["weight"].as_f64())
+            .fold(1.0_f64, f64::max);
+        for f in first.iter_mut() {
+            let w = f["weight"].as_f64().unwrap_or(1.0) / top;
+            f["hop"] = json!(1);
+            f["path_score"] = json!(w * decay);
+        }
+        // The frontier: entities the first hop reached that are not seeds, with the best path that reached each.
+        let mut frontier: HashMap<String, (String, f64)> = HashMap::new();
+        for f in &first {
+            let score = f["path_score"].as_f64().unwrap_or(0.0);
+            for (id, name, other) in [
+                (
+                    f["target_id"].as_str(),
+                    f["target"].as_str(),
+                    f["source"].as_str(),
+                ),
+                (
+                    f["source_id"].as_str(),
+                    f["source"].as_str(),
+                    f["target"].as_str(),
+                ),
+            ] {
+                let (Some(id), Some(_name), Some(other)) = (id, name, other) else {
+                    continue;
+                };
+                if seed_set.contains(id) {
+                    continue;
+                }
+                let e = frontier
+                    .entry(id.to_string())
+                    .or_insert((other.to_string(), 0.0));
+                if score > e.1 {
+                    *e = (other.to_string(), score);
+                }
+            }
+        }
+        let seen: std::collections::HashSet<String> = first
+            .iter()
+            .filter_map(|f| f["id"].as_str().map(str::to_string))
+            .collect();
+        let mut second: Vec<Value> = Vec::new();
+        if !frontier.is_empty() {
+            let ids: Vec<String> = frontier.keys().cloned().collect();
+            let hop2 = self.store.facts_for(kb, &ids, beam * 8).await?;
+            let mut per_entity: HashMap<String, usize> = HashMap::new();
+            for mut f in hop2 {
+                let Some(id) = f["id"].as_str().map(str::to_string) else {
+                    continue;
+                };
+                if seen.contains(&id) {
+                    continue;
+                }
+                // The frontier entity this relation hangs off, and the path that reached that entity.
+                let through = [f["source_id"].as_str(), f["target_id"].as_str()]
+                    .into_iter()
+                    .flatten()
+                    .find(|x| frontier.contains_key(*x))
+                    .map(str::to_string);
+                let Some(through) = through else { continue };
+                let n = per_entity.entry(through.clone()).or_insert(0);
+                if *n >= beam {
+                    continue;
+                }
+                *n += 1;
+                let (_, reached) = &frontier[&through];
+                let w = f["weight"].as_f64().unwrap_or(1.0) / top;
+                let via = if f["source_id"].as_str() == Some(through.as_str()) {
+                    f["source"].as_str().unwrap_or("")
+                } else {
+                    f["target"].as_str().unwrap_or("")
+                }
+                .to_string();
+                f["hop"] = json!(2);
+                f["via"] = json!(via);
+                f["path_score"] = json!(reached * w.min(1.0) * decay);
+                second.push(f);
+            }
+        }
+        second.sort_by(|a, b| {
+            b["path_score"]
+                .as_f64()
+                .unwrap_or(0.0)
+                .total_cmp(&a["path_score"].as_f64().unwrap_or(0.0))
+        });
+        second.truncate(beam * 3);
+        let mut all = first;
+        all.extend(second);
+        all.sort_by(|a, b| {
+            b["path_score"]
+                .as_f64()
+                .unwrap_or(0.0)
+                .total_cmp(&a["path_score"].as_f64().unwrap_or(0.0))
+        });
+        Ok(all)
     }
 
     /// A question embedded as Memorilla reads it: no instruction prefix (the memory module was trained that way).
@@ -881,6 +1053,62 @@ pub fn fuse(lex: Vec<Hit>, vec: Vec<Hit>, k: usize) -> Vec<Hit> {
     out
 }
 
+/// FR-K50: the search's order and the graph's signal fused by rank, as the lexical and vector arms are.
+///
+/// The graph's own ranking puts a passage first when the facts citing it are heavy and when it names more of the
+/// question's entities; `graph_weight` says how much that list counts against the search's (1.0 = an equal arm).
+/// Rank fusion rather than adding the scores, because a BM25 score, a cosine and a relation weight share no scale.
+pub fn fuse_graph(
+    hits: Vec<Hit>,
+    mentioning: &HashMap<String, usize>,
+    cited: &HashMap<String, f64>,
+    k: usize,
+    graph_weight: f64,
+) -> Vec<Hit> {
+    // The search's list, in the order it came back.
+    let search: Vec<&str> = hits.iter().map(|h| h.chunk_id.as_str()).collect();
+    // The graph's list ranks the **whole** candidate population, heaviest cited facts first, then most seed entities
+    // named, then the search order. Ranking only the passages the graph has an opinion about would make "last of
+    // two" score like "second overall", and a passage with one weak mention would leapfrog the search's best.
+    let mut graph: Vec<(&str, f64, usize, usize)> = hits
+        .iter()
+        .enumerate()
+        .map(|(i, h)| {
+            (
+                h.chunk_id.as_str(),
+                cited.get(&h.chunk_id).copied().unwrap_or(0.0),
+                mentioning.get(&h.chunk_id).copied().unwrap_or(0),
+                i,
+            )
+        })
+        .collect();
+    graph.sort_by(|a, b| b.1.total_cmp(&a.1).then(b.2.cmp(&a.2)).then(a.3.cmp(&b.3)));
+    let graph: Vec<&str> = graph.into_iter().map(|x| x.0).collect();
+    let mut score: HashMap<&str, f64> = HashMap::new();
+    for (rank, id) in search.iter().enumerate() {
+        *score.entry(id).or_insert(0.0) += 1.0 / (60.0 + rank as f64 + 1.0);
+    }
+    for (rank, id) in graph.iter().enumerate() {
+        *score.entry(id).or_insert(0.0) += graph_weight / (60.0 + rank as f64 + 1.0);
+    }
+    let order: HashMap<&str, usize> = search.iter().enumerate().map(|(i, id)| (*id, i)).collect();
+    let mut ids: Vec<(&str, f64)> = score.into_iter().collect();
+    ids.sort_by(|a, b| {
+        b.1.total_cmp(&a.1)
+            .then(order.get(a.0).cmp(&order.get(b.0)))
+    });
+    let mut out: Vec<Hit> = Vec::with_capacity(k);
+    for (id, s) in ids.into_iter().take(k) {
+        if let Some(h) = hits.iter().find(|h| h.chunk_id == id) {
+            let mut h = h.clone();
+            h.score = s;
+            h.rank = out.len() + 1;
+            out.push(h);
+        }
+    }
+    out
+}
+
 /// The client's file name, reduced to a display name (no directories, no control characters, at most 200 chars).
 pub fn display_name(name: &str) -> String {
     let base = name.rsplit(['/', '\\']).next().unwrap_or(name);
@@ -906,6 +1134,57 @@ fn hex(b: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn h(id: &str, rank: usize) -> Hit {
+        Hit {
+            chunk_id: id.into(),
+            doc_id: "d".into(),
+            doc_title: "t".into(),
+            ord: 0,
+            heading: String::new(),
+            page: None,
+            text: String::new(),
+            score: 1.0 / rank as f64,
+            rank,
+            lexical_score: None,
+            vector_score: None,
+        }
+    }
+
+    /// FR-K50: the graph is an arm, not an override. A passage the search ranked first stays ahead of one the graph
+    /// alone likes, and a passage only the graph found still reaches the answer.
+    #[test]
+    fn the_graph_arm_moves_passages_without_overriding_the_search() {
+        let hits = vec![h("a", 1), h("b", 2), h("c", 3), h("d", 4)];
+        let no_ents: HashMap<String, usize> = HashMap::new();
+        let no_cites: HashMap<String, f64> = HashMap::new();
+        // With nothing from the graph, the search order is kept exactly.
+        let out = fuse_graph(hits.clone(), &no_ents, &no_cites, 4, 1.0);
+        assert_eq!(
+            out.iter().map(|x| x.chunk_id.as_str()).collect::<Vec<_>>(),
+            ["a", "b", "c", "d"]
+        );
+        // "c" is cited by a heavy fact and names two seed entities: it rises from third to second. The search's
+        // first stays first — it leads one list and trails the other by as much, and an exact tie breaks toward the
+        // search, which is the primary signal. This is the case the old code got wrong, in the other direction.
+        let cited = HashMap::from([("c".to_string(), 9.0)]);
+        let mentioning = HashMap::from([("c".to_string(), 2usize), ("d".to_string(), 1usize)]);
+        let out = fuse_graph(hits.clone(), &mentioning, &cited, 4, 1.0);
+        assert_eq!(
+            out.iter().map(|x| x.chunk_id.as_str()).collect::<Vec<_>>(),
+            ["a", "c", "b", "d"]
+        );
+        // Weight 0 means the graph contributes facts and never moves a passage.
+        let out = fuse_graph(hits.clone(), &mentioning, &cited, 4, 0.0);
+        assert_eq!(
+            out.iter().map(|x| x.chunk_id.as_str()).collect::<Vec<_>>(),
+            ["a", "b", "c", "d"]
+        );
+        // k truncates, and the ranks are renumbered from 1.
+        let out = fuse_graph(hits, &mentioning, &cited, 2, 1.0);
+        assert_eq!(out.len(), 2);
+        assert_eq!((out[0].rank, out[1].rank), (1, 2));
+    }
 
     #[test]
     fn display_names_drop_paths_and_controls() {

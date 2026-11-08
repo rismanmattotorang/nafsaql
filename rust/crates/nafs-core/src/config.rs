@@ -81,6 +81,13 @@ pub struct KnowledgeCfg {
     pub entity_merge_similarity: f64,
     /// Chat in `graph` mode: facts put in the prompt.
     pub graph_facts: usize,
+    /// FR-K50 (Phase 21): how much the graph's ranking of passages counts against the search's when the two are
+    /// fused (1.0 = an equal arm, 0 = the graph adds facts but never moves a passage).
+    pub graph_weight: f64,
+    /// FR-K56 (Phase 21): relations kept per entity at the second hop of the graph walk, and the per-hop decay of a
+    /// path's score (a second-hop fact must be well attested to outrank a first-hop one).
+    pub graph_beam: usize,
+    pub graph_decay: f64,
     /// Memorilla (Phase 5): a memory-module checkpoint (`config.json` + `weights.safetensors`) trained for System 1;
     /// empty turns `memory` mode off.
     pub memory_checkpoint: String,
@@ -126,6 +133,9 @@ impl Default for KnowledgeCfg {
             graph_max_tokens: 400,
             entity_merge_similarity: 0.92,
             graph_facts: 12,
+            graph_weight: 1.0,
+            graph_beam: 8,
+            graph_decay: 0.6,
             memory_checkpoint: String::new(),
             memory_placeholder: "<|fim_pad|>".into(),
             memory_trainer: "rust/target/release/memorilla-train".into(),

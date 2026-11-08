@@ -1,7 +1,7 @@
 # Knowledge Base, GraphRAG and Memorilla: technical specification (Phase 20)
 
-Version 1.6, 2026-11-08. Status: Phases 0–7 implemented (6: training works; 7: `hybrid`, `auto` and the measured
-mode comparison); Phase 8 specified. Research:
+Version 1.7, 2026-11-08. Status: Phases 0–7 implemented (6: training works; 7: `hybrid`, `auto` and the measured
+mode comparison), and Phase 21's retrieval and graph upgrade (FR-K50 to FR-K59, below); Phase 8 specified. Research:
 [`memorilla_knowledge.md`](../research/memorilla_knowledge.md). Decision: [`014`](../decisions/014-knowledge-base-memorilla.md).
 Requirement ids: FR-K (functional), NFR-K (non-functional), SR-K (security), IF-K (interfaces).
 
@@ -118,6 +118,34 @@ gateway's existing token auth, and Stage 1–2 Memorilla pre-training on this ma
   the plain prompt). Not built: resume after a crash.
 - **FR-K43** A GPU recipe (`training/memorilla/`) to pre-train Stages 1–2 for our encoder/decoder pair with the
   reference PyTorch code, with a cost estimate derived from measured per-example times.
+
+Phase 21 (retrieval and graph upgrade; the gap analysis and the reasoning are in
+[`graph_rag_upgrade_spec.md`](graph_rag_upgrade_spec.md)):
+
+- **FR-K50** The graph **supplies candidates** to retrieval and never reorders it alone: passages a fact cites join
+  the pool, and the search's rank and the graph's rank (facts' weight, then seed entities named, over the whole
+  pool) are fused by reciprocal rank with `[knowledge] graph_weight` on the graph arm (1.0 = equal; 0 = facts only).
+  Implemented: `Kb::fuse_graph`.
+- **FR-K51** Contextual BM25: the words index is over `search_text` - the same text a passage is embedded as (title,
+  heading path, context line, body). `reindex` fills it for passages stored before Phase 21.
+- **FR-K52** The prompt block packs whole sentences under one character budget: each sentence scored by its own
+  relevance to the question plus its passage's rank, both z-normalised; a unit that does not fit is skipped, not cut.
+  Implemented: `nafs_core::knowledge::pack_units`.
+- **FR-K53** A context line per passage, written by the graph extraction call the base already pays for, stored on
+  the chunk, folded into `search_text` at once and into the vector on `reindex?fresh=true`. Never shown to a person.
+- **FR-K54** The ontology is data: `GET/PUT /v1/kb/{kb}/ontology` (types with definitions, hashed; an empty list
+  restores the default); the extraction prompt is built from it and a stray type is mapped onto its last type.
+- **FR-K55** Every relation carries the sentence that states it, kept only if it occurs in the passage verbatim after
+  whitespace normalisation; drops are counted per document (`quote_drops` in the log). **SR-K10**: the gate bounds
+  what a document can put into a prompt through the graph.
+- **FR-K56** Two-hop walk: hop 1 is every relation of a seed; hop 2 keeps `graph_beam` relations per reached entity,
+  scored by weight (normalised to the heaviest first-hop relation) times `graph_decay` per hop; a second-hop fact
+  carries `via`, and the prompt shows the chain.
+- **FR-K59** Every knowledge reply carries a `sources` row naming the arms that ran and why any did not.
+- **NFR-K11** `scripts/kb_modes_ab.py` gives every question exactly one fate (`answered`, `retrieved_not_used`,
+  `not_retrieved`) and asserts the fates sum to the set.
+- Specified, not shipped: **FR-K57** community summaries, **FR-K58** a reranker, **FR-K60** a confidence per relation
+  with a review band, **NFR-K10** a measured ceiling, **NFR-K12** graph precision with an interval.
 
 ## 4. Non-functional requirements
 
@@ -320,6 +348,9 @@ graph_model = "system1"
 graph_max_tokens = 400
 entity_merge_similarity = 0.92
 graph_facts = 12
+graph_weight = 1.0                     # FR-K50: the graph's rank as an arm beside the search's (0 = facts only)
+graph_beam = 8                         # FR-K56: relations kept per entity at the second hop
+graph_decay = 0.6                      # FR-K56: a path's score decays by this per hop
 memory_checkpoint = ""                 # Phase 5; "" = memory mode off
 memory_placeholder = "<|fim_pad|>"
 memory_trainer = "rust/target/release/memorilla-train"   # Phase 6

@@ -990,33 +990,41 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 };
                 let pmode = if want_memory { "rag" } else { kmode };
                 match (&retriever, serve_passages) {
-                    (Some(r), true) => match r.retrieve(&kq.kb, &user.content, pk, pmode).await {
-                        Ok(found) => {
-                            // SR-K05: nothing outside the memory block may carry the placeholder token, or the engine
-                            // counts more memory positions than there are vectors and refuses the request. The whole
-                            // block is cleaned, not only the passage text: the base's name, a document title and a
-                            // heading all reach the prompt, and a crafted document would break the base for everyone.
-                            let block =
-                                crate::knowledge::prompt_block(&found, cfg.knowledge.rag_max_chars);
-                            system.push_str(&crate::knowledge::strip_placeholder(
-                                &block,
-                                memory_ph.as_deref().unwrap_or(""),
-                            ));
-                            sources.extend(passage_sources(&kq.kb, &found));
-                            if !found.facts.is_empty() {
-                                sources.push(json!({"facts": found.facts, "kb": kq.kb, "kb_name": found.kb_name}));
+                    (Some(r), true) => {
+                        match r.retrieve(&kq.kb, &user.content, pk, pmode).await {
+                            Ok(found) => {
+                                // SR-K05: nothing outside the memory block may carry the placeholder token, or the engine
+                                // counts more memory positions than there are vectors and refuses the request. The whole
+                                // block is cleaned, not only the passage text: the base's name, a document title and a
+                                // heading all reach the prompt, and a crafted document would break the base for everyone.
+                                let block = crate::knowledge::prompt_block_for(
+                                    &found,
+                                    &user.content,
+                                    cfg.knowledge.rag_max_chars,
+                                );
+                                system.push_str(&crate::knowledge::strip_placeholder(
+                                    &block,
+                                    memory_ph.as_deref().unwrap_or(""),
+                                ));
+                                sources.extend(passage_sources(&kq.kb, &found));
+                                if !found.facts.is_empty() {
+                                    sources.push(json!({"facts": found.facts, "kb": kq.kb, "kb_name": found.kb_name}));
+                                }
+                                // FR-K59: which arms ran, and why any did not. One row, read by the Details panel.
+                                sources.push(json!({"arms": found.arms, "arm_notes": found.notes, "kb": kq.kb,
+                                "embed_ms": found.embed_ms, "search_ms": found.search_ms}));
+                                if found.passages.is_empty() && found.facts.is_empty() {
+                                    sources.push(json!({"note": format!("The knowledge base \"{}\" has no passage about this question.", found.kb_name), "kb": kq.kb}));
+                                }
+                                metrics::counter!("nafs_knowledge_passages_total")
+                                    .increment(found.passages.len() as u64);
                             }
-                            if found.passages.is_empty() && found.facts.is_empty() {
-                                sources.push(json!({"note": format!("The knowledge base \"{}\" has no passage about this question.", found.kb_name), "kb": kq.kb}));
+                            Err(e) => {
+                                tracing::warn!(kb = %kq.kb, error = %e, "knowledge retrieval failed; answering without it");
+                                sources.push(json!({"note": format!("The knowledge base could not be searched: {e}"), "kb": kq.kb}));
                             }
-                            metrics::counter!("nafs_knowledge_passages_total")
-                                .increment(found.passages.len() as u64);
                         }
-                        Err(e) => {
-                            tracing::warn!(kb = %kq.kb, error = %e, "knowledge retrieval failed; answering without it");
-                            sources.push(json!({"note": format!("The knowledge base could not be searched: {e}"), "kb": kq.kb}));
-                        }
-                    },
+                    }
                     // `want_memory` has already said so.
                     (None, _) if !want_memory => sources.push(
                         json!({"note": "Knowledge is turned off on this server.", "kb": kq.kb}),
