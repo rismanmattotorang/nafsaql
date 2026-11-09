@@ -43,6 +43,8 @@ DEFINE FIELD IF NOT EXISTS dims        ON kb TYPE option<int>;
 -- FR-K54: the ontology a base's graph is built under, as JSON; "" means the default types.
 DEFINE FIELD IF NOT EXISTS ontology ON kb TYPE string DEFAULT "";
 DEFINE FIELD IF NOT EXISTS deleting ON kb TYPE bool DEFAULT false;
+-- A base made before the field existed holds NONE, which fails the type on its next write (an upload, a rename): give it false.
+UPDATE kb SET deleting = false WHERE deleting = NONE;
 DEFINE INDEX IF NOT EXISTS kb_name     ON kb FIELDS name UNIQUE;
 DEFINE TABLE IF NOT EXISTS document SCHEMAFULL;
 DEFINE FIELD IF NOT EXISTS kb         ON document TYPE record<kb>;
