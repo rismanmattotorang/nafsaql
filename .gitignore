@@ -31,6 +31,8 @@ tools/venv-convert/
 tools/tectonic
 *.gguf
 *.safetensors
+# Parity fixtures of the Memorilla module (under 1 MB, needed by CI)
+!rust/crates/nafs-memorilla/tests/fixtures/**/*.safetensors
 *.bin
 # Machine-local state
 *.bak
