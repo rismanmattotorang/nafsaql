@@ -87,7 +87,125 @@ fn normalise(v: &mut [f32]) {
     }
 }
 
-fn dot(a: &[f32], b: &[f32]) -> f32 {
+/// Dot product of two vectors, on AVX2 and FMA when the machine has them (four independent accumulators, 32 floats a
+/// step: about 90 ns for 384 dimensions and 150 ns for 1,024 here), else the portable sum. The head-to-head benchmark
+/// against vLLM Semantic Router's `vecmath` (`benchmarks/headtohead/`) found the portable one 3 to 5 times slower.
+pub fn dot(a: &[f32], b: &[f32]) -> f32 {
+    #[cfg(target_arch = "x86_64")]
+    {
+        // One cached answer rather than two feature probes on every call.
+        static FAST: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if *FAST.get_or_init(|| is_x86_feature_detected!("avx2") && is_x86_feature_detected!("fma"))
+        {
+            // SAFETY: both features were detected; the kernel reads only `min(a.len(), b.len())` floats.
+            return unsafe { dot_avx2(a, b) };
+        }
+    }
+    dot_portable(a, b)
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2,fma")]
+unsafe fn dot_avx2(a: &[f32], b: &[f32]) -> f32 {
+    use std::arch::x86_64::*;
+    let n = a.len().min(b.len());
+    let (pa, pb) = (a.as_ptr(), b.as_ptr());
+    let mut i = 0;
+    let (mut s0, mut s1, mut s2, mut s3) = (
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+    );
+    let (mut s4, mut s5, mut s6, mut s7) = (
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+        _mm256_setzero_ps(),
+    );
+    // 64 floats a step with eight independent accumulators: an FMA has a latency of four cycles and two issue per cycle, so
+    // eight chains keep both ports busy.
+    while i + 64 <= n {
+        s0 = _mm256_fmadd_ps(_mm256_loadu_ps(pa.add(i)), _mm256_loadu_ps(pb.add(i)), s0);
+        s1 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 8)),
+            _mm256_loadu_ps(pb.add(i + 8)),
+            s1,
+        );
+        s2 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 16)),
+            _mm256_loadu_ps(pb.add(i + 16)),
+            s2,
+        );
+        s3 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 24)),
+            _mm256_loadu_ps(pb.add(i + 24)),
+            s3,
+        );
+        s4 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 32)),
+            _mm256_loadu_ps(pb.add(i + 32)),
+            s4,
+        );
+        s5 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 40)),
+            _mm256_loadu_ps(pb.add(i + 40)),
+            s5,
+        );
+        s6 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 48)),
+            _mm256_loadu_ps(pb.add(i + 48)),
+            s6,
+        );
+        s7 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 56)),
+            _mm256_loadu_ps(pb.add(i + 56)),
+            s7,
+        );
+        i += 64;
+    }
+    s0 = _mm256_add_ps(s0, s4);
+    s1 = _mm256_add_ps(s1, s5);
+    s2 = _mm256_add_ps(s2, s6);
+    s3 = _mm256_add_ps(s3, s7);
+    while i + 32 <= n {
+        s0 = _mm256_fmadd_ps(_mm256_loadu_ps(pa.add(i)), _mm256_loadu_ps(pb.add(i)), s0);
+        s1 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 8)),
+            _mm256_loadu_ps(pb.add(i + 8)),
+            s1,
+        );
+        s2 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 16)),
+            _mm256_loadu_ps(pb.add(i + 16)),
+            s2,
+        );
+        s3 = _mm256_fmadd_ps(
+            _mm256_loadu_ps(pa.add(i + 24)),
+            _mm256_loadu_ps(pb.add(i + 24)),
+            s3,
+        );
+        i += 32;
+    }
+    while i + 8 <= n {
+        s0 = _mm256_fmadd_ps(_mm256_loadu_ps(pa.add(i)), _mm256_loadu_ps(pb.add(i)), s0);
+        i += 8;
+    }
+    let v = _mm256_add_ps(_mm256_add_ps(s0, s1), _mm256_add_ps(s2, s3));
+    // Horizontal sum in registers: 8 lanes to 4 to 2 to 1.
+    let q = _mm_add_ps(_mm256_castps256_ps128(v), _mm256_extractf128_ps(v, 1));
+    let q = _mm_hadd_ps(q, q);
+    let q = _mm_hadd_ps(q, q);
+    let mut sum = _mm_cvtss_f32(q);
+    while i < n {
+        sum += *pa.add(i) * *pb.add(i);
+        i += 1;
+    }
+    sum
+}
+
+/// The portable dot product (kept for the benchmark and for machines without AVX2).
+pub fn dot_portable(a: &[f32], b: &[f32]) -> f32 {
     // Four partial sums let the compiler vectorise without changing the result's meaning.
     let mut s = [0f32; 4];
     for (x, y) in a.chunks_exact(4).zip(b.chunks_exact(4)) {
@@ -234,6 +352,17 @@ mod tests {
                 assert_eq!(g.0, b.1);
                 assert!((g.1 - b.0).abs() < 1e-5);
             }
+        }
+    }
+
+    /// The AVX2 kernel and the portable one agree (to rounding) on every length, including ones that are not multiples of 8.
+    #[test]
+    fn the_fast_dot_agrees_with_the_portable_one() {
+        for n in [0usize, 1, 7, 8, 9, 31, 32, 33, 37, 64, 384, 768, 1000, 1024] {
+            let a = vec_of(11, n.max(1))[..n].to_vec();
+            let b = vec_of(23, n.max(1))[..n].to_vec();
+            let (x, y) = (dot(&a, &b), dot_portable(&a, &b));
+            assert!((x - y).abs() <= 1e-3 * (1.0 + y.abs()), "n={n}: {x} vs {y}");
         }
     }
 

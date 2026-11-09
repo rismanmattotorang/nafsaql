@@ -4,6 +4,7 @@
 #   scripts/fetch_models.sh vllm       Hugging Face safetensors for the vLLM profile: Qwen3-1.7B + Qwen3-4B-Thinking-2507 (~11.5 GB)
 #   scripts/fetch_models.sh draft      Qwen3-0.6B Q8_0 only: speculative-decoding draft for System 2 (~0.64 GB)
 #   scripts/fetch_models.sh embed      Qwen3-Embedding-0.6B: Q8_0 GGUF for Smiley Core + safetensors for the Candle reference (~1.8 GB)
+#   scripts/fetch_models.sh embed4b    Qwen3-Embedding-4B Q4_K_M GGUF, a stronger embedder to test against the 0.6B (2.5 GB, Apache-2.0)
 #   scripts/fetch_models.sh all        both, plus Qwen3-4B (Profile B), Qwen3-0.6B Q8_0, Qwen3-Embedding-0.6B
 # Requires python3 with huggingface_hub (and hf_xet for fast transfers). Record revisions/hashes afterwards (MR-001, NFR-012).
 set -euo pipefail
@@ -27,6 +28,8 @@ todo_hf = hf_vllm if which in ("vllm", "all") else []
 if which == "embed":  # Phase 20: Knowledge Base embeddings (decision 014)
     todo_gguf = [("Qwen/Qwen3-Embedding-0.6B-GGUF", "Qwen3-Embedding-0.6B-Q8_0.gguf")]
     todo_hf = ["Qwen/Qwen3-Embedding-0.6B"]
+if which == "embed4b":  # Phase 23 follow-up: paraphrase retrieval with a larger embedder (2,560 dimensions)
+    todo_gguf = [("Qwen/Qwen3-Embedding-4B-GGUF", "Qwen3-Embedding-4B-Q4_K_M.gguf")]
 for repo, name in todo_gguf:
     t = time.time(); p = hf_hub_download(repo_id=repo, filename=name, local_dir="models")
     print(f"OK gguf {repo} {name} {p} {time.time()-t:.0f}s", flush=True)

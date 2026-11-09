@@ -240,20 +240,22 @@ pub fn pack_units(r: &Retrieved, question: &str, budget: usize) -> Vec<Packed> {
         .map(|p| split_sentences(&p.text))
         .collect();
     let n_sents: usize = sents.iter().map(Vec::len).sum();
+    // The content words of every sentence, once: the idf below and the relevance after it both read them (computing them
+    // inside each question word's pass cost the question's length times as many allocations; the head-to-head benchmark
+    // against vLLM Semantic Router's compressor found the packer slower than theirs on a 500-token text).
+    let sent_words: Vec<Vec<String>> = sents.iter().flatten().map(|s| content_words(s)).collect();
     // idf of each question word over the sentences of the retrieved set.
     let idf: Vec<f64> = q
         .iter()
         .map(|w| {
-            let df = sents
+            let df = sent_words
                 .iter()
-                .flatten()
-                .filter(|s| content_words(s).iter().any(|x| x == w))
+                .filter(|ws| ws.iter().any(|x| x == w))
                 .count();
             ((n_sents as f64 + 1.0) / (df as f64 + 0.5)).ln().max(0.0)
         })
         .collect();
-    let relevance = |s: &str| -> f64 {
-        let words = content_words(s);
+    let relevance = |words: &Vec<String>| -> f64 {
         q.iter()
             .zip(&idf)
             .filter(|(w, _)| words.iter().any(|x| x == *w))
@@ -265,7 +267,7 @@ pub fn pack_units(r: &Retrieved, question: &str, budget: usize) -> Vec<Packed> {
         .map(|i| 1.0 / (i as f64 + 1.0))
         .collect();
     let zp = z_scores(&passage_score);
-    let raw: Vec<f64> = sents.iter().flatten().map(|s| relevance(s)).collect();
+    let raw: Vec<f64> = sent_words.iter().map(relevance).collect();
     let zs = z_scores(&raw);
     // Units: (score, passage, Some(sentence index) | None for the whole passage, chars).
     let mut units: Vec<(f64, usize, Option<usize>, usize)> = Vec::new();

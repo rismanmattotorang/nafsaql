@@ -1613,7 +1613,7 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
     <div class="card" id="gAudits"></div></div>`;
   let ratePoll = null;
   const load = async () => {
-    const [g, sm, au, rates, rruns, pref, drift] = await Promise.all([api.get('/v1/gate'), api.get('/v1/self-model').catch(() => null), api.get('/v1/audits?limit=50').catch(() => null), api.get('/v1/verifiers').catch(() => null), api.get('/v1/verifiers/runs').catch(() => []), api.get('/v1/preferences').catch(() => null), api.get('/v1/drift').catch(() => null)]);
+    const [g, sm, au, rates, rruns, pref, drift, lb] = await Promise.all([api.get('/v1/gate'), api.get('/v1/self-model').catch(() => null), api.get('/v1/audits?limit=50').catch(() => null), api.get('/v1/verifiers').catch(() => null), api.get('/v1/verifiers/runs').catch(() => []), api.get('/v1/preferences').catch(() => null), api.get('/v1/drift').catch(() => null), api.get('/v1/gate/labels').catch(() => null)]);
     if (!alive()) return; const cal = g.calibration, req = g.requirements;
     const eff = g.effective_rule;
     // The page's answer first: four plain numbers, the detail below.
@@ -1630,6 +1630,7 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
       <dl class="kv small" style="margin-top:12px"><dt>Rule</dt><dd>${eff === 'fixed' ? 'Think longer when the quick answer sounds unsure, or when quick samples disagree with each other' : eff === 'budget' ? `Think longer for the ${pct(g.escalation_budget, 0)} of questions where it is most likely to help` : 'Think longer when the predicted gain in accuracy is worth the extra time'}</dd>
       <dt>Learned rule</dt><dd>${g.promoted ? '<span class="badge b-verified">accurate enough to use</span>' : `<span class="badge b-unverified">not in use yet</span> <span class="small">${esc(plain(g.promotion_reason || ''))}</span>`}</dd>
       <dt>Fixed share</dt><dd>needs the learned rule, trained on at least ${req.dkw_n} checked answers, so the share holds within ±${pct(req.epsilon, 1)} (${pct(1 - req.delta, 0)} confidence)</dd>
+      <dt>Practice while idle</dt><dd>${lb ? (lb.enabled ? `<span class="badge b-verified">on</span> ${lb.ledger.labelled} checked quick answers collected, ${pct(Math.min(1, lb.ledger.labelled / (req.min_n || 2900)), 0)} of the ${req.min_n || 2900} the learned rule needs${lb.ledger.labelled ? ` (${pct(lb.ledger.draft_wrong / lb.ledger.labelled, 0)} were wrong)` : ''}` : '<span class="badge b-unverified">off</span> switch it on in the settings file to collect checked answers while nobody is using the app') : '–'}</dd>
       <dt>Relearning</dt><dd>${g.recalibrate_every_h ? `every ${g.recalibrate_every_h} h from real use` : 'by hand'} · <button class="btn sm ghost" id="gRecal" type="button">Relearn now</button></dd></dl>
       <p class="hint">${g.mode !== eff ? `<b>${esc(MODE_NAME[g.mode] || g.mode)}</b> is selected, but the simple rule stays in use until the learned rule is accurate enough.` : ''}</p></div>`;
     $$('#gSeg button').forEach(b => b.onclick = async () => { await api.post('/v1/gate', { mode: b.dataset.m }).catch(e => toast(e.message)); load(); });
