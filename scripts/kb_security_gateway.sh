@@ -26,6 +26,8 @@ sub("files_dir", "run/kb-security/files")
 for k, v in [("max_upload_mb", 2), ("max_request_mb", 3), ("max_documents_per_base", 5), ("max_chunks_per_document", 60),
              ("concurrent_uploads", 1), ("parse_timeout_s", 120)]:
     sub(k, v, quote=False)
+# the label stream of the main config must not run here
+s = re.sub(r"(?m)^(\[labels\][^\n]*\n)enabled = true", r"\1enabled = false", s)
 open("run/kb-security/nafs-aql.toml", "w").write(s)
 PY
     if [ -f $PID ] && kill -0 "$(cat $PID)" 2>/dev/null; then echo "already running (pid $(cat $PID))"; exit 0; fi

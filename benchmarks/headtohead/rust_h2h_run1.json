@@ -1,0 +1,54 @@
+{
+  "domain classifier, 2 KB prompt": {
+    "note": "their BM25 30 rules 207 us, n-gram 8.2 ms",
+    "ns_per_op": 1725.874147730701
+  },
+  "dot, n=1024 (AVX2 + FMA)": {
+    "note": "their AVX2 asm: 89 / 93 / 154 ns",
+    "ns_per_op": 362.4679725421148
+  },
+  "dot, n=1024 (portable)": {
+    "note": "their portable: 510 / 1,121 / 1,509 ns",
+    "ns_per_op": 1607.5263355906698
+  },
+  "dot, n=384 (AVX2 + FMA)": {
+    "note": "their AVX2 asm: 89 / 93 / 154 ns",
+    "ns_per_op": 280.199242406572
+  },
+  "dot, n=384 (portable)": {
+    "note": "their portable: 510 / 1,121 / 1,509 ns",
+    "ns_per_op": 483.4488018514908
+  },
+  "dot, n=768 (AVX2 + FMA)": {
+    "note": "their AVX2 asm: 89 / 93 / 154 ns",
+    "ns_per_op": 334.74323138366
+  },
+  "dot, n=768 (portable)": {
+    "note": "their portable: 510 / 1,121 / 1,509 ns",
+    "ns_per_op": 873.3352934840515
+  },
+  "gate decision (calibrated + certified bins)": {
+    "note": "no counterpart benchmarked upstream",
+    "ns_per_op": 2314.514532300121
+  },
+  "gate decision (fixed rule)": {
+    "note": "no counterpart benchmarked upstream",
+    "ns_per_op": 4810.319816132485
+  },
+  "harness host overhead, 100 turns / 800 reads": {
+    "note": "their budget: 900 ms (CI runner, enforced median)",
+    "ns_per_op": 1780097.7688888889
+  },
+  "sentence packer, 16K tokens to 512": {
+    "note": "their Compress: 1.66 ms / 8.35 ms / 72.8 ms",
+    "ns_per_op": 27091853.375
+  },
+  "sentence packer, 2K tokens to 512": {
+    "note": "their Compress: 1.66 ms / 8.35 ms / 72.8 ms",
+    "ns_per_op": 5804034.356164384
+  },
+  "sentence packer, 500 tokens to 256": {
+    "note": "their Compress: 1.66 ms / 8.35 ms / 72.8 ms",
+    "ns_per_op": 1068562.3887468032
+  }
+}

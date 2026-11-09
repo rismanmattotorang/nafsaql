@@ -260,7 +260,8 @@ async fn graph_build_search_and_prune() {
     kb.delete_kb(&base.id).await.unwrap();
     assert!(store.get_kb(&base.id).await.is_err());
     let t = std::time::Instant::now();
-    while store.graph_stats(&base.id).await.unwrap()["entities"] != 0 && t.elapsed().as_secs() < 60 {
+    while store.graph_stats(&base.id).await.unwrap()["entities"] != 0 && t.elapsed().as_secs() < 60
+    {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     }
     assert_eq!(store.graph_stats(&base.id).await.unwrap()["entities"], 0);

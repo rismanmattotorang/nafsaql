@@ -1,0 +1,76 @@
+{
+ "rounds": 5,
+ "pairs": [
+  {
+   "workload": "routing signals, 2 KB prompt (their 30-rule BM25 / ours: domain classifier)",
+   "go_ns": 197718.0,
+   "rust_ns": 2207.2544962565103,
+   "go_over_rust": 89.57644002326352
+  },
+  {
+   "workload": "   (their n-gram variant)",
+   "go_ns": 3650195.0,
+   "rust_ns": 2207.2544962565103,
+   "go_over_rust": 1653.7263855122767
+  },
+  {
+   "workload": "extractive compression, 500 tokens",
+   "go_ns": 745269.0,
+   "rust_ns": 310122.1495535714,
+   "go_over_rust": 2.4031466345529764
+  },
+  {
+   "workload": "extractive compression, 2K tokens",
+   "go_ns": 5072693.0,
+   "rust_ns": 1156082.2272727273,
+   "go_over_rust": 4.387830623403675
+  },
+  {
+   "workload": "extractive compression, 16K tokens",
+   "go_ns": 50325433.0,
+   "rust_ns": 8959296.217391305,
+   "go_over_rust": 5.617118998957862
+  },
+  {
+   "workload": "dot product n=384, SIMD",
+   "go_ns": 70.08,
+   "rust_ns": 89.85674565633138,
+   "go_over_rust": 0.7799080579662869
+  },
+  {
+   "workload": "dot product n=768, SIMD",
+   "go_ns": 99.11,
+   "rust_ns": 145.17935909442048,
+   "go_over_rust": 0.6826728029260806
+  },
+  {
+   "workload": "dot product n=1024, SIMD",
+   "go_ns": 135.2,
+   "rust_ns": 198.60703913370767,
+   "go_over_rust": 0.6807412294635724
+  },
+  {
+   "workload": "dot product n=384, portable",
+   "go_ns": 439.7,
+   "rust_ns": 348.8136073521205,
+   "go_over_rust": 1.260558621373195
+  },
+  {
+   "workload": "dot product n=768, portable",
+   "go_ns": 1043.0,
+   "rust_ns": 861.3702670010654,
+   "go_over_rust": 1.2108613913866497
+  },
+  {
+   "workload": "dot product n=1024, portable",
+   "go_ns": 1195.0,
+   "rust_ns": 1210.9181098937988,
+   "go_over_rust": 0.986854511660417
+  }
+ ],
+ "rust_only": {
+  "gate decision (fixed rule)": 7388.368725585938,
+  "gate decision (calibrated + certified bins)": 2351.3620876736113,
+  "harness host overhead, 100 turns / 800 reads": 1752214.263888889
+ }
+}

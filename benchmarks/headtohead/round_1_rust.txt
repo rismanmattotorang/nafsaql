@@ -1,0 +1,13 @@
+domain classifier, 2 KB prompt                       4.0 us   their BM25 30 rules 207 us, n-gram 8.2 ms
+sentence packer, 500 tokens to 256                 392.9 us   their Compress: 1.66 ms / 8.35 ms / 72.8 ms
+sentence packer, 2K tokens to 512                   1.16 ms   their Compress: 1.66 ms / 8.35 ms / 72.8 ms
+sentence packer, 16K tokens to 512                  8.96 ms   their Compress: 1.66 ms / 8.35 ms / 72.8 ms
+dot, n=384 (AVX2 + FMA)                               70 ns   their AVX2 asm: 89 / 93 / 154 ns
+dot, n=384 (portable)                                350 ns   their portable: 510 / 1,121 / 1,509 ns
+dot, n=768 (AVX2 + FMA)                              163 ns   their AVX2 asm: 89 / 93 / 154 ns
+dot, n=768 (portable)                                758 ns   their portable: 510 / 1,121 / 1,509 ns
+dot, n=1024 (AVX2 + FMA)                             216 ns   their AVX2 asm: 89 / 93 / 154 ns
+dot, n=1024 (portable)                               1.9 us   their portable: 510 / 1,121 / 1,509 ns
+gate decision (fixed rule)                           9.6 us   no counterpart benchmarked upstream
+gate decision (calibrated + certified bins)          2.6 us   no counterpart benchmarked upstream
+harness host overhead, 100 turns / 800 reads        1.87 ms   their budget: 900 ms (CI runner, enforced median)

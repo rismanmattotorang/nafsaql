@@ -29,12 +29,12 @@ case "${1:-status}" in
     start_one system1 8201 "$S1" 8192
     if [ -n "${DSPARK:-}" ]; then start_one system2 8202 "$S2" 8192 --dspark "$DSPARK"; else start_one system2 8202 "$S2" 8192; fi
     for p in 8201 8202; do for i in $(seq 1 120); do curl -sf "localhost:$p/health" >/dev/null && { echo ":$p healthy"; break; }; sleep 1; done; done ;;
-  embed) # The Knowledge Base's embedding server: /v1/embeddings, no chat. EMBED_MODEL and EMBED_THREADS override.
+  embed) # The Knowledge Base's embedding server: /v1/embeddings, no chat. EMBED_MODEL, EMBED_PORT and EMBED_THREADS override.
     E=${EMBED_MODEL:-models/Qwen3-Embedding-0.6B-Q8_0.gguf}
     if [ -f "$RUN/smiley-embed.pid" ] && kill -0 "$(cat "$RUN/smiley-embed.pid")" 2>/dev/null; then echo "smiley embed already running (pid $(cat $RUN/smiley-embed.pid))"; exit 0; fi
     [ -x "$BIN" ] || (cd rust && cargo build --release -p nafs-smiley-server)
     [ -f "$E" ] || { echo "missing $E: run scripts/fetch_models.sh embed"; exit 1; }
-    nohup "$BIN" -m "$E" --alias embed -t "${EMBED_THREADS:-$THREADS}" --port 8203 --embedding > logs/smiley-embed.log 2>&1 &
+    nohup "$BIN" -m "$E" --alias embed -t "${EMBED_THREADS:-$THREADS}" --port "${EMBED_PORT:-8203}" --embedding > logs/smiley-embed.log 2>&1 &
     echo $! > "$RUN/smiley-embed.pid"; echo "started smiley embed on :8203 (pid $!)"
     for i in $(seq 1 60); do curl -sf localhost:8203/health >/dev/null && { echo ":8203 healthy"; break; }; sleep 1; done ;;
   stop-embed) [ -f "$RUN/smiley-embed.pid" ] && kill "$(cat $RUN/smiley-embed.pid)" 2>/dev/null && echo "stopped smiley embed"; rm -f "$RUN/smiley-embed.pid" ;;

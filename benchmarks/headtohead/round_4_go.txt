@@ -1,0 +1,11 @@
+BenchmarkBM25ThirtyRulesLongEnglish-4    	    2686	    129717 ns/op	   23754 B/op	      30 allocs/op
+BenchmarkNgramThirtyRulesLongEnglish-4   	     135	   2820528 ns/op	   64472 B/op	     123 allocs/op
+BenchmarkCompress500Tokens-4   	     640	    672243 ns/op	   59855 B/op	     388 allocs/op
+BenchmarkCompress2KTokens-4    	     100	   4066932 ns/op	  196625 B/op	    1432 allocs/op
+BenchmarkCompress16KTokens-4   	      10	  48433167 ns/op	 1316392 B/op	    4369 allocs/op
+BenchmarkDot/n=384-4         	14291802	        70.08 ns/op
+BenchmarkDot/portable/n=384-4         	 1000000	       608.4 ns/op
+BenchmarkDot/n=768-4                  	 9985441	       153.2 ns/op
+BenchmarkDot/portable/n=768-4         	 1000000	      1043 ns/op
+BenchmarkDot/n=1024-4                 	 8024035	       116.4 ns/op
+BenchmarkDot/portable/n=1024-4        	  783386	      1153 ns/op

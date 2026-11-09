@@ -47,7 +47,7 @@ def multipart(files):
     return out + f"--{b}--\r\n".encode(), f"multipart/form-data; boundary={b}"
 
 
-def config(size):
+def config(size, embed_url="", dims=0, model=""):
     s = open(os.path.join(ROOT, "config/nafs-aql.toml")).read()
 
     def sub(key, val, quote=True):
@@ -59,11 +59,20 @@ def config(size):
     for k, v in [("calibration_file", "gate_calibration.json"), ("params_file", "gate_params.json"),
                  ("rates_file", "verifier_rates.json"), ("sqlite_path", "nafs.sqlite"), ("trace_path", "trace.jsonl")]:
         sub(k, "run/chunk-size/" + v)
-    sub("database", "kb_chunk_size")
+    # The vector index is fixed to one width per database, so each embedder gets its own.
+    sub("database", f"kb_chunk_size_{dims or 1024}")
     sub("files_dir", "run/chunk-size/files")
+    if embed_url:
+        sub("embed_url", embed_url)
+        sub("embed_dims", dims, quote=False)
+        if model:
+            sub("embed_model", model)
     sub("chunk_chars", size, quote=False)
     sub("chunk_overlap", size // 8, quote=False)
     s = re.sub(r"(?m)^\[audit\]\nenabled = true", "[audit]\nenabled = false", s)
+    # A throw-away gateway must not run the label stream the main config switches on: it would spend the quick model's time
+    # during the experiment and share the main gateway's cursor file.
+    s = re.sub(r"(?m)^(\[labels\][^\n]*\n)enabled = true", r"\1enabled = false", s)
     path = os.path.join(D, "nafs-aql.toml")
     open(path, "w").write(s)
     return path
@@ -73,6 +82,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sizes", default="600,1200,2400")
     ap.add_argument("--budget", type=int, default=4800)
+    ap.add_argument("--embed-url", default="", help="another embedding server (a different model); needs --dims")
+    ap.add_argument("--dims", type=int, default=0)
+    ap.add_argument("--model", default="", help="the embedding model's name, stored with the vectors")
     ap.add_argument("--out", default=os.path.join(ROOT, "benchmarks/kb_chunk_size.json"))
     a = ap.parse_args()
     os.makedirs(os.path.join(D, "files"), exist_ok=True)
@@ -87,7 +99,7 @@ def main():
     print({k: len(v) for k, v in qsets.items()}, "questions whose answer is in these documents")
     results = {}
     for size in [int(x) for x in a.sizes.split(",")]:
-        cfg = config(size)
+        cfg = config(size, a.embed_url, a.dims, a.model)
         proc = subprocess.Popen([os.path.join(ROOT, "rust/target/release/nafs-gateway"), "--config", cfg],
                                 cwd=ROOT, stdout=open(os.path.join(D, "gateway.log"), "w"), stderr=subprocess.STDOUT)
         try:
@@ -114,14 +126,18 @@ def main():
             slots = max(1, a.budget // size)
             res = {"passages": n_chunks, "slots": slots, "sets": {}}
             for name, qs in qsets.items():
-                ranks = []
+                ranks, vranks = [], []
                 for q, ph in qs:
                     hits = call("POST", f"/v1/kb/{kb}/search", {"query": q, "k": 20, "mode": "hybrid"})[1].get("results", [])
                     ranks.append(next((i for i, h in enumerate(hits, 1) if any(norm(p) in norm(h["text"]) for p in ph)), None))
+                    vh = call("POST", f"/v1/kb/{kb}/search", {"query": q, "k": 20, "mode": "vector"})[1].get("results", [])
+                    vranks.append(next((i for i, h in enumerate(vh, 1) if any(norm(p) in norm(h["text"]) for p in ph)), None))
                 n = len(ranks)
                 res["sets"][name] = {
                     "n": n, "R@1": sum(1 for x in ranks if x == 1) / n, f"R@{slots} (the same {a.budget} characters)": sum(1 for x in ranks if x and x <= slots) / n,
-                    "R@4": sum(1 for x in ranks if x and x <= 4) / n, "MRR": round(sum(1 / x for x in ranks if x) / n, 3)}
+                    "R@4": sum(1 for x in ranks if x and x <= 4) / n, "MRR": round(sum(1 / x for x in ranks if x) / n, 3),
+                    "vector_only": {"R@1": sum(1 for x in vranks if x == 1) / n, "R@4": sum(1 for x in vranks if x and x <= 4) / n,
+                                    "R@20": sum(1 for x in vranks if x) / n, "MRR": round(sum(1 / x for x in vranks if x) / n, 3)}}
             results[size] = res
             print(size, json.dumps(res))
         finally:

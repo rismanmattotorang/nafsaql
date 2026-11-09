@@ -1,0 +1,30 @@
+=== pkg/classification
+FAIL	github.com/vllm-project/semantic-router/src/semantic-router/pkg/classification [setup failed]
+FAIL
+=== pkg/promptcompression
+BenchmarkCompress500Tokens-4   	     298	   1656523 ns/op	   62237 B/op	     388 allocs/op
+BenchmarkCompress2KTokens-4    	      58	   8349576 ns/op	  175707 B/op	    1432 allocs/op
+BenchmarkCompress16KTokens-4   	      15	  72768788 ns/op	 1231721 B/op	    4368 allocs/op
+ok  	github.com/vllm-project/semantic-router/src/semantic-router/pkg/promptcompression	2.256s
+=== pkg/topiccontinuity
+FAIL	github.com/vllm-project/semantic-router/src/semantic-router/pkg/topiccontinuity [setup failed]
+FAIL
+=== pkg/embedding/vecmath
+BenchmarkDot/n=384-4           	14329416	        89.29 ns/op
+BenchmarkDot/portable/n=384-4  	 1187163	       510.0 ns/op
+BenchmarkDot/n=768-4           	 5136454	        93.01 ns/op
+BenchmarkDot/portable/n=768-4  	 1000000	      1121 ns/op
+BenchmarkDot/n=1024-4          	 7961767	       153.5 ns/op
+BenchmarkDot/portable/n=1024-4 	  780446	      1509 ns/op
+BenchmarkSquaredDistance64/n=1038-4         	 1000000	       332.4 ns/op
+BenchmarkSquaredDistance64/portable/n=1038-4         	  712023	      1389 ns/op
+ok  	github.com/vllm-project/semantic-router/src/semantic-router/pkg/embedding/vecmath	7.292s
+=== pkg/protocolcodec
+FAIL	github.com/vllm-project/semantic-router/src/semantic-router/pkg/protocolcodec [setup failed]
+FAIL
+=== pkg/looper
+FAIL	github.com/vllm-project/semantic-router/src/semantic-router/pkg/looper [setup failed]
+FAIL
+=== pkg/cache
+FAIL	github.com/vllm-project/semantic-router/src/semantic-router/pkg/cache [setup failed]
+FAIL
