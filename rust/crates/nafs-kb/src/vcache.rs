@@ -208,18 +208,13 @@ unsafe fn dot_avx2(a: &[f32], b: &[f32]) -> f32 {
 pub fn dot_portable(a: &[f32], b: &[f32]) -> f32 {
     // Four partial sums let the compiler vectorise without changing the result's meaning.
     let mut s = [0f32; 4];
-    for (x, y) in a.chunks_exact(4).zip(b.chunks_exact(4)) {
+    let ((ca, ra), (cb, rb)) = (a.as_chunks::<4>(), b.as_chunks::<4>());
+    for (x, y) in ca.iter().zip(cb) {
         for i in 0..4 {
             s[i] += x[i] * y[i];
         }
     }
-    s.iter().sum::<f32>()
-        + a.chunks_exact(4)
-            .remainder()
-            .iter()
-            .zip(b.chunks_exact(4).remainder())
-            .map(|(x, y)| x * y)
-            .sum::<f32>()
+    s.iter().sum::<f32>() + ra.iter().zip(rb).map(|(x, y)| x * y).sum::<f32>()
 }
 
 enum State {
