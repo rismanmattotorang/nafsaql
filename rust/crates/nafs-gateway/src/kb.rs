@@ -61,6 +61,7 @@ pub fn from_config(k: &KnowledgeCfg) -> Option<Arc<Kb>> {
         vector_cache_mb: k.vector_cache_mb,
         graph_beam: k.graph_beam.max(1),
         graph_decay: k.graph_decay,
+        index: index_config(k),
         limits: nafs_kb::Limits {
             max_documents_per_base: k.max_documents_per_base.max(1),
             max_chunks_per_document: k.max_chunks_per_document.max(1),
@@ -69,6 +70,34 @@ pub fn from_config(k: &KnowledgeCfg) -> Option<Arc<Kb>> {
             search_timeout_s: k.search_timeout_s.max(1),
         },
     }))
+}
+
+/// The index's settings from `[knowledge]` (Phase 25).
+fn index_config(k: &nafs_core::config::KnowledgeCfg) -> nafs_kb::IndexConfig {
+    use nafs_kb::index::{Bm25, Fusion, Params, Ppr};
+    nafs_kb::IndexConfig {
+        memory_mb: k.index_memory_mb,
+        params: Params {
+            bm25: Bm25 {
+                weights: k.bm25_weights,
+                ..Bm25::default()
+            },
+            fusion: if k.fusion == "convex" {
+                Fusion::Convex {
+                    alpha: k.fusion_alpha,
+                }
+            } else {
+                Fusion::Rrf {
+                    vector_weight: k.vector_weight,
+                }
+            },
+            prf: None,
+            ppr: (k.graph_arm_weight > 0.0).then(|| Ppr {
+                weight: k.graph_arm_weight,
+                ..Ppr::default()
+            }),
+        },
+    }
 }
 
 /// The routes, with authentication and the same-origin guard applied here because they sit outside the main
@@ -196,6 +225,8 @@ async fn status(State(s): State<AppState>) -> Json<Value> {
         "error": version.as_ref().err().map(|e| e.to_string()).or(schema.err()),
         "url": c.url,
         "queue": kb.queue(),
+        "index": { "memory_mb": c.index_memory_mb, "bases": kb.index_stats().0, "passages": kb.index_stats().1,
+            "mb": kb.index_stats().2 / 1_048_576 },
         // Memory tokens need Smiley Core: no other engine takes caller-supplied input vectors, so the chat page
         // must not offer the mode while another one is active (FR-K23).
         "memory": s.knowledge_memory && s.orch.active().s1.kind == "smiley",
@@ -462,6 +493,9 @@ struct SearchReq {
     k: Option<usize>,
     #[serde(default)]
     mode: Option<String>,
+    /// "store" answers through the store as every search did before the in-process index; for comparing the two.
+    #[serde(default)]
+    engine: Option<String>,
 }
 
 async fn search(
@@ -481,9 +515,23 @@ async fn search(
     if b.query.chars().count() > 2000 {
         return Err(KbError::BadInput("the query is longer than 2,000 characters".into()).into());
     }
-    kb.store().get_kb(&id).await?;
+    let engine = match b.engine.as_deref() {
+        None => nafs_kb::Engine::Auto,
+        Some(e) => nafs_kb::Engine::parse(e)
+            .ok_or_else(|| KbError::BadInput(format!("unknown engine \"{e}\" (index or store)")))?,
+    };
+    // An indexed base is known to exist; asking the store again would be the round trip the index removes.
+    if engine == nafs_kb::Engine::Store || kb.index_of(&id).await?.is_none() {
+        kb.store().get_kb(&id).await?;
+    }
     let r = kb
-        .search(&id, &b.query, b.k.unwrap_or(kb.config().search_k), mode)
+        .search_with(
+            &id,
+            &b.query,
+            b.k.unwrap_or(kb.config().search_k),
+            mode,
+            engine,
+        )
         .await?;
     Ok(Json(json!(r)))
 }
@@ -537,6 +585,8 @@ struct GraphQuery {
     depth: usize,
     #[serde(default = "d_nodes")]
     limit: usize,
+    /// "text" asks for the graph made from the text alone even when a model-built one exists.
+    source: Option<String>,
 }
 fn d_depth() -> usize {
     1
@@ -558,6 +608,18 @@ async fn graph_view(
         .graph_view(&id, q.entity.as_deref(), q.depth, q.limit)
         .await?;
     view["stats"] = kb.store().graph_stats(&id).await?;
+    view["source"] = json!("model");
+    // FR-K71: a base nobody has built a graph for still has the one made from its text.
+    let empty = view["nodes"].as_array().is_none_or(Vec::is_empty);
+    if q.source.as_deref() == Some("text") || (empty && q.entity.is_none()) {
+        if let Some(text) = kb.text_graph_view(&id, q.entity.as_deref(), q.limit).await {
+            if text["nodes"].as_array().is_some_and(|n| !n.is_empty()) {
+                for key in ["nodes", "edges", "source", "terms"] {
+                    view[key] = text[key].clone();
+                }
+            }
+        }
+    }
     view["enabled"] = json!(kb.graph_enabled());
     let docs = kb.store().list_documents(&id).await?;
     let (read, total): (u64, u64) = docs

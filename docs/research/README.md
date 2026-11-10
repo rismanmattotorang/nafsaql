@@ -4,6 +4,7 @@ Verified research notes behind the report. Each file ends with a verification lo
 
 | File | Content |
 |------|---------|
+| [Knowledge module: where it stands and what the state of the art says](knowledge_sota_2026.md) · [Decision 018](../decisions/018-knowledge-index-phase25.md) | Phase 25: the assessment (seven weaknesses with evidence), parsing, chunking, vectors, fusion, graph retrieval, what not to do, the interface audit |
 | `qwen_models.md` | Qwen generations, small variants, GGUF/AWQ/GPTQ availability, llama.cpp support, non-autoregressive Qwen derivatives, embeddings |
 | `lit_s1s2_notes.md` | System 1/System 2, test-time compute, routing, speculative and diffusion decoding: what each paper found, with discrepancies |
 | `islamic_sources.md` | Qur'anic nafs vocabulary, al-Ghazali, Ibn Sina, Ibn 'Arabi, Mulla Sadra, scholarly disagreements, rules for respectful analogy |

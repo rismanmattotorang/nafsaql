@@ -129,6 +129,7 @@ async fn graph_build_search_and_prune() {
         vector_cache_mb: 64,
         graph_beam: 8,
         graph_decay: 0.6,
+        index: Default::default(),
         limits: nafs_kb::Limits::default(),
     });
     match kb.ready().await {

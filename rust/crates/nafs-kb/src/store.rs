@@ -228,7 +228,7 @@ const DOC_FIELDS: &str = "record::id(id) AS id, record::id(kb) AS kb, title, fil
 /// English function words: they appear in nearly every passage, carry no information for ranking, and (the words
 /// being OR-ed) make the store score all of those passages. Measured at 50,000 passages: a query with one very
 /// common word took 18 s against 1.4 s for the rare word alone.
-const FUNCTION_WORDS: &[&str] = &[
+pub(crate) const FUNCTION_WORDS: &[&str] = &[
     "a", "an", "the", "and", "or", "but", "if", "of", "to", "in", "on", "at", "by", "for", "with",
     "from", "as", "is", "are", "was", "were", "be", "been", "being", "do", "does", "did", "have",
     "has", "had", "it", "its", "this", "that", "these", "those", "what", "which", "who", "whom",
@@ -959,6 +959,88 @@ impl Store {
         Ok(r.last()
             .and_then(|v| v.as_u64().or_else(|| v.as_f64().map(|x| x as u64)))
             .unwrap_or(0))
+    }
+
+    /// FR-K73: the text each embedded passage of a document was embedded as (heading and body; the title is the
+    /// document's) and its vector, for passages with no context line (one written later is not in the vector, and one
+    /// written before is not in a re-read passage's text).
+    pub async fn embedded_texts(&self, doc: &str) -> Result<Vec<(String, Vec<f32>)>, KbError> {
+        let r = self
+            .query(
+                "SELECT heading, text, embedding FROM chunk \
+                 WHERE doc = type::record('document', $doc) AND embedding != NONE AND context = '';",
+                json!({ "doc": doc }),
+            )
+            .await?;
+        let mut out = Vec::new();
+        for row in r
+            .into_iter()
+            .next()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+        {
+            let s = |k: &str| row.get(k).and_then(Value::as_str).unwrap_or("");
+            let Some(e) = row["embedding"].as_array() else {
+                continue;
+            };
+            out.push((
+                format!("{}\u{1f}{}", s("heading"), s("text")),
+                e.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect(),
+            ));
+        }
+        Ok(out)
+    }
+
+    /// What the in-process index holds of a passage (Phase 25, FR-K67): (document, row), for one document or, with
+    /// `doc = None`, the whole base in one request (small bases).
+    pub async fn index_rows(
+        &self,
+        kb: &str,
+        doc: Option<&str>,
+    ) -> Result<Vec<(String, crate::index::Row)>, KbError> {
+        let fields = "record::id(id) AS id, record::id(doc) AS doc, ord, heading, page, context, text, embedding";
+        let r = match doc {
+            Some(d) => {
+                self.query(
+                    &format!(
+                        "SELECT {fields} FROM chunk WHERE doc = type::record('document', $doc);"
+                    ),
+                    json!({ "doc": d }),
+                )
+                .await?
+            }
+            None => {
+                self.query(
+                    &format!("SELECT {fields} FROM chunk WHERE kb = type::record('kb', $kb);"),
+                    json!({ "kb": kb }),
+                )
+                .await?
+            }
+        };
+        let mut out = Vec::new();
+        for row in r
+            .into_iter()
+            .next()
+            .and_then(|v| v.as_array().cloned())
+            .unwrap_or_default()
+        {
+            let s = |k: &str| row.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+            out.push((
+                s("doc"),
+                crate::index::Row {
+                    id: s("id"),
+                    ord: row["ord"].as_u64().unwrap_or(0),
+                    heading: s("heading"),
+                    page: row["page"].as_u64(),
+                    context: s("context"),
+                    text: s("text"),
+                    embedding: row["embedding"]
+                        .as_array()
+                        .map(|e| e.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect()),
+                },
+            ));
+        }
+        Ok(out)
     }
 
     /// The vectors of one document's passages: (passage id, vector). Read through the `chunk_doc` index (70 ms for 50

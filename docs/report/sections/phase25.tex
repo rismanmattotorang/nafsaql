@@ -1,0 +1,124 @@
+% ---------------------------------------------------------------------------
+% Section: Phase 25 -- the Knowledge module: in-process index, a graph without a model, measured retrieval
+% ---------------------------------------------------------------------------
+\section{Phase 25: An In-Process Index, a Graph without a Model, and a 256-Question Sweep}
+\label{sec:phase25}
+
+This phase assessed the Knowledge module as merged, read the 2024 to 2026 literature on building and searching vector and graph indexes, and rebuilt the search path
+(10 November 2026; shared host, load average 6 to 8 for the measurements below and 24 to 129 for the baseline). Records:
+\texttt{docs/research/knowledge\_sota\_2026.md}, \texttt{docs/spec/knowledge\_sota\_spec.md} (FR-K67 to FR-K82, NFR-K13 to NFR-K16, UX-1 to UX-21) and
+\texttt{docs/decisions/018-knowledge-index-phase25.md}. No public benchmark and no model weights were downloaded, so nothing here is claimed against published
+systems; the claims are measured changes against the module of Phase~24.
+
+\subsection{Assessment}
+
+Every search made several round trips to the store, and under load each cost seconds: on a 443-passage base at load 24 to 129 a search by words took 1.2\,s at
+the median and a hybrid search 5.3\,s. The graph cost a model call per passage (17 to 28\,s), so most bases never had one, and its fixed two-hop walk answered 15 of
+20 questions against 18 for plain retrieval. A re-read embedded every passage again. Reworded questions were the weak point (mean reciprocal rank 0.45 against 0.91
+for quoted ones), and the 20-question set could not separate two settings.
+
+\subsection{What the literature says, and what was taken from it}
+
+An in-process inverted index answers in about 2\,ms where a search server takes 50 (BM25S); below a few hundred thousand passages an exact scan of the vectors is
+both the fastest and the most accurate index (measured here: 100{,}000 $\times$ 1{,}024 in 20.8\,ms). The gain of graph retrieval comes from Personalized PageRank
+over a passage-and-entity graph, not from typed relations: HippoRAG~2 loses 6.1 points of recall at 5 without passage nodes and 0.7 without its model filter, and
+LinearRAG and KET-RAG build such graphs with no model call. Fixed-size chunks beat semantic chunking on real documents; a convex combination of normalised scores
+beats reciprocal-rank fusion on nine BEIR sets. Not taken: query-time model expansion, GraphRAG's query modes and community summaries (39{,}000 to 331{,}000
+prompt tokens a question), an approximate-nearest-neighbour library, a full search engine, and anything that needs PDFium, ONNX Runtime or unapproved weights.
+
+\subsection{Built}
+
+\paragraph{An in-process index (FR-K67 to FR-K69).} SurrealDB remains the source of truth. The service holds, per base and per document, the passages, an
+inverted index over their words, their vectors and the terms they name, within a memory limit (512\,MB by default; a base that does not fit keeps the store path).
+The words are scored by BM25F over four fields (title, heading path, context line, body) with the store's analyzer (lowercase, ASCII folding, Snowball stems) and one
+addition: an identifier is a term of its own beside its parts, so \texttt{vector\_weight} or \texttt{Qwen3-1.7B} is not cut into words that match everywhere. A
+change touches one document's part; a base is immutable once made, so a search in flight keeps a consistent view; a generation counter keeps a load from installing
+rows read before a change; and every 30\,s, off the search path, the index's counts are compared with the store's and the documents that differ are read again.
+
+\paragraph{A graph with no model call (FR-K71, FR-K72).} Terms are read from the text by rule: acronyms, identifiers, runs of capitalised words, and single
+capitalised words that are also capitalised away from the start of a sentence. A term named by at least two passages (and at most a fifth of the base) is a node,
+linked to the passages that name it with a weight that grows with its rarity. For the 847-passage base this gives 1{,}306 terms and 5{,}975 links in under a
+millisecond. Personalized PageRank over this bipartite graph (20 rounds of power iteration, seeded by the best passages of the search and the terms the question
+names) is available as a third ranking. The model-built graph of Phases~20 to~22 stays as the layer of typed, quoted relations that a person reads.
+
+\paragraph{Embedding once (FR-K73, FR-K79a).} A re-read keeps the vector of every passage whose embedded text did not change. The vector of a question is
+remembered. And once the index had left the question's embedding as 99.9\,\% of a hybrid search, the embedder was changed to keep the cache rows of the tokens a
+text shares with the previous one: every question starts with the same instruction. Attention is causal, so the kept rows are what would be computed again; the
+vectors are identical (cosine 1.000000 on 30 questions).
+
+\paragraph{An evaluation that can separate two settings (FR-K75).} Three question sets over the 847-passage base, each accepted phrase verbatim in at most three
+passages and checked by script: 60 quoted questions, 146 reworded ones (on average 9\,\% of a question's content words occur in the answering passage) and 50
+questions that need two passages. A harness reads the base once, embeds each question once and ranks every question under every setting in milliseconds.
+
+\subsection{Measured}
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lrr}
+\toprule
+ & Store path & In-process index \\
+\midrule
+Search by words, median (p90) & 177\,ms (221) & 0.086\,ms (0.100) \\
+Hybrid search, median (p90), Phase 24 embedder & 740\,ms (822) & 351\,ms (427) \\
+Hybrid search, median (p90), embedder with kept prefix & 578\,ms (649) & 152\,ms (181) \\
+The hybrid search without the embedding call & -- & 0.17\,ms \\
+The same with the PageRank arm & -- & 0.60\,ms \\
+Question embedding, median (Phase 24 / kept prefix) & 297\,ms & 146\,ms \\
+Graph of a base & 17 to 28\,s per passage (model) & under 1\,ms (rules) \\
+\bottomrule
+\end{tabular}
+\caption{Time, 40 questions interleaved through both paths, 847 passages, SHARED MACHINE (load 6 to 8). Under the load of the baseline (24 to 129) the store
+path took 5.3\,s for a hybrid search at the median.}
+\label{tab:p25time}
+\end{table}
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{llrrrr}
+\toprule
+Set & Path & R@1 & R@8 & MRR & both@8 \\
+\midrule
+Quoted (60) & store, hybrid & 0.767 & 1.000 & 0.855 & \\
+ & index, hybrid & 0.817 & 1.000 & 0.882 & \\
+Reworded (146) & store, hybrid & 0.096 & 0.226 & 0.147 & \\
+ & index, hybrid & 0.116 & 0.240 & 0.160 & \\
+ & index, vectors alone & 0.062 & 0.137 & 0.088 & \\
+Two-passage (50) & store, hybrid & 0.300 & 0.800 & 0.485 & 0.62 \\
+ & index, hybrid & 0.260 & 0.830 & 0.460 & 0.68 \\
+\bottomrule
+\end{tabular}
+\caption{Where the answering passage ranks, 256 questions. Pooled mean reciprocal rank: 0.379 through the store, 0.388 through the index. One question is 0.017
+of the quoted set and 0.007 of the reworded one: the two paths are equally accurate within what the sets resolve.}
+\label{tab:p25acc}
+\end{table}
+
+\subsection{What the sweep decided, including what it rejected}
+
+Fifty-nine settings were ranked on the three sets. \textbf{Adopted:} length normalisation $b=0.5$ (the answer first for 53 of 60 quoted questions against 50 at
+the textbook 0.75). \textbf{Confirmed:} reciprocal-rank fusion with the vectors at 0.1 (Phase~23's choice, now on a set seven times larger). \textbf{Measured and
+not adopted:} (i) the convex combination, better on quoted and two-passage questions and worse on reworded ones, equal pooled (0.387 against 0.388); (ii) BM25F
+field weights from 0 to 3, each within one question of flat weights on every set; (iii) feedback terms from the first passages, which cost eight quoted questions
+their first place; (iv) the PageRank arm in the default search, which leaves the first eight passages unchanged on every set and raises recall at 20 on reworded
+questions from 0.329 to as much as 0.377. The arm serves the \texttt{graph} mode and waits for a reranker to use what it finds below rank eight. An earlier run at
+$b=0.75$ had shown the arm raising two-passage recall; at $b=0.5$ the plain search finds those passages itself, so the gain had been the baseline's weakness.
+
+\subsection{The readers}
+
+No public score exists for the PDF reader's reading order or for the TeX stripper, so the same document was read both ways (FR-K74): of this report read from its
+34 TeX files, 98.0\,\% of the numbers and 91.6\,\% of the distinct words are in the reading of its PDF. The missing words are macro and label names that the TeX
+stripper lets through inside mathematics and tables, recorded as an open defect.
+
+\subsection{Interface}
+
+An audit of the web interface ranked 21 defects. Fixed: an answer in flight survives leaving the Chat page; a streaming answer is redrawn at most every 150\,ms;
+\texttt{[n]} in an answer opens its source with a preview of the passage; an upload has a row per file with its stage, a cancel and errors that stay; the documents
+table is updated row by row; a search result opens its passage in context; the graph can be zoomed, panned and filtered and says how much of itself it shows; route
+changes move focus and are announced; errors persist and no status code reaches a person; expensive actions ask first. Not done: the Rooms access key still
+travels in the WebSocket address (a protocol change), and three items need server routes that do not exist yet.
+
+\subsection{What this does not establish}
+
+Retrieval is faster by the factors of Table~\ref{tab:p25time}; it is not measurably more accurate. The reworded question remains open: the answering passage is
+first for 12\,\% of such questions and within the first eight for 24\,\%, and the 0.6B embedding model alone ranks it first for 6\,\%. The remedies the literature
+offers (a reranker or a stronger embedder, questions written for each passage when it is indexed) need model weights or hours of the quick model, and a comparison
+with published systems needs public corpora; none was downloaded without the owner's approval.

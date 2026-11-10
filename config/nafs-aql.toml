@@ -226,6 +226,11 @@ graph_facts = 12                       # chat, graph mode: facts put in the prom
 graph_weight = 1.0                     # FR-K50: the graph's ranking as an arm beside the search's (0 = facts only)
 graph_beam = 8                         # FR-K56: relations kept per entity at the second hop of the walk
 graph_decay = 0.6                      # FR-K56: a path's score decays by this per hop
+index_memory_mb = 512                  # Phase 25 (FR-K67): memory for the in-process indexes (about 6 MB per 1,000 passages); a search of an indexed base makes no round trip to the store. 0 = off
+bm25_weights = [1.0, 1.0, 1.0, 1.0]    # FR-K68: BM25F weights of the title, the heading path, the context line and the body
+fusion = "rrf"                         # FR-K70: "rrf" (by rank, the meaning weighted vector_weight) or "convex" (by normalised score, the meaning's share fusion_alpha)
+fusion_alpha = 0.2
+graph_arm_weight = 0.0                 # FR-K72: the walk over the passage-and-term graph as a third arm (0 = off)
 memory_checkpoint = ""                 # Phase 5: Memorilla module trained for System 1 (dir with config.json + weights.safetensors); "" = memory mode off
 memory_placeholder = "<|fim_pad|>"     # the token at the 16 memory positions of the prompt
 memory_trainer = "rust/target/release/memorilla-train"   # Phase 6: cargo build --release -p nafs-memorilla

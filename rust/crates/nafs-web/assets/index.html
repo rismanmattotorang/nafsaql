@@ -32,7 +32,7 @@
   </nav>
   <div class="main">
     <header class="topbar">
-      <h1 id="pageTitle">Chat</h1>
+      <h1 id="pageTitle" tabindex="-1">Chat</h1>
       <div class="top-right">
         <button type="button" id="settingsTop" class="icon-btn top-settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg></button>
         <div id="backendPill" class="pill" role="button" tabindex="0" title="Service status"><span class="dot"></span><span class="txt">Connecting…</span></div>
@@ -41,8 +41,10 @@
     <section id="view" class="view" tabindex="-1"></section>
   </div>
 </div>
-<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="routeSay" class="sr-only" role="status" aria-live="polite"></div>
+<div id="toast" class="toasts" role="region" aria-label="Notifications"></div>
 <dialog id="modal"><form method="dialog" class="modal-body"><div id="modalContent"></div><div class="modal-actions"><button class="btn ghost" value="cancel">Close</button></div></form></dialog>
+<dialog id="modal2" class="confirm"><div class="modal-body"><div id="modal2Content"></div></div></dialog>
 <script src="/app.js" type="module"></script>
 </body>
 </html>

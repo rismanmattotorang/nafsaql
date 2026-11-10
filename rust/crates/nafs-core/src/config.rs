@@ -114,6 +114,18 @@ pub struct KnowledgeCfg {
     /// path's score (a second-hop fact must be well attested to outrank a first-hop one).
     pub graph_beam: usize,
     pub graph_decay: f64,
+    /// Phase 25 (FR-K67): the most memory (MB) the in-process indexes of all bases may use (passages, their words,
+    /// their vectors and the term graph: about 6 MB per 1,000 passages at 1,024 dimensions). A search of an indexed
+    /// base makes no round trip to the store. 0 turns the index off; a base that does not fit uses the store.
+    pub index_memory_mb: u64,
+    /// FR-K68: BM25F weights of the document title, the heading path, the context line and the body.
+    pub bm25_weights: [f32; 4],
+    /// FR-K70: how the words and the meaning are fused in the index: "rrf" (by rank, the meaning weighted
+    /// `vector_weight`) or "convex" (by normalised score, the meaning's share `fusion_alpha`).
+    pub fusion: String,
+    pub fusion_alpha: f64,
+    /// FR-K72: how much the walk over the passage-and-term graph counts against the fused search (0 = off).
+    pub graph_arm_weight: f64,
     /// Memorilla (Phase 5): a memory-module checkpoint (`config.json` + `weights.safetensors`) trained for System 1;
     /// empty turns `memory` mode off.
     pub memory_checkpoint: String,
@@ -173,6 +185,11 @@ impl Default for KnowledgeCfg {
             graph_weight: 1.0,
             graph_beam: 8,
             graph_decay: 0.6,
+            index_memory_mb: 512,
+            bm25_weights: [1.0, 1.0, 1.0, 1.0],
+            fusion: "rrf".into(),
+            fusion_alpha: 0.2,
+            graph_arm_weight: 0.0,
             memory_checkpoint: String::new(),
             memory_placeholder: "<|fim_pad|>".into(),
             memory_trainer: "rust/target/release/memorilla-train".into(),
