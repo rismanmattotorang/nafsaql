@@ -27,4 +27,5 @@ quick-xml = "0.42.0"
 ciborium = "0.2.2"
 jsonschema = { workspace = true }
 htmd = "0.5.6"
+rust-stemmers = "1.2.0"
 text-splitter = { version = "0.33.1", features = ["markdown"] }

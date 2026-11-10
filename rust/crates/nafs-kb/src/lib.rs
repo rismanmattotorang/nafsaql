@@ -7,6 +7,7 @@ pub mod chunk;
 pub mod dataset;
 pub mod embed;
 pub mod graph;
+pub mod index;
 pub mod parse;
 pub mod store;
 pub mod vcache;
@@ -25,6 +26,7 @@ use tokio::sync::{mpsc, Mutex};
 pub use chunk::{chunk, Chunk, ChunkOpts};
 pub use embed::{EmbedConfig, Embedder, QUERY_INSTRUCTION};
 pub use graph::{Extractor, GraphConfig};
+pub use index::IndexConfig;
 pub use parse::{parse, Kind, Parsed};
 pub use store::{Document, Hit, KbSummary, NewDocument, Store, StoreConfig, StoredChunk};
 
@@ -120,6 +122,8 @@ pub struct KbConfig {
     /// FR-K56: relations kept per entity at the second hop, and the per-hop decay of a path's score.
     pub graph_beam: usize,
     pub graph_decay: f64,
+    /// Phase 25 (FR-K67): the in-process index a search uses instead of round trips to the store.
+    pub index: IndexConfig,
     pub limits: Limits,
 }
 
@@ -157,6 +161,27 @@ pub struct SearchResult {
     /// Why the requested mode was not used, when it was not.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fallback: Option<String>,
+    /// What answered: `index` (in process, FR-K67) or `store`.
+    pub engine: &'static str,
+}
+
+/// Which path a search takes (FR-K69). `Store` is the path every search took before Phase 25; it stays for bases
+/// that do not fit in memory and for comparing the two.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Engine {
+    /// The in-process index when the base has one, else the store.
+    Auto,
+    Store,
+}
+
+impl Engine {
+    pub fn parse(s: &str) -> Option<Engine> {
+        match s {
+            "auto" | "index" => Some(Engine::Auto),
+            "store" => Some(Engine::Store),
+            _ => None,
+        }
+    }
 }
 
 /// Ingestion queue counters for `/v1/kb/status`.
@@ -201,7 +226,14 @@ pub struct Kb {
     extractor: Option<Extractor>,
     /// In-memory copies of large bases' vectors (NFR-K07).
     vcache: vcache::VectorCache,
+    /// The in-process indexes (Phase 25, FR-K67).
+    index: Arc<index::Index>,
+    /// Vectors of recent questions (FR-K69): a repeated question, and the graph search after the plain one, embed once.
+    questions: std::sync::Mutex<HashMap<String, (Vec<f32>, u64)>>,
 }
+
+/// Questions whose vectors are remembered.
+const QUESTION_CACHE: usize = 256;
 
 impl Kb {
     /// Create the service and start its worker (needs a Tokio runtime). Nothing touches SurrealDB until first use.
@@ -209,6 +241,7 @@ impl Kb {
         let (tx_fast, rx_fast) = mpsc::unbounded_channel();
         let (tx_slow, rx_slow) = mpsc::unbounded_channel();
         let vector_cache_mb = cfg.vector_cache_mb;
+        let index_memory_mb = cfg.index.memory_mb;
         let embedder = cfg.embed.clone().map(Embedder::new);
         let extractor = cfg.graph.clone().map(Extractor::new);
         let kb = Arc::new(Kb {
@@ -223,6 +256,8 @@ impl Kb {
             embedder,
             extractor,
             vcache: vcache::VectorCache::new(vector_cache_mb),
+            index: index::Index::new(index_memory_mb),
+            questions: std::sync::Mutex::new(HashMap::new()),
         });
         tokio::spawn(worker(Arc::downgrade(&kb), rx_fast));
         tokio::spawn(worker(Arc::downgrade(&kb), rx_slow));
@@ -247,6 +282,12 @@ impl Kb {
                 // Passages stored before the embedder ran (Phase 1 documents, or the embedder was down) get vectors.
                 if k.embedder.is_some() {
                     let _ = k.reindex(None).await;
+                }
+                // The indexes are read now rather than by the first question (FR-K67).
+                if let Ok(bases) = k.store.list_kbs().await {
+                    for b in bases {
+                        let _ = k.index.get(&k.store, &b.id, k.dims()).await;
+                    }
                 }
             }
         });
@@ -399,6 +440,7 @@ impl Kb {
         let d = self.store.get_document(kb, doc).await?;
         self.vcache.drop_kb(kb);
         let n = self.store.delete_document(kb, doc).await?;
+        self.index.remove_doc(kb, doc);
         if self.store.prune_graph(kb).await.is_ok() {
             let _ = self.recompute_communities(kb).await;
         }
@@ -413,6 +455,7 @@ impl Kb {
         let base = self.store.get_kb(kb).await?;
         // Out of use at once; its rows go in the background (under an hour at 50,000 passages), and a restart resumes it.
         self.store.mark_kb_deleting(kb).await?;
+        self.index.remove_kb(kb);
         let _ = tokio::fs::remove_dir_all(self.kb_dir(kb)).await;
         let (store, id) = (self.store.clone(), kb.to_string());
         tokio::spawn(async move {
@@ -470,22 +513,70 @@ impl Kb {
             .clone()
             .filter(|t| t.chars().count() <= 200)
             .unwrap_or(d.title.clone());
+        // FR-K73: a re-read keeps the vector of every passage whose embedded text did not change.
+        let kept = if self.embedder.is_some() && title == d.title && d.n_embedded > 0 {
+            self.store.embedded_texts(&d.id).await.unwrap_or_default()
+        } else {
+            Vec::new()
+        };
         self.store
             .store_chunks(&job.kb, &d.id, &title, parsed.pages, parse_ms, &chunks)
             .await?;
         // The base changed: a copy of its vectors made before no longer describes it.
         self.vcache.drop_kb(&job.kb);
+        let reused = self.reuse_vectors(&job.kb, &d.id, kept).await;
+        self.index
+            .refresh_doc(&self.store, &job.kb, &d.id, self.dims())
+            .await;
         // A re-read replaces the passages, so what the graph held about the old ones goes.
         if self.store.prune_graph(&job.kb).await.is_ok() {
             let _ = self.recompute_communities(&job.kb).await;
         }
         // Ready by its words now; the vectors follow on the slow lane (the page shows "Words only" until then).
         self.store.set_status(&d.id, "ready", None).await?;
-        tracing::info!(doc = %d.id, kind = %d.kind, chunks = chunks.len(), parse_ms, "knowledge document ready");
+        tracing::info!(doc = %d.id, kind = %d.kind, chunks = chunks.len(), reused, parse_ms, "knowledge document ready");
         if self.embedder.is_some() {
             self.enqueue(&job.kb, &d.id, JobKind::Vectors);
         }
         Ok(())
+    }
+
+    /// FR-K73: give the new passages of a re-read document the vectors their text already had. `kept` is what the
+    /// document held before: (embedded text, vector). Returns how many vectors were reused.
+    async fn reuse_vectors(&self, kb: &str, doc: &str, kept: Vec<(String, Vec<f32>)>) -> usize {
+        let Some(e) = &self.embedder else { return 0 };
+        if kept.is_empty() {
+            return 0;
+        }
+        let Ok(todo) = self.store.chunks_without_vectors(doc).await else {
+            return 0;
+        };
+        // Passages with the same text share a vector, so a lookup, not a removal.
+        let by_text: HashMap<String, Vec<f32>> = kept.into_iter().collect();
+        let rows: Vec<(String, Vec<f32>)> = todo
+            .iter()
+            .filter_map(|c| {
+                // The title is the same (checked by the caller) and a new passage has no context line yet.
+                let v = by_text.get(&format!("{}\u{1f}{}", c.heading, c.text))?;
+                (v.len() == e.cfg.dims).then(|| (c.id.clone(), v.clone()))
+            })
+            .collect();
+        for batch in rows.chunks(64) {
+            if self.store.set_vectors(batch).await.is_err() {
+                return 0;
+            }
+        }
+        if !rows.is_empty() {
+            let _ = self
+                .store
+                .finish_vectors(kb, doc, &e.cfg.model, e.cfg.dims)
+                .await;
+        }
+        rows.len()
+    }
+
+    fn dims(&self) -> usize {
+        self.embedder.as_ref().map_or(0, |e| e.cfg.dims)
     }
 
     /// Give a document's passages that lack one a vector (state `embedding`). Returns a plain-language note when the
@@ -534,6 +625,11 @@ impl Kb {
                 .set_vectors(&rows)
                 .await
                 .map_err(|x| x.to_string())?;
+            if !self.index.apply_vectors(kb, doc, &rows) {
+                self.index
+                    .refresh_doc(&self.store, kb, doc, e.cfg.dims)
+                    .await;
+            }
             // Progress for the page: the count grows batch by batch.
             let _ = self
                 .store
@@ -574,6 +670,7 @@ impl Kb {
             if fresh {
                 self.vcache.drop_kb(base);
                 self.store.clear_vectors(base).await?;
+                self.index.drop_kb(base);
             }
         }
         let docs = self.store.documents_missing_vectors(kb).await?;
@@ -831,14 +928,7 @@ impl Kb {
         let mut base = self
             .search(kb, query, (k * 3).max(12), SearchMode::Hybrid)
             .await?;
-        let qv = match &self.embedder {
-            Some(e) => e
-                .embed(&[query.to_string()], Some(QUERY_INSTRUCTION))
-                .await
-                .ok()
-                .map(|mut v| v.remove(0)),
-            None => None,
-        };
+        let qv = self.question_vector(query).await.ok().map(|x| x.0);
         let found = self
             .store
             .find_entities(kb, query, qv.as_deref(), 8)
@@ -853,6 +943,16 @@ impl Kb {
             .take(5)
             .collect();
         if seeds.is_empty() {
+            // FR-K72: no model-built graph names anything in the question; the passage-and-term graph still links
+            // the passages, so its walk supplies the candidates.
+            if let index::Lookup::Ready(ix) = self.index.get(&self.store, kb, self.dims()).await? {
+                let mut params = self.cfg.index.params;
+                params.ppr = Some(params.ppr.unwrap_or_default());
+                let r = self
+                    .search_indexed(ix, query, k, SearchMode::Hybrid, params)
+                    .await;
+                return Ok((Vec::new(), r));
+            }
             base.results.truncate(k);
             return Ok((Vec::new(), base));
         }
@@ -1098,9 +1198,146 @@ impl Kb {
         k: usize,
         mode: SearchMode,
     ) -> Result<SearchResult, KbError> {
+        self.search_with(kb, query, k, mode, Engine::Auto).await
+    }
+
+    /// The vector of a question, remembered for a while (FR-K69). Returns it with the time the embedding took (0 when
+    /// it was remembered).
+    async fn question_vector(&self, query: &str) -> Result<(Vec<f32>, u64), KbError> {
+        let e = self
+            .embedder
+            .as_ref()
+            .ok_or_else(|| KbError::Unavailable("searching by meaning is turned off".into()))?;
+        static TICK: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let tick = TICK.fetch_add(1, Ordering::Relaxed);
+        if let Some(hit) = self
+            .questions
+            .lock()
+            .expect("question cache")
+            .get_mut(query)
+        {
+            hit.1 = tick;
+            return Ok((hit.0.clone(), 0));
+        }
+        let t = Instant::now();
+        let v = e
+            .embed(&[query.to_string()], Some(QUERY_INSTRUCTION))
+            .await?
+            .remove(0);
+        let mut cache = self.questions.lock().expect("question cache");
+        if cache.len() >= QUESTION_CACHE {
+            if let Some(oldest) = cache.iter().min_by_key(|x| x.1 .1).map(|x| x.0.clone()) {
+                cache.remove(&oldest);
+            }
+        }
+        cache.insert(query.to_string(), (v.clone(), tick));
+        Ok((v, t.elapsed().as_millis() as u64))
+    }
+
+    /// The in-process index of a base when it is loaded (FR-K67).
+    pub async fn index_of(&self, kb: &str) -> Result<Option<Arc<index::Base>>, KbError> {
+        self.ready().await?;
+        Ok(match self.index.get(&self.store, kb, self.dims()).await? {
+            index::Lookup::Ready(b) => Some(b),
+            _ => None,
+        })
+    }
+
+    /// (bases, passages, bytes) the in-process indexes hold.
+    pub fn index_stats(&self) -> (usize, usize, usize) {
+        self.index.stats()
+    }
+
+    /// FR-K71: the Graph view of the passage-and-term graph, for a base whose index is loaded.
+    pub async fn text_graph_view(
+        &self,
+        kb: &str,
+        center: Option<&str>,
+        limit: usize,
+    ) -> Option<Value> {
+        let base = self.index_of(kb).await.ok()??;
+        Some(base.graph_view(center, limit))
+    }
+
+    /// A search answered from the in-process index: no round trip to the store, and the question is embedded once.
+    async fn search_indexed(
+        &self,
+        base: Arc<index::Base>,
+        query: &str,
+        k: usize,
+        mode: SearchMode,
+        params: index::Params,
+    ) -> SearchResult {
+        let t0 = Instant::now();
+        let (mut fallback, mut embed_ms) = (None, 0);
+        let qv = if mode == SearchMode::Lexical || query.trim().is_empty() {
+            None
+        } else if self.embedder.is_none() {
+            fallback = Some("searching by meaning is turned off".to_string());
+            None
+        } else if base.vectors() == 0 {
+            fallback = Some("this knowledge base has no meaning index yet".to_string());
+            None
+        } else {
+            match self.question_vector(query).await {
+                Ok((v, ms)) => {
+                    embed_ms = ms;
+                    Some(v)
+                }
+                Err(err) => {
+                    fallback = Some(format!("the embedding server is not available ({err})"));
+                    None
+                }
+            }
+        };
+        let used = if qv.is_some() {
+            mode
+        } else {
+            SearchMode::Lexical
+        };
+        let index = self.index.clone();
+        let query = query.to_string();
+        let large = base.passages() > 20_000;
+        let run = move || base.search(&index.analyzer, &query, qv.as_deref(), used, k, &params);
+        // Scoring a small base takes well under a millisecond; a large one goes off the async threads.
+        let results = if large {
+            tokio::task::spawn_blocking(run).await.unwrap_or_default()
+        } else {
+            run()
+        };
+        SearchResult {
+            results,
+            mode: used,
+            took_ms: t0.elapsed().as_millis() as u64,
+            embed_ms,
+            fallback,
+            engine: "index",
+        }
+    }
+
+    /// `search`, with the path chosen by the caller (FR-K69): `Engine::Store` is the path every search took before
+    /// Phase 25, kept for bases that do not fit in memory and for comparing the two.
+    pub async fn search_with(
+        &self,
+        kb: &str,
+        query: &str,
+        k: usize,
+        mode: SearchMode,
+        engine: Engine,
+    ) -> Result<SearchResult, KbError> {
         self.ready().await?;
         let t0 = Instant::now();
         let k = k.clamp(1, 100);
+        if engine == Engine::Auto {
+            if let index::Lookup::Ready(base) = self.index.get(&self.store, kb, self.dims()).await?
+            {
+                let mut r = self
+                    .search_indexed(base, query, k, mode, self.cfg.index.params)
+                    .await;
+                r.took_ms = t0.elapsed().as_millis() as u64;
+                return Ok(r);
+            }
+        }
         let mut fallback = None;
         let mut embed_ms = 0;
         let qv = if mode == SearchMode::Lexical || query.trim().is_empty() {
@@ -1203,6 +1440,7 @@ impl Kb {
             took_ms: t0.elapsed().as_millis() as u64,
             embed_ms,
             fallback,
+            engine: "store",
         })
     }
 }
@@ -1221,6 +1459,10 @@ async fn worker(kb: std::sync::Weak<Kb>, mut rx: mpsc::UnboundedReceiver<Job>) {
             if let Ok(d) = kb.store.get_document(&job.kb, &job.doc).await {
                 let note = kb.graph_document(&job.kb, &d.id).await.err();
                 let _ = kb.store.set_status(&d.id, "ready", note.as_deref()).await;
+                // The pass wrote context lines, which the words index covers (FR-K53).
+                kb.index
+                    .refresh_doc(&kb.store, &job.kb, &d.id, kb.dims())
+                    .await;
             }
         } else if let Err(e) = kb.ingest(&job).await {
             tracing::warn!(doc = %job.doc, error = %e, "knowledge ingestion failed");

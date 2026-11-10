@@ -22,6 +22,9 @@ pub struct Embedder {
     end: u32,
     /// Longest input in tokens, the end token included; longer texts are truncated.
     pub max_tokens: usize,
+    /// The tokens whose keys and values the cache holds (the previous text). A text that starts with the same tokens
+    /// reuses them: every search query starts with the same instruction, about half of a short question's tokens.
+    held: Vec<u32>,
 }
 
 /// One embedding and what it cost.
@@ -55,6 +58,7 @@ impl Embedder {
             end,
             model,
             max_tokens,
+            held: Vec::new(),
         }
     }
 
@@ -70,11 +74,22 @@ impl Embedder {
         let truncated = toks.len() + 1 > self.max_tokens;
         toks.truncate(self.max_tokens - 1);
         toks.push(self.end);
-        self.kv.truncate(0);
+        // Attention is causal, so the cache rows of a shared prefix are what this text would compute again. At least
+        // the end token is always forwarded: its hidden state is the embedding.
+        let shared = self
+            .held
+            .iter()
+            .zip(&toks)
+            .take_while(|(a, b)| a == b)
+            .count()
+            .min(toks.len() - 1);
+        self.kv.truncate(shared);
+        // Nothing is held while the forward runs: a failure must not leave rows that do not match `held`.
+        self.held.clear();
         let mut stats = StepStats::default();
-        let mut start = 0;
+        let mut start = shared;
         let mut last_rows = 0;
-        for chunk in toks.chunks(CHUNK) {
+        for chunk in toks[shared..].chunks(CHUNK) {
             self.model.forward(
                 &mut self.st,
                 &mut self.kv,
@@ -87,6 +102,7 @@ impl Embedder {
             start += chunk.len();
             last_rows = chunk.len();
         }
+        self.held.clone_from(&toks);
         let mut v = self.model.final_hidden(&self.st, last_rows - 1);
         let norm = v
             .iter()

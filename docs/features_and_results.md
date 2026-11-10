@@ -118,3 +118,56 @@ Everything the project has built and measured, phase by phase, with the evidence
 
 The sweep found and fixed three defects in the Lean integration (an inconsistent 400 between `/v1/chat` and `/v1/verify`, Lean tasks classified as open questions with no retries, and a prompt that did not say Mathlib is absent). **One honest limit it exposed:** Qwen3-4B-Thinking (4-bit, CPU) cannot yet write valid Lean 4, even for `n + 0 = n`, so Lean tasks end in a labelled *abstain* unless a stronger prover is used. The Lean verifier itself is exact: it accepts real proofs and rejects a hidden `sorryAx`, a user axiom, `native_decide`, `#eval`, a changed statement and a shadowed `HAdd` instance.
 
+## Phase 25: the Knowledge module's search path (2026-11-10)
+
+Specification [`knowledge_sota_spec.md`](spec/knowledge_sota_spec.md), research [`knowledge_sota_2026.md`](research/knowledge_sota_2026.md),
+decision [018](decisions/018-knowledge-index-phase25.md). SHARED MACHINE, load 6 to 8; 847-passage base; files in `benchmarks/kb_phase25/`.
+
+| Change | Effect | Evidence |
+|---|---|---|
+| Search from an in-process index instead of round trips to the store | words **177 ms → 0.086 ms**; hybrid **740 ms → 152 ms** (the store path took 5.3 s under load 24 to 129) | `eval_store_latency.json`, `eval_latency_prefix.json`, 40 questions interleaved |
+| The embedder keeps the cache rows a text shares with the previous one | question embedding **297 ms → 146 ms**, identical vectors | 30 questions interleaved against the old server |
+| A graph of every base from its text, no model call | 1,306 terms and 5,975 links in **under 1 ms** (the model-built graph: 17 to 28 s a passage) | `eval_sweep.json` |
+| A re-read keeps the vectors of unchanged passages | no embedding call for an unchanged document | `tests/index_it.rs` |
+| BM25 length normalisation 0.5 | answer first for 53 of 60 quoted questions against 50 | `eval_sweep.json` |
+| 256 questions in three sets (60 quoted, 146 reworded, 50 two-passage) | one answer is 0.007 of the reworded set (was 0.05) | `scripts/kb_p25_*.json` |
+
+**Accuracy is unchanged within what the sets resolve** (pooled hybrid MRR 0.388 through the index, 0.379 through the store).
+**Measured and not adopted:** convex-combination fusion (pooled 0.387 against 0.388), BM25F field weights (no effect),
+feedback terms (quoted R@1 0.883 → 0.750), the PageRank arm in the default search (first 8 passages unchanged; reworded
+R@20 0.329 → up to 0.377). **Open:** a reworded question finds its passage first 12 % of the time and in the first 8
+24 % of the time.
+
+## The numbers at a glance (moved from the README, Phase 25)
+
+Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so absolute speeds are lower bounds. Every figure comes from a stored run in [`benchmarks/`](../benchmarks/).
+
+| | |
+|---|---|
+| Hard questions: same accuracy at **36 %** of the cost of always thinking | gate with a visible checker, 6 mixed tasks |
+| Reasoning that stops when the checker is satisfied | **−52 %** reasoning tokens, **−44 %** time |
+| The built-in engine against llama.cpp | **131 s vs 303 s** for twelve checked prompts, same accuracy |
+| Several people at once | **14 → 25 tokens/s** from 1 to 4 users, each answer identical to what they would get alone |
+| Passage retrieval with the right context | closed-book answers **2 of 20** held-out questions; with passages, **18 of 20** |
+| Your documents at scale | 1,000 documents / 50,000 passages: search by meaning in **0.4 s**, listing under **0.3 s**; a security sweep of uploads and deletion passes **36/36** |
+| Security and quality | **451** Rust tests, **26/26** security probes, **67/67** end-to-end checks |
+
+We also publish what did not work: speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model and more. See [features and measured results](features_and_results.md).
+
+## How it compares
+
+We read the source of two well-known projects and measured them against ours: [vLLM Semantic Router](https://github.com/vllm-project/semantic-router) (routes requests across models) and [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (a coding agent loop). The full note is [here](research/semantic_router_deepseek_h2h.md); the short version:
+
+| | Semantic Router | DeepSeek Harness | Nafs-Aql |
+|---|---|---|---|
+| Who decides an answer is right | model confidence or self-rating | the model says it is done | **an exact checker** (maths, tests, schema, proof) |
+| Acceptance of a quick answer | calibrated bins with a certified error bound | none | **the same certified bound**, plus an idle-time practice stream that fills its ledger |
+| Needs | Envoy or Kubernetes, 0.3B+ classifiers, often a GPU | a hosted model | **4 CPU cores, no GPU, nothing leaves the machine** |
+| Cost of its per-request signal (2 KB prompt) | 198 µs (30 keyword rules) | n/a | **2.2 µs** |
+| Cutting a long text to a budget (16K tokens) | 50 ms | n/a | **9 ms** |
+| Vector dot product (1,024 floats, AVX2) | **135 ns** | n/a | 199 ns |
+| Agent harness overhead (100 turns, 800 reads) | n/a | budget 900 ms | **1.75 ms** |
+
+Measured on a shared, loaded 4-core machine; the same-work rows are interleaved runs of their own benchmarks beside ours, and the dot product is the one place they are ahead. Where they are ahead and we have chosen not to follow: Envoy and Kubernetes integration, around twenty signal types with trained jailbreak and PII classifiers, a dashboard, byte-exact prompt replay, subagents at scale, and browser control. Reproduce with `ROUNDS=5 benchmarks/headtohead/run.sh`.
+
+<p align="center"><img src="shared/screenshots/muhasaba.png" alt="The Quality page: how Auto decides, and the practice stream that collects checked answers" width="760"><br><sub><b>Quality.</b> How Auto decides, how well it predicts its own mistakes, and the practice it does while nobody is using the app.</sub></p>

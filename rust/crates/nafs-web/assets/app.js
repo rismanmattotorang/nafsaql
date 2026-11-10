@@ -68,14 +68,20 @@ function toolcardsHTML(t, live) {
   return cards.length ? `<div class="toolcards">${cards.join('')}</div>` : '';
 }
 // Knowledge-base passages the answer was given (numbered as the model cites them), or why there were none.
+const ARM_NAME = { lexical: 'words', vector: 'meaning', graph: 'the knowledge graph', hybrid: 'meaning and words' };
+const WEAK_MATCH = 0.45; // similarity of the best passage below which the match is called weak: the chat filter's own floor (off-topic passages measured 0.38 to 0.40, answering ones 0.45 to 0.77)
+const kbWeakNote = (why) => `<div class="notice kb-weak">${icon.alert}<span><b>No strong match.</b> ${esc(why)}</span></div>`;
 function kbSourcesHTML(sources) {
   const notes = sources.filter(x => x.note), facts = sources.filter(x => x.facts).flatMap(x => x.facts), mem = sources.filter(x => x.memory), arms = sources.find(x => x.arms), hits = sources.filter(x => x.chunk_id);
   let out = notes.map(n => `<div class="sources">${icon.book}<span>${esc(n.note)}</span></div>`).join('');
   // FR-K59: which searches ran, and why any did not (Advanced).
-  if (arms && advanced()) out += `<div class="sources tiny faint">${icon.search}<span>Searched by ${esc((arms.arms || []).join(', ') || 'nothing')}${(arms.arm_notes || []).length ? ' · ' + esc(arms.arm_notes.join('; ')) : ''}${arms.search_ms != null ? ` · ${fmtMs((arms.embed_ms || 0) + (arms.search_ms || 0))}` : ''}</span></div>`;
-  out += mem.map(m => `<div class="sources">${icon.book}<span>Answered with a memory of <b>${esc(m.kb_name || 'your knowledge base')}</b>: ${m.memory.tokens} memory tokens read from ${plural(m.memory.documents, 'passage')} (experimental)${advanced() ? ` · ${fmtMs((m.memory.prepare_ms || 0) + (m.memory.read_ms || 0))}` : ''}.</span></div>`).join('');
+  if (arms && advanced()) out += `<div class="sources tiny faint">${icon.search}<span>Searched by ${esc((arms.arms || []).map(a => ARM_NAME[a] || a).join(', ') || 'nothing')}${(arms.arm_notes || []).length ? ' · ' + esc(plain(arms.arm_notes.join('; '))) : ''}${arms.search_ms != null ? ` · ${fmtMs((+arms.embed_ms || 0) + (+arms.search_ms || 0))}` : ''}</span></div>`;
+  out += mem.map(m => `<div class="sources">${icon.book}<span>Answered with a memory of <b>${esc(m.kb_name || 'your knowledge base')}</b>: ${+m.memory.tokens || 0} memory tokens read from ${plural(+m.memory.documents || 0, 'passage')} (experimental)${advanced() ? ` · ${fmtMs((m.memory.prepare_ms || 0) + (m.memory.read_ms || 0))}` : ''}.</span></div>`).join('');
   if (facts.length) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.book}<span>Used ${plural(facts.length, 'relation')} from the knowledge graph</span></summary><ul class="kb-facts">${facts.map(f => `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b>${f.via ? ` <span class="faint">via ${esc(f.via)}</span>` : ''}${f.quote ? `<div class="tiny muted">“${esc(f.quote)}”</div>` : ''}</li>`).join('')}</ul></details>`;
-  if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src"><summary><span class="kb-n">${x.n}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${x.page ? ` <span class="faint">· page ${x.page}</span>` : ''}</span>${advanced() && x.vector_score != null ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
+  // The closest passage is still far from the question: say so, so the answer is read against its sources.
+  const scored = hits.filter(x => typeof x.vector_score === 'number');
+  if (hits.length && scored.length === hits.length && Math.max(...scored.map(x => x.vector_score)) < WEAK_MATCH) out += kbWeakNote('The closest passages are only loosely related to this question, so read the answer against them.');
+  if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src" data-n="${+x.n || 0}"><summary><span class="kb-n">${+x.n || 0}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${+x.page ? ` <span class="faint">· page ${+x.page}</span>` : ''}</span>${advanced() && typeof x.vector_score === 'number' ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
   return out;
 }
 // Follow-ups (OpenUI FollowUpBlock): what to ask next, from the state of this answer.
@@ -101,11 +107,45 @@ function designNotes() {
     <p class="tiny muted">Rūḥ, ilhām and the Active Intellect are deliberately not mapped.</p>`);
 }
 
-function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms); }
-// A page loader that loses the gateway mid-request (restart, network) must not leave an uncaught error:
-// show one notice instead; the status pill and the next navigation recover on their own.
-window.addEventListener('unhandledrejection', (e) => { const m = String(e.reason?.message || e.reason || '');
-  if (/Failed to fetch|NetworkError|Load failed|Cannot reach the service/i.test(m)) { e.preventDefault(); if (!toast._net || Date.now() - toast._net > 10000) { toast._net = Date.now(); toast('Cannot reach the service; reconnecting when it is back', 4000); } } });
+// Notices stack in a queue (newest last, at most four). A success or a note leaves on its own; an error stays
+// until it is dismissed and looks different. `opts` is a duration in ms (older call sites) or
+// { kind: 'ok' | 'info' | 'error', ms, action: { label, fn } }. Returns a function that removes the notice.
+function toast(msg, opts = {}) {
+  const o = typeof opts === 'number' ? { ms: opts } : (opts || {}); const kind = o.kind || 'ok'; const box = $('#toast'); const text = String(msg ?? '');
+  const same = $$('.toast', box).find(t => t.dataset.msg === text && t.dataset.kind === kind); if (same && !o.action) same._close();
+  const el = h(`<div class="toast ${kind === 'error' ? 'err' : kind === 'info' ? 'info' : ''}" role="${kind === 'error' ? 'alert' : 'status'}"><span class="tico">${kind === 'error' ? icon.alert : kind === 'info' ? icon.book : icon.check}</span><span class="tmsg"></span>${o.action ? '<button type="button" class="tact"></button>' : ''}<button type="button" class="tx" aria-label="Dismiss this notice">${icon.x}</button></div>`);
+  el.dataset.msg = text; el.dataset.kind = kind; $('.tmsg', el).textContent = text;
+  let timer = null; const close = () => { clearTimeout(timer); el.remove(); }; el._close = close;
+  if (o.action) { const b = $('.tact', el); b.textContent = o.action.label; b.onclick = () => { close(); o.action.fn(); }; }
+  $('.tx', el).onclick = close;
+  if (kind !== 'error') { const ms = o.ms || (o.action ? 6000 : 3200); const arm = () => { timer = setTimeout(close, ms); }; arm(); el.onmouseenter = () => clearTimeout(timer); el.onmouseleave = arm; }
+  const old = $$('.toast', box); if (old.length >= 4) (old.find(t => !t.classList.contains('err')) || old[0])._close();
+  box.appendChild(el); return close;
+}
+// What went wrong, in a sentence a person can act on: never a status code or an exception name.
+function humanError(e) {
+  const st = e?.status, m = String(e?.message ?? e ?? '');
+  if (e?.network || /Failed to fetch|NetworkError|Load failed|network error/i.test(m)) return 'Cannot reach the service. It may be restarting; try again in a moment.';
+  if (e?.name === 'AbortError') return 'That was stopped before it finished.';
+  if (st === 401) return 'This service needs an access key: add it in Settings.';
+  if (st === 403) return 'You are not allowed to do that here.';
+  if (st === 413) return 'That is too large for the service to accept.';
+  if (st === 429) return 'Too many requests at once. Wait a moment, then try again.';
+  if (st >= 500 || /^HTTP \d+/.test(m) || /^(TypeError|ReferenceError|SyntaxError|RangeError)\b|is not a function|is not defined|Cannot read prop|of undefined|of null|Unexpected (?:token|end)/.test(m) || !m) {
+    const base = st === 404 ? 'That could not be found. It may have been deleted.' : st === 503 || st === 502 || st === 504 ? 'The service is busy or still starting. Try again in a moment.' : 'Something went wrong. Please try again.';
+    return base + (advanced() && e?.detail ? ` (${String(e.detail).slice(0, 160)})` : '');
+  }
+  return plain(m) || 'Something went wrong. Please try again.';
+}
+const toastErr = (e, what) => toast((what ? what + ' ' : '') + humanError(e), { kind: 'error' });
+// Wrap an event handler or a timer callback so a failed request ends as one plain notice, never as an uncaught error.
+const guard = (fn, what) => async (...a) => { try { return await fn(...a); } catch (e) { toastErr(e, what); } };
+// Anything that still escapes (a page loader that loses the gateway mid-request, a late timer) must not leave an
+// uncaught error: show one notice; the status pill and the next navigation recover on their own.
+window.addEventListener('unhandledrejection', (e) => { e.preventDefault(); if (e.reason?.name === 'AbortError') return; console.warn('unhandled', e.reason);
+  if (toast._net && Date.now() - toast._net < 10000) return; toast._net = Date.now();
+  const net = e.reason?.network || /Failed to fetch|NetworkError|Load failed|Cannot reach the service/i.test(String(e.reason?.message || e.reason || ''));
+  if (net) toast('Cannot reach the service; reconnecting when it is back', { kind: 'info', ms: 5000 }); else toastErr(e.reason); });
 // Copy text, with a fallback for the cases where the async clipboard API is missing or refuses (plain-HTTP hosts,
 // an unfocused page, denied permission): a hidden textarea and execCommand. Resolves true when the text was copied.
 async function copyText(text) {
@@ -137,7 +177,11 @@ function plain(t) {
 const ALERT_NAME = { fast_path_latency: 'Quick answers are slow (slowest 5%)', error_rate: 'Share of failed answers', escalation_rate: 'Share sent to thorough (cost)', verifier_acceptance: 'Share of checks that pass', calibration_drift: 'Mistake prediction has drifted' };
 const GATE_NAME = { G0: 'Setup measured and model server chosen', G1: 'First version accepted and fast enough', G2: 'Auto as good as always thinking, in less time', G3: 'First quick-model update trained, proven and reversible', G4: 'Full test suite run and load tested', G5: 'Security reviewed and deployment verified', G6: 'Release: no worse than always thinking, tests green, scholar sign-off' };
 const SET_NAME = { 'chat-short': 'Short chat questions', math: 'Word problems (often need thinking)', mixed: 'Mixed: maths, code, facts, open questions' };
-function modal(html) { $('#modalContent').innerHTML = html; $('#modal').showModal(); }
+// The dialog names itself from its first heading and gives the focus back to whatever opened it.
+function modal(html) { const dlg = $('#modal'); if (!dlg.open) modal._from = document.activeElement; $('#modalContent').innerHTML = html;
+  const hd = $('#modalContent h3'); if (hd) { hd.id = 'modalTitle'; dlg.setAttribute('aria-labelledby', 'modalTitle'); } else { dlg.removeAttribute('aria-labelledby'); dlg.setAttribute('aria-label', 'Details'); }
+  if (!dlg.open) dlg.showModal(); }
+$('#modal').addEventListener('close', () => { const f = modal._from; modal._from = null; if (f && f.isConnected) f.focus?.(); });
 
 const api = {
   token: () => store.get('token', ''),
@@ -148,14 +192,18 @@ const api = {
     catch (e) { const err = new Error('Cannot reach the service. It may be restarting; try again in a moment.'); err.network = true; throw err; }
     if (r.status === 204) return null;
     const text = await r.text(); let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    if (!r.ok) { const e = new Error((data && data.message) || `HTTP ${r.status}`); e.status = r.status; e.data = data; if (r.status === 401) toast('This service needs an access key: add it in Settings.', 4000); throw e; }
+    if (!r.ok) throw this.fail(r.status, data);
     return data;
   },
+  // An error whose message is already a sentence for people; the server's own words are kept in `detail`.
+  fail(status, data) { const said = data && typeof data === 'object' && typeof data.message === 'string' ? data.message : '';
+    const e = new Error(said); e.status = status; e.data = data; e.detail = said || (typeof data === 'string' ? data.slice(0, 200) : ''); e.message = humanError(e);
+    if (status === 401) toast('This service needs an access key: add it in Settings.', { kind: 'error' }); return e; },
   get(p) { return this.req('GET', p); }, post(p, b) { return this.req('POST', p, b ?? {}); }, patch(p, b) { return this.req('PATCH', p, b); }, del(p) { return this.req('DELETE', p); },
   // POST + Server-Sent Events reader (EventSource cannot POST).
   async stream(path, body, onEvent, signal) {
     const r = await fetch(path, { method: 'POST', headers: this.headers(), body: JSON.stringify(body), signal });
-    if (!r.ok) { let m = `HTTP ${r.status}`; try { m = (await r.json()).message || m; } catch {} throw new Error(m); }
+    if (!r.ok) { let d = null; try { d = await r.json(); } catch {} throw this.fail(r.status, d); }
     const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = '';
     for (;;) {
       const { value, done } = await reader.read(); if (done) break;
@@ -182,7 +230,7 @@ function prettyMath(t) {
   return x;
 }
 
-function md(src) {
+function md(src, cites = null) {
   if (!src) return '';
   const blocks = []; let s = String(src).replace(/\r/g, '');
   // Display math ($$...$$ or \[...\]) renders as a centred formula line; inline $...$ as code.
@@ -195,7 +243,8 @@ function md(src) {
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/(<code[^>]*>[\s\S]*?<\/code>)|\[(\d{1,2}(?:\s*[,;]\s*\d{1,2})*)\]/g, (m, code, ns) => code || !cites ? m : ns.split(/\s*[,;]\s*/).map(n => cites.has(+n) ? `<button type="button" class="cite" data-cite="${+n}" aria-haspopup="dialog" aria-expanded="false" aria-label="Source ${+n}: show the passage">${+n}</button>` : `[${+n}]`).join(''));
   const out = []; const lines = s.split('\n'); let list = null; let para = [];
   const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join('\n')).replace(/\n/g, '<br>')}</p>`); para = []; } };
   const flushList = () => { if (list) { out.push(`<${list.t}${list.t === 'ol' && list.start > 1 ? ` start="${list.start}"` : ''}>${list.items.map(i => `<li>${inline(i)}</li>`).join('')}</${list.t}>`); list = null; } };
@@ -320,7 +369,7 @@ function openSettings() {
       </section>
       <section><h4>Advanced</h4>
         <label class="toggle"><input type="checkbox" id="stAdv" ${advanced() ? 'checked' : ''}> Show Insights pages and technical details</label>
-        <span class="hint">Adds the Quality, Learning, Experiments, Speed and Status pages, and how each answer was produced.</span>
+        <span class="hint" id="stAdvHint">Adds the Quality, Learning, Experiments, Speed and Status pages, and how each answer was produced.</span>
         <label class="f" style="margin-top:10px"><span>Access key <span class="faint">(only if your administrator gave you one)</span></span>
           <input id="stTok" type="password" autocomplete="off" placeholder="Paste your access key" value="${esc(api.token())}"></label>
         <p class="tiny faint" style="margin:6px 0 0">Press <kbd>?</kbd> in Chat for keyboard shortcuts.</p>
@@ -333,6 +382,7 @@ function openSettings() {
   $$('#stTheme button').forEach(b => b.onclick = () => { setTheme(b.dataset.t === 'system' ? null : b.dataset.t); $$('#stTheme button').forEach(x => x.classList.toggle('on', x === b)); });
   $('#stAdv').onchange = (e) => { setAdvanced(e.target.checked); route(); };
   $('#stTok').onchange = (e) => { store.set('token', e.target.value.trim()); toast(e.target.value.trim() ? 'Access key saved' : 'Access key removed'); refreshStatus(); };
+  $('#stAdv').setAttribute('aria-describedby', 'stAdvHint');
 }
 $('#settingsBtn').onclick = openSettings; $('#settingsTop').onclick = openSettings;
 // Phones: the Insights pages sit behind "More" so the bottom bar keeps a few large targets.
@@ -357,20 +407,35 @@ async function refreshStatus() {
     if (advanced()) pill.title += ` Models: ${ENGINE_NAMES[s.backend] || s.backend} · quick ${s.backends.system1} · careful ${s.backends.system2}.`;
   } catch { pill.querySelector('.dot').className = 'dot bad'; pill.querySelector('.txt').textContent = 'Offline'; pill.title = 'Cannot reach the service. It may be restarting; this page reconnects on its own.'; }
 }
-setInterval(refreshStatus, 10000); refreshStatus();
-let routeGen = 0;
+// Nothing is asked of the service while the tab is in the background; coming back refreshes at once.
+setInterval(() => { if (!document.hidden) refreshStatus(); }, 10000); refreshStatus();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshStatus(); });
+// Keyboard: anything that is clickable but is not a button (table rows, cards) opens with Enter or Space.
+document.addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !== ' ') return; const t = e.target;
+  if (t instanceof HTMLElement && t.matches('tr.click, .ex[tabindex], [role=button][data-kbd]')) { e.preventDefault(); t.click(); } });
+// Pages the address can name but that are not shown: an unknown address, or an Insights page while Advanced is off.
+const stubPage = (title, html) => ({ title, async render(view) { view.innerHTML = `<div class="page"><div class="card"><div class="card-b stub">${html}</div></div></div>`;
+  const on = $('#stubAdv', view); if (on) on.onclick = () => { setAdvanced(true); route(); }; } });
+let routeGen = 0, routeSeen = false;
 async function route() {
-  const name = (location.hash.replace(/^#\//, '').split('/')[0]) || 'chat';
+  const name = (location.hash.replace(/^#\/?/, '').split(/[/?]/)[0]) || 'chat';
   const my = ++routeGen; // a slower, older render must not overwrite a newer page (review L8)
   if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
-  $$('.rail a').forEach(a => a.classList.toggle('active', a.dataset.route === name));
-  const r = routes[name] || routes.chat;
+  const known = Object.prototype.hasOwnProperty.call(routes, name) ? routes[name] : null;
+  const r = !known ? stubPage('Page not found', `<h2>There is no page at this address</h2><p class="muted">The link may be old or mistyped.</p><p><a class="btn" href="#/chat">Go to Chat</a></p>`)
+    : known.adv && !advanced() ? stubPage(known.title, `<h2>${esc(known.title)} is an Insights page</h2><p class="muted">Insights pages show measurements and technical detail. They appear when Advanced mode is on; you can turn it off again in Settings.</p><p class="row" style="justify-content:center"><button class="btn" type="button" id="stubAdv">Turn on Advanced mode</button><a class="btn ghost" href="#/chat">Go to Chat</a></p>`)
+    : known;
+  $$('.rail a').forEach(a => { const on = !!known && a.dataset.route === name; a.classList.toggle('active', on); if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   $('#pageTitle').innerHTML = `${esc(r.title)}${r.sub ? `<small class="sub">${esc(r.sub)}</small>` : ''}`; document.title = `${r.title} · Nafs-Aql`;
-  const view = h('<section class="view"></section>'); view.id = 'view'; $('#view').replaceWith(view);
+  const view = h('<section class="view" tabindex="-1"></section>'); view.id = 'view'; $('#view').replaceWith(view);
+  // After the first page, a change of page is announced and the focus moves to its heading (Chat then takes it
+  // to the message box), so a keyboard or screen-reader user is not left on a link of the page that is gone.
+  if (routeSeen) { $('#routeSay').textContent = `${r.title} page`; if (!$('#modal').open) $('#pageTitle').focus({ preventScroll: true }); }
+  routeSeen = true; liveMark();
   const alive = () => my === routeGen;
   // Pages that fetch before they draw show a skeleton instead of a blank screen; drawing replaces it.
   view.innerHTML = `<div class="page skel" aria-busy="true" aria-label="Loading"><div class="sk sk-intro"></div><div class="sk-row"><div class="sk"></div><div class="sk"></div></div><div class="sk sk-tall"></div></div>`;
-  let c = null; try { c = await r.render(view, alive) || null; } catch (e) { if (alive()) view.innerHTML = `<div class="page"><div class="notice bad">${icon.alert}<span>${esc(e.message)}</span></div></div>`; }
+  let c = null; try { c = await r.render(view, alive) || null; } catch (e) { console.warn('page failed', e); if (alive()) { view.innerHTML = `<div class="page"><div class="notice bad" role="alert">${icon.alert}<span>This page could not be loaded. ${esc(humanError(e))}</span><span class="sp"></span><button class="btn sm ghost" type="button" id="routeRetry">Try again</button></div></div>`; $('#routeRetry', view).onclick = route; } }
   if (alive()) cleanup = c; else if (c) { try { c(); } catch {} }
 }
 window.addEventListener('hashchange', route);
@@ -419,27 +484,37 @@ class Turn {
       <button data-a="copy" title="Copy the answer">${icon.copy}Copy</button><button data-a="regen" title="Ask the same question again">${icon.retry}Regenerate</button>
       <button data-a="why" title="Why this answer took this path">${icon.book}Why?</button><button data-a="inspect" class="adv-only" title="Show how this answer was produced">${icon.search}Details</button><button data-a="compare" class="adv-only" title="Compare the first draft with the final answer" hidden>${icon.compare}Compare</button></div></div></div>`);
     this.el.querySelector('.actions').onclick = (e) => { const a = e.target.closest('button')?.dataset.a; if (!a) return;
-      if (a === 'inspect') this.onSelect?.(this, true); if (a === 'copy') copyText(this.reply?.message?.content || this.answerText()).then((ok) => toast(ok ? 'Copied' : 'Could not copy: select the text and press Ctrl/Cmd+C'));
+      if (a === 'inspect') this.onSelect?.(this, true); if (a === 'copy') copyText(this.reply?.message?.content || this.answerText()).then((ok) => toast(ok ? 'Copied' : 'Could not copy: select the text and press Ctrl/Cmd+C', ok ? {} : { kind: 'error' }));
       if (a === 'slow' || a === 'fast') this.onRetry?.(this.prompt, a, this.request);
       if (a === 'regen') this.onRetry?.(this.prompt, this.request?.force_mode || 'auto', this.request);
       if (a === 'compare') compareModal(this);
       if (a === 'why' && this.reply) modal(`<h3 style="margin-top:0">Why this answer</h3><p class="small">${esc(whyText(this.reply))}</p>`);
       if (a === 'up' || a === 'down') this.rate(a === 'up' ? 1 : -1); };
     this.el.querySelector('.body').addEventListener('dblclick', () => advanced() && this.onSelect?.(this, true));
+    // A citation in the answer opens the passage it points to.
+    this.el.querySelector('.answer').addEventListener('click', (e) => { const b = e.target.closest('.cite'); if (!b) return;
+      const src = (this.reply?.sources || []).find(x => x.chunk_id && +x.n === +b.dataset.cite); if (src) citePopover(b, src, this); });
     this.onVerify = opts.onVerify || null;
     this.el.querySelector('.followups').onclick = (e) => { const f = e.target.closest('button')?.dataset.f; if (!f) return;
       if (f === 'slow' || f === 'fast') this.onRetry?.(this.prompt, f, this.request);
       if (f === 'steps') this.onRetry?.(`${this.prompt}\n\nExplain your reasoning step by step.`, this.request?.force_mode || 'auto', this.request);
       if (f === 'compare') compareModal(this); if (f === 'verify') this.onVerify?.(this); };
-    container.appendChild(this.el); this.scheduled = false; this.render();
-    this.ticker = setInterval(() => { if (this.reply || this.error || !this.el.isConnected) clearInterval(this.ticker); else this.schedule(); }, 500);
+    container.appendChild(this.el); this.timer = null; this.dirty = false; this.stopped = false; this.render(); this.tick();
   }
-  dispose() { clearInterval(this.ticker); this.onUpdate = null; }
+  isLive() { return !this.reply && !this.error && !this.stopped; }
+  // The elapsed time keeps counting while the answer is on screen; off screen (another page) nothing is drawn.
+  tick() { clearInterval(this.ticker); this.ticker = setInterval(() => { if (!this.isLive()) clearInterval(this.ticker); else if (this.el.isConnected) this.schedule(); }, 500); }
+  dispose() { clearInterval(this.ticker); clearTimeout(this.timer); this.timer = null; this.onUpdate = null; }
+  // Put this turn (back) on a page: an answer still being written survives leaving Chat and returning to it.
+  adopt(container, opts = {}) { this.onSelect = opts.onSelect; this.onRetry = opts.onRetry; this.onVerify = opts.onVerify || null; this.onUpdate = opts.onUpdate || null;
+    container.appendChild(this.el); this.dirty = false; this.render(); if (this.isLive()) this.tick(); }
+  // Stopped by the person: not an error. What was written so far stays.
+  stop() { if (!this.isLive()) return; this.stopped = true; this.log('stopped', 'stopped by you'); this.schedule(true); }
   async rate(v) {
     if (!this.reply?.reply_id) return; const prev = this.feedback; this.feedback = prev === v ? prev : v; this.render();
     if (prev === v) return;
     try { await api.post(`/v1/replies/${this.reply.reply_id}/feedback`, { rating: v }); toast(v > 0 ? 'Thanks for the feedback' : 'Thanks: this answer is flagged for review'); }
-    catch (e) { this.feedback = prev; this.render(); toast(e.message); }
+    catch (e) { this.feedback = prev; this.render(); toastErr(e); }
   }
   log(kind, text) { this.events.push({ t: performance.now() - this.t0, kind, text }); }
   answerText() { return this.escalated ? this.slow : this.fast; }
@@ -456,11 +531,18 @@ class Turn {
       case 'done': this.reply = d; this.states = d.states; this.cur = d.trace_state; this.decision = d.decision; this.escalated = d.reasoning_mode === 'slow'; this.log('done', `${d.reasoning_mode} · ${d.assurance} · ${fmtMs(d.usage.wall_ms)}`); break;
       case 'error': this.error = d.message; this.log('error', d.message); break;
     }
-    this.schedule();
+    this.schedule(ev === 'done' || ev === 'error');
   }
-  schedule() { if (this.scheduled) return; this.scheduled = true; requestAnimationFrame(() => { this.scheduled = false; this.render(); }); }
+  // While the answer streams, the page is redrawn at most every 150 ms (each redraw parses the whole answer);
+  // the finished answer, an error and a stop are drawn at once.
+  schedule(now = false) {
+    if (!this.el.isConnected) { this.dirty = true; return; }
+    if (now) { clearTimeout(this.timer); this.timer = null; this.render(); return; }
+    if (this.timer) return;
+    this.timer = setTimeout(() => { this.timer = null; if (this.el.isConnected) this.render(); else this.dirty = true; }, Math.max(0, 150 - (performance.now() - (this.drawnAt || 0))));
+  }
   render() {
-    const r = this.reply, el = this.el; const live = !r && !this.error;
+    const r = this.reply, el = this.el; const live = this.isLive(); this.drawnAt = performance.now(); el.setAttribute('aria-busy', String(live));
     const mode = r ? r.reasoning_mode : (this.escalated ? 'slow' : 'fast');
     const adv = advanced();
     el.querySelector('.meta').innerHTML = [r || adv ? modeBadge(mode) : '', r ? assureBadge(r.assurance) : '', adv && (r?.domain || this.domain) ? `<span class="badge b-domain">${esc(r?.domain || this.domain)}</span>` : '',
@@ -480,17 +562,22 @@ class Turn {
     { const tools = el.querySelector('.tools'); const open = new Set($$('.toolcard[open]', tools).map((x, i) => i)); const html = adv ? toolcardsHTML(this, live) : ''; if (tools.dataset.h !== html) { tools.dataset.h = html; tools.innerHTML = html; $$('.toolcard', tools).forEach((x, i) => { if (open.has(i)) x.open = true; }); } }
     const text = r ? r.message.content : this.answerText();
     const ans = el.querySelector('.answer');
-    if (!text && live) ans.innerHTML = this.escalated ? `<span class="muted small"><span class="spin"></span> Thinking it through. Careful answers can take a minute or two.</span>` : '<span class="caret"></span>';
-    else ans.innerHTML = md(text) + (live ? '<span class="caret"></span>' : '');
+    const cites = r ? new Set((r.sources || []).filter(x => x.chunk_id).map(x => +x.n)) : null;
+    const ahtml = !text && live ? (this.escalated ? `<span class="muted small"><span class="spin"></span> Thinking it through. Careful answers can take a minute or two.</span>` : '<span class="caret"></span>')
+      : md(text, cites && cites.size ? cites : null) + (live ? '<span class="caret"></span>' : '');
+    if (this._ans !== ahtml) { this._ans = ahtml; ans.innerHTML = ahtml; closeCite(false, this); }
     let notes = '';
     if (r?.retrieved?.length) notes += `<div class="sources">${icon.book}<span>Drew on ${r.retrieved.length} earlier checked answer${r.retrieved.length > 1 ? 's' : ''}: ${r.retrieved.map(x => `<span class="src" title="${esc(x.question || '')}">${esc((x.question || '').slice(0, 60))}${(x.question || '').length > 60 ? '…' : ''} <span class="faint">(${pct(x.score, 0)} match)</span></span>`).join(' · ')}</span></div>`;
     if (r?.sources?.length) notes += kbSourcesHTML(r.sources);
+    else if (r && this.request?.knowledge?.kb) notes += kbWeakNote('Nothing in the knowledge base is about this question, so this answer does not come from your documents.');
     if (r?.uncertainty_notice) notes += `<div class="notice ${r.assurance === 'abstained' ? 'bad' : ''}">${icon.alert}<span>${esc(r.uncertainty_notice)}</span></div>`;
     if (this.error) notes += `<div class="notice bad">${icon.alert}<span>${esc(this.error)}</span></div>`;
-    el.querySelector('.notes').innerHTML = notes;
+    if (this.stopped) notes += `<div class="notice info stopnote">${icon.stop}<span><b>Stopped.</b> ${text ? 'What was written so far is kept above.' : 'Nothing had been written yet.'} Choose Regenerate to ask again.</span></div>`;
+    // Redrawn only when it changes, so an opened source stays open.
+    if (this._notes !== notes) { this._notes = notes; el.querySelector('.notes').innerHTML = notes; }
     { const fu = el.querySelector('.followups'); const html = r && !this.error ? followupsHTML(this) : ''; if (fu.dataset.h !== html) { fu.dataset.h = html; fu.innerHTML = html; } }
     el.querySelector('.actions').style.display = live ? 'none' : '';
-    const acts = el.querySelector('.actions'); acts.querySelector('[data-a=compare]').hidden = !(r && r.draft);
+    const acts = el.querySelector('.actions'); acts.querySelector('[data-a=compare]').hidden = !(r && r.draft); acts.querySelector('[data-a=why]').hidden = !r;
     acts.querySelector('[data-a=up]').classList.toggle('on', this.feedback === 1); acts.querySelector('[data-a=down]').classList.toggle('on', this.feedback === -1);
     acts.querySelectorAll('.fb').forEach(b => { b.hidden = !r?.reply_id || !!r?.conversation_id === false; });
     this.onUpdate?.(this);
@@ -515,9 +602,9 @@ function judgeBars(d) {
 document.addEventListener('click', async (e) => {
   const dl = e.target.closest('a[data-dl]');
   if (dl) { e.preventDefault(); try { const r = await fetch(dl.getAttribute('href'), { headers: api.headers() }); if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const name = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'export'; const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click(); } catch (err) { toast(err.message); } return; }
+      const name = (r.headers.get('content-disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'export'; const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = name; a.click(); } catch (err) { toastErr(err); } return; }
   const b = e.target.closest('[data-decision]'); if (!b) return; e.preventDefault();
-  try { const d = await api.get('/v1/decisions/' + b.dataset.decision); modal(`<h3 style="margin-top:0">Decision record</h3><div class="codebox" style="max-height:60vh;overflow:auto">${esc(JSON.stringify(d, null, 2))}</div>`); } catch (err) { toast(err.message); }
+  try { const d = await api.get('/v1/decisions/' + b.dataset.decision); modal(`<h3 style="margin-top:0">Decision record</h3><div class="codebox" style="max-height:60vh;overflow:auto">${esc(JSON.stringify(d, null, 2))}</div>`); } catch (err) { toastErr(err); }
 });
 // P7-T01: where the time went. Stage colours and a stacked bar (samples drawn with the draft overlap it, so they are listed, not stacked; samples drawn after it, sample_after, and the rescue tries before escalating, are stacked).
 const STAGE = { retrieval: ['Looking up earlier answers', 'var(--faint)'], draft: ['Quick draft', 'var(--fast)'], sample: ['Quick samples', 'var(--leaf)'], sample_after: ['Quick samples', 'var(--leaf)'], verify_draft: ['Checking the draft', 'var(--navy)'], rescue: ['Extra quick tries', 'var(--leaf)'], deliberate_overlap: ['Other tries at the same time', 'var(--slate)'], probe_overlap: ['Progress checks of those tries', 'var(--slate)'], probe: ['Progress check', 'var(--violet)'],
@@ -531,7 +618,52 @@ function stagesHTML(u) { const S = (u?.stages || []); if (!S.length) return '';
   return `<div class="sec"><h3>Where the time went</h3>${stageBar(parts)}<table class="t mini-t">${S.map(s => `<tr><td><i class="dot" style="background:${STAGE[s.stage]?.[1] || 'var(--slate)'}"></i>${esc(STAGE[s.stage]?.[0] || s.stage)}${s.stage === 'sample' ? ' <span class="faint">(at the same time)</span>' : ''}<div class="tiny faint">${engineLine(s)}${s.note ? `${engineLine(s) ? ' · ' : ''}${esc(s.note)}` : ''}</div></td><td class="num">${fmtMs(s.ms)}</td></tr>`).join('')}
     ${other > 0 ? `<tr><td><i class="dot" style="background:var(--surface-3)"></i>Other</td><td class="num">${fmtMs(other)}</td></tr>` : ''}</table></div>`; }
 // A dropped stream (network suspended, gateway restarted) cancels the request on the server, so say so and what to do.
-const streamError = (e) => /network|fetch|load failed|suspended|terminated/i.test(String(e?.message || e)) ? 'The connection dropped, so this answer stopped. Press Regenerate to ask again.' : (e?.message || String(e));
+// ---- citations: the passage behind an "[n]" in an answer, in a small popover next to it ----
+let citeEl = null;
+function closeCite(refocus = false, turn = null) {
+  if (!citeEl || (turn && citeEl._turn !== turn)) return; const b = citeEl._btn; citeEl.remove(); citeEl = null;
+  if (b?.isConnected) { b.setAttribute('aria-expanded', 'false'); if (refocus) b.focus(); }
+}
+function citePopover(btn, src, turn) {
+  if (citeEl && citeEl._btn === btn) return closeCite(true); closeCite(false);
+  const n = +src.n || 0; const text = String(src.text || '').replace(/^#{1,6} /gm, '').trim();
+  const where = [src.heading && src.heading !== src.doc_title ? esc(src.heading) : '', +src.page ? `page ${+src.page}` : '', src.kb_name ? esc(src.kb_name) : ''].filter(Boolean).join(' · ');
+  const el = h(`<div class="cite-pop" role="dialog" aria-label="Source ${n}" tabindex="-1"><div class="cp-h"><span class="kb-n">${n}</span><b>${esc(src.doc_title || 'Document')}</b><button type="button" class="ibtn" data-c="x" aria-label="Close">${icon.x}</button></div>
+    ${where ? `<div class="tiny faint">${where}</div>` : ''}<div class="kb-ptext">${esc(text.length > 700 ? text.slice(0, 700) + '…' : text) || '<span class="faint">The passage text was not kept with this answer.</span>'}</div>
+    <div class="row cp-a"><button type="button" class="btn sm ghost" data-c="list">Show in the source list</button>${src.doc_id && src.kb ? '<button type="button" class="btn sm ghost" data-c="doc">Open in the document</button>' : ''}</div></div>`);
+  el._btn = btn; el._turn = turn; document.body.appendChild(el); citeEl = el; btn.setAttribute('aria-expanded', 'true');
+  const r = btn.getBoundingClientRect(), w = Math.min(420, window.innerWidth - 24); el.style.width = w + 'px';
+  el.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + 'px';
+  const hgt = el.offsetHeight; el.style.top = (r.bottom + 8 + hgt > window.innerHeight - 8 && r.top - 8 - hgt > 8 ? r.top - 8 - hgt : r.bottom + 8) + 'px';
+  el.onclick = (e) => { const c = e.target.closest('[data-c]')?.dataset.c; if (!c) return;
+    if (c === 'x') return closeCite(true);
+    closeCite(false);
+    if (c === 'list') { const d = turn.el.querySelector(`.kb-src[data-n="${n}"]`); if (d) { d.open = true; d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); d.querySelector('summary').focus({ preventScroll: true }); d.classList.add('flash'); setTimeout(() => d.classList.remove('flash'), 1600); } }
+    if (c === 'doc') guard(() => kbPassageModal(src.kb, { id: src.doc_id, title: src.doc_title }, { chunkId: src.chunk_id }), 'The document could not be opened.')(); };
+  el.onkeydown = (e) => { if (e.key === 'Escape') { e.stopPropagation(); closeCite(true); } };
+  el.focus({ preventScroll: true });
+}
+document.addEventListener('click', (e) => { if (citeEl && !e.target.closest('.cite-pop, .cite')) closeCite(false); });
+document.addEventListener('scroll', (e) => { if (citeEl && !(e.target instanceof Element && e.target.closest('.cite-pop'))) closeCite(false); }, true);
+window.addEventListener('resize', () => closeCite(false)); window.addEventListener('hashchange', () => closeCite(false));
+// A document's passages, 50 at a time. Given a passage (its place `ord`, or only its id), the page that holds it
+// opens with that passage marked and scrolled into view, so a search hit or a citation is read in its context.
+async function kbPassageModal(kbId, d, { offset = 0, ord = null, chunkId = null, query = '' } = {}) {
+  const base = `/v1/kb/${encodeURIComponent(kbId)}/documents/${encodeURIComponent(d.id)}/chunks`;
+  if (ord == null && chunkId) { // only the id is known: look for its place (up to 2,000 passages)
+    for (let off = 0, i = 0; i < 4; i++, off += 500) { const s = await api.get(`${base}?offset=${off}&limit=500`); const c = (s.chunks || []).find(x => x.id === chunkId);
+      if (c) { ord = +c.ord; break; } if (off + (s.chunks || []).length >= s.total || !(s.chunks || []).length) break; } }
+  if (ord != null) offset = Math.floor(ord / 50) * 50;
+  const r = await api.get(`${base}?offset=${offset}&limit=50`); const chunks = r.chunks || []; const total = +r.total || 0;
+  const more = offset + chunks.length < total; const isHit = (c) => (ord != null && +c.ord === +ord) || (chunkId != null && c.id === chunkId);
+  modal(`<h3 style="margin-top:0">${esc(d.title || 'Document')}</h3><div class="small muted">${plural(total, 'passage')}${+d.pages ? ` from ${plural(+d.pages, 'page')}` : ''}${chunks.length ? `; showing ${offset + 1}–${offset + chunks.length}` : ''}.${(ord != null || chunkId) && !chunks.some(isHit) ? ' The passage could not be found; it may have changed since.' : ''}</div>
+    <div class="kb-passages">${chunks.map(c => `<div class="kb-pass${isHit(c) ? ' hit' : ''}"${isHit(c) ? ' id="kbPassHit" tabindex="-1"' : ''}><div class="tiny faint">#${(+c.ord || 0) + 1}${c.heading ? ` · ${esc(c.heading)}` : ''}${+c.page ? ` · page ${+c.page}` : ''}${isHit(c) ? ' · <b>the passage you opened</b>' : ''}</div><div class="kb-ptext kb-htext">${isHit(c) && query ? kbHighlight(c.text, query) : esc(String(c.text || '').replace(/^#{1,6} /gm, ''))}</div></div>`).join('') || '<div class="empty small">This document has no passages.</div>'}</div>
+    <div class="row" style="justify-content:space-between;margin-top:10px">${offset > 0 ? '<button class="btn sm ghost" type="button" id="kbPrev">Previous</button>' : '<span></span>'}${more ? '<button class="btn sm ghost" type="button" id="kbNext">Next 50</button>' : ''}</div>`);
+  const p = $('#kbPrev'), n = $('#kbNext'); const go = (off) => guard(() => kbPassageModal(kbId, d, { offset: off }), 'The passages could not be loaded.')();
+  if (p) p.onclick = () => go(Math.max(0, offset - 50)); if (n) n.onclick = () => go(offset + 50);
+  const hit = $('#kbPassHit'); if (hit) { hit.scrollIntoView({ block: 'center' }); hit.focus({ preventScroll: true }); } else $('.kb-passages')?.scrollTo?.(0, 0);
+}
+const streamError = (e) => /network|fetch|load failed|suspended|terminated/i.test(String(e?.message || e)) ? 'The connection dropped, so this answer stopped. Press Regenerate to ask again.' : humanError(e);
 function inspectorHTML(t) {
   if (!t) return `<div class="sec"><h3>Answer details</h3><p class="muted small">Send a message, or choose <b>Details</b> on an answer, to see how it was routed, what each check found and where the time went.</p>
     <dl class="kv small">${Object.entries(STATIONS).map(([k, v]) => `<dt>${v.en}</dt><dd>${esc(v.tip.replace(/^[^:]*\(Q [^)]*\):\s*/, ''))}</dd>`).join('')}</dl></div>`;
@@ -566,16 +698,53 @@ const EXAMPLES = [
 
 function settingsBar() { return { s: PREFS, save: savePrefs }; }
 
+// The answer being written lives here, not in the Chat page: leaving Chat (or opening another chat) does not
+// cancel it, and coming back puts it on the page again. `view` is the Chat page that is on screen, if any.
+const LIVE = { cur: null, view: null };
+let chatDraft = null; // text another page wants in the message box when Chat opens ("Ask about this")
+function liveMark() {
+  const L = LIVE.cur, on = !!L && !L.done; const a = $('.rail a[data-route="chat"]');
+  if (a) { a.classList.toggle('answering', on && !LIVE.view); if (on && !LIVE.view) a.setAttribute('aria-label', 'Chat: an answer is being written'); else a.removeAttribute('aria-label'); }
+  $$('#convList .conv').forEach(el => el.classList.toggle('answering', on && el.dataset.id === L.convId));
+}
+function startLive({ text, body, turn }) {
+  const ctrl = new AbortController(); const L = { convId: body.conversation_id || null, text, body, turn, ctrl, done: false, stopped: false }; LIVE.cur = L;
+  (async () => {
+    try { await api.stream('/v1/chat/stream', body, (ev, data) => {
+        if (ev === 'start' && data.data.conversation_id && !L.convId) { L.convId = data.data.conversation_id; if (LIVE.view) LIVE.view.onStart(L); else if (store.get('conv', null) == null) store.set('conv', L.convId); liveMark(); }
+        turn.on(ev, data); }, ctrl.signal);
+      if (turn.isLive()) turn.on('error', { data: { message: 'The answer stopped early. It may still have been saved: reopen the chat to check.' } }); }
+    catch (e) { if (e.name === 'AbortError' || ctrl.signal.aborted) { L.stopped = true; turn.stop(); } else turn.on('error', { data: { message: streamError(e) } }); }
+    finally { L.done = true; liveMark();
+      if (LIVE.view) LIVE.view.onDone(L);
+      else if (turn.reply) toast('Your answer is ready', { ms: 8000, action: { label: 'Open chat', fn: () => { if (L.convId) store.set('conv', L.convId); location.hash = '#/chat'; } } });
+      else if (!L.stopped) toast('The answer you were waiting for stopped early.', { kind: 'error', action: { label: 'Open chat', fn: () => { if (L.convId) store.set('conv', L.convId); location.hash = '#/chat'; } } }); }
+  })();
+  liveMark(); return L;
+}
+// Deleting a chat waits a few seconds, so Undo can bring it back; closing the page deletes at once.
+const convTrash = new Map();
+function deleteConvSoon(id, title) {
+  let closeToast = () => {};
+  const fin = () => { convTrash.delete(id); closeToast(); api.del('/v1/conversations/' + id).then(() => LIVE.view?.convsChanged(), (e) => { if (e.status !== 404) toastErr(e, 'The chat was not deleted.'); LIVE.view?.convsChanged(); }); };
+  convTrash.set(id, { timer: setTimeout(fin, 6500) });
+  closeToast = toast(`Deleted “${title}”`, { ms: 6500, action: { label: 'Undo', fn: () => { const p = convTrash.get(id); if (!p) return; clearTimeout(p.timer); convTrash.delete(id); LIVE.view?.convsChanged(); toast('The chat is back', { kind: 'info' }); } } });
+}
+window.addEventListener('pagehide', () => { for (const [id, p] of convTrash) { clearTimeout(p.timer); try { fetch('/v1/conversations/' + id, { method: 'DELETE', headers: api.headers(), keepalive: true }); } catch {} } convTrash.clear(); });
+// What a stored answer was asked with, as far as the answer records it, so asking again keeps the mode and the knowledge base.
+const storedRequest = (reply) => { const src = (reply.sources || []).find(x => x && x.kb);
+  return { verification: null, force_mode: reply.decision?.rule === 'forced_override' ? reply.reasoning_mode : null, knowledge: src ? { kb: src.kb, mode: 'auto' } : null }; };
+
 routes.chat = { title: 'Chat', async render(view, alive) {
   const cfg = settingsBar(); const S = cfg.s;
   view.innerHTML = `<div class="chat noinspect" id="chatGrid">
     <aside class="convs"><div class="head" style="flex-direction:column;align-items:stretch;gap:8px"><button class="btn" id="newConv" style="justify-content:center" title="New chat (Ctrl/Cmd+K)">${icon.plus}New chat</button>
-      <input id="convSearch" type="search" placeholder="Search chats" aria-label="Search chats"></div><div class="list" id="convList"></div></aside>
+      <input id="convSearch" type="search" placeholder="Search chats" aria-label="Search chats"></div><nav class="list" id="convList" aria-label="Your chats"></nav></aside>
     <div class="thread"><div class="mbar"><button class="btn sm ghost" id="convsToggle" type="button" aria-label="Show conversations"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Chats</button><span class="sp"></span><button class="btn sm" id="mbNew" type="button">${icon.plus}New chat</button></div><div class="threadbar" id="threadBar" hidden><b id="tbTitle" class="t1"></b><span class="sp"></span>
         <div class="menu-wrap"><button class="btn sm ghost icon-only" id="tbMenu" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Chat options" title="Chat options"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
           <div class="pop menu" id="tbPop" hidden><button type="button" id="tbExport">${icon.download}Download chat</button>
             <label class="toggle"><input type="checkbox" id="tbOptOut"> Don't use to improve answers</label></div></div></div>
-      <div class="msgs" id="msgs"><div class="inner" id="inner"></div></div>
+      <div class="msgs" id="msgs" role="log" aria-label="Conversation" tabindex="0"><div class="inner" id="inner"></div></div>
       <div class="composer"><div class="inner">
         <div id="verifyPanel" class="verify-panel" hidden>
           <div class="row" style="margin-bottom:8px"><b class="small">Add a check</b><span class="hint">The reply is checked against this exactly, and is marked Checked only if it passes.</span><span class="sp"></span><button class="btn ghost sm" id="vClear" type="button">Clear</button></div>
@@ -646,59 +815,86 @@ routes.chat = { title: 'Chat', async render(view, alive) {
   input.addEventListener('input', autosize);
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
   $('#sendBtn').onclick = () => busy ? busy.abort() : send();
-  const setBusy = (ctrl) => { busy = ctrl; const b = $s('#sendBtn'); b.innerHTML = ctrl ? icon.stop : icon.send; b.title = ctrl ? 'Stop' : 'Send'; b.classList.toggle('danger', !!ctrl); };
+  const setBusy = (ctrl) => { busy = ctrl; const b = $s('#sendBtn'); b.innerHTML = ctrl ? icon.stop : icon.send; b.title = ctrl ? 'Stop the answer (Esc)' : 'Send (Enter)'; b.setAttribute('aria-label', ctrl ? 'Stop the answer' : 'Send'); b.classList.toggle('danger', !!ctrl); };
+  const liveNow = () => (LIVE.cur && !LIVE.cur.done ? LIVE.cur : null);
+  const onTurnUpdate = (t) => { if (selected === t) insp.innerHTML = inspectorHTML(t); const near = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 160; if (near) scrollDown(); };
+  // Put the answer in flight (or one that ended while this chat was not on screen) back on the page.
+  // `tailUser` is the last stored message when it is a question: the one being answered may be stored already.
+  function attachLive(tailUser = null) {
+    const L = LIVE.cur; if (!L || (L.convId || null) !== (convId || null)) return;
+    if (inner.contains(L.turn.el)) return;
+    if (L.done && L.turn.reply && turns.some(t => t.reply?.reply_id && t.reply.reply_id === L.turn.reply.reply_id)) { LIVE.cur = null; return; }
+    if (inner.querySelector('.welcome')) inner.innerHTML = '';
+    if (tailUser !== L.text) addUser(L.text);
+    L.turn.adopt(inner, { onSelect: select, onRetry: retry, onVerify, onUpdate: onTurnUpdate }); turns.push(L.turn); select(L.turn);
+    if (L.done) LIVE.cur = null; else setBusy(L.ctrl); scrollDown();
+  }
   const scrollDown = () => { msgs.scrollTop = msgs.scrollHeight; };
   const welcome = () => { inner.innerHTML = `<div class="welcome"><h2>Fast when it can, careful when it must.</h2><p>Simple questions get an instant answer. Hard ones get time to think. Answers that can be checked exactly are marked <b>Checked</b>.</p>
       <div class="starters">${EXAMPLES.map((x, i) => `<div class="starter ex" data-i="${i}" tabindex="0" role="button"><span class="st-ico">${icon[x.i] || icon.bolt}</span><div><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div></div>`).join('')}</div>
       <div class="journey adv-only" aria-label="How an answer is made">${journeyHTML(['A', 'L', 'M', 'T'], ['A', 'L', 'M', 'T'], null, null, null)}<span class="jlive"><span class="faint">or</span></span><span class="jstep x" title="${esc(STATIONS.X.tip)}"><span class="n">X</span>${STATIONS.X.en}<i class="ar">${STATIONS.X.ar}</i></span></div>
       <p class="tiny faint" style="margin-top:10px"><button class="linkbtn" id="dnBtn">About the name Nafs-Aql</button></p></div>`;
     $('#dnBtn') && ($('#dnBtn').onclick = designNotes);
-    $$('.ex', inner).forEach(el => { const go = () => { const x = EXAMPLES[+el.dataset.i]; input.value = x.prompt; autosize(); fillVerification(x.v || null); input.focus(); }; el.onclick = go; el.onkeydown = (e) => e.key === 'Enter' && go(); }); };
+    $$('.ex', inner).forEach(el => { const go = () => { const x = EXAMPLES[+el.dataset.i]; input.value = x.prompt; autosize(); fillVerification(x.v || null); input.focus(); }; el.onclick = go; }); };
   const addUser = (text, who) => { const el = h(`<div class="msg user">${who ? `<div class="who">${esc(who)}</div>` : ''}</div>`); el.appendChild(document.createTextNode(text)); inner.appendChild(el); };
   let convCache = [];
   $('#convSearch').addEventListener('input', () => renderConvs());
   async function loadConvs() { try { convCache = await api.get('/v1/conversations'); renderConvs(); } catch {} }
+  const exportConv = guard(async (id) => { const c = await api.get('/v1/conversations/' + id); downloadText(`nafs-aql-${c.conversation_id.slice(0, 8)}.json`, JSON.stringify(c, null, 2), 'application/json'); }, 'The chat was not downloaded.');
+  // Each row is a real button (open) with two more beside it (download, delete), all reachable by keyboard.
   function renderConvs() {
-    { const q = ($('#convSearch')?.value || '').toLowerCase(); const list = convCache.filter(c => !q || c.title.toLowerCase().includes(q)); const L = $('#convList');
-      const row = (c) => `<div class="conv ${c.conversation_id === convId ? 'on' : ''}" data-id="${c.conversation_id}"><span class="t1" title="${esc(c.title)} · ${esc(new Date(c.updated_at).toLocaleString())}">${esc(c.title)}</span><button class="x" title="Download" aria-label="Download chat" data-exp="${c.conversation_id}">⤓</button><button class="x" title="Delete" aria-label="Delete chat" data-del="${c.conversation_id}">×</button></div>`;
-      const groups = []; for (const c of list) { const g = dayLabel(c.updated_at) || 'Earlier'; if (!groups.length || groups[groups.length - 1].g !== g) groups.push({ g, items: [] }); groups[groups.length - 1].items.push(c); }
-      L.innerHTML = list.length ? groups.map(gr => `<div class="convgroup">${esc(gr.g)}</div>${gr.items.map(row).join('')}`).join('') : `<div class="empty small">${q ? '<b>No chat matches.</b><br>Try another word, or start a new chat.' : '<b>No chats yet.</b><br>Ask something; your chats are saved here.'}</div>`;
-      $$('.conv', L).forEach(el => el.onclick = async (e) => { if (e.target.dataset.exp) { const c = await api.get('/v1/conversations/' + e.target.dataset.exp);
-          const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(c, null, 2)], { type: 'application/json' })); a.download = `nafs-aql-${c.conversation_id.slice(0, 8)}.json`; a.click(); return; }
-        if (e.target.dataset.del) { const id = e.target.dataset.del; const title = el.querySelector('.t1')?.textContent || 'this conversation';
-          if (await confirmDialog({ title: 'Delete this chat?', ok: 'Delete', body: `<p>“${esc(title)}” and its messages are removed for good. This cannot be undone.</p><p class="small muted">Download it first if you want to keep a copy.</p>` })) { await api.del('/v1/conversations/' + id); if (convId === id) newConv(); loadConvs(); } return; } openConv(el.dataset.id); });
-    }
+    const L = $('#convList'); if (!L) return; const q = ($('#convSearch')?.value || '').toLowerCase(); const list = convCache.filter(c => !convTrash.has(c.conversation_id) && (!q || String(c.title).toLowerCase().includes(q)));
+    const liveId = liveNow()?.convId; const had = document.activeElement?.closest?.('#convList .conv')?.dataset.id, hadKind = document.activeElement?.dataset?.exp ? 'exp' : document.activeElement?.dataset?.del ? 'del' : 'open';
+    const row = (c) => { const id = esc(c.conversation_id), on = c.conversation_id === convId;
+      return `<div class="conv ${on ? 'on' : ''} ${c.conversation_id === liveId ? 'answering' : ''}" data-id="${id}"><button type="button" class="conv-open t1" ${on ? 'aria-current="true"' : ''} title="${esc(c.title)} · ${esc(new Date(c.updated_at).toLocaleString())}">${esc(c.title)}</button><span class="live-dot" title="An answer is being written"></span><button type="button" class="x" title="Download this chat" aria-label="Download the chat “${esc(c.title)}”" data-exp="${id}">${icon.download}</button><button type="button" class="x" title="Delete this chat" aria-label="Delete the chat “${esc(c.title)}”" data-del="${id}">${icon.x}</button></div>`; };
+    const groups = []; for (const c of list) { const g = dayLabel(c.updated_at) || 'Earlier'; if (!groups.length || groups[groups.length - 1].g !== g) groups.push({ g, items: [] }); groups[groups.length - 1].items.push(c); }
+    L.innerHTML = list.length ? groups.map(gr => `<div class="convgroup">${esc(gr.g)}</div>${gr.items.map(row).join('')}`).join('') : `<div class="empty small">${q ? '<b>No chat matches.</b><br>Try another word, or start a new chat.' : '<b>No chats yet.</b><br>Ask something; your chats are saved here.'}</div>`;
+    if (had) { const el = $$('.conv', L).find(x => x.dataset.id === had); (el?.querySelector(hadKind === 'exp' ? '[data-exp]' : hadKind === 'del' ? '[data-del]' : '.conv-open'))?.focus({ preventScroll: true }); }
   }
+  $('#convList').addEventListener('click', (e) => {
+    const el = e.target.closest('.conv'); if (!el) return; const id = el.dataset.id;
+    if (e.target.closest('[data-exp]')) return exportConv(id);
+    if (e.target.closest('[data-del]')) { const title = el.querySelector('.t1')?.textContent || 'this chat'; const next = el.nextElementSibling?.querySelector?.('.conv-open') || el.previousElementSibling?.querySelector?.('.conv-open');
+      if (liveNow()?.convId === id) liveNow().ctrl.abort();
+      deleteConvSoon(id, title); if (convId === id) newConv(); renderConvs(); if (convId !== id) (next?.isConnected ? next : $('#convList .conv-open') || $('#newConv'))?.focus?.(); return; }
+    openConv(id); });
   const showBar = (c) => { const bar = $s('#threadBar'); if (!c) { bar.hidden = true; return; } bar.hidden = false; $s('#tbTitle').textContent = c.title; $s('#tbOptOut').checked = !!c.training_opt_out; };
-  $('#tbOptOut').onchange = async (e) => { if (!convId) return; try { await api.patch('/v1/conversations/' + convId, { training_opt_out: e.target.checked }); toast(e.target.checked ? 'This chat will not be used to improve answers' : 'This chat may be used to improve answers'); } catch (x) { toast(x.message); e.target.checked = !e.target.checked; } };
-  $('#tbExport').onclick = async () => { closePop(); if (!convId) return; const c = await api.get('/v1/conversations/' + convId); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(c, null, 2)], { type: 'application/json' })); a.download = `nafs-aql-${c.conversation_id.slice(0, 8)}.json`; a.click(); };
-  function newConv() { convId = null; store.set('conv', null); turns.forEach(t => t.dispose()); turns = []; select(null); welcome(); showBar(null); $$('.conv').forEach(c => c.classList.remove('on')); input.focus(); }
+  $('#tbOptOut').onchange = async (e) => { if (!convId) return; try { await api.patch('/v1/conversations/' + convId, { training_opt_out: e.target.checked }); toast(e.target.checked ? 'This chat will not be used to improve answers' : 'This chat may be used to improve answers'); } catch (x) { toastErr(x, 'That setting was not saved.'); e.target.checked = !e.target.checked; } };
+  $('#tbExport').onclick = () => { closePop(); if (convId) exportConv(convId); };
+  function newConv() { convId = null; store.set('conv', null); turns.forEach(t => t.dispose()); turns = []; select(null); welcome(); showBar(null); $$('.conv').forEach(c => { c.classList.remove('on'); c.querySelector('.conv-open')?.removeAttribute('aria-current'); }); attachLive(); input.focus(); }
   async function openConv(id) {
-    try { const c = await api.get('/v1/conversations/' + id); convId = id; store.set('conv', id); inner.innerHTML = ''; turns = [];
+    try { const c = await api.get('/v1/conversations/' + id); if (!alive()) return; convId = id; store.set('conv', id); inner.innerHTML = ''; turns.forEach(t => t.dispose()); turns = [];
       let lastUser = null;
-      for (const m of c.messages) { if (m.role === 'user') { addUser(m.content); lastUser = m.content; } else if (m.reply) { const t = Turn.fromStored(inner, m.reply, { onSelect: select, onRetry: retry, prompt: lastUser, request: { verification: null }, onVerify }, m.feedback); turns.push(t); } }
-      if (!c.messages.length) welcome(); select(turns[turns.length - 1] || null); showBar(c); scrollDown(); loadConvs();
-    } catch (e) { toast('Could not open this chat: ' + e.message); newConv(); }
+      for (const m of c.messages) { if (m.role === 'user') { addUser(m.content); lastUser = m.content; } else if (m.reply) { const t = Turn.fromStored(inner, m.reply, { onSelect: select, onRetry: retry, prompt: lastUser, request: storedRequest(m.reply), onVerify }, m.feedback); turns.push(t); } }
+      if (!c.messages.length) welcome(); select(turns[turns.length - 1] || null); showBar(c); const tail = c.messages[c.messages.length - 1]; attachLive(tail && tail.role === 'user' ? tail.content : null); scrollDown(); loadConvs();
+    } catch (e) { if (!alive()) return; if (LIVE.cur && LIVE.cur.convId === id) { convId = id; inner.innerHTML = ''; turns = []; attachLive(); return; } toastErr(e, 'This chat could not be opened.'); newConv(); }
   }
   $('#newConv').onclick = newConv;
-  async function send(textOverride, modeOverride, reqOverride) {
-    if (busy) return; const text = (textOverride ?? input.value).trim(); if (!text) return;
-    let v; try { v = reqOverride ? reqOverride.verification : verification(); } catch (e) { toast(e.message); return; }
+  function send(textOverride, modeOverride, reqOverride) {
+    if (busy) { const L = liveNow(), here = L && inner.contains(L.turn.el);
+      toast(here || !L ? 'An answer is still being written. Stop it, or wait for it to finish.' : 'An answer is still being written in another chat. Stop it, or wait for it to finish.', { kind: 'info', ms: 5000, action: L && !here && L.convId ? { label: 'Show it', fn: () => openConv(L.convId) } : undefined }); return; }
+    const text = (textOverride ?? input.value).trim(); if (!text) return;
+    let v; try { v = reqOverride ? reqOverride.verification : verification(); } catch (e) { toast('The JSON format for the check is not valid JSON. Correct it, or clear the check.', { kind: 'error' }); return; }
     if (inner.querySelector('.welcome')) inner.innerHTML = '';
     addUser(text); if (!textOverride) { input.value = ''; autosize(); if (v) { $('#vRef').value = ''; $('#vTests').value = ''; $('#vSchema').value = ''; vp.hidden = true; updateChip(); } }
     const mode = modeOverride || S.mode;
     if (mode === 'both') return trial(text, v);
+    // Asking again keeps the knowledge base the answer was first asked with; a new question uses the one chosen below the box.
+    const kn = reqOverride && 'knowledge' in reqOverride ? (reqOverride.knowledge || undefined) : PREFS.kb ? { kb: PREFS.kb, mode: PREFS.kbMode || 'auto' } : undefined;
     const body = { conversation_id: convId, messages: [{ role: 'user', content: text }], lambda: S.lambda, thinking_budget: S.budget > 0 ? S.budget : undefined, show_reasoning: S.reason,
-      force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined,
-      knowledge: PREFS.kb ? { kb: PREFS.kb, mode: PREFS.kbMode || 'auto' } : undefined };
+      force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined, knowledge: kn };
     const turn = new Turn(inner, { onSelect: select, onRetry: retry, prompt: text, request: body, onVerify }); turns.push(turn); select(turn);
-    turn.onUpdate = (t) => { if (selected === t) insp.innerHTML = inspectorHTML(t); const near = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 160; if (near) scrollDown(); };
-    scrollDown(); const ctrl = new AbortController(); setBusy(ctrl);
-    try { await api.stream('/v1/chat/stream', body, (ev, data) => { if (ev === 'start' && data.data.conversation_id && !convId) { convId = data.data.conversation_id; store.set('conv', convId); showBar({ title: text.slice(0, 60), training_opt_out: false }); } turn.on(ev, data); }, ctrl.signal);
-      if (!turn.reply && !turn.error) turn.on('error', { data: { message: 'The answer stopped early. It may still have been saved: reopen the chat to check.' } }); }
-    catch (e) { if (e.name === 'AbortError') { turn.on('error', { data: { message: 'Stopped.' } }); } else turn.on('error', { data: { message: streamError(e) } }); }
-    finally { setBusy(null); loadConvs(); input.focus(); }
+    turn.onUpdate = onTurnUpdate; scrollDown();
+    setBusy(startLive({ text, body, turn }).ctrl);
   }
+  const hooks = {
+    onStart(L) { if (inner.contains(L.turn.el) && !convId) { convId = L.convId; store.set('conv', convId); showBar({ title: L.text.slice(0, 60), training_opt_out: false }); } loadConvs(); },
+    onDone(L) { if (busy === L.ctrl) setBusy(null); loadConvs();
+      if (inner.contains(L.turn.el)) { LIVE.cur = null; if (!document.activeElement || document.activeElement === document.body || document.activeElement.id === 'sendBtn') input.focus(); }
+      else if (!L.stopped && L.convId) toast(L.turn.reply ? 'The answer in your other chat is ready' : 'The answer in your other chat stopped early.', { kind: L.turn.reply ? 'ok' : 'error', ms: 8000, action: { label: 'Show it', fn: () => openConv(L.convId) } }); },
+    convsChanged() { loadConvs(); },
+  };
+  LIVE.view = hooks;
   // Lab trial: both paths answer the same prompt (sequentially, to share the CPU fairly); the person
   // chooses the better answer, which estimates the value of deliberation where no verifier exists.
   async function trial(text, v) {
@@ -710,8 +906,8 @@ routes.chat = { title: 'Chat', async render(view, alive) {
       const body = { messages: [{ role: 'user', content: text }], lambda: S.lambda, thinking_budget: S.budget > 0 ? S.budget : undefined, show_reasoning: S.reason, force_mode: m, verification: v || undefined, ephemeral: true, audit: false };
       const t = new Turn(box.querySelector(`[data-c=${m}]`), { onSelect: select, onRetry: retry, prompt: text, request: body }); turns.push(t);
       t.onUpdate = (x) => { if (selected === x) insp.innerHTML = inspectorHTML(x); };
-      try { await api.stream('/v1/chat/stream', body, (ev, data) => t.on(ev, data), ctrl.signal); if (!t.reply && !t.error) t.on('error', { data: { message: 'The stream ended unexpectedly.' } }); }
-      catch (e) { t.on('error', { data: { message: e.name === 'AbortError' ? 'Stopped.' : streamError(e) } }); }
+      try { await api.stream('/v1/chat/stream', body, (ev, data) => t.on(ev, data), ctrl.signal); if (t.isLive()) t.on('error', { data: { message: 'The answer stopped early. Choose Regenerate to ask again.' } }); }
+      catch (e) { if (e.name === 'AbortError' || ctrl.signal.aborted) t.stop(); else t.on('error', { data: { message: streamError(e) } }); }
       replies[m] = t.reply;
     };
     try { await run('fast'); if (!ctrl.signal.aborted) await run('slow'); } finally { setBusy(null); input.focus(); }
@@ -723,9 +919,9 @@ routes.chat = { title: 'Chat', async render(view, alive) {
       ${[['fast', 'Quick'], ['slow', 'Thorough'], ['tie', 'About the same'], ['both_bad', 'Both poor']].map(([k, l]) => `<button class="btn sm ${k === 'tie' || k === 'both_bad' ? 'ghost' : ''}" data-p="${k}">${l}</button>`).join('')}`;
     vote.querySelectorAll('[data-p]').forEach(b => b.onclick = async () => {
       try { await api.post('/v1/preferences', { prompt: text, domain: sl.domain, fast_reply_id: f.reply_id, slow_reply_id: sl.reply_id, preferred: b.dataset.p });
-        vote.innerHTML = `<span class="small">${icon.check} Thanks, recorded: ${esc(b.textContent)}.</span>`; } catch (e) { toast(e.message); } });
+        vote.innerHTML = `<span class="small">${icon.check} Thanks, recorded: ${esc(b.textContent)}.</span>`; } catch (e) { toastErr(e); } });
   }
-  function retry(prompt, mode, req) { if (!prompt) return toast('The original question is not available'); send(prompt, mode, req || { verification: null }); }
+  function retry(prompt, mode, req) { if (!prompt) return toast('The original question is not available, so it cannot be asked again.', { kind: 'error' }); send(prompt, mode, req || { verification: null }); }
   // Follow-up "check with a reference or tests": open the verification panel with the question ready to resend.
   function onVerify(t) { vp.hidden = false; input.value = t.prompt || ''; autosize(); setTab(t.reply?.domain === 'code' ? 'tests' : t.reply?.domain === 'structured' ? 'schema' : 'ref'); (t.reply?.domain === 'code' ? $('#vTests') : t.reply?.domain === 'structured' ? $('#vSchema') : $('#vRef')).focus(); toast('Add what the answer must match, then press Enter'); }
   const keys = (e) => {
@@ -737,10 +933,13 @@ routes.chat = { title: 'Chat', async render(view, alive) {
     else if (!typing && e.key === '?') { modal(`<h3 style="margin-top:0">Keyboard shortcuts</h3><table class="t small"><tr><td><kbd>Enter</kbd></td><td>Send</td></tr><tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>New line</td></tr><tr><td><kbd>Esc</kbd></td><td>Stop the answer</td></tr><tr><td><kbd>/</kbd></td><td>Focus the message box</td></tr><tr><td><kbd>Ctrl/Cmd</kbd>+<kbd>K</kbd></td><td>New chat</td></tr>${advanced() ? '<tr><td><kbd>Ctrl/Cmd</kbd>+<kbd>I</kbd></td><td>Show or hide answer details</td></tr>' : ''}</table>`); }
   };
   document.addEventListener('keydown', keys);
-  if (convId) await openConv(convId); else { welcome(); select(null); }
-  loadConvs(); input.focus();
-  // Navigating away stops the live view; the request is cancelled on the server when the stream closes.
-  return () => { document.removeEventListener('keydown', keys); document.removeEventListener('click', closePop); turns.forEach(t => t.dispose()); if (busy) busy.abort(); };
+  liveMark();
+  if (convId) await openConv(convId); else { welcome(); select(null); attachLive(); }
+  if (!alive()) { if (LIVE.view === hooks) { LIVE.view = null; liveMark(); } document.removeEventListener('keydown', keys); document.removeEventListener('click', closePop); turns.forEach(t => t.dispose()); return; }
+  if (liveNow() && !busy) setBusy(liveNow().ctrl);   // an answer is being written in another chat: the button still stops it
+  loadConvs(); if (chatDraft) { input.value = chatDraft; chatDraft = null; autosize(); } input.focus();
+  // Leaving the page leaves the answer in flight alone (it is put back on return); only a Compare run is stopped.
+  return () => { document.removeEventListener('keydown', keys); document.removeEventListener('click', closePop); turns.forEach(t => t.dispose()); if (busy && busy !== liveNow()?.ctrl) busy.abort(); if (LIVE.view === hooks) LIVE.view = null; liveMark(); };
 } };
 
 // ============================== rooms ==============================
@@ -761,9 +960,12 @@ const people = (n) => n === 1 ? '1 person' : `${n} people`;
 const downloadText = (name, text, type) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
 function confirmDialog({ title, body, ok = 'Delete', danger = true }) {
   return new Promise((resolve) => {
-    modal(`<h3 style="margin-top:0">${esc(title)}</h3>${body}<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost" id="cdNo" type="button">Cancel</button><button class="btn ${danger ? 'danger' : ''}" id="cdYes" type="button">${esc(ok)}</button></div>`);
-    const dlg = $('#modal'); dlg.classList.add('confirm'); let done = false; const fin = (v) => { if (done) return; done = true; if (dlg.open) dlg.close(); dlg.classList.remove('confirm'); resolve(v); };
-    $('#cdYes').onclick = () => fin(true); $('#cdNo').onclick = () => fin(false); dlg.addEventListener('close', () => fin(false), { once: true }); $('#cdNo').focus();
+    // A question asked while a dialog is open gets a dialog of its own, so the one underneath is not replaced.
+    const nested = $('#modal').open; const dlg = nested ? $('#modal2') : $('#modal'); const from = document.activeElement;
+    const html = (n) => `<h3 style="margin-top:0"${n ? ' id="confirmTitle"' : ''}>${esc(title)}</h3>${body}<div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn ghost" id="cdNo" type="button">Cancel</button><button class="btn ${danger ? 'danger' : ''}" id="cdYes" type="button">${esc(ok)}</button></div>`;
+    if (nested) { $('#modal2Content').innerHTML = html(true); dlg.setAttribute('aria-labelledby', 'confirmTitle'); dlg.showModal(); } else { modal(html(false)); dlg.classList.add('confirm'); }
+    let done = false; const fin = (v) => { if (done) return; done = true; if (dlg.open) dlg.close(); if (nested) { $('#modal2Content').innerHTML = ''; if (from?.isConnected) from.focus?.(); } else dlg.classList.remove('confirm'); resolve(v); };
+    $('#cdYes', dlg).onclick = () => fin(true); $('#cdNo', dlg).onclick = () => fin(false); dlg.addEventListener('close', () => fin(false), { once: true }); $('#cdNo', dlg).focus();
   });
 }
 // Stored messages -> display items. A room question is stored as "[Name] text".
@@ -822,9 +1024,9 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
     if (!S.listOk && !S.rooms.length) { L.innerHTML = `<div class="empty small">Could not load rooms.<br><button class="btn sm ghost" id="retryList" type="button" style="margin-top:8px">Try again</button></div>`; $('#retryList').onclick = () => refreshList(); return; }
     if (!S.rooms.length) { L.innerHTML = `<div class="empty small"><b>No rooms yet.</b><br>A room is a shared chat: everyone in it sees each question and the assistant's answer as it is written.<br><button class="btn sm" id="firstRoom" type="button" style="margin-top:10px">${icon.plus}Create the first room</button></div>`; $('#firstRoom').onclick = openNewForm; return; }
     if (!shown.length) { L.innerHTML = `<div class="empty small">No room matches “${esc(S.filter)}”.<br><button class="btn sm ghost" id="clearSearch" type="button" style="margin-top:8px">Clear search</button></div>`; $('#clearSearch').onclick = () => { $('#roomSearch').value = ''; S.filter = ''; renderList(); }; return; }
-    L.innerHTML = shown.map((r) => `<button class="room${S.room?.room_id === r.room_id ? ' on' : ''}${unread(r) ? ' unread' : ''}" type="button" role="listitem" data-id="${r.room_id}"${S.room?.room_id === r.room_id ? ' aria-current="true"' : ''}>
+    L.innerHTML = shown.map((r) => `<div role="listitem"><button class="room${S.room?.room_id === r.room_id ? ' on' : ''}${unread(r) ? ' unread' : ''}" type="button" data-id="${esc(r.room_id)}"${S.room?.room_id === r.room_id ? ' aria-current="true"' : ''}>
       ${roomAvatar(r.name)}<span class="rbody"><span class="rname">${esc(r.name)}</span><span class="rmeta">${r.members ? `<i class="dot ok"></i>${r.members} online · ` : ''}${r.questions ? plural(r.questions, 'question') : 'no questions yet'} · ${ago(r.last_activity)}</span></span>
-      <span class="rflags">${r.busy ? '<i class="dot warn pulse" title="The assistant is answering"></i>' : ''}${unread(r) ? '<i class="rnew-dot" title="New activity"></i>' : ''}</span></button>`).join('');
+      <span class="rflags">${r.busy ? '<i class="dot warn pulse" title="The assistant is answering"></i>' : ''}${unread(r) ? '<i class="rnew-dot" title="New activity"></i><span class="sr-only">new activity</span>' : ''}</span></button></div>`).join('');
     $$('#roomList .room').forEach(el => el.onclick = () => { join(el.dataset.id); root.classList.remove('side-open'); });
   }
   let listBusy = false;
@@ -847,7 +1049,7 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
     const clash = S.rooms.find(r => r.name.toLowerCase() === name.toLowerCase()); if (clash) { err.innerHTML = `A room named “${esc(clash.name)}” exists. <button class="linkbtn" type="button" id="openClash">Open it</button>`; $('#openClash').onclick = () => { closeNewForm(); join(clash.room_id); }; return; }
     $('#mkRoom').disabled = true;
     try { const r = await api.post('/v1/rooms', { name }); closeNewForm(); await refreshList(); await join(r.room_id); input.focus(); }
-    catch (x) { err.textContent = x.status === 409 ? 'A room with that name already exists.' : x.message; } finally { $('#mkRoom').disabled = false; } };
+    catch (x) { err.textContent = x.status === 409 ? 'A room with that name already exists.' : humanError(x); } finally { $('#mkRoom').disabled = false; } };
   // ---------------- header ----------------
   function chips() {
     const room = S.room; if (!room) return '';
@@ -884,28 +1086,28 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
     inp.onkeydown = async (e) => { if (e.key === 'Escape') { finish(); return; } if (e.key !== 'Enter' || busy) return; e.preventDefault();
       const name = cleanRoomName(inp.value); if (!name || name === room.name) { finish(); return; } busy = true;
       try { const r = await api.patch(`/v1/rooms/${room.room_id}`, { name }); S.room = { ...S.room, ...r }; finish(); updateComposer(); refreshList(); toast('Room renamed'); }
-      catch (x) { busy = false; $('#renameErr').textContent = x.status === 409 ? 'Another room already has that name.' : x.status === 404 ? 'This room no longer exists.' : x.message; } };
+      catch (x) { busy = false; $('#renameErr').textContent = x.status === 409 ? 'Another room already has that name.' : x.status === 404 ? 'This room no longer exists.' : humanError(x); } };
     inp.onblur = () => setTimeout(() => { if ($('#renameInput') && !busy) finish(); }, 150);
   }
   async function copyLink() { const url = `${location.origin}${location.pathname}#/rooms/${S.room.room_id}`; if (await copyText(url)) toast('Link copied'); else { modal(`<h3 style="margin-top:0">Link to this room</h3><input type="text" readonly style="width:100%" value="${esc(url)}">`); const i = $('#modalContent input'); i?.focus(); i?.select(); } }
   async function exportRoom(kind) {
     const room = S.room; try { const conv = await api.get('/v1/conversations/' + room.conversation_id); const slug = room.name.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'room'; const day = new Date().toISOString().slice(0, 10);
       if (kind === 'json') downloadText(`room-${slug}-${day}.json`, JSON.stringify({ room: { room_id: room.room_id, name: room.name, created_at: room.created_at }, conversation: conv }, null, 2), 'application/json');
-      else downloadText(`room-${slug}-${day}.md`, roomMarkdown(room, conv), 'text/markdown'); toast('Transcript exported'); } catch (e) { toast(`Export failed: ${e.message}`, 4000); }
+      else downloadText(`room-${slug}-${day}.md`, roomMarkdown(room, conv), 'text/markdown'); toast('Transcript exported'); } catch (e) { toastErr(e, 'The transcript was not exported.'); }
   }
   async function deleteRoom() {
     const room = S.room; if (!room) return; const others = Math.max(0, S.users.length - 1);
     const ok = await confirmDialog({ title: `Delete “${room.name}”?`, ok: 'Delete room', body: `<p>This permanently deletes the room and everything said in it: ${plural(room.questions || 0, 'question')} and the assistant's answers, <b>for everyone</b>.${others ? ` ${others === 1 ? '1 other person is' : others + ' other people are'} in the room now and will be disconnected.` : ''}</p><p class="small muted">Its saved decisions, feedback and retrieval-memory entries are deleted too. This cannot be undone. To keep a copy, cancel and use Export first.</p>` });
     if (!ok) return;
     try { const rep = await api.del(`/v1/rooms/${room.room_id}`); toast(`Deleted “${rep.name}” (${plural(rep.removed.messages, 'message')})`); leaveRoom(); }
-    catch (e) { if (e.status === 404) { toast('That room was already deleted.'); leaveRoom(); } else toast(`Could not delete the room: ${e.message}`, 4500); }
+    catch (e) { if (e.status === 404) { toast('That room was already deleted.', { kind: 'info' }); leaveRoom(); } else toastErr(e, 'The room was not deleted.'); }
   }
   function leaveRoom() { closeSocket(); clearTranscript(); S.room = null; S.me = null; S.users = []; S.conn = 'idle'; store.set('lastRoom', null); history.replaceState(null, '', '#/rooms'); banner(null); renderBar(); renderMainEmpty(); updateComposer(); refreshList(); $('#roomSearch').focus(); }
   // ---------------- banner and empty states ----------------
   function banner(kind, extra) {
     const b = $('#roomBanner'); if (!kind) { b.hidden = true; b.innerHTML = ''; return; } b.hidden = false;
     if (kind === 'deleted') b.innerHTML = `<div class="notice bad">${icon.alert}<span><b>This room was deleted.</b> Its messages are gone for everyone.</span><span class="sp"></span><button class="btn sm ghost" id="bnBack" type="button">Back to rooms</button></div>`;
-    if (kind === 'load') b.innerHTML = `<div class="notice">${icon.alert}<span>Earlier messages could not be loaded (${esc(extra)}).</span><span class="sp"></span><button class="btn sm ghost" id="bnRetry" type="button">Retry</button></div>`;
+    if (kind === 'load') b.innerHTML = `<div class="notice">${icon.alert}<span>Earlier messages could not be loaded. ${esc(extra)}</span><span class="sp"></span><button class="btn sm ghost" id="bnRetry" type="button">Retry</button></div>`;
     if (kind === 'full') b.innerHTML = `<div class="notice bad">${icon.alert}<span>${esc(extra)}</span><span class="sp"></span><button class="btn sm ghost" id="bnBack" type="button">Back to rooms</button></div>`;
     const back = $('#bnBack'); if (back) back.onclick = leaveRoom; const rt = $('#bnRetry'); if (rt) rt.onclick = () => reconnectNow();
   }
@@ -921,7 +1123,7 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
   rmsgs.addEventListener('scroll', () => { S.follow = nearBottom(); if (S.follow) { S.unseen = 0; $('#jumpNew').hidden = true; } });
   $('#jumpNew').onclick = toBottom;
   const resizer = new ResizeObserver(() => { if (S.follow) rmsgs.scrollTop = rmsgs.scrollHeight; }); resizer.observe(rinner);
-  const retryAsk = (prompt, mode) => { if (!online()) return toast('Not connected; try again in a moment.'); sendRaw(prompt, mode === 'auto' ? null : mode); };
+  const retryAsk = (prompt, mode) => { if (!online()) return toast('Not connected; try again in a moment.', { kind: 'error' }); sendRaw(prompt, mode === 'auto' ? null : mode); };
   function daySep(into, ts) { const k = new Date(ts).toDateString(); if (k === S.lastDay) return; S.lastDay = k; into.appendChild(h(`<div class="rsep"><span>${esc(dayLabel(ts))}</span></div>`)); }
   function bubble(into, who, text, ts) {
     const mine = who === S.me; const prev = into.lastElementChild; const cont = !!(prev && prev.classList.contains('rmsg') && prev.dataset.who === who && Math.abs(new Date(ts) - new Date(prev.dataset.ts)) < 120000);
@@ -950,7 +1152,7 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
     if (S.dead) return; if (S.room && S.room.room_id !== id) drafts_save();
     closeSocket(); clearTranscript(); banner(null); S.attempt = 0; S.users = []; S.me = null; S.assistant = { busy: false, working_for: null, queued: 0 }; S.typers.clear(); renderTyping();
     let r = S.rooms.find(x => x.room_id === id);
-    try { r = await api.get(`/v1/rooms/${id}`); } catch (e) { if (e.status === 404) { toast('That room no longer exists.'); if (store.get('lastRoom') === id) store.set('lastRoom', null); S.room = null; history.replaceState(null, '', '#/rooms'); renderBar(); renderMainEmpty(); refreshList(); return; } if (!r) { toast(`Could not open the room: ${e.message}`, 4000); return; } }
+    try { r = await api.get(`/v1/rooms/${id}`); } catch (e) { if (e.status === 404) { toast('That room no longer exists.', { kind: 'info' }); if (store.get('lastRoom') === id) store.set('lastRoom', null); S.room = null; history.replaceState(null, '', '#/rooms'); renderBar(); renderMainEmpty(); refreshList(); return; } if (!r) { toastErr(e, 'The room could not be opened.'); return; } }
     if (S.dead || !alive()) return;
     S.room = r; markSeen(r); store.set('lastRoom', id); history.replaceState(null, '', `#/rooms/${id}`); S.conn = 'connecting'; $('#roomBar').innerHTML = ''; renderBar(); renderList(); updateComposer();
     input.value = S.drafts.get(id) || ''; autosize(); connect(S.gen);
@@ -991,8 +1193,8 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
       case 'typing': if (f.user !== S.me) { S.typers.set(f.user, Date.now() + 4500); renderTyping(); } return;
       case 'room_renamed': S.room = { ...S.room, name: f.payload.name }; $('#roomBar').innerHTML = ''; renderBar(); updateComposer(); refreshSoon(); $('#rlive').appendChild(h(`<div class="rnote">Room renamed to “${esc(f.payload.name)}”</div>`)); return;
       case 'room_deleted': return handleDeleted();
-      case 'error': { const p = f.payload; note(p.message); toast(p.message, 4500); if (['E_TOO_LONG', 'E_RATE_LIMITED', 'E_QUEUE_FULL'].includes(p.code) && !input.value && S.lastSent) { input.value = S.lastSent; autosize(); updateComposer(); } if (p.code === 'E_ROOM_FULL') banner('full', p.message); return; }
-      case 'resync': toast('Connection fell behind; reloading the transcript.', 3500); return reconnectNow();
+      case 'error': { const p = f.payload; note(p.message); toast(plain(p.message), { kind: 'error' }); if (['E_TOO_LONG', 'E_RATE_LIMITED', 'E_QUEUE_FULL'].includes(p.code) && !input.value && S.lastSent) { input.value = S.lastSent; autosize(); updateComposer(); } if (p.code === 'E_ROOM_FULL') banner('full', p.message); return; }
+      case 'resync': toast('Connection fell behind; reloading the transcript.', { kind: 'info', ms: 4000 }); return reconnectNow();
       default: return; // heartbeat, pong
     }
   }
@@ -1001,7 +1203,7 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
     clearTranscript(); banner(null); renderBar(); updateComposer(); const hint = $('#userHint'); const want = store.get('user', ''); hint.textContent = w.you !== want ? `You appear here as “${w.you}” because “${want}” is taken.` : 'Shown to everyone in a room. Letters, numbers, spaces, - and _.';
     try { const c = await api.get('/v1/conversations/' + S.room.conversation_id); if (my !== S.hyd || gen !== S.gen) return;
       S.hist = roomItems(c.messages.slice(0, w.cursor)); S.histStart = Math.max(0, S.hist.length - WINDOW); renderHistory(); }
-    catch (e) { if (my !== S.hyd || gen !== S.gen) return; banner('load', e.message); }
+    catch (e) { if (my !== S.hyd || gen !== S.gen) return; banner('load', humanError(e)); }
     for (const p of w.pending || []) addQuestion(p.id, p.user, p.content, p.ts);
     S.hydrating = false; const buf = S.buffer; S.buffer = []; buf.forEach(onContent); toBottom(); empty(); markSeen(S.room); renderBar(); updateComposer();
   }
@@ -1019,10 +1221,10 @@ routes.rooms = { title: 'Rooms', async render(view, alive) {
     input.placeholder = !S.room ? 'Select or create a room to start' : S.conn === 'deleted' ? 'This room was deleted' : ok ? `Message “${S.room.name}”…` : S.conn === 'closed' ? 'Disconnected. Your draft is kept; press Reconnect.' : 'Connecting… you can type while you wait';
     const c = $('#rcount'); c.textContent = len > max * 0.8 ? `${len.toLocaleString()} / ${max.toLocaleString()}` : ''; c.style.color = over ? 'var(--bad)' : 'var(--faint)';
   }
-  function sendRaw(text, mode) { if (!online()) return false; S.lastSent = text; S.ws.send(JSON.stringify({ type: 'user_message', payload: { content: text, force_mode: mode, show_reasoning: true } })); S.follow = true; return true; }
+  function sendRaw(text, mode) { if (!online()) return false; S.lastSent = text; S.ws.send(JSON.stringify({ type: 'user_message', payload: { content: text, force_mode: mode, show_reasoning: PREFS.reason !== false } })); S.follow = true; return true; }
   function sendRoom() {
     const t = input.value.trim(); if (!t) return;
-    if (!online()) { toast('Not connected yet. Your message is kept.'); return; }
+    if (!online()) { toast('Not connected yet. Your message is kept.', { kind: 'info' }); return; }
     if ([...t].length > S.limits.message_chars) { note(`Messages are limited to ${S.limits.message_chars.toLocaleString()} characters.`); return; }
     if (sendRaw(t, S.mode === 'auto' ? null : S.mode)) { input.value = ''; S.drafts.delete(S.room.room_id); autosize(); updateComposer(); note(''); }
   }
@@ -1069,23 +1271,28 @@ function kbHighlight(text, query) {
   const re = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'giu');
   return out.replace(re, '<mark>$1</mark>');
 }
-// Multipart upload with progress (fetch cannot report upload progress).
-function kbUpload(kbId, files, onProgress) {
-  return new Promise((resolve, reject) => {
-    const fd = new FormData(); for (const f of files) fd.append('file', f, f.name);
-    const x = new XMLHttpRequest(); x.open('POST', `/v1/kb/${encodeURIComponent(kbId)}/documents`);
+// Multipart upload of one file, with progress (fetch cannot report upload progress) and a way to cancel it.
+function kbUpload(kbId, file, onProgress) {
+  const x = new XMLHttpRequest();
+  const done = new Promise((resolve, reject) => {
+    const fd = new FormData(); fd.append('file', file, file.name);
+    x.open('POST', `/v1/kb/${encodeURIComponent(kbId)}/documents`);
     const t = api.token(); if (t) x.setRequestHeader('Authorization', `Bearer ${t}`);
     x.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
     x.onload = () => { let d = null; try { d = JSON.parse(x.responseText); } catch {}
       if (x.status >= 200 && x.status < 300 || x.status === 422) resolve(d || { documents: [], refused: [] });
-      else reject(new Error((d && d.message) || `Upload failed (HTTP ${x.status})`)); };
-    x.onerror = () => reject(new Error('Cannot reach the service. It may be restarting; try again in a moment.'));
+      else reject(api.fail(x.status, d)); };
+    x.onerror = () => { const e = new Error('Cannot reach the service. It may be restarting; try again in a moment.'); e.network = true; reject(e); };
+    x.onabort = () => { const e = new Error('cancelled'); e.name = 'AbortError'; reject(e); };
     x.send(fd);
   });
+  return { done, abort: () => x.abort() };
 }
+const KB_EXT = new Set(KB_ACCEPT.split(',').map(x => x.slice(1)));
 
 routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questions', async render(view, alive) {
-  const S = { bases: [], cur: store.get('kbCurrent', null), docs: [], status: null, timer: null, dead: false, query: '', smode: store.get('kbSearchMode', 'hybrid') };
+  const S = { bases: [], cur: store.get('kbCurrent', null), docs: [], status: null, timer: null, dead: false, query: '', smode: store.get('kbSearchMode', 'hybrid'),
+    seq: 0, hits: [], ups: [], upSeq: 0, upBusy: false, gcenter: null, gsel: null, gdim: null, gview: null, gpos: new Map(), gbuilding: false };
   view.innerHTML = `<div class="page kb">
     <div class="kb-grid">
       <aside class="card kb-side" aria-label="Knowledge bases">
@@ -1101,12 +1308,16 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
       <section id="kbMain" class="kb-main"></section>
     </div></div>`;
   const list = $('#kbList', view), main = $('#kbMain', view);
+  const kbPath = () => `/v1/kb/${encodeURIComponent(S.cur)}`;
 
   const notice = (cls, html) => `<div class="notice ${cls}">${icon.alert}<span>${html}</span></div>`;
+  const retryLink = ' <button type="button" class="linkbtn" id="kbRetry">Try again</button>';
   async function loadStatus() {
-    try { S.status = await api.get('/v1/kb/status'); } catch (e) { S.status = { enabled: false, error: e.message }; }
-    if (!S.status.enabled) { main.innerHTML = notice('warn', 'Knowledge is turned off in this server\'s configuration. An administrator can turn it on under <b>[knowledge]</b>.'); list.innerHTML = ''; return false; }
-    if (!S.status.reachable) { main.innerHTML = notice('bad', `The knowledge store is not running, so documents cannot be read or searched. An administrator can start it with <code>scripts/serve_surreal.sh start</code>.${S.status.error && advanced() ? `<br><span class="tiny">${esc(S.status.error)}</span>` : ''}`); list.innerHTML = ''; return false; }
+    const stop = (cls, html) => { main.innerHTML = notice(cls, html + retryLink); list.innerHTML = ''; $('#kbRetry', main).onclick = () => { main.innerHTML = '<div class="empty small"><span class="spin"></span> Loading…</div>'; start(); }; return false; };
+    try { S.status = await api.get('/v1/kb/status'); } catch (e) { return stop('bad', `Knowledge could not be loaded. ${esc(humanError(e))}`); }
+    // What an administrator has to do is shown in Advanced mode; everyone else is told whom to ask.
+    if (!S.status.enabled) return stop('warn', `Knowledge is turned off on this server. ${advanced() ? 'It is turned on under <b>[knowledge]</b> in the settings file.' : 'Ask your administrator to turn it on.'}`);
+    if (!S.status.reachable) return stop('bad', `The knowledge store is not running, so documents cannot be read or searched. ${advanced() ? `Start it with <code>scripts/serve_surreal.sh start</code>.${S.status.error ? `<br><span class="tiny">${esc(S.status.error)}</span>` : ''}` : 'Ask your administrator to start it.'}`);
     return true;
   }
   async function loadBases() {
@@ -1115,91 +1326,123 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     store.set('kbCurrent', S.cur); drawList();
   }
   function drawList() {
-    list.innerHTML = S.bases.length ? S.bases.map(b => `<button type="button" role="listitem" class="kb-item ${b.id === S.cur ? 'on' : ''}" data-id="${esc(b.id)}">
-        <span class="kb-iname">${esc(b.name)}</span><span class="tiny faint">${plural(b.documents, 'document')} · ${fmtCount(b.chunks)} passages</span></button>`).join('')
+    const had = list.contains(document.activeElement) ? document.activeElement.dataset.id : null;
+    list.innerHTML = S.bases.length ? S.bases.map(b => `<div role="listitem"><button type="button" class="kb-item ${b.id === S.cur ? 'on' : ''}" data-id="${esc(b.id)}"${b.id === S.cur ? ' aria-current="true"' : ''}>
+        <span class="kb-iname">${esc(b.name)}</span><span class="tiny faint">${plural(+b.documents || 0, 'document')} · ${fmtCount(b.chunks)} passages</span></button></div>`).join('')
       : `<div class="empty small">No knowledge bases yet. Create one, then add documents to it.</div>`;
-    $$('.kb-item', list).forEach(el => el.onclick = () => { S.cur = el.dataset.id; store.set('kbCurrent', S.cur); drawList(); openBase(); });
+    $$('.kb-item', list).forEach(el => el.onclick = () => { if (el.dataset.id === S.cur) return; S.cur = el.dataset.id; store.set('kbCurrent', S.cur); drawList(); guard(openBase, 'This knowledge base could not be opened.')(); });
+    if (had) $$('.kb-item', list).find(x => x.dataset.id === had)?.focus({ preventScroll: true });
   }
   const curBase = () => S.bases.find(b => b.id === S.cur);
+  // The name and the counts are changed in place, so a rename or a finished document does not redraw the page.
+  const headText = (b) => `<h2 id="kbTitle">${esc(b.name)}</h2>${b.description ? `<div class="small muted">${esc(b.description)}</div>` : ''}`;
+  const headStats = (b) => `<span><b>${fmtCount(b.documents)}</b> ${+b.documents === 1 ? 'document' : 'documents'}</span><span><b>${fmtCount(b.chunks)}</b> passages</span><span><b>${fmtCount(b.chars)}</b> characters</span>`;
+  function updateHead() { const b = curBase(); if (!b) return; const t = $('#kbHeadText', main), st = $('#kbStats', main); if (t) t.innerHTML = headText(b); if (st) st.innerHTML = headStats(b); }
 
   function drawMain() {
     const b = curBase();
     if (!b) { main.innerHTML = `<div class="card"><div class="card-b kb-welcome">${icon.book}<h3>Bring your documents</h3>
-      <p class="muted">Create a knowledge base, then drop PDFs, Word and PowerPoint files, LaTeX sources, web pages, Markdown or text into it. Each document is read into short passages you can search; next, the assistant will answer from them.</p>
+      <p class="muted">Create a knowledge base, then drop PDFs, Word and PowerPoint files, LaTeX sources, web pages, Markdown or text into it. Each document is read into short passages you can search, and in Chat the assistant can answer from them and show which passages it used.</p>
       <button class="btn" type="button" id="kbFirst">${icon.plus}New knowledge base</button></div></div>`;
       $('#kbFirst', main).onclick = () => $('#kbNew', view).click(); return; }
-    main.innerHTML = `<div class="card kb-head"><div class="card-h"><div><h2 id="kbTitle">${esc(b.name)}</h2>${b.description ? `<div class="small muted">${esc(b.description)}</div>` : ''}</div>
+    main.innerHTML = `<div class="card kb-head"><div class="card-h"><div id="kbHeadText">${headText(b)}</div>
         <div class="row"><button class="btn sm ghost" id="kbRename" type="button">Rename</button><button class="btn sm ghost" id="kbDelete" type="button">Delete</button></div></div>
-      <div class="card-b kb-stats"><span><b>${fmtCount(b.documents)}</b> ${b.documents === 1 ? 'document' : 'documents'}</span><span><b>${fmtCount(b.chunks)}</b> passages</span><span><b>${fmtCount(b.chars)}</b> characters</span></div></div>
-    <div class="card"><div class="card-h"><h3>Search</h3><div class="seg" id="kbMode" role="group" aria-label="How to search">${[['hybrid', 'Meaning and words', 'Passages close in meaning and passages with your words, ranked together'], ['vector', 'Meaning', 'Passages close in meaning, even without your words'], ['lexical', 'Words', 'Passages that contain your words']].map(([m, l, t]) => `<button type="button" data-m="${m}" title="${t}" class="${S.smode === m ? 'on' : ''}">${l}</button>`).join('')}</div></div>
-      <div class="card-b"><div id="kbEmbedNote"></div><form id="kbSearchForm" class="row kb-search" autocomplete="off"><input id="kbQ" type="search" placeholder="Search this knowledge base" aria-label="Search this knowledge base" value="${esc(S.query)}"><button class="btn" type="submit">${icon.search}Search</button></form>
-      <div id="kbResults" class="kb-results" aria-live="polite"></div></div></div>
-    <div class="card"><div class="card-h"><h3>Documents</h3><span class="hint small muted">PDF, Word, PowerPoint, LaTeX, web pages, Markdown and text, up to ${S.status?.limits?.max_upload_mb ?? 50} MB each</span></div>
-      <div class="card-b"><label class="kb-drop" id="kbDrop" tabindex="0"><input type="file" id="kbFile" multiple accept="${KB_ACCEPT}" hidden>
+      <div class="card-b kb-stats" id="kbStats">${headStats(b)}</div></div>
+    <div class="card"><div class="card-h"><h3>Search</h3><div class="seg" id="kbSearchMode" role="group" aria-label="How to search">${[['hybrid', 'Meaning and words', 'Passages close in meaning and passages with your words, ranked together'], ['vector', 'Meaning', 'Passages close in meaning, even without your words'], ['lexical', 'Words', 'Passages that contain your words']].map(([m, l, t]) => `<button type="button" data-m="${m}" title="${t}" aria-pressed="${S.smode === m}" class="${S.smode === m ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      <div class="card-b"><div id="kbEmbedNote"></div><form id="kbSearchForm" class="row kb-search" role="search" autocomplete="off"><input id="kbQ" type="search" placeholder="Search this knowledge base" aria-label="Search this knowledge base" value="${esc(S.query)}"><button class="btn" type="submit">${icon.search}Search</button></form>
+      <div class="tiny faint" id="kbSearchHint">Results appear as you type. Open a result to read it in its document.</div>
+      <div id="kbResults" class="kb-results"></div></div></div>
+    <div class="card"><div class="card-h"><h3>Documents</h3><span class="hint small muted">PDF, Word, PowerPoint, LaTeX, web pages, Markdown and text, up to ${upMax()} MB each</span></div>
+      <div class="card-b"><label class="kb-drop" id="kbDrop" tabindex="0" role="button"><input type="file" id="kbFile" multiple accept="${KB_ACCEPT}" hidden>
         ${icon.download}<span><b>Drop files here</b> or <u>choose files</u></span></label>
-        <div id="kbUploads" class="kb-uploads"></div>
+        <div id="kbUploads" class="kb-uploads" aria-live="polite"></div>
         <div id="kbDocs"></div></div></div>
     <div class="card" id="kbGraphCard"><div class="card-h"><h3>Knowledge graph</h3><span class="hint small muted">The things your documents name, and how they relate.</span></div>
       <div class="card-b" id="kbGraph"><div class="empty small">Loading…</div></div></div>
     <div class="card adv-only" id="kbMemCard"><div class="card-h"><h3>Memory <span class="tiny faint">experimental</span></h3><span class="hint small muted">Teaches a small memory module this knowledge base, for answers from 16 memory tokens.</span></div>
       <div class="card-b" id="kbMem"><div class="empty small">Loading…</div></div></div>`;
     $('#kbRename', main).onclick = renameBase; $('#kbDelete', main).onclick = deleteBase;
-    $$('#kbMode button', main).forEach(b => b.onclick = () => { S.smode = b.dataset.m; store.set('kbSearchMode', S.smode); $$('#kbMode button', main).forEach(x => x.classList.toggle('on', x === b)); if (S.query) search(S.query); });
-    $('#kbSearchForm', main).onsubmit = (e) => { e.preventDefault(); search($('#kbQ', main).value); };
+    $$('#kbSearchMode button', main).forEach(b => b.onclick = () => { S.smode = b.dataset.m; store.set('kbSearchMode', S.smode); $$('#kbSearchMode button', main).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); }); if (S.query) search(S.query); });
+    // Search as you type (after a short pause, from three letters), or at once with Enter.
+    const q = $('#kbQ', main); let typing = null;
+    q.oninput = () => { clearTimeout(typing); const v = q.value.trim(); if (!v) return search(''); if (v.length >= 3) typing = setTimeout(() => search(v), 400); };
+    $('#kbSearchForm', main).onsubmit = (e) => { e.preventDefault(); clearTimeout(typing); search(q.value); };
+    $('#kbResults', main).addEventListener('click', (e) => { const b = e.target.closest('[data-hit]'); if (!b) return; const x = S.hits[+b.dataset.hit]; if (!x) return;
+      if (b.dataset.ha === 'ask') { PREFS.kb = S.cur; savePrefs(); chatDraft = `About “${x.doc_title}”${x.heading && x.heading !== x.doc_title ? ` (${x.heading})` : ''}${+x.page ? `, page ${+x.page}` : ''}: `; location.hash = '#/chat'; return; }
+      guard(() => kbPassageModal(S.cur, { id: x.doc_id, title: x.doc_title, pages: S.docs.find(d => d.id === x.doc_id)?.pages }, { ord: x.ord ?? null, chunkId: x.chunk_id, query: S.query }), 'The passage could not be opened.')(); });
     const drop = $('#kbDrop', main), file = $('#kbFile', main);
     file.onchange = () => { if (file.files.length) upload([...file.files]); file.value = ''; };
     drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } };
     ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
     ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
     drop.addEventListener('drop', (e) => { const f = [...(e.dataTransfer?.files || [])]; if (f.length) upload(f); });
-    drawDocs(); if (S.query) search(S.query);
+    $('#kbUploads', main).addEventListener('click', (e) => { const b = e.target.closest('[data-ua]'); if (!b) return; const u = S.ups.find(x => x.id === +b.closest('[data-up]').dataset.up); if (!u) return;
+      if (b.dataset.ua === 'cancel') { if (u.x) u.x.abort(); else { u.state = 'cancelled'; u.msg = 'Cancelled before it was sent.'; } }
+      if (b.dataset.ua === 'retry') { u.state = 'wait'; u.p = 0; u.msg = ''; }
+      if (b.dataset.ua === 'x') S.ups = S.ups.filter(x => x !== u);
+      drawUps(); pump(); });
+    // One listener for the whole table: its rows are changed in place while documents are read.
+    $('#kbDocs', main).addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (!b || b.disabled) return; const d = S.docs.find(x => x.id === b.closest('tr')?.dataset.id); if (!d) return;
+      ({ view: () => guard(() => kbPassageModal(S.cur, d), 'The passages could not be loaded.')(), again: () => reread(d), del: () => deleteDoc(d) })[b.dataset.act]?.(); });
+    drawUps(); drawDocs(); if (S.query) search(S.query);
   }
   // Whether passages can be searched by meaning, and a way to index the ones that cannot yet.
   function embedNote() {
     const e = S.status?.embedder; const missing = S.docs.filter(d => d.status === 'ready' && d.n_embedded < d.n_chunks).length;
     if (!e) return '';
-    if (!e.reachable) return `<div class="notice warn kb-note">${icon.alert}<span>Searching by meaning is unavailable: the embedding service is not running, so searches use words only.${advanced() ? ` <span class="tiny">An administrator can start it with <code>scripts/serve_smiley.sh embed</code>.</span>` : ''}</span></div>`;
+    if (!e.reachable) return `<div class="notice warn kb-note">${icon.alert}<span>Searching by meaning is unavailable right now, so searches use words only.${advanced() ? ` <span class="tiny">The embedding service is not running; start it with <code>scripts/serve_smiley.sh embed</code>.</span>` : ''}</span></div>`;
     if (missing) return `<div class="notice kb-note">${icon.alert}<span>${plural(missing, 'document')} can only be searched by words so far. <button type="button" class="linkbtn" id="kbReindex">Index for meaning</button></span></div>`;
     return '';
   }
-  async function reindex() {
-    try { const r = await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/reindex`); S.reindexing = r.queued > 0; toast(r.queued ? `Indexing ${plural(r.queued, 'document')} for meaning` : 'Everything is already indexed'); await loadDocs(); }
-    catch (e) { toast(e.message, 4000); }
+  const reindex = guard(async () => { const r = await api.post(`${kbPath()}/reindex`); S.reindexing = r.queued > 0; toast(r.queued ? `Indexing ${plural(r.queued, 'document')} for meaning` : 'Everything is already indexed'); await loadDocs(); }, 'Indexing did not start.');
+  function docCells(d) {
+    let [label, cls] = KB_STATE[d.status] || [String(d.status || 'Unknown'), 'warn']; const busy = cls === 'warn';
+    if (d.status === 'embedding' && +d.n_chunks) label = `Indexing ${Math.round(100 * d.n_embedded / d.n_chunks)}%`;
+    if (d.status === 'extracting' && +d.n_chunks) label = `Graph ${Math.round(100 * d.n_graphed / d.n_chunks)}%`;
+    if (d.status === 'ready' && d.n_embedded < d.n_chunks && S.status?.embedder) { label = 'Words only'; cls = 'warn'; }
+    const pages = +d.pages ? ` · ${plural(+d.pages, 'page')}` : '';
+    return `<td><div class="kb-dtitle">${esc(d.title)}</div><div class="tiny faint">${esc(d.filename)}${pages} · added ${ago(d.created_at)}</div></td>
+      <td><span class="badge">${esc(KB_KINDS[d.kind] || d.kind)}</span></td><td class="nowrap">${fmtBytes(+d.bytes || 0)}</td><td>${d.status === 'ready' || +d.n_chunks ? fmtCount(d.n_chunks) : '–'}</td>
+      <td><span class="kb-state ${cls}">${busy && d.status !== 'ready' ? '<span class="spin"></span>' : ''}${esc(label)}</span>${d.error ? `<div class="tiny kb-err">${esc(plain(d.error))}</div>` : ''}</td>
+      <td class="nowrap"><button class="btn sm ghost" data-act="view" type="button" ${d.status !== 'ready' ? 'disabled' : ''} aria-label="Passages of ${esc(d.title)}">Passages</button>
+        <button class="ibtn" data-act="again" type="button" ${busy && d.status !== 'ready' ? 'disabled' : ''} aria-label="Read ${esc(d.title)} again" title="Read again">${icon.retry}</button>
+        <button class="ibtn" data-act="del" type="button" aria-label="Delete ${esc(d.title)}" title="Delete">${icon.x}</button></td>`;
   }
+  // The table is patched row by row (by document id): a row is rewritten only when its content changed, so a
+  // refresh while documents are read does not disturb typing, search results, the graph or the keyboard focus.
   function drawDocs() {
     const box = $('#kbDocs', main); if (!box) return;
-    const en = $('#kbEmbedNote', main); if (en) { en.innerHTML = embedNote(); const ri = $('#kbReindex', en); if (ri) ri.onclick = reindex; }
-    if (!S.docs.length) { box.innerHTML = `<div class="empty small">No documents yet.</div>`; return; }
-    box.innerHTML = `<table class="t kb-docs"><thead><tr><th>Document</th><th>Type</th><th>Size</th><th>Passages</th><th>State</th><th></th></tr></thead><tbody>${S.docs.map(d => {
-      let [label, cls] = KB_STATE[d.status] || [d.status, 'warn']; const busy = cls === 'warn';
-      if (d.status === 'embedding' && d.n_chunks) label = `Indexing ${Math.round(100 * d.n_embedded / d.n_chunks)}%`;
-      if (d.status === 'extracting' && d.n_chunks) label = `Graph ${Math.round(100 * d.n_graphed / d.n_chunks)}%`;
-      if (d.status === 'ready' && d.n_embedded < d.n_chunks && S.status?.embedder) { label = 'Words only'; cls = 'warn'; }
-      const pages = d.pages ? ` · ${plural(d.pages, 'page')}` : '';
-      return `<tr data-id="${esc(d.id)}"><td><div class="kb-dtitle">${esc(d.title)}</div><div class="tiny faint">${esc(d.filename)}${pages} · added ${ago(d.created_at)}</div></td>
-        <td><span class="badge">${esc(KB_KINDS[d.kind] || d.kind)}</span></td><td class="nowrap">${fmtBytes(d.bytes)}</td><td>${d.status === 'ready' || d.n_chunks ? fmtCount(d.n_chunks) : '–'}</td>
-        <td><span class="kb-state ${cls}" ${d.error ? `title="${esc(d.error)}"` : ''}>${busy ? '<span class="spin"></span>' : ''}${label}</span>${d.error ? `<div class="tiny kb-err">${esc(d.error)}</div>` : ''}</td>
-        <td class="nowrap"><button class="btn sm ghost" data-act="view" type="button" ${d.status !== 'ready' ? 'disabled' : ''}>Passages</button>
-          <button class="ibtn" data-act="again" type="button" ${busy ? 'disabled' : ''} aria-label="Read ${esc(d.title)} again" title="Read again">${icon.retry}</button>
-          <button class="ibtn" data-act="del" type="button" aria-label="Delete ${esc(d.title)}" title="Delete">${icon.x}</button></td></tr>`; }).join('')}</tbody></table>`;
-    $$('tr[data-id]', box).forEach(tr => { const d = S.docs.find(x => x.id === tr.dataset.id);
-      $$('[data-act]', tr).forEach(b => b.onclick = () => ({ view: () => showPassages(d), again: () => reread(d), del: () => deleteDoc(d) })[b.dataset.act]()); });
+    const en = $('#kbEmbedNote', main); if (en) { const html = embedNote(); if (en._h !== html) { en._h = html; en.innerHTML = html; const ri = $('#kbReindex', en); if (ri) ri.onclick = reindex; } }
+    if (!S.docs.length) { if (!$('.empty', box)) box.innerHTML = `<div class="empty small">No documents yet. Add some with the box above.</div>`; return; }
+    let tb = $('tbody', box);
+    if (!tb) { box.innerHTML = `<table class="t kb-docs"><thead><tr><th>Document</th><th>Type</th><th>Size</th><th>Passages</th><th>State</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody></tbody></table>`; tb = $('tbody', box); }
+    const have = new Map($$('tr[data-id]', tb).map(tr => [tr.dataset.id, tr])); let prev = null;
+    for (const d of S.docs) {
+      let tr = have.get(d.id); if (!tr) { tr = document.createElement('tr'); tr.dataset.id = d.id; } have.delete(d.id);
+      const html = docCells(d);
+      if (tr._h !== html) { const act = tr.contains(document.activeElement) ? document.activeElement.dataset.act : null; tr._h = html; tr.innerHTML = html; if (act) (tr.querySelector(`[data-act="${act}"]:not([disabled])`) || tr.querySelector('[data-act]:not([disabled])'))?.focus({ preventScroll: true }); }
+      const want = prev ? prev.nextElementSibling : tb.firstElementChild; if (want !== tr) tb.insertBefore(tr, want); prev = tr;
+    }
+    have.forEach(tr => tr.remove());
   }
   async function loadDocs() {
     if (!S.cur) { S.docs = []; return; }
-    const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/documents`); if (!alive()) return;
-    const was = S.docs.filter(d => KB_STATE[d.status]?.[1] === 'warn').map(d => d.id);
+    const kb = S.cur; const r = await api.get(`${kbPath()}/documents`); if (!alive() || kb !== S.cur) return;
+    const was = new Map(S.docs.map(d => [d.id, d.status]));
     S.docs = r.documents || [];
-    const finished = S.docs.filter(d => was.includes(d.id) && d.status === 'ready');
-    if (finished.length) { toast(finished.length === 1 ? `“${finished[0].title}” is ready` : `${finished.length} documents are ready`); await loadBases(); drawMain(); drawDocs(); loadGraph(); return; }
-    drawDocs(); schedule();
+    const busyBefore = (d) => was.has(d.id) && KB_STATE[was.get(d.id)]?.[1] === 'warn';
+    const finished = S.docs.filter(d => d.status === 'ready' && busyBefore(d)), failed = S.docs.filter(d => d.status === 'failed' && busyBefore(d));
+    drawDocs();
+    if (finished.length) { toast(finished.length === 1 ? `“${finished[0].title}” is ready` : `${finished.length} documents are ready`); loadBases().then(updateHead).catch(() => {}); loadGraph(S.gcenter, true); }
+    if (failed.length) toast(failed.length === 1 ? `“${failed[0].title}” could not be read. The reason is next to it in the list.` : `${failed.length} documents could not be read. The reasons are in the list.`, { kind: 'error' });
+    schedule();
   }
   function schedule() {
     clearTimeout(S.timer);
     if (S.reindexing && !S.docs.some(d => d.status === 'ready' && d.n_embedded < d.n_chunks)) S.reindexing = false;
-    if (!S.dead && (S.reindexing || S.docs.some(d => KB_STATE[d.status]?.[1] === 'warn'))) S.timer = setTimeout(() => loadDocs().catch(() => schedule()), 1500);
+    if (!S.dead && (S.reindexing || S.docs.some(d => KB_STATE[d.status]?.[1] === 'warn'))) S.timer = setTimeout(() => { if (document.hidden) return schedule(); loadDocs().catch(() => schedule()); }, 1500);
   }
-  async function openBase() { S.docs = []; S.query = ''; S.gcenter = null; drawMain(); if (S.cur) { await loadDocs(); drawDocs(); loadGraph(); if (advanced()) loadMemory(); } }
+  async function openBase() { S.docs = []; S.query = ''; S.hits = []; S.seq++; S.gcenter = null; S.gsel = null; S.gdim = null; S.gview = null; S.gpos.clear(); drawMain(); if (S.cur) { await loadDocs(); loadGraph(); if (advanced()) loadMemory(); } }
 
   // ---- memory: training runs of a Memorilla module on this base (Advanced) ----
   const RUN_STATE = { building: 'Preparing the questions', preparing: 'Loading the model', training: 'Training', done: 'Finished', stopped: 'Stopped', failed: 'Failed' };
@@ -1212,7 +1455,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
   }
   async function loadMemory() {
     const box = $('#kbMem', main); if (!box || !S.cur) return;
-    let r; try { r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs`); } catch (e) { box.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; return; }
+    let r; try { r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs`); } catch (e) { box.innerHTML = `<div class="small kb-err">${esc(humanError(e))}</div>`; return; }
     if (!alive()) return;
     const busy = r.runs.some(x => ['building', 'preparing', 'training'].includes(x.state));
     const head = `<div class="row kb-ghead"><span class="small">${r.active ? '<b>A module is in use</b> for this knowledge base.' : 'No module yet.'}</span><span class="sp"></span>
@@ -1224,141 +1467,214 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
         <div class="tiny muted">${p.train_examples != null ? `${p.train_examples} training and ${p.validation_examples} check questions · ` : ''}${p.steps ? `step ${p.step} of ${p.steps}` : ''}${p.seconds_per_example ? ` · ${num(p.seconds_per_example, 1)} s per question` : ''}${p.start_val_loss != null ? ` · check loss ${num(p.start_val_loss, 2)}${(p.val_loss || []).length ? ` → ${num(p.val_loss[p.val_loss.length - 1][1], 2)}` : ''}` : ''}</div>
         ${x.error ? `<div class="tiny kb-err">${esc(x.error)}</div>` : ''}${lossChart(loss)}</div>`; }).join('') : '');
     const t = $('#kbTrain', box), f = $('#kbTune', box);
-    const go = async (kind) => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs`, { kind, epochs: 3 }); toast(kind === 'finetune' ? 'Fine-tuning started' : 'Training started'); loadMemory(); } catch (e) { toast(e.message, 5000); } };
+    const go = async (kind) => { if (!await confirmDialog({ title: kind === 'finetune' ? 'Fine-tune the memory module?' : 'Train a memory module?', ok: kind === 'finetune' ? 'Start fine-tuning' : 'Start training', danger: false,
+        body: '<p>Training runs on this computer\'s processor and takes hours. Chat keeps working, but answers are slower until it finishes.</p><p class="small muted">You can stop the run from this card; a stopped run keeps what it has learned so far.</p>' })) return;
+      try { await api.post(`${kbPath()}/memory/runs`, { kind, epochs: 3 }); toast(kind === 'finetune' ? 'Fine-tuning started' : 'Training started'); loadMemory(); } catch (e) { toastErr(e, 'Training did not start.'); } };
     if (t) t.onclick = () => go('train'); if (f) f.onclick = () => go('finetune');
-    $$('[data-stop]', box).forEach(b => b.onclick = async () => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.stop}/stop`); toast('The run stops after its current step'); } catch (e) { toast(e.message, 4000); } loadMemory(); });
-    $$('[data-use]', box).forEach(b => b.onclick = async () => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.use}/activate`); toast('Memory questions now use this module'); loadMemory(); } catch (e) { toast(e.message, 4000); } });
-    clearTimeout(S.mtimer); if (busy && !S.dead) S.mtimer = setTimeout(loadMemory, 5000);
+    $$('[data-stop]', box).forEach(b => b.onclick = async () => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.stop}/stop`); toast('The run stops after its current step'); } catch (e) { toastErr(e); } loadMemory(); });
+    $$('[data-use]', box).forEach(b => b.onclick = async () => { try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/memory/runs/${b.dataset.use}/activate`); toast('Memory questions now use this module'); loadMemory(); } catch (e) { toastErr(e); } });
+    clearTimeout(S.mtimer); if (busy && !S.dead) S.mtimer = setTimeout(function again() { if (document.hidden && !S.dead) S.mtimer = setTimeout(again, 5000); else loadMemory(); }, 5000);
   }
 
   // ---- knowledge graph: build, browse, one entity's relations with the passages behind them ----
   const GCOL = ['var(--accent)', 'var(--slow)', 'var(--warn)', 'var(--ok)', 'var(--bad)', 'var(--focus)', 'var(--muted)'];
-  async function loadGraph(center = S.gcenter) {
-    const box = $('#kbGraph', main); if (!box || !S.cur) return;
+  const GW = 760, GH = 400; // the drawing's own size; the view box zooms and pans over it
+  // `light` refreshes the numbers above the drawing only (while the graph is being built), so the drawing, the
+  // zoom, the chosen thing and anything typed stay as they are.
+  async function loadGraph(center = S.gcenter, light = false) {
+    const box = $('#kbGraph', main); if (!box || !S.cur) return; const kb = S.cur;
+    if ((center || null) !== S.gcenter) { S.gview = null; S.gdim = null; }
     S.gcenter = center || null;
-    let g; try { g = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/graph?depth=${center ? 2 : 1}&limit=${center ? 40 : 50}${center ? `&entity=${encodeURIComponent(center)}` : ''}`); } catch (e) { box.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; return; }
-    if (!alive()) return;
-    const p = g.progress || {}, st = g.stats || {}, left = (p.passages || 0) - (p.passages_read || 0);
-    const head = `<div class="row kb-ghead"><span class="small"><b>${fmtCount(st.entities)}</b> things · <b>${fmtCount(st.relations)}</b> relations · <b>${fmtCount(st.communities)}</b> groups</span><span class="sp"></span>
-      ${!g.enabled ? '<span class="tiny faint">The graph is turned off on this server.</span>' : p.building ? `<span class="small"><span class="spin"></span> Reading ${fmtCount(p.passages_read)} of ${fmtCount(p.passages)} passages</span>` : left > 0 ? `<button class="btn sm" type="button" id="kbBuild">${st.entities ? 'Continue the graph' : 'Build the graph'}</button>` : ''}</div>
-      ${g.enabled && !p.building && left > 0 ? `<div class="tiny faint">The quick model reads each passage for names and relations: ${fmtCount(left)} passages, about ${Math.max(1, Math.round(left * 15 / 60))} minutes on this computer. Chat keeps working meanwhile.</div>` : ''}`;
-    const nodes = g.nodes || [];
-    box.innerHTML = head + (nodes.length ? `<div class="row kb-gtools"><input type="search" id="kbEnt" placeholder="Find a thing by name" aria-label="Find a thing in the graph">${S.gcenter ? '<button class="btn sm ghost" type="button" id="kbGAll">Show the most mentioned</button>' : ''}</div><div id="kbEntList" class="kb-entlist"></div>
-      <div class="kb-gwrap"><svg id="kbSvg" class="kb-svg" role="img" aria-label="Knowledge graph: things and their relations"></svg><aside id="kbEntity" class="kb-entity"><div class="tiny faint">Choose a thing in the graph to see what the documents say about it.</div></aside></div>`
-      : `<div class="empty small">${st.entities ? 'Nothing to show.' : 'No graph yet. Build it to see the people, systems, methods and ideas your documents name, and how they connect.'}</div>`);
-    const b = $('#kbBuild', box); if (b) b.onclick = async () => { try { const r = await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/graph/build`); toast(r.queued ? `Reading ${plural(r.queued, 'document')} for the graph` : 'The graph is up to date'); S.reindexing = r.queued > 0; await loadDocs(); loadGraph(); } catch (e) { toast(e.message, 4000); } };
-    const all = $('#kbGAll', box); if (all) all.onclick = () => loadGraph(null);
-    const ent = $('#kbEnt', box); if (ent) { let t; ent.oninput = () => { clearTimeout(t); t = setTimeout(async () => { const q = ent.value.trim(); const l = $('#kbEntList', box); if (!q) { l.innerHTML = ''; return; }
-      const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/graph/entities?q=${encodeURIComponent(q)}`); l.innerHTML = r.entities.slice(0, 12).map(e => `<button type="button" class="rchip" data-id="${esc(e.id)}">${esc(e.name)} <span class="faint">${esc(e.type)}</span></button>`).join('') || '<span class="tiny faint">No match.</span>';
-      $$('button', l).forEach(x => x.onclick = () => loadGraph(x.dataset.id)); }, 250); }; }
-    if (nodes.length) { drawGraph($('#kbSvg', box), nodes, g.edges || []); if (S.gcenter) showEntity(S.gcenter, nodes.find(n => n.id === S.gcenter)); }
-    if (p.building && !S.gtimer) S.gtimer = setTimeout(() => { S.gtimer = null; if (!S.dead) loadGraph(); }, 4000);
+    let g; try { g = await api.get(`${kbPath()}/graph?depth=${center ? 2 : 1}&limit=${center ? 40 : 50}${center ? `&entity=${encodeURIComponent(center)}` : ''}`); }
+    catch (e) { if (!alive() || kb !== S.cur) return; if ($('#kbGBody', box)?.firstChild) { if (S.gbuilding && !S.dead) { clearTimeout(S.gtimer); S.gtimer = setTimeout(() => loadGraph(S.gcenter, true), 8000); } return; } box.innerHTML = `<div class="small kb-err" role="alert">The graph could not be loaded. ${esc(humanError(e))} <button type="button" class="linkbtn" id="kbGRetry">Try again</button></div>`; $('#kbGRetry', box).onclick = () => loadGraph(); return; }
+    if (!alive() || kb !== S.cur) return;
+    const p = g.progress || {}, st = g.stats || {}, left = Math.max(0, (+p.passages || 0) - (+p.passages_read || 0)), mins = Math.max(1, Math.round(left * 15 / 60));
+    let hd = $('#kbGHead', box), body = $('#kbGBody', box);
+    if (!hd || !body) { box.innerHTML = '<div id="kbGHead"></div><div id="kbGBody"></div>'; hd = $('#kbGHead', box); body = $('#kbGBody', box); }
+    hd.innerHTML = `<div class="row kb-ghead"><span class="small"><b>${fmtCount(st.entities)}</b> things · <b>${fmtCount(st.relations)}</b> relations · <b>${fmtCount(st.communities)}</b> groups</span><span class="sp"></span>
+      ${!g.enabled ? '<span class="tiny faint">The graph is turned off on this server.</span>' : p.building ? `<span class="small" role="status"><span class="spin"></span> Reading ${fmtCount(p.passages_read)} of ${fmtCount(p.passages)} passages</span>` : left > 0 ? `<button class="btn sm" type="button" id="kbBuild">${st.entities ? 'Continue the graph' : 'Build the graph'}</button>` : ''}</div>
+      ${g.source === 'text' && (g.nodes || []).length ? '<div class="small muted kb-gsrc">Built from the text of your documents. Build the full graph to add typed, quoted relations.</div>' : ''}
+      ${g.enabled && !p.building && left > 0 ? `<div class="tiny faint">The quick model reads each passage for names and relations: ${fmtCount(left)} passages, about ${mins} minutes on this computer. Chat keeps working meanwhile.</div>` : ''}`;
+    const b = $('#kbBuild', hd); if (b) b.onclick = async () => {
+      if (!await confirmDialog({ title: st.entities ? 'Continue building the graph?' : 'Build the knowledge graph?', ok: st.entities ? 'Continue' : 'Build the graph', danger: false,
+        body: `<p>The quick model reads ${fmtCount(left)} passages for names and relations. That takes about ${mins} minutes on this computer; Chat keeps working, but answers are slower meanwhile.</p><p class="small muted">Once it starts it runs to the end: it cannot be stopped from this page.</p>` })) return;
+      try { const r = await api.post(`${kbPath()}/graph/build`); toast(r.queued ? `Reading ${plural(r.queued, 'document')} for the graph` : 'The graph is up to date'); S.reindexing = r.queued > 0; await loadDocs(); loadGraph(S.gcenter, true); } catch (e) { toastErr(e, 'The graph was not started.'); } };
+    const nodes = g.nodes || []; S.gsource = g.source || 'model';
+    const full = !light || !body.firstChild || (S.gbuilding && !p.building); S.gbuilding = !!p.building;
+    if (full) {
+      const typed = $('#kbEnt', body)?.value || '', focused = document.activeElement?.id === 'kbEnt';
+      body.innerHTML = nodes.length ? `<div class="row kb-gtools"><input type="search" id="kbEnt" placeholder="Find a thing by name" aria-label="Find a thing in the graph">${S.gcenter ? '<button class="btn sm ghost" type="button" id="kbGAll">Show the most mentioned</button>' : ''}</div><div id="kbEntList" class="kb-entlist"></div>
+        <div class="row kb-gbar"><span class="small muted" id="kbGCount" role="status"></span><span class="sp"></span><span class="kb-zoom" role="group" aria-label="Zoom the graph"><button type="button" class="btn sm ghost" data-z="out" aria-label="Zoom out">−</button><button type="button" class="btn sm ghost" data-z="in" aria-label="Zoom in">+</button><button type="button" class="btn sm ghost" data-z="fit">Fit</button></span></div>
+        <div class="kb-gwrap"><div class="kb-gcol"><svg id="kbSvg" class="kb-svg" role="group" aria-label="Knowledge graph: things and their relations"></svg>
+          <div class="kb-legend" id="kbLegend"></div><div class="tiny faint">Scroll to zoom, drag to move. A bigger circle is mentioned in more passages; a colour marks a group of closely related things.</div></div>
+          <aside id="kbEntity" class="kb-entity" aria-live="polite"><div class="tiny faint">Choose a thing in the graph to see what the documents say about it.</div></aside></div>`
+        : `<div class="empty small">${st.entities ? 'Nothing to show.' : 'No graph yet. Build it to see the people, systems, methods and ideas your documents name, and how they connect.'}</div>`;
+      const all = $('#kbGAll', body); if (all) all.onclick = () => { S.gsel = null; loadGraph(null); };
+      const ent = $('#kbEnt', body); if (ent) { let t; ent.value = typed; if (focused) ent.focus();
+        const find = guard(async () => { const q = ent.value.trim(); const l = $('#kbEntList', body); if (!l) return; if (!q) { l.innerHTML = ''; return; }
+          const r = await api.get(`${kbPath()}/graph/entities?q=${encodeURIComponent(q)}`); if (!l.isConnected) return;
+          l.innerHTML = (r.entities || []).slice(0, 12).map(e => `<button type="button" class="rchip" data-id="${esc(e.id)}">${esc(e.name)} <span class="faint">${esc(e.type)}</span></button>`).join('') || '<span class="tiny faint">Nothing in the graph has that name.</span>';
+          $$('button', l).forEach(x => x.onclick = () => { S.gsel = x.dataset.id; loadGraph(x.dataset.id); }); }, 'The graph could not be searched.');
+        ent.oninput = () => { clearTimeout(t); t = setTimeout(find, 250); }; if (typed) find(); }
+      if (nodes.length) { drawGraph($('#kbSvg', body), nodes, g.edges || [], +st.entities || nodes.length); const sel = S.gsel || S.gcenter; if (sel && nodes.some(n => n.id === sel)) showEntity(sel, nodes.find(n => n.id === sel)); }
+    }
+    clearTimeout(S.gtimer); S.gtimer = null;
+    if (p.building) S.gtimer = setTimeout(function again() { S.gtimer = null; if (S.dead) return; if (document.hidden) { S.gtimer = setTimeout(again, 4000); return; } loadGraph(S.gcenter, true); }, 4000);
   }
-  // A small force layout (springs on edges, repulsion between nodes), run to rest before drawing.
-  function drawGraph(svg, allNodes, edges) {
+  // A small force layout (springs on edges, repulsion between nodes). A thing keeps the place it was first given:
+  // choosing one, or opening its neighbourhood, moves nothing that is already on screen.
+  function drawGraph(svg, allNodes, edges, total) {
     // The overview keeps connected things only (isolated ones crowd the edges and say nothing about relations).
     const linked = new Set(edges.flatMap(e => [e.source, e.target]));
     const nodes = S.gcenter || !edges.length ? allNodes : allNodes.filter(n => linked.has(n.id)).slice(0, 36);
-    const W = Math.max(svg.clientWidth || 600, 320), H = 380; svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    const idx = new Map(nodes.map((n, i) => [n.id, i])); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const P = nodes.map(() => ({ x: W / 2 + (rnd() - 0.5) * W * 0.6, y: H / 2 + (rnd() - 0.5) * H * 0.6, vx: 0, vy: 0 }));
+    const W = GW, H = GH; const idx = new Map(nodes.map((n, i) => [n.id, i])); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const P = nodes.map((n) => { const c = S.gpos.get(n.id); return c ? { x: c.x, y: c.y, vx: 0, vy: 0, pin: true } : { x: W / 2 + (rnd() - 0.5) * W * 0.6, y: H / 2 + (rnd() - 0.5) * H * 0.6, vx: 0, vy: 0, pin: false }; });
     const E = edges.map(e => [idx.get(e.source), idx.get(e.target), e]).filter(e => e[0] != null && e[1] != null);
-    const ci = S.gcenter ? idx.get(S.gcenter) : -1;
-    for (let it = 0; it < 300; it++) {
+    const ci = S.gcenter ? idx.get(S.gcenter) : -1; const fresh = P.filter(p => !p.pin).length;
+    for (let it = 0; it < (fresh ? (fresh === P.length ? 300 : 160) : 0); it++) {
       const K = (W * H) / Math.max(8, nodes.length) / 6;
       for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) { const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = dx * dx + dy * dy + 0.01, f = K / d2; P[i].vx += dx * f / Math.sqrt(d2); P[i].vy += dy * f / Math.sqrt(d2); P[j].vx -= dx * f / Math.sqrt(d2); P[j].vy -= dy * f / Math.sqrt(d2); }
       for (const [a, b] of E) { const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - 90) * 0.02; P[a].vx += dx / d * f; P[a].vy += dy / d * f; P[b].vx -= dx / d * f; P[b].vy -= dy / d * f; }
-      for (let i = 0; i < P.length; i++) { const p = P[i]; p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004; if (i === ci) { p.vx += (W / 2 - p.x) * 0.1; p.vy += (H / 2 - p.y) * 0.1; }
+      for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.pin) { p.vx = p.vy = 0; continue; } p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004; if (i === ci) { p.vx += (W / 2 - p.x) * 0.1; p.vy += (H / 2 - p.y) * 0.1; }
         p.x = Math.min(W - 30, Math.max(30, p.x + Math.max(-12, Math.min(12, p.vx)))); p.y = Math.min(H - 16, Math.max(16, p.y + Math.max(-12, Math.min(12, p.vy)))); p.vx *= 0.6; p.vy *= 0.6; }
     }
-    const maxM = Math.max(1, ...nodes.map(n => n.mentions || 1));
+    nodes.forEach((n, i) => S.gpos.set(n.id, { x: P[i].x, y: P[i].y }));
+    const maxM = Math.max(1, ...nodes.map(n => +n.mentions || 1)); const f1 = (v) => (+v).toFixed(1);
     // Labels for the most mentioned and the chosen thing; the rest show their name on hover.
-    const labelled = new Set([...nodes].sort((a, b) => (b.mentions || 0) - (a.mentions || 0)).slice(0, 14).map(n => n.id)); if (S.gcenter) labelled.add(S.gcenter);
-    svg.innerHTML = E.map(([a, b, e]) => `<line x1="${P[a].x}" y1="${P[a].y}" x2="${P[b].x}" y2="${P[b].y}" class="kb-edge" stroke-width="${Math.min(4, 0.8 + (e.weight || 1) * 0.6)}"><title>${esc(nodes[a].name)} ${esc(e.predicate)} ${esc(nodes[b].name)}</title></line>`).join('')
-      + nodes.map((n, i) => { const r = 4 + 9 * Math.sqrt((n.mentions || 1) / maxM); return `<g class="kb-node ${i === ci ? 'on' : ''}" data-id="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.name)}"><circle cx="${P[i].x}" cy="${P[i].y}" r="${r}" fill="${GCOL[(n.community ?? 6) % GCOL.length]}"/>${labelled.has(n.id) ? `<text x="${P[i].x + r + 3}" y="${P[i].y + 4}">${esc(n.name.length > 26 ? n.name.slice(0, 25) + '…' : n.name)}</text>` : ''}<title>${esc(n.name)} (${esc(n.type)}, mentioned in ${plural(n.mentions || 0, 'passage')})</title></g>`; }).join('');
-    $$('.kb-node', svg).forEach(g => { const go = () => loadGraph(g.dataset.id); g.onclick = go; g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+    const labelled = new Set([...nodes].sort((a, b) => (b.mentions || 0) - (a.mentions || 0)).slice(0, 14).map(n => n.id)); if (S.gcenter) labelled.add(S.gcenter); if (S.gsel) labelled.add(S.gsel);
+    const grp = (n) => (Number.isInteger(n.community) ? n.community : -1), col = (n) => GCOL[(grp(n) < 0 ? 6 : grp(n)) % GCOL.length];
+    svg.innerHTML = E.map(([a, b, e]) => `<line x1="${f1(P[a].x)}" y1="${f1(P[a].y)}" x2="${f1(P[b].x)}" y2="${f1(P[b].y)}" class="kb-edge" data-a="${a}" data-b="${b}" stroke-width="${Math.min(4, 0.8 + (+e.weight || 1) * 0.6)}"><title>${esc(nodes[a].name)} ${esc(e.predicate)} ${esc(nodes[b].name)}</title></line>`).join('')
+      + nodes.map((n, i) => { const r = 4 + 9 * Math.sqrt((+n.mentions || 1) / maxM); return `<g class="kb-node" data-id="${esc(n.id)}" data-i="${i}" tabindex="0" role="button" aria-label="${esc(n.name)}, ${esc(n.type)}, mentioned in ${plural(+n.mentions || 0, 'passage')}"><circle cx="${f1(P[i].x)}" cy="${f1(P[i].y)}" r="${f1(r)}" fill="${col(n)}"/>${labelled.has(n.id) ? `<text x="${f1(P[i].x + r + 3)}" y="${f1(P[i].y + 4)}">${esc(n.name.length > 26 ? n.name.slice(0, 25) + '…' : n.name)}</text>` : ''}<title>${esc(n.name)} (${esc(n.type)}, mentioned in ${plural(+n.mentions || 0, 'passage')})</title></g>`; }).join('');
+    const cnt = $('#kbGCount', main); if (cnt) cnt.textContent = `Showing ${nodes.length} of ${fmtCount(total)} things${S.gcenter ? ': the chosen one and what is around it' : nodes.length < total ? ': the most mentioned that have relations' : ''}`;
+    // Marks: the chosen thing, and (from the legend) one group with the rest dimmed.
+    const mark = () => { $$('.kb-node', svg).forEach(g => { const n = nodes[+g.dataset.i]; g.classList.toggle('on', n.id === (S.gsel || S.gcenter)); g.classList.toggle('dim', S.gdim != null && grp(n) !== S.gdim); });
+      $$('.kb-edge', svg).forEach(l => l.classList.toggle('dim', S.gdim != null && (grp(nodes[+l.dataset.a]) !== S.gdim || grp(nodes[+l.dataset.b]) !== S.gdim)));
+      $$('#kbLegend [data-g]', main).forEach(c => c.setAttribute('aria-pressed', String(S.gdim === +c.dataset.g))); };
+    // Legend: one chip per group on screen, named after its most mentioned member; a chip shows that group alone.
+    const groups = new Map(); for (const n of nodes) { const k = grp(n); const x = groups.get(k) || { k, n: 0, top: n }; x.n++; if ((+n.mentions || 0) > (+x.top.mentions || 0)) x.top = n; groups.set(k, x); }
+    const lg = $('#kbLegend', main); if (lg) { const gs = [...groups.values()].sort((a, b) => b.n - a.n); if (S.gdim != null && !groups.has(S.gdim)) S.gdim = null;
+      lg.innerHTML = gs.length > 1 ? `<span class="tiny faint">Groups:</span>` + gs.slice(0, 8).map(x => `<button type="button" class="rchip kb-lg" data-g="${x.k}" aria-pressed="false" title="Show only this group"><i style="background:${col(x.top)}"></i>${x.k < 0 ? 'No group' : esc(x.top.name.length > 22 ? x.top.name.slice(0, 21) + '…' : x.top.name)} <span class="faint">${x.n}</span></button>`).join('') + (gs.length > 8 ? `<span class="tiny faint">and ${gs.length - 8} more</span>` : '') : '';
+      $$('[data-g]', lg).forEach(c => c.onclick = () => { S.gdim = S.gdim === +c.dataset.g ? null : +c.dataset.g; mark(); }); }
+    mark();
+    // View: wheel zooms about the pointer, dragging the background pans, the buttons do the same for keyboards.
+    const v = S.gview || (S.gview = { x: 0, y: 0, w: W, h: H }); const apply = () => svg.setAttribute('viewBox', `${f1(v.x)} ${f1(v.y)} ${f1(v.w)} ${f1(v.h)}`); apply();
+    const zoom = (k, cx = v.x + v.w / 2, cy = v.y + v.h / 2) => { const nw = Math.min(W * 2.5, Math.max(W / 8, v.w * k)), q = nw / v.w; v.x = cx - (cx - v.x) * q; v.y = cy - (cy - v.y) * q; v.w = nw; v.h *= q; apply(); };
+    const at = (e) => { const m = svg.getScreenCTM(); return m ? new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse()) : { x: v.x + v.w / 2, y: v.y + v.h / 2 }; };
+    svg.onwheel = (e) => { e.preventDefault(); const pt = at(e); zoom(e.deltaY < 0 ? 0.85 : 1 / 0.85, pt.x, pt.y); };
+    let drag = null;
+    svg.onpointerdown = (e) => { if (e.button !== 0 || e.target.closest('.kb-node')) return; const m = svg.getScreenCTM(); drag = { cx: e.clientX, cy: e.clientY, x: v.x, y: v.y, s: m ? m.a : 1 }; svg.setPointerCapture?.(e.pointerId); svg.classList.add('grab'); };
+    svg.onpointermove = (e) => { if (!drag) return; v.x = drag.x - (e.clientX - drag.cx) / drag.s; v.y = drag.y - (e.clientY - drag.cy) / drag.s; apply(); };
+    svg.onpointerup = svg.onpointercancel = () => { drag = null; svg.classList.remove('grab'); };
+    $$('.kb-zoom [data-z]', main).forEach(b => b.onclick = () => { if (b.dataset.z === 'fit') { v.x = 0; v.y = 0; v.w = W; v.h = H; apply(); } else zoom(b.dataset.z === 'in' ? 0.75 : 1 / 0.75); });
+    // Choosing a thing shows what the documents say about it and leaves the drawing as it is.
+    $$('.kb-node', svg).forEach(g => { const go = () => { S.gsel = g.dataset.id; mark(); showEntity(g.dataset.id, nodes[+g.dataset.i]); }; g.onclick = go; g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
   }
   async function showEntity(id, node) {
     const box = $('#kbEntity', main); if (!box) return;
-    const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/graph/entities/${encodeURIComponent(id)}`); if (!alive()) return;
-    const pass = new Map((r.passages || []).map(p => [p.chunk_id, p]));
-    box.innerHTML = `<h4>${esc(node?.name || '')} <span class="tiny faint">${esc(node?.type || '')}</span></h4><div class="tiny faint">Mentioned in ${plural(node?.mentions || 0, 'passage')}.</div>`
-      + (r.facts.length ? `<ul class="kb-facts">${r.facts.map(f => { const p = pass.get((f.evidence || [])[0]); return `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b>${f.weight > 1 ? ` <span class="tiny faint">(${f.weight} passages)</span>` : ''}${f.quote ? `<div class="tiny muted">“${esc(f.quote)}”</div>` : ''}${p ? `<details><summary class="tiny">Where it says so: ${esc(p.doc_title)}${p.page ? `, page ${p.page}` : ''}</summary><div class="kb-ptext">${esc(p.text.replace(/^#{1,6} /gm, ''))}</div></details>` : ''}</li>`; }).join('')}</ul>` : '<div class="tiny faint">No relation recorded.</div>');
+    // A term read from the text has no recorded relations yet: say what it is and how to get more.
+    if (S.gsource === 'text') { box.innerHTML = `<h4>${esc(node?.name || '')}</h4><div class="tiny faint">A term found in ${plural(+node?.mentions || 0, 'passage')}. Lines join terms that appear together.</div><p class="small muted">Build the full graph to see how it relates to other things, with the sentences that say so. To read where it appears, search for it above.</p>`; return; }
+    let r; try { r = await api.get(`${kbPath()}/graph/entities/${encodeURIComponent(id)}`); } catch (e) { if (box.isConnected) box.innerHTML = `<div class="small kb-err" role="alert">What the documents say about it could not be loaded. ${esc(humanError(e))}</div>`; return; }
+    if (!alive() || !box.isConnected || (S.gsel || S.gcenter) !== id) return;
+    const pass = new Map((r.passages || []).map(p => [p.chunk_id, p])); const facts = r.facts || [];
+    box.innerHTML = `<h4>${esc(node?.name || '')} <span class="tiny faint">${esc(node?.type || '')}</span></h4><div class="tiny faint">Mentioned in ${plural(+node?.mentions || 0, 'passage')}.</div>${S.gcenter !== id ? '<button type="button" class="btn sm ghost" id="kbAround" style="margin-top:6px">Show what is around it</button>' : ''}`
+      + (facts.length ? `<ul class="kb-facts">${facts.map(f => { const p = pass.get((f.evidence || [])[0]); return `<li><b>${esc(f.source)}</b> ${esc(f.predicate)} <b>${esc(f.target)}</b>${+f.weight > 1 ? ` <span class="tiny faint">(${+f.weight} passages)</span>` : ''}${f.quote ? `<div class="tiny muted">“${esc(f.quote)}”</div>` : ''}${p ? `<details><summary class="tiny">Where it says so: ${esc(p.doc_title)}${+p.page ? `, page ${+p.page}` : ''}</summary><div class="kb-ptext">${esc(String(p.text || '').replace(/^#{1,6} /gm, ''))}</div></details>` : ''}</li>`; }).join('')}</ul>` : '<div class="tiny faint">No relation recorded.</div>');
+    const ar = $('#kbAround', box); if (ar) ar.onclick = () => loadGraph(id);
   }
 
-  async function upload(files) {
-    const box = $('#kbUploads', main); const row = h(`<div class="kb-up"><div class="small">Uploading ${plural(files.length, 'file')}…</div><div class="progress"><span style="width:0%"></span></div></div>`);
-    box.prepend(row);
-    try {
-      const r = await kbUpload(S.cur, files, (p) => { const bar = row.querySelector('.progress span'); if (bar) bar.style.width = `${Math.round(p * 100)}%`; });
-      const dup = (r.documents || []).filter(d => d.duplicate);
-      const parts = [];
-      const added = (r.documents || []).length - dup.length;
-      if (added) parts.push(`${plural(added, 'document')} added; reading ${added === 1 ? 'it' : 'them'} now`);
-      if (dup.length) parts.push(`${plural(dup.length, 'file')} already in this knowledge base`);
-      row.innerHTML = `<div class="small">${esc(parts.join('. ') || 'Nothing was added.')}</div>${(r.refused || []).map(x => `<div class="tiny kb-err">${esc(x.filename)}: ${esc(x.reason)}</div>`).join('')}`;
-      setTimeout(() => row.remove(), (r.refused || []).length ? 15000 : 5000);
-      await loadDocs(); await loadBases();
-    } catch (e) { row.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; }
+  // ---- uploads: one row per file, with its stage, a way to cancel, and errors that stay until dismissed ----
+  const upMax = () => +S.status?.limits?.max_upload_mb || 50;
+  function upload(files) {
+    for (const f of files) { const u = { id: ++S.upSeq, file: f, kb: S.cur, state: 'wait', p: 0, msg: '', x: null, retry: true };
+      const ext = f.name.includes('.') ? f.name.split('.').pop().toLowerCase() : '';
+      // Checked before anything is sent: the type, the size limit, an empty file.
+      if (!KB_EXT.has(ext)) { u.state = 'bad'; u.retry = false; u.msg = 'This type of file cannot be read. Use PDF, Word, PowerPoint, LaTeX, a web page, Markdown or text.'; }
+      else if (f.size > upMax() * 1048576) { u.state = 'bad'; u.retry = false; u.msg = `This file is ${fmtBytes(f.size)}; the limit is ${upMax()} MB.`; }
+      else if (!f.size) { u.state = 'bad'; u.retry = false; u.msg = 'This file is empty.'; }
+      S.ups.push(u); }
+    drawUps(); pump();
+  }
+  const upStage = (u) => u.state === 'wait' ? 'Waiting its turn' : u.state === 'up' ? (u.p >= 1 ? 'Sent. Waiting for the service to accept it…' : `Uploading ${Math.round(u.p * 100)}%`) : u.msg;
+  function drawUps() {
+    const box = $('#kbUploads', main); if (!box) return; const had = box.contains(document.activeElement) ? [document.activeElement.closest('[data-up]')?.dataset.up, document.activeElement.dataset.ua] : null;
+    box.innerHTML = S.ups.filter(u => u.kb === S.cur).map(u => { const name = esc(u.file.name), live = u.state === 'wait' || u.state === 'up';
+      return `<div class="kb-up ${u.state}" data-up="${u.id}"><div class="row kb-uph"><b class="kb-upn">${name}</b><span class="tiny faint">${fmtBytes(u.file.size)}</span><span class="sp"></span>
+        ${live ? `<button type="button" class="btn sm ghost" data-ua="cancel" aria-label="Cancel uploading ${name}">Cancel</button>` : ''}${(u.state === 'bad' && u.retry) || u.state === 'cancelled' ? `<button type="button" class="btn sm ghost" data-ua="retry" aria-label="Try ${name} again">Try again</button>` : ''}${live ? '' : `<button type="button" class="ibtn" data-ua="x" aria-label="Dismiss ${name}" title="Dismiss">${icon.x}</button>`}</div>
+        <div class="small kb-upst ${u.state === 'bad' ? 'kb-err' : 'muted'}">${u.state === 'bad' ? icon.alert : u.state === 'done' ? icon.check : ''}<span>${esc(upStage(u))}</span></div>
+        ${live ? `<div class="progress" role="progressbar" aria-label="Upload progress of ${name}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(u.p * 100)}"><span style="width:${Math.round(u.p * 100)}%"></span></div>` : ''}</div>`; }).join('');
+    if (had && had[0]) { const row = $(`[data-up="${had[0]}"]`, box); (row?.querySelector(`[data-ua="${had[1]}"]`) || row?.querySelector('[data-ua]') || $('#kbDrop', main))?.focus({ preventScroll: true }); }
+  }
+  // Files go up one at a time, so each has its own progress and can be cancelled on its own.
+  async function pump() {
+    if (S.upBusy) return; const u = S.ups.find(x => x.state === 'wait'); if (!u) return; S.upBusy = true; u.state = 'up'; u.p = 0; drawUps();
+    try { const req = kbUpload(u.kb, u.file, (p) => { u.p = p; const row = $(`#kbUploads [data-up="${u.id}"]`, main); if (!row) return; const bar = $('.progress', row), st = $('.kb-upst span', row);
+        if (bar) { bar.setAttribute('aria-valuenow', String(Math.round(p * 100))); bar.firstElementChild.style.width = `${Math.round(p * 100)}%`; } if (st) st.textContent = upStage(u); });
+      u.x = req; const r = await req.done; const doc = (r.documents || [])[0], ref = (r.refused || [])[0];
+      if (ref) { u.state = 'bad'; u.retry = false; u.msg = plain(ref.reason) || 'The service did not accept this file.'; }
+      else if (doc?.duplicate) { u.state = 'done'; u.msg = 'Already in this knowledge base; nothing was added.'; }
+      else if (doc) { u.state = 'done'; u.msg = 'Added. It is being read now; follow it in the list below.'; }
+      else { u.state = 'bad'; u.msg = 'Nothing was added. Try again.'; }
+    } catch (e) { if (e.name === 'AbortError') { u.state = 'cancelled'; u.msg = 'Cancelled. Nothing was added.'; } else { u.state = 'bad'; u.retry = e.status !== 413; u.msg = humanError(e); } }
+    u.x = null; S.upBusy = false; drawUps();
+    // The page was left while files were going up: they still go up, and the outcome is said in a notice.
+    if (S.dead && u.state === 'done') toast(`“${u.file.name}” was added to your knowledge base`);
+    if (S.dead && u.state === 'bad') toast(`“${u.file.name}” was not added. ${u.msg}`, { kind: 'error' });
+    if (u.state === 'done') { setTimeout(() => { S.ups = S.ups.filter(x => x !== u); if (!S.dead) drawUps(); }, 6000); if (!S.dead && u.kb === S.cur) { loadDocs().catch(() => {}); loadBases().then(updateHead).catch(() => {}); } }
+    pump();
   }
   async function search(q) {
-    S.query = q.trim(); const box = $('#kbResults', main); if (!box) return;
-    if (!S.query) { box.innerHTML = ''; return; }
-    box.innerHTML = `<div class="small muted"><span class="spin"></span> Searching…</div>`;
+    S.query = String(q).trim(); const box = $('#kbResults', main); if (!box) return; const my = ++S.seq;
+    if (!S.query) { S.hits = []; box.innerHTML = ''; return; }
+    if ($('.kb-hit', box)) box.classList.add('stale'); else box.innerHTML = `<div class="small muted" role="status"><span class="spin"></span> Searching…</div>`;
     try {
-      const r = await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/search`, { query: S.query, k: 8, mode: S.smode });
-      if (!alive()) return;
-      const how = { hybrid: 'by meaning and words', vector: 'by meaning', lexical: 'by words' }[r.mode];
-      box.innerHTML = (r.fallback ? `<div class="tiny kb-err">Searched by words only: ${esc(r.fallback)}.</div>` : '') + (r.results.length ? `<div class="tiny faint">${plural(r.results.length, 'passage')} ${how} · ${fmtMs(r.took_ms)}</div>` + r.results.map(x => `<article class="kb-hit">
-          <div class="kb-hmeta"><b>${esc(x.doc_title)}</b>${x.heading ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${x.page ? ` <span class="faint">· page ${x.page}</span>` : ''}${x.vector_score != null ? ` <span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}${advanced() ? ` <span class="tiny faint">score ${num(x.score, 3)}</span>` : ''}</div>
-          <div class="kb-htext">${kbHighlight(x.text, S.query)}</div></article>`).join('')
-        : `<div class="empty small">No passage matches. Try other words, or check that the documents are ready.</div>`);
-    } catch (e) { box.innerHTML = `<div class="small kb-err">${esc(e.message)}</div>`; }
-  }
-  async function showPassages(d, offset = 0) {
-    const r = await api.get(`/v1/kb/${encodeURIComponent(S.cur)}/documents/${encodeURIComponent(d.id)}/chunks?offset=${offset}&limit=50`);
-    const more = offset + r.chunks.length < r.total;
-    modal(`<h3 style="margin-top:0">${esc(d.title)}</h3><div class="small muted">${plural(r.total, 'passage')}${d.pages ? ` from ${plural(d.pages, 'page')}` : ''}; showing ${offset + 1}–${offset + r.chunks.length}.</div>
-      <div class="kb-passages">${r.chunks.map(c => `<div class="kb-pass"><div class="tiny faint">#${c.ord + 1}${c.heading ? ` · ${esc(c.heading)}` : ''}${c.page ? ` · page ${c.page}` : ''}</div><div class="kb-ptext">${esc(c.text.replace(/^#{1,6} /gm, ''))}</div></div>`).join('')}</div>
-      <div class="row" style="justify-content:space-between;margin-top:10px">${offset > 0 ? `<button class="btn sm ghost" type="button" id="kbPrev">Previous</button>` : '<span></span>'}${more ? `<button class="btn sm ghost" type="button" id="kbNext">Next 50</button>` : ''}</div>`);
-    const p = $('#kbPrev'), n = $('#kbNext');
-    if (p) p.onclick = () => showPassages(d, Math.max(0, offset - 50)); if (n) n.onclick = () => showPassages(d, offset + 50);
+      const r = await api.post(`${kbPath()}/search`, { query: S.query, k: 8, mode: S.smode });
+      if (!alive() || my !== S.seq) return;
+      const how = { hybrid: 'by meaning and words', vector: 'by meaning', lexical: 'by words' }[r.mode] || ''; S.hits = r.results || [];
+      box.innerHTML = (r.fallback ? `<div class="tiny kb-err">Searched by words only: ${esc(plain(r.fallback))}.</div>` : '') + (S.hits.length ? `<div class="tiny faint" role="status">${plural(S.hits.length, 'passage')} ${how} · ${fmtMs(+r.took_ms || 0)}${advanced() && r.engine ? ` · ${esc(String(r.engine))}` : ''}</div>` + S.hits.map((x, i) => `<article class="kb-hit">
+          <div class="kb-hmeta"><button type="button" class="linkbtn kb-hopen" data-hit="${i}" data-ha="open" title="Open this passage in its document"><b>${esc(x.doc_title)}</b>${x.heading ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${+x.page ? ` <span class="faint">· page ${+x.page}</span>` : ''}</button>${typeof x.vector_score === 'number' ? ` <span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}${typeof x.vector_score === 'number' && typeof x.lexical_score === 'number' ? ' <span class="tiny faint">· close in meaning and has your words</span>' : typeof x.lexical_score === 'number' ? ' <span class="tiny faint">· has your words</span>' : ''}${advanced() ? ` <span class="tiny faint">score ${num(+x.score, 3)}${typeof x.lexical_score === 'number' ? ` · words ${num(x.lexical_score, 2)}` : ''}</span>` : ''}</div>
+          <div class="kb-htext">${kbHighlight(x.text, S.query)}</div>
+          <div class="row kb-hact"><button type="button" class="btn sm ghost" data-hit="${i}" data-ha="open">${icon.book}Open in the document</button><button type="button" class="btn sm ghost" data-hit="${i}" data-ha="ask">${icon.send}Ask about this</button></div></article>`).join('')
+        : `<div class="empty small" role="status">No passage matches. Try other words, or check that the documents are ready.</div>`);
+    } catch (e) { if (my !== S.seq || !box.isConnected) return; box.innerHTML = `<div class="small kb-err" role="alert">The search did not finish. ${esc(humanError(e))}</div>`; }
+    finally { if (my === S.seq) box.classList.remove('stale'); }
   }
   async function reread(d) {
-    try { await api.post(`/v1/kb/${encodeURIComponent(S.cur)}/documents/${encodeURIComponent(d.id)}/reingest`); toast(`Reading “${d.title}” again`); await loadDocs(); }
-    catch (e) { toast(e.message, 4000); }
+    if (!await confirmDialog({ title: `Read “${d.title}” again?`, ok: 'Read again', danger: false, body: `<p>The document is read from its stored file again and its ${fmtCount(d.n_chunks)} passages are replaced. It cannot be searched until that finishes, and what the graph learned from it is read again later.</p>` })) return;
+    try { await api.post(`${kbPath()}/documents/${encodeURIComponent(d.id)}/reingest`); toast(`Reading “${d.title}” again`); await loadDocs(); }
+    catch (e) { toastErr(e, 'The document was not read again.'); }
   }
   async function deleteDoc(d) {
     if (!await confirmDialog({ title: `Delete “${d.title}”?`, body: `<p class="small">The document and its ${fmtCount(d.n_chunks)} passages are removed from this knowledge base, with the stored file. This cannot be undone.</p>` })) return;
-    try { await api.del(`/v1/kb/${encodeURIComponent(S.cur)}/documents/${encodeURIComponent(d.id)}`); toast('Document deleted'); await loadBases(); await openBase(); }
-    catch (e) { toast(e.message, 4000); }
+    try { await api.del(`${kbPath()}/documents/${encodeURIComponent(d.id)}`); toast('Document deleted'); S.docs = S.docs.filter(x => x.id !== d.id); drawDocs(); if (S.query) search(S.query); await loadBases(); updateHead(); loadGraph(S.gcenter, true); }
+    catch (e) { toastErr(e, 'The document was not deleted.'); }
   }
   async function renameBase() {
     const b = curBase(); if (!b) return;
     modal(`<h3 style="margin-top:0">Rename knowledge base</h3><form id="kbRen" class="stack" autocomplete="off"><label class="f">Name<input id="kbRn" type="text" maxlength="80" value="${esc(b.name)}"></label>
       <label class="f">Description<input id="kbRd" type="text" maxlength="300" value="${esc(b.description || '')}"></label><div class="rerr" id="kbRe" role="alert"></div>
       <div class="row" style="justify-content:flex-end"><button class="btn" type="submit">Save</button></div></form>`);
+    $('#kbRn').focus(); $('#kbRn').select();
     $('#kbRen').onsubmit = async (e) => { e.preventDefault();
-      try { await api.patch(`/v1/kb/${encodeURIComponent(b.id)}`, { name: $('#kbRn').value, description: $('#kbRd').value }); $('#modal').close(); await loadBases(); drawMain(); drawDocs(); }
-      catch (err) { $('#kbRe').textContent = err.message; } };
+      try { await api.patch(`/v1/kb/${encodeURIComponent(b.id)}`, { name: $('#kbRn').value, description: $('#kbRd').value }); $('#modal').close(); await loadBases(); updateHead(); toast('Saved'); }
+      catch (err) { $s('#kbRe').textContent = humanError(err); } };
   }
   async function deleteBase() {
     const b = curBase(); if (!b) return;
-    if (!await confirmDialog({ title: `Delete “${b.name}”?`, body: `<p class="small">This removes the knowledge base for good: its ${plural(b.documents, 'document')}, ${fmtCount(b.chunks)} passages and the stored files. This cannot be undone.</p>` })) return;
-    try { await api.del(`/v1/kb/${encodeURIComponent(b.id)}`); toast('Knowledge base deleted'); S.cur = null; await loadBases(); await openBase(); }
-    catch (e) { toast(e.message, 4000); }
+    if (!await confirmDialog({ title: `Delete “${b.name}”?`, body: `<p class="small">This removes the knowledge base for good: its ${plural(+b.documents || 0, 'document')}, ${fmtCount(b.chunks)} passages and the stored files. This cannot be undone.</p>` })) return;
+    try { await api.del(`/v1/kb/${encodeURIComponent(b.id)}`); toast('Knowledge base deleted'); S.ups.filter(u => u.kb === b.id && u.x).forEach(u => u.x.abort()); S.cur = null; await loadBases(); await openBase(); }
+    catch (e) { toastErr(e, 'The knowledge base was not deleted.'); }
   }
 
   const form = $('#kbNewForm', view);
   $('#kbNew', view).onclick = () => { form.hidden = false; $('#kbName', view).focus(); };
-  $('#kbNewCancel', view).onclick = () => { form.hidden = true; $('#kbNewErr', view).textContent = ''; };
+  $('#kbNewCancel', view).onclick = () => { form.hidden = true; $('#kbNewErr', view).textContent = ''; $('#kbNew', view).focus(); };
   form.onsubmit = async (e) => { e.preventDefault();
     const name = cleanRoomName($('#kbName', view).value); if (!name) { $('#kbNewErr', view).textContent = 'Give it a name.'; return; }
     try { const b = await api.post('/v1/kb', { name, description: $('#kbDesc', view).value.trim() }); form.hidden = true; form.reset(); $('#kbNewErr', view).textContent = '';
       S.cur = b.id; await loadBases(); await openBase(); }
-    catch (err) { $('#kbNewErr', view).textContent = err.message; } };
+    catch (err) { $('#kbNewErr', view).textContent = humanError(err); } };
 
-  if (await loadStatus()) { await loadBases(); await openBase(); }
+  const start = guard(async () => { if (await loadStatus()) { await loadBases(); if (alive()) await openBase(); } }, 'Knowledge could not be loaded.');
+  await start();
   return () => { S.dead = true; clearTimeout(S.timer); clearTimeout(S.gtimer); clearTimeout(S.mtimer); };
 } };
 
@@ -1409,24 +1725,26 @@ routes.bench = { title: 'Speed', sub: 'response times and load', adv: true, asyn
     $('#bProg').hidden = false; $('#bBar').style.width = total ? `${Math.min(100, done / total * 100)}%` : `${Math.min(100, (r.elapsed_s || 0) / (req.duration_s || 1) * 100)}%`;
     $('#bProgTxt').textContent = `${r.status === 'running' ? 'Running' : 'Finished'} · ${done}${total ? ' / ' + total : ''} questions · ${num(r.elapsed_s, 0)} s`;
     $('#bStart').hidden = r.status === 'running'; $('#bCancel').hidden = r.status !== 'running'; };
-  const history = async () => { const runs = await api.get('/v1/bench/runs').catch(() => []);
-    $('#bHist').innerHTML = runs.length ? `<table class="t"><tr><th>When</th><th>Questions</th><th>Mode</th><th>Users</th><th>Answered</th><th>Typical</th><th>Slowest 5%</th><th></th></tr>${runs.map(r => r.kind === 'protocol' ? `<tr class="click" data-proto="${esc(r.run_id)}"><td>${ago(r.created_at || new Date().toISOString())}</td><td>${esc(SET_NAME[r.request?.prompt_set] || r.request?.prompt_set)}</td><td>${modeName(r.request?.mode || 'fast')}</td><td>standard ${esc((r.request?.levels || []).join('/'))}</td><td>${(r.table || []).reduce((a, x) => a + (x.ok || 0), 0) || '–'}</td><td colspan="2">${r.nfr007?.pass == null ? '–' : `target ${r.nfr007.pass ? 'met' : 'missed'} (${num(r.nfr007.ratio, 2)}×)`}</td><td>${r.status === 'running' ? '<span class="spin"></span>' : ''}</td></tr>`
-      : `<tr class="click" data-id="${esc(r.run_id)}"><td>${ago(r.created_at || r.finished_at || new Date().toISOString())}</td><td>${esc(SET_NAME[r.request?.prompt_set] || r.request?.prompt_set)}</td><td>${modeName(r.request?.mode || 'auto')}</td><td>${r.request?.concurrency ?? '–'}</td><td>${r.results?.ok ?? '–'}</td><td>${fmtMs(r.results?.latency_ms?.p50)}</td><td>${fmtMs(r.results?.latency_ms?.p95)}</td><td>${r.status === 'running' ? '<span class="spin"></span>' : ''}</td></tr>`).join('')}</table>` : '<div class="empty small">No runs yet.</div>';
+  const history = async () => { const runs = await api.get('/v1/bench/runs').catch(() => []); if (!alive()) return;
+    $('#bHist').innerHTML = runs.length ? `<table class="t"><tr><th>When</th><th>Questions</th><th>Mode</th><th>Users</th><th>Answered</th><th>Typical</th><th>Slowest 5%</th><th></th></tr>${runs.map(r => r.kind === 'protocol' ? `<tr class="click" tabindex="0" data-proto="${esc(r.run_id)}"><td>${ago(r.created_at || new Date().toISOString())}</td><td>${esc(SET_NAME[r.request?.prompt_set] || r.request?.prompt_set)}</td><td>${modeName(r.request?.mode || 'fast')}</td><td>standard ${esc((r.request?.levels || []).join('/'))}</td><td>${(r.table || []).reduce((a, x) => a + (x.ok || 0), 0) || '–'}</td><td colspan="2">${r.nfr007?.pass == null ? '–' : `target ${r.nfr007.pass ? 'met' : 'missed'} (${num(r.nfr007.ratio, 2)}×)`}</td><td>${r.status === 'running' ? '<span class="spin"></span>' : ''}</td></tr>`
+      : `<tr class="click" tabindex="0" data-id="${esc(r.run_id)}"><td>${ago(r.created_at || r.finished_at || new Date().toISOString())}</td><td>${esc(SET_NAME[r.request?.prompt_set] || r.request?.prompt_set)}</td><td>${modeName(r.request?.mode || 'auto')}</td><td>${r.request?.concurrency ?? '–'}</td><td>${r.results?.ok ?? '–'}</td><td>${fmtMs(r.results?.latency_ms?.p50)}</td><td>${fmtMs(r.results?.latency_ms?.p95)}</td><td>${r.status === 'running' ? '<span class="spin"></span>' : ''}</td></tr>`).join('')}</table>` : '<div class="empty small">No runs yet.</div>';
     $$('#bHist tr[data-id]').forEach(tr => tr.onclick = () => watch(tr.dataset.id)); $$('#bHist tr[data-proto]').forEach(tr => tr.onclick = () => { watchProto(tr.dataset.proto); $('#pOut').scrollIntoView({ behavior: 'smooth' }); }); };
-  const watch = (id) => { clearInterval(poll); const tick = async () => { const r = await api.get('/v1/bench/runs/' + id); show(r); if (r.status !== 'running') { clearInterval(poll); history(); } }; tick(); poll = setInterval(tick, 1500); };
+  const watch = (id) => { clearInterval(poll); const tick = async () => { if (document.hidden) return; if (!alive()) return clearInterval(poll); const r = await api.get('/v1/bench/runs/' + id).catch(() => null); if (!r || !alive()) return; show(r); if (r.status !== 'running') { clearInterval(poll); history(); } }; tick(); poll = setInterval(tick, 1500); };
   $('#bStart').onclick = async () => { const [k, v] = $('#bStop').value.split(':'); const body = { prompt_set: $('#bSet').value, mode: $('#bMode').value, concurrency: +$('#bConc').value, max_tokens: +$('#bMax').value, [k === 'r' ? 'requests' : 'duration_s']: +v };
-    try { const r = await api.post('/v1/bench/runs', body); toast('Load test started'); watch(r.run_id); history(); } catch (e) { toast(e.message); } };
+    try { const r = await api.post('/v1/bench/runs', body); toast('Load test started'); watch(r.run_id); history(); } catch (e) { toastErr(e); } };
   $('#bCancel').onclick = async () => { if (current) { await api.post(`/v1/bench/runs/${current.run_id}/cancel`).catch(() => {}); toast('Stopping once the current answers finish…'); } };
   const showProto = (r) => { const T = r.table || []; const v = r.nfr007 || {};
     $('#pOut').innerHTML = `${r.status === 'running' ? `<p class="small"><span class="spin"></span> Running step ${(r.level_index ?? 0) + 1} of ${r.request?.levels?.length ?? 3}…</p>` : ''}${T.length ? `<table class="t"><tr><th>Users</th><th>Questions</th><th>Answered</th><th>Typical</th><th>Slowest 5%</th><th>Slowest 1%</th><th>First words (slowest 5%)</th><th>Answers per minute</th><th>Thorough</th><th>CPU time per answer</th></tr>
       ${T.map(x => `<tr><td><b>${x.concurrency}</b></td><td>${x.requests}</td><td>${x.ok}</td><td>${fmtMs(x.p50_ms)}</td><td>${fmtMs(x.p95_ms)}</td><td>${fmtMs(x.p99_ms)}</td><td>${fmtMs(x.ttft_p95_ms)}</td><td>${num((x.throughput_rps || 0) * 60, 1)}</td><td>${pct(x.escalation_rate, 0)}</td><td>${num(x.cost_per_request_s, 1)} s</td></tr>`).join('')}</table>
       <p class="small">${v.pass == null ? 'The verdict needs the runs with 1 and 2 users.' : `${v.pass ? '<span class="badge b-verified">Target met</span>' : '<span class="badge b-abstained">Target missed</span>'} With ${v.limit_sessions || 2} users the slowest 5% of answers took ${num(v.ratio, 2)}× as long as with one user (target: 2× or less)${v.ratio_at_4 != null ? `; with 4 users ${num(v.ratio_at_4, 2)}×` : ''}.${(T[0]?.requests ?? 0) < 8 ? ` <span class="badge" title="With fewer than 8 questions per step the slowest 5% is just the slowest answer">rough: ${T[0]?.requests ?? 0} questions</span>` : ''}${v.pass ? '' : ' One run can miss when other programs share the computer; the verdict that counts is the median of the five latest runs, shown under Release readiness on the Experiments page.'}`}</p>` : ''}`; };
-  const watchProto = (id) => { const tick = async () => { const r = await api.get('/v1/bench/runs/' + id).catch(() => null); if (!r) return; showProto(r); if (r.status !== 'running') clearInterval(pPoll); }; clearInterval(pPoll); tick(); pPoll = setInterval(tick, 3000); };
+  const watchProto = (id) => { const tick = async () => { if (document.hidden) return; if (!alive()) return clearInterval(pPoll); const r = await api.get('/v1/bench/runs/' + id).catch(() => null); if (!r || !alive()) return; showProto(r); if (r.status !== 'running') clearInterval(pPoll); }; clearInterval(pPoll); tick(); pPoll = setInterval(tick, 3000); };
   let pPoll = null;
-  $('#pStart').onclick = async () => { try { const r = await api.post('/v1/bench/protocol', { prompt_set: $('#bSet').value, mode: 'fast', levels: [1, 2, 4], requests_per_session: 8, max_tokens: +$('#bMax').value }); toast('Standard load test started: 1, 2, then 4 users'); watchProto(r.run_id); } catch (e) { toast(e.message); } };
-  { const prev = (await api.get('/v1/bench/runs').catch(() => [])).find(r => r.kind === 'protocol'); if (prev) watchProto(prev.run_id); }
+  $('#pStart').onclick = async () => { if (!await confirmDialog({ title: 'Run the standard load test?', ok: 'Run the test', danger: false, body: '<p>The same questions are asked with 1, then 2, then 4 simultaneous users. It takes several minutes, and everyone\'s answers are slower while it runs.</p><p class="small muted">It cannot be stopped from this page once it has started.</p>' })) return;
+    try { const r = await api.post('/v1/bench/protocol', { prompt_set: $('#bSet').value, mode: 'fast', levels: [1, 2, 4], requests_per_session: 8, max_tokens: +$('#bMax').value }); toast('Standard load test started: 1, 2, then 4 users'); watchProto(r.run_id); } catch (e) { toastErr(e); } };
+  const runs = await api.get('/v1/bench/runs').catch(() => []); if (!alive()) return;
+  { const prev = runs.find(r => r.kind === 'protocol'); if (prev) watchProto(prev.run_id); }
   tiles(null); history();
-  const runs = await api.get('/v1/bench/runs').catch(() => []); const lastBench = runs.find(r => r.kind !== 'protocol'); if (lastBench) watch(lastBench.run_id);
+  const lastBench = runs.find(r => r.kind !== 'protocol'); if (lastBench) watch(lastBench.run_id);
   return () => { clearInterval(poll); clearInterval(pPoll); };
 } };
 
@@ -1468,9 +1786,9 @@ routes.eval = { title: 'Experiments', sub: 'compare answering strategies', adv: 
     <div class="card" id="gatesCard"><div class="card-b"><span class="spin"></span> Checking release readiness…</div></div>
     <div class="card" id="insCard"><div class="card-b"><span class="spin"></span> Summarising all experiments…</div></div>
     <div class="card"><div class="card-h"><h2>Question sets</h2><span class="hint">Every question has an exact check. Licences: GSM8K MIT, HumanEval MIT, MBPP CC-BY-4.0, task sets Apache-2.0.</span></div>
-      <div class="card-b grid g4">${datasets.map(d => `<div class="ex" data-ds="${esc(d.name)}"><b>${esc(d.name)}</b><span>${d.tasks} questions · ${d.verifiable} checkable<br>${Object.entries(d.domains).map(([k, v]) => `${esc(k)} ${v}`).join(' · ')}</span></div>`).join('')}</div></div>
+      <div class="card-b grid g4">${datasets.map(d => `<div class="ex" data-ds="${esc(d.name)}" tabindex="0" role="button" title="Show the first questions of this set"><b>${esc(d.name)}</b><span>${d.tasks} questions · ${d.verifiable} checkable<br>${Object.entries(d.domains).map(([k, v]) => `${esc(k)} ${v}`).join(' · ')}</span></div>`).join('')}</div></div>
     <div class="card"><div class="card-h"><h2>Experiments</h2><span class="hint">Questions about when the quick and thorough models should each answer. Pick one to fill in the form below.</span><span class="sp"></span><button class="btn sm ghost" id="eGloss">${icon.book}What the numbers mean</button></div>
-      <div class="card-b grid g3">${PRESETS.map((p, i) => `<div class="ex preset" data-preset="${i}" tabindex="0"><b>${esc(p.t)}</b><span class="q">${esc(p.q)}</span><span>${esc(p.d)}</span><span class="tiny faint">${esc(p.ds)} · ${p.n} questions · ${p.sys.length} strategies</span></div>`).join('')}</div></div>
+      <div class="card-b grid g3">${PRESETS.map((p, i) => `<div class="ex preset" data-preset="${i}" tabindex="0" role="button"><b>${esc(p.t)}</b><span class="q">${esc(p.q)}</span><span>${esc(p.d)}</span><span class="tiny faint">${esc(p.ds)} · ${p.n} questions · ${p.sys.length} strategies</span></div>`).join('')}</div></div>
     <div class="card"><div class="card-h"><h2>New experiment</h2><span class="hint">Every selected strategy answers the same questions, so they can be compared pair by pair.</span></div>
       <div class="card-b"><div class="row" style="align-items:flex-end;gap:14px">
         <label class="f">Question set<select id="eDs">${datasets.map(d => `<option value="${esc(d.name)}" ${d.name === 'smoke_mixed' ? 'selected' : ''}>${esc(d.name)} (${d.tasks})</option>`).join('')}</select></label>
@@ -1493,12 +1811,14 @@ routes.eval = { title: 'Experiments', sub: 'compare answering strategies', adv: 
       <div class="card-b gates">${g.gates.map((x, i) => `<details class="gate ${x.status}"><summary><b>${i + 1}</b> <span title="${esc(x.gate)}: ${esc(x.title)}">${esc(GATE_NAME[x.gate] || plain(x.title))}</span><span class="sp"></span><span class="badge ${C[x.status]}">${W[x.status] || esc(x.status)}</span></summary>
         <ul>${x.criteria.map(c => `<li><span class="badge ${C[c.status]}">${W[c.status] || esc(c.status)}</span> ${esc(plain(c.criterion))}<div class="tiny muted">${esc(plain(c.evidence))}</div></li>`).join('')}</ul></details>`).join('')}</div>`; }).catch(() => { if (alive()) $('#gatesCard').innerHTML = '<div class="card-b muted small">Release readiness is unavailable right now.</div>'; });
   const POL = { fast: ['Quick only', 'var(--fast)', 'always answer at once'], gated: ['Auto + checks', 'var(--accent)', 'check, then decide'], blind: ['Auto (estimate)', 'var(--teal)', 'decide from an estimate'], slow: ['Thorough only', 'var(--slow)', 'always think first'] };
-  const loadInsights = async (lam) => { const ins = await api.get('/v1/lab/insights' + (lam != null ? `?lambda=${lam}` : '')).catch(() => null); if (!alive() || !ins) return;
+  const loadInsights = async (lam) => { const ins = await api.get('/v1/lab/insights' + (lam != null ? `?lambda=${lam}` : '')).catch(() => null); if (!alive()) return;
+    // A failed summary says so and offers another try, instead of spinning for ever.
+    if (!ins) { $('#insCard').innerHTML = '<div class="card-b small"><span class="muted">The summary of all experiments is unavailable right now.</span> <button type="button" class="linkbtn" id="insRetry">Try again</button></div>'; $('#insRetry').onclick = () => { $('#insCard').innerHTML = '<div class="card-b"><span class="spin"></span> Summarising all experiments…</div>'; loadInsights(lam); }; return; }
     const D = ins.domains || [];
     $('#insCard').innerHTML = `<div class="card-h"><h2>Which strategy wins?</h2><span class="hint">From ${ins.runs} experiments. Each cell is the best strategy for that topic when speed matters as much as the column says (left: accuracy first; right: speed first).</span></div>
       <div class="card-b">${D.length ? `<div style="overflow:auto"><table class="t policy-map"><tr><th>Topic</th>${ins.lambda_grid.map(l => `<th title="Speed weight: the value of one minute saved, against one wrong answer">Speed ${+(+l).toFixed(2)}</th>`).join('')}<th title="How much more often thorough answers are right than quick ones on the same questions, with a 95% interval">Thorough gain</th><th title="In Compare trials in Chat, how often people preferred the thorough answer">People prefer thorough</th></tr>
-        ${D.map(d => `<tr><td class="dom"><b>${esc(d.domain)}</b><table class="mini">${d.policies.map(p => `<tr><td>${POL[p.policy]?.[0] || p.policy}</td><td>${pct(p.accuracy, 0)}</td><td>${num(p.mean_cost_s, 0)} s</td><td class="faint">${p.n} q</td></tr>`).join('')}</table></td>
-          ${ins.lambda_grid.map(l => { const b = (d.policy_map || []).find(x => Math.abs(x.lambda - l) < 1e-4); return b ? `<td><span class="pm" style="background:${POL[b.policy]?.[1]}" title="${esc(POL[b.policy]?.[2] || '')} · ${b.n} questions · ${b.confidence} confidence">${esc(POL[b.policy]?.[0] || b.policy)}</span>${b.confidence === 'low' ? '<span class="tiny faint"> ?</span>' : ''}</td>` : '<td class="faint">–</td>'; }).join('')}
+        ${D.map(d => `<tr><td class="dom"><b>${esc(d.domain)}</b><table class="mini">${d.policies.map(p => `<tr><td>${esc(POL[p.policy]?.[0] || p.policy)}</td><td>${pct(p.accuracy, 0)}</td><td>${num(p.mean_cost_s, 0)} s</td><td class="faint">${+p.n || 0} q</td></tr>`).join('')}</table></td>
+          ${ins.lambda_grid.map(l => { const b = (d.policy_map || []).find(x => Math.abs(x.lambda - l) < 1e-4); return b ? `<td><span class="pm" style="background:${POL[b.policy]?.[1]}" title="${esc(POL[b.policy]?.[2] || '')} · ${+b.n || 0} questions · ${esc(b.confidence)} confidence">${esc(POL[b.policy]?.[0] || b.policy)}</span>${b.confidence === 'low' ? '<span class="tiny faint"> ?</span>' : ''}</td>` : '<td class="faint">–</td>'; }).join('')}
           <td class="small">${d.value_of_deliberation ? `<b>${d.value_of_deliberation.delta_accuracy >= 0 ? '+' : ''}${(d.value_of_deliberation.delta_accuracy * 100).toFixed(0)} pts</b> ${d.value_of_deliberation.ci95 ? `[${(d.value_of_deliberation.ci95[0] * 100).toFixed(0)}, ${(d.value_of_deliberation.ci95[1] * 100).toFixed(0)}]` : ''} for +${num(d.value_of_deliberation.extra_cost_s, 0)} s <span class="faint">(${d.value_of_deliberation.pairs} pairs)</span>` : '<span class="faint">needs quick-only and thorough-only on the same questions</span>'}</td>
           <td class="small">${d.human_preference && (d.human_preference.slow + d.human_preference.fast) ? `${pct(d.human_preference.slow / (d.human_preference.slow + d.human_preference.fast), 0)} of ${d.human_preference.slow + d.human_preference.fast}` : '<span class="faint">no trials yet</span>'}</td></tr>`).join('')}</table></div>
         <p class="hint">"?" marks low confidence (fewer than 30 questions). Run the experiments below to fill in the table.</p>` : '<div class="empty small">No experiments yet. Start with "Speed against care" or "Full service".</div>'}</div>`; };
@@ -1506,18 +1826,18 @@ routes.eval = { title: 'Experiments', sub: 'compare answering strategies', adv: 
   const systems = () => { const xs = $$('.eSys:checked').map(x => x.value); if ($('#eSweep').checked) xs.push(...$('#eSweepB').value.split(',').map(x => parseInt(x.trim(), 10)).filter(b => b >= 16 && b <= 8192).map(b => `slow_b${b}`));
     if ($('#eLamSweep').checked) xs.push(...$('#eLamB').value.split(',').map(x => Math.round(parseFloat(x) * 100)).filter(v => v >= 0 && v <= 100).map(v => `nafs_blind_l${String(v).padStart(2, '0')}`)); return [...new Set(xs)]; };
   $('#eGloss').onclick = glossary;
-  $$('[data-preset]').forEach(el => { const go = () => { const p = PRESETS[+el.dataset.preset]; if (![...$('#eDs').options].some(o => o.value === p.ds)) return toast(`The question set ${p.ds} is not available yet`);
+  $$('[data-preset]').forEach(el => { const go = () => { const p = PRESETS[+el.dataset.preset]; if (![...$('#eDs').options].some(o => o.value === p.ds)) return toast(`The question set ${p.ds} is not available yet`, { kind: 'error' });
     $('#eDs').value = p.ds; $('#eN').value = p.n; $('#eOff').value = 0; $('#eShuf').checked = true; $('#eSweep').checked = false; $('#eLamSweep').checked = false;
     $$('.eSys').forEach(c => { c.checked = p.sys.includes(c.value); });
     const extra = p.sys.filter(x => !Object.keys(SYS_LABEL).includes(x));
     if (extra.some(x => x.startsWith('slow_b'))) { $('#eSweep').checked = true; $('#eSweepB').value = extra.filter(x => x.startsWith('slow_b')).map(x => x.slice(6)).join(','); }
     if (extra.some(x => x.startsWith('nafs_blind_l'))) { $('#eLamSweep').checked = true; $('#eLamB').value = extra.filter(x => x.startsWith('nafs_blind_l')).map(x => (+x.slice(12) / 100).toString()).join(','); }
     est(); toast(`${p.t} is ready: press Start`); $('#eStart').scrollIntoView({ behavior: 'smooth', block: 'center' }); };
-    el.onclick = go; el.onkeydown = (e) => e.key === 'Enter' && go(); });
+    el.onclick = go; });
   const est = () => { const n = +$('#eN').value; const sy = systems(); const slow = sy.filter(x => x.startsWith('slow') || x === 'nafs_aql' || x === 'nafs_blind').length; $('#eEst').textContent = `${n * sy.length} answers. On this computer a thorough answer takes about 1–4 minutes and a quick one 5–30 seconds: roughly ${Math.round(n * (slow * 1.5 + (sy.length - slow) * 0.3))}–${Math.round(n * (slow * 3 + (sy.length - slow) * 0.5))} minutes in all.`; };
   ['#eN', '.eSys', '#eSweep', '#eSweepB', '#eLamSweep', '#eLamB'].forEach(q => $$(q).forEach(el => el.addEventListener('input', est))); est();
-  $$('[data-ds]').forEach(el => el.onclick = async () => { $('#eDs').value = el.dataset.ds; const items = await api.get(`/v1/eval/datasets/${encodeURIComponent(el.dataset.ds)}?limit=8`);
-    modal(`<h3 style="margin-top:0">${esc(el.dataset.ds)}: first ${items.length} questions</h3>${items.map(t => `<div style="margin-bottom:10px"><span class="badge b-domain">${esc(t.domain)}</span> <span class="mono tiny">${esc(t.id)}</span><div class="codebox" style="margin-top:4px">${esc(t.prompt.slice(0, 600))}</div><div class="tiny muted">checked by: ${esc(Object.keys(t.verification || {}).map(k => ({ reference_answer: 'expected answer', tests: 'tests', test_code: 'tests', json_schema: 'format' }[k] || k)).join(', ') || 'nothing')}</div></div>`).join('')}`); });
+  $$('[data-ds]').forEach(el => el.onclick = guard(async () => { $('#eDs').value = el.dataset.ds; const items = await api.get(`/v1/eval/datasets/${encodeURIComponent(el.dataset.ds)}?limit=8`);
+    modal(`<h3 style="margin-top:0">${esc(el.dataset.ds)}: first ${items.length} questions</h3>${items.map(t => `<div style="margin-bottom:10px"><span class="badge b-domain">${esc(t.domain)}</span> <span class="mono tiny">${esc(t.id)}</span><div class="codebox" style="margin-top:4px">${esc(t.prompt.slice(0, 600))}</div><div class="tiny muted">checked by: ${esc(Object.keys(t.verification || {}).map(k => ({ reference_answer: 'expected answer', tests: 'tests', test_code: 'tests', json_schema: 'format' }[k] || k)).join(', ') || 'nothing')}</div></div>`).join('')}`); }, 'The questions could not be shown.'));
   let poll = null, current = null; const selected = new Set();
   const ci = (c) => c ? `[${(c[0] * 100).toFixed(1)}, ${(c[1] * 100).toFixed(1)}]` : '–';
   const render = (r) => { current = r; const sys = r.systems || {}; const keys = Object.keys(sys);
@@ -1558,22 +1878,22 @@ routes.eval = { title: 'Experiments', sub: 'compare answering strategies', adv: 
       ${cpCard || bcCard ? `<div class="grid g2" style="margin-top:16px">${cpCard}${bcCard}</div>` : ''}
       <div class="card" style="margin-top:16px"><div class="card-h"><h3>Answers</h3><span class="sp"></span>${r.run_id ? `<a class="btn sm ghost" href="/v1/eval/runs/${esc(r.run_id)}/export?format=md" data-dl>${icon.download}Report</a><a class="btn sm ghost" href="/v1/eval/runs/${esc(r.run_id)}/export?format=csv" data-dl>${icon.download}Spreadsheet (.csv)</a>` : ''}<div class="row"><select id="eFilt"><option value="all">all</option><option value="wrong">wrong</option><option value="right">right</option><option value="slow">thought longer</option><option value="err">failed</option></select></div></div><div class="card-b" style="padding:0;max-height:480px;overflow:auto" id="eItems"></div></div>`;
     const items = () => { const f = $('#eFilt')?.value || 'all'; const all = r.items || []; const its = all.filter(i => f === 'all' || (f === 'wrong' && i.correct === false) || (f === 'right' && i.correct === true) || (f === 'slow' && i.escalated) || (f === 'err' && i.error));
-      $('#eItems').innerHTML = `<table class="t"><tr><th>Question</th><th>Strategy</th><th>Result</th><th>Mode</th><th>Checked</th><th title="Predicted chance that the quick answer is wrong">Risk</th><th title="Was the quick draft right?">Draft</th><th>Time</th><th>Answer</th></tr>${its.slice(0, 600).map(i => `<tr class="click" data-ix="${all.indexOf(i)}"><td class="mono tiny">${esc(i.task_id)}</td><td>${sysLabel(i.system)}</td><td>${i.error ? '<span class="badge b-abstained">failed</span>' : i.correct == null ? '<span class="badge b-unverified">no check</span>' : i.correct ? `<span class="badge b-verified">${icon.check}right</span>` : `<span class="badge b-abstained">${icon.x}wrong</span>`}</td><td>${i.mode === 'slow' ? modeBadge('slow') : i.mode === 'fast' ? modeBadge('fast') : ''}</td><td>${ASSURE[i.assurance] ? assureBadge(i.assurance) : esc(i.assurance)}</td><td>${num(i.e1_hat, 2)}</td><td>${i.draft_correct == null ? '–' : i.draft_correct ? '✓' : '✗'}</td><td>${fmtMs(i.wall_ms)}</td><td class="small" style="max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.error || i.answer_preview)}</td></tr>`).join('')}</table>${its.length > 600 ? `<p class="hint" style="padding:0 16px">Showing 600 of ${its.length}.</p>` : ''}`;
+      $('#eItems').innerHTML = `<table class="t"><tr><th>Question</th><th>Strategy</th><th>Result</th><th>Mode</th><th>Checked</th><th title="Predicted chance that the quick answer is wrong">Risk</th><th title="Was the quick draft right?">Draft</th><th>Time</th><th>Answer</th></tr>${its.slice(0, 600).map(i => `<tr class="click" tabindex="0" data-ix="${all.indexOf(i)}"><td class="mono tiny">${esc(i.task_id)}</td><td>${sysLabel(i.system)}</td><td>${i.error ? '<span class="badge b-abstained">failed</span>' : i.correct == null ? '<span class="badge b-unverified">no check</span>' : i.correct ? `<span class="badge b-verified">${icon.check}right</span>` : `<span class="badge b-abstained">${icon.x}wrong</span>`}</td><td>${i.mode === 'slow' ? modeBadge('slow') : i.mode === 'fast' ? modeBadge('fast') : ''}</td><td>${ASSURE[i.assurance] ? assureBadge(i.assurance) : esc(i.assurance)}</td><td>${num(i.e1_hat, 2)}</td><td>${i.draft_correct == null ? '–' : i.draft_correct ? '✓' : '✗'}</td><td>${fmtMs(i.wall_ms)}</td><td class="small" style="max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(i.error || i.answer_preview)}</td></tr>`).join('')}</table>${its.length > 600 ? `<p class="hint" style="padding:0 16px">Showing 600 of ${its.length}.</p>` : ''}`;
       $$('#eItems tr.click').forEach(tr => tr.onclick = () => { const i = all[+tr.dataset.ix]; modal(`<h3 style="margin-top:0">${esc(i.task_id)} · ${sysLabel(i.system)}</h3><div class="row">${i.mode !== 'error' ? modeBadge(i.mode) : ''}${ASSURE[i.assurance] ? assureBadge(i.assurance) : ''}<span class="small muted">${fmtMs(i.wall_ms)} · ${i.model_calls} model calls · ${i.reasoning_tokens} thinking tokens${i.attempts ? ` · ${i.attempts} thorough attempts${i.first_pass_attempt ? ', passed at ' + i.first_pass_attempt : ''}` : ''}</span></div>
           <h4>Answer</h4><div class="answer">${md(i.answer_preview)}</div>${i.evidence ? `<h4>What the check found</h4><div class="codebox">${esc(i.evidence)}</div>` : ''}${i.error ? `<div class="notice bad">${esc(i.error)}</div>` : ''}
           <details><summary class="small">Routing signals</summary><div class="codebox">${esc(JSON.stringify(i.features, null, 1))}</div>${i.decision_id ? `<p><button class="linkbtn" data-decision="${esc(i.decision_id)}">Full routing record</button></p>` : ''}</details>`); }); };
     items(); $('#eFilt') && ($('#eFilt').onchange = items);
-    $('#eFit') && ($('#eFit').onclick = async () => { try { const c = await api.post(`/v1/eval/runs/${r.run_id}/calibrate`, { include_ledger: false }); showCalibration(c); } catch (e) { toast(e.message, 6000); } }); };
+    $('#eFit') && ($('#eFit').onclick = async () => { try { const c = await api.post(`/v1/eval/runs/${r.run_id}/calibrate`, { include_ledger: false }); showCalibration(c); } catch (e) { toastErr(e); } }); };
   const history = async () => { const runs = await api.get('/v1/eval/runs').catch(() => []); if (!alive()) return;
     const cols = ['nafs_aql', 'nafs_blind', 'fast_only', 'slow_only'];
-    $('#eHist').innerHTML = runs.length ? `<table class="t"><tr><th></th><th>When</th><th>Question set</th><th>Progress</th>${cols.map(k => `<th>${sysLabel(k)}</th>`).join('')}<th>Other</th><th></th></tr>${runs.map(r => `<tr class="click" data-id="${esc(r.run_id)}"><td><input type="checkbox" class="eSel" value="${esc(r.run_id)}" ${selected.has(r.run_id) ? 'checked' : ''}></td><td>${ago(r.started_at || r.created_at || new Date().toISOString())}</td><td>${esc(r.request?.benchmark)}</td><td>${r.progress?.done ?? 0}/${r.progress?.total ?? '?'}</td>${cols.map(k => `<td>${r.systems?.[k] ? pct(r.systems[k].accuracy, 0) : '–'}</td>`).join('')}<td class="small">${Object.keys(r.systems || {}).filter(k => !cols.includes(k)).map(sysLabel).join(', ')}</td><td>${r.status === 'running' ? '<span class="spin"></span>' : esc(r.status)}${r.status === 'interrupted' || r.status === 'cancelled' ? ` <button class="btn sm ghost" data-resume="${esc(r.run_id)}" title="Continue where it stopped">Resume</button>` : ''}</td></tr>`).join('')}</table>` : '<div class="empty small">No experiments yet. Start with <b>smoke_mixed</b> and 4–6 questions.</div>';
+    $('#eHist').innerHTML = runs.length ? `<table class="t"><tr><th></th><th>When</th><th>Question set</th><th>Progress</th>${cols.map(k => `<th>${sysLabel(k)}</th>`).join('')}<th>Other</th><th></th></tr>${runs.map(r => `<tr class="click" tabindex="0" data-id="${esc(r.run_id)}"><td><input type="checkbox" class="eSel" value="${esc(r.run_id)}" ${selected.has(r.run_id) ? 'checked' : ''}></td><td>${ago(r.started_at || r.created_at || new Date().toISOString())}</td><td>${esc(r.request?.benchmark)}</td><td>${r.progress?.done ?? 0}/${r.progress?.total ?? '?'}</td>${cols.map(k => `<td>${r.systems?.[k] ? pct(r.systems[k].accuracy, 0) : '–'}</td>`).join('')}<td class="small">${Object.keys(r.systems || {}).filter(k => !cols.includes(k)).map(sysLabel).join(', ')}</td><td>${r.status === 'running' ? '<span class="spin"></span>' : esc(r.status)}${r.status === 'interrupted' || r.status === 'cancelled' ? ` <button class="btn sm ghost" data-resume="${esc(r.run_id)}" title="Continue where it stopped">Resume</button>` : ''}</td></tr>`).join('')}</table>` : '<div class="empty small">No experiments yet. Start with <b>smoke_mixed</b> and 4–6 questions.</div>';
     $$('#eHist .eSel').forEach(cb => { cb.onclick = (e) => e.stopPropagation(); cb.onchange = () => { cb.checked ? selected.add(cb.value) : selected.delete(cb.value); $('#eDerive').disabled = !selected.size; }; });
-    $$('#eHist [data-resume]').forEach(b => b.onclick = async (e) => { e.stopPropagation(); try { const r = await api.post(`/v1/eval/runs/${b.dataset.resume}/resume`); toast(`Resumed; ${r.kept_items} finished answers kept`); watch(b.dataset.resume); history(); } catch (x) { toast(x.message); } });
+    $$('#eHist [data-resume]').forEach(b => b.onclick = async (e) => { e.stopPropagation(); try { const r = await api.post(`/v1/eval/runs/${b.dataset.resume}/resume`); toast(`Resumed; ${r.kept_items} finished answers kept`); watch(b.dataset.resume); history(); } catch (x) { toastErr(x); } });
     $$('#eHist tr.click').forEach(tr => tr.onclick = () => watch(tr.dataset.id)); };
-  const watch = (id) => { clearInterval(poll); const tick = async () => { if (!alive()) return clearInterval(poll); const r = await api.get('/v1/eval/runs/' + id).catch(() => null); if (!r || !alive()) return; render(r); if (r.status !== 'running') { clearInterval(poll); history(); } }; tick(); poll = setInterval(tick, 3000); };
+  const watch = (id) => { clearInterval(poll); const tick = async () => { if (!alive()) return clearInterval(poll); if (document.hidden) return; const r = await api.get('/v1/eval/runs/' + id).catch(() => null); if (!r || !alive()) return; render(r); if (r.status !== 'running') { clearInterval(poll); history(); } }; tick(); poll = setInterval(tick, 3000); };
   $('#eStart').onclick = async () => { const body = { benchmark: $('#eDs').value, max_items: +$('#eN').value, offset: +$('#eOff').value, systems: systems(), lambda: +$('#eLam').value, shuffle: $('#eShuf').checked };
-    if ($('#eB').value) body.thinking_budget = +$('#eB').value; if (!body.systems.length) return toast('Select at least one strategy');
-    try { const r = await api.post('/v1/eval/runs', body); toast('Experiment started'); watch(r.run_id); history(); } catch (e) { toast(e.message, 5000); } };
+    if ($('#eB').value) body.thinking_budget = +$('#eB').value; if (!body.systems.length) return toast('Select at least one strategy', { kind: 'error' });
+    try { const r = await api.post('/v1/eval/runs', body); toast('Experiment started'); watch(r.run_id); history(); } catch (e) { toastErr(e); } };
   $('#eCancel').onclick = async () => { if (current) { await api.post(`/v1/eval/runs/${current.run_id}/cancel`).catch(() => {}); toast('Stopping after the current question…'); } };
   $('#eDerive').onclick = () => deriveDialog([...selected]);
   await history(); if (!alive()) return; const runs = await api.get('/v1/eval/runs').catch(() => []); if (runs[0] && alive()) watch(runs[0].run_id);
@@ -1595,8 +1915,8 @@ async function deriveDialog(ids) {
     modal(`<h3 style="margin-top:0">Tuned settings (preview)</h3><p class="small muted">From ${ids.length} experiment(s). Topics with fewer than 10 thorough-only answers keep their defaults. Applying keeps a record of where the values came from.</p>
       <table class="t"><tr><th>Topic</th><th>Thorough / quick answers</th><th>Thorough answers wrong</th><th>Extra time</th><th>Retries</th><th>Thinking budget</th></tr>${rows}</table>
       <div class="row" style="margin-top:12px"><button class="btn sm" id="dApply" type="button">Apply these values</button></div>`);
-    $('#dApply').onclick = async () => { try { await api.post('/v1/gate/derive', { run_ids: ids, apply: true, min_n: 10 }); $('#modal').close(); toast('Tuned settings applied'); } catch (e) { toast(e.message, 5000); } };
-  } catch (e) { toast(e.message, 6000); }
+    $('#dApply').onclick = async () => { try { await api.post('/v1/gate/derive', { run_ids: ids, apply: true, min_n: 10 }); $('#modal').close(); toast('Tuned settings applied'); } catch (e) { toastErr(e); } };
+  } catch (e) { toastErr(e); }
 }
 
 // ============================== gate and ledger ==============================
@@ -1611,10 +1931,14 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
     <div class="grid g2"><div class="card" id="gPref"></div><div class="card" id="gDrift"></div></div>
     <div class="card" id="gAlerts"></div>
     <div class="card" id="gAudits"></div></div>`;
-  let ratePoll = null;
+  let ratePoll = null, gateErr = null;
   const load = async () => {
-    const [g, sm, au, rates, rruns, pref, drift, lb] = await Promise.all([api.get('/v1/gate'), api.get('/v1/self-model').catch(() => null), api.get('/v1/audits?limit=50').catch(() => null), api.get('/v1/verifiers').catch(() => null), api.get('/v1/verifiers/runs').catch(() => []), api.get('/v1/preferences').catch(() => null), api.get('/v1/drift').catch(() => null), api.get('/v1/gate/labels').catch(() => null)]);
-    if (!alive()) return; const cal = g.calibration, req = g.requirements;
+    const keep = { ds: $('#gRDs')?.value, rj: $('#gRJ')?.checked };   // choices made on the page survive its refresh
+    const [g, sm, au, rates, rruns, pref, drift, lb] = await Promise.all([api.get('/v1/gate').catch((e) => (gateErr = e, null)), api.get('/v1/self-model').catch(() => null), api.get('/v1/audits?limit=50').catch(() => null), api.get('/v1/verifiers').catch(() => null), api.get('/v1/verifiers/runs').catch(() => []), api.get('/v1/preferences').catch(() => null), api.get('/v1/drift').catch(() => null), api.get('/v1/gate/labels').catch(() => null)]);
+    if (!alive()) return;
+    // Without the routing settings the page cannot be drawn: on a refresh keep what is shown; on the first load say so.
+    if (!g) { if (!$('#gSeg')) { $('#gMode').innerHTML = `<div class="card-b"><div class="notice bad" role="alert">${icon.alert}<span>The quality numbers could not be loaded. ${esc(humanError(gateErr))}</span><span class="sp"></span><button class="btn sm ghost" type="button" id="gRetry">Try again</button></div></div>`; $('#gRetry').onclick = () => { $('#gMode').innerHTML = '<div class="card-b"><span class="spin"></span></div>'; load(); }; } return; }
+    const cal = g.calibration, req = g.requirements;
     const eff = g.effective_rule;
     // The page's answer first: four plain numbers, the detail below.
     { const D0 = sm?.domains || []; const tot = D0.reduce((a, d) => a + d.n, 0); const esc0 = tot ? D0.reduce((a, d) => a + d.n * (d.escalation_rate || 0), 0) / tot : null;
@@ -1633,10 +1957,13 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
       <dt>Practice while idle</dt><dd>${lb ? (lb.enabled ? `<span class="badge b-verified">on</span> ${lb.ledger.labelled} checked quick answers collected, ${pct(Math.min(1, lb.ledger.labelled / (req.min_n || 2900)), 0)} of the ${req.min_n || 2900} the learned rule needs${lb.ledger.labelled ? ` (${pct(lb.ledger.draft_wrong / lb.ledger.labelled, 0)} were wrong)` : ''}` : '<span class="badge b-unverified">off</span> switch it on in the settings file to collect checked answers while nobody is using the app') : '–'}</dd>
       <dt>Relearning</dt><dd>${g.recalibrate_every_h ? `every ${g.recalibrate_every_h} h from real use` : 'by hand'} · <button class="btn sm ghost" id="gRecal" type="button">Relearn now</button></dd></dl>
       <p class="hint">${g.mode !== eff ? `<b>${esc(MODE_NAME[g.mode] || g.mode)}</b> is selected, but the simple rule stays in use until the learned rule is accurate enough.` : ''}</p></div>`;
-    $$('#gSeg button').forEach(b => b.onclick = async () => { await api.post('/v1/gate', { mode: b.dataset.m }).catch(e => toast(e.message)); load(); });
+    $$('#gSeg button').forEach(b => { b.setAttribute('aria-pressed', String(g.mode === b.dataset.m)); b.onclick = async () => { if (b.dataset.m === g.mode) return;
+      // This changes how every Auto answer is routed, for everyone, so it asks first.
+      if (!await confirmDialog({ title: `Switch Auto to “${MODE_NAME[b.dataset.m]}”?`, ok: 'Switch', danger: false, body: '<p>This changes at once how Auto decides when to think longer, for everyone using this service. You can switch back here at any time.</p>' })) return;
+      await api.post('/v1/gate', { mode: b.dataset.m }).then(() => toast(`Auto now uses: ${MODE_NAME[b.dataset.m]}`), (e) => toastErr(e, 'The rule was not changed.')); load(); }; });
     $('#gBudget') && ($('#gBudget').oninput = (e) => { $('#gBudgetV').textContent = pct(+e.target.value, 0); });
-    $('#gBudget') && ($('#gBudget').onchange = async (e) => { await api.post('/v1/gate', { escalation_budget: +e.target.value }).catch(x => toast(x.message)); load(); });
-    $('#gRecal').onclick = async () => { const b = $('#gRecal'); b.disabled = true; b.innerHTML = '<span class="spin"></span>'; try { showCalibration(await api.post('/v1/gate/recalibrate', {})); } catch (e) { toast(e.message, 6000); } finally { load(); } };
+    $('#gBudget') && ($('#gBudget').onchange = async (e) => { await api.post('/v1/gate', { escalation_budget: +e.target.value }).catch(x => toastErr(x)); load(); });
+    $('#gRecal').onclick = async () => { const b = $('#gRecal'); b.disabled = true; b.innerHTML = '<span class="spin"></span>'; try { showCalibration(await api.post('/v1/gate/recalibrate', {})); } catch (e) { toastErr(e); } finally { load(); } };
     $('#gCal').innerHTML = `<div class="card-h"><h3>How well Auto predicts mistakes</h3><span class="badge b-domain" title="${esc(cal.version)}">${/^prior/.test(cal.version) ? 'starting estimate' : 'learned ' + esc(cal.version)}</span></div><div class="card-b">${cal.n ? `<div class="row" style="gap:20px"><div class="tile" style="padding:0"><div class="k">Calibration error</div><div class="v">${num(cal.ece, 3)}</div><div class="s">target ${req.max_ece} or less${cal.folds ? '' : ' (older measurement)'}</div></div><div class="tile" style="padding:0"><div class="k">Checked answers</div><div class="v">${cal.n}</div><div class="s">needs ${req.min_n}</div></div><div class="tile" style="padding:0"><div class="k">Wrong / right</div><div class="v">${cal.n_pos + cal.n_neg ? `${cal.n_pos} / ${cal.n_neg}` : '–'}</div><div class="s">at least ${req.min_per_class} of each</div></div></div>
       ${cal.reliability?.length ? `<div style="max-width:320px;margin:8px auto 0">${chart.reliability(cal.reliability.map(([p, o, n]) => ({ predicted: p, observed: o, count: n })))}</div>` : ''}` : '<p class="muted small">Not learned yet: Auto uses a starting estimate. It learns from quick answers whose correctness is known (checked questions, spot checks and experiments). Press Relearn now, or fit one on the Experiments page.</p>'}</div>`;
     const prov = g.params; const doms = Object.keys(prov);
@@ -1644,21 +1971,23 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
     $('#gParams').innerHTML = `<div class="card-h"><h3>Settings per topic</h3><span class="hint">Defaults until tuned from experiments. ${g.derived?.derived_at ? `Tuned ${ago(g.derived.derived_at)} from ${g.derived.source_runs.length} experiment(s).` : ''}</span><span class="sp"></span>${g.derived?.derived_at ? '<button class="btn sm ghost" id="gReset" type="button">Back to defaults</button>' : ''}</div><div class="card-b" style="padding:0;overflow:auto">
       <table class="t"><tr><th>Topic</th><th title="Expected share of thorough answers that are still wrong">Thorough still wrong</th><th></th><th title="How much longer a thorough answer takes">Extra time</th><th></th><th title="Thorough attempts per question">Attempts</th><th title="Retries after a failed check">Retries</th><th>Thinking budget</th><th></th></tr>${doms.map(d => { const x = prov[d]; return `<tr><td>${esc(d)}</td><td>${pct(x.e2_hat, 1)}</td><td>${src(x.e2_source)}</td><td>${num(x.delta_c_s, 0)} s</td><td>${src(x.delta_c_source)}</td><td>${x.caps.N}</td><td>${x.caps.R}</td><td>${x.caps.budget}</td><td>${src(x.caps_source)} ${src(x.budget_source)}</td></tr>`; }).join('')}</table>
       <p class="hint" style="padding:0 16px">To tune them, run quick-only and thorough-only on the same questions on the Experiments page, tick those experiments, and choose "Tune from selected".</p></div>`;
-    $('#gReset') && ($('#gReset').onclick = async () => { if (await confirmDialog({ title: 'Go back to the default settings?', ok: 'Use defaults', danger: false, body: '<p>Auto goes back to the default values. You can tune them again from the Experiments page.</p>' })) { await api.del('/v1/gate/params'); load(); } });
+    $('#gReset') && ($('#gReset').onclick = async () => { if (await confirmDialog({ title: 'Go back to the default settings?', ok: 'Use defaults', danger: false, body: '<p>Auto goes back to the default values. You can tune them again from the Experiments page.</p>' })) { await api.del('/v1/gate/params').then(() => toast('Default settings are in use again'), (e) => toastErr(e, 'The settings were not changed.')); load(); } });
     const R = rates?.rates || {}; const running = (rruns || []).find(x => x.status === 'running');
         $('#gRates').innerHTML = `<div class="card-h"><h3>How good the checks are</h3><span class="sp"></span><select id="gRDs" title="Test suites used for the broken answers"><option value="base">Standard tests</option><option value="plus">Extended tests</option><option value="judge">Review only</option></select><label class="toggle small"><input type="checkbox" id="gRJ"> include review</label><button class="btn sm" id="gRRun" type="button" ${running ? 'disabled' : ''}>${running ? '<span class="spin"></span> measuring' : 'Measure'}</button></div><div class="card-b" style="padding:0">
       ${Object.keys(R).length ? `<table class="t"><tr><th>Check</th><th title="Share of known-correct answers it accepts">Accepts right answers</th><th title="Share of deliberately broken answers it wrongly accepts">Fooled by wrong answers</th><th title="95% upper bound of that share">At most (95%)</th><th>Broken answers tried</th><th>Right answers tried</th></tr>${Object.entries(R).map(([k, v]) => `<tr><td>${esc(checkerName(k))}</td><td>${pct(v.r, 1)}</td><td><b>${pct(v.phi, 1)}</b></td><td>${pct(v.phi_upper95, 1)}</td><td>${v.n_mutants}</td><td>${v.n_correct}</td></tr>`).join('')}</table>` : '<div class="empty small">Not measured yet.</div>'}
       ${running ? `<p class="hint" style="padding:0 16px">${esc(running.stage || '')} ${running.progress?.done ?? 0}/${running.progress?.total ?? '?'}</p>` : ''}<p class="hint" style="padding:0 16px">Measured with known-correct answers and with deliberately broken ones. Targets: fooled at most 1% of the time for code and maths, never for formats.</p></div>`;
-    $('#gRRun').onclick = async () => { const ds = $('#gRDs').value; const body = { include_judge: $('#gRJ').checked || ds === 'judge', judge_only: ds === 'judge', items_per_dataset: 210, code_datasets: ds === 'plus' ? ['mbpp_plus', 'humaneval_plus'] : ['mbpp', 'humaneval'] };
-      try { await api.post('/v1/verifiers/runs', body); toast('Measuring the checks…'); load(); } catch (e) { toast(e.message); } };
-    clearInterval(ratePoll); if (running) ratePoll = setInterval(() => alive() ? load() : clearInterval(ratePoll), 4000);
+    if (keep.ds && $('#gRDs')) $('#gRDs').value = keep.ds; if (keep.rj && $('#gRJ')) $('#gRJ').checked = true;
+    $('#gRRun').onclick = async () => { const ds = $('#gRDs').value;
+      if (!await confirmDialog({ title: 'Measure the checks?', ok: 'Measure', danger: false, body: '<p>Each check is tried on a few hundred known-correct and deliberately broken answers. It takes a long time on this computer, and answers are slower while it runs.</p>' })) return; const body = { include_judge: $('#gRJ').checked || ds === 'judge', judge_only: ds === 'judge', items_per_dataset: 210, code_datasets: ds === 'plus' ? ['mbpp_plus', 'humaneval_plus'] : ['mbpp', 'humaneval'] };
+      try { await api.post('/v1/verifiers/runs', body); toast('Measuring the checks…'); load(); } catch (e) { toastErr(e); } };
+    clearInterval(ratePoll); if (running) ratePoll = setInterval(() => { if (!alive()) return clearInterval(ratePoll); if (!document.hidden && !$('#modal').open && !$('#modal2').open) load().catch(() => {}); }, 4000);
     if (!$('#gJudge').dataset.ready) { $('#gJudge').dataset.ready = '1';
       $('#gJudge').innerHTML = `<div class="card-h"><h3>Try the review</h3><span class="hint">The thorough model reviews an answer for honesty, safety, helpfulness and grounding. It passes when the first three score at least 0.5 and the overall score at least 0.7.</span></div><div class="card-b">
         <label class="f">Question<input id="jQ" type="text" value="Is it safe to look directly at the Sun during a partial eclipse?"></label>
         <label class="f" style="margin-top:8px">Answer<textarea id="jA" rows="3">Yes, sunglasses are enough during a partial eclipse.</textarea></label>
         <div class="row" style="margin-top:8px"><button class="btn sm" id="jRun" type="button">${icon.shield}Review</button><span id="jOut"></span></div><div id="jDet"></div></div>`;
       $('#jRun').onclick = async () => { $('#jOut').innerHTML = '<span class="spin"></span> reviewing…'; $('#jDet').innerHTML = '';
-        try { const v = await api.post('/v1/judge', { question: $('#jQ').value, answer: $('#jA').value }); $s('#jOut').innerHTML = `<span class="verif ${v.passed ? 'pass' : 'fail'}">${v.passed ? icon.check : icon.x} review ${v.passed ? 'passed' : 'failed'} · score ${num(v.score, 2)} · ${fmtMs(v.duration_ms)}</span>`; $s('#jDet').innerHTML = judgeBars(v.details || {}); } catch (e) { $s('#jOut').textContent = e.message; } }; }
+        try { const v = await api.post('/v1/judge', { question: $('#jQ').value, answer: $('#jA').value }); $s('#jOut').innerHTML = `<span class="verif ${v.passed ? 'pass' : 'fail'}">${v.passed ? icon.check : icon.x} review ${v.passed ? 'passed' : 'failed'} · score ${num(v.score, 2)} · ${fmtMs(v.duration_ms)}</span>`; $s('#jDet').innerHTML = judgeBars(v.details || {}); } catch (e) { $s('#jOut').textContent = humanError(e); } }; }
     const D = sm?.domains || [];
     $('#gSelf').innerHTML = `<div class="card-h"><h3>Reliability by topic</h3><span class="hint">Real use only${Object.keys(sm?.audits || {}).length ? ` · spot checks ${Object.entries(sm.audits).map(([k, v]) => `${esc(k)} ${esc(String(v))}`).join(', ')}` : ''}</span></div><div class="card-b" style="padding:0;overflow:auto">${D.length ? `<table class="t"><tr><th>Topic</th><th>Answers</th><th>Thought longer</th><th title="Thorough answers that passed a check">Thorough right (checked)</th><th title="Spot-checked thorough answers that were right">Thorough right (spot checks)</th><th title="Best estimate, corrected for which questions were checked">Thorough right (estimate)</th><th>± margin</th><th title="Quick answers that a spot check found right">Quick right (spot checks)</th><th title="How often the quick answer agreed with a thorough re-answer">Quick agrees with thorough</th><th>Spot checks</th><th>Status</th></tr>
       ${D.map(d => `<tr><td>${esc(d.domain)}</td><td>${d.n}</td><td>${pct(d.escalation_rate, 0)}</td><td>${pct(d.p2_given_escalated)}<span class="tiny faint"> of ${d.n_escalated_labelled}</span></td><td>${pct(d.p2_given_audit)}<span class="tiny faint"> of ${d.n_audit_labelled}</span></td><td><b>${pct(d.p2_hat)}</b></td><td>${d.p2_se_bound == null ? '–' : '±' + pct(d.p2_se_bound)}</td><td>${pct(d.p1_kept_audited)}</td><td>${pct(d.kept_vs_slow_agreement, 0)}</td><td>${d.n_audit}</td><td>${d.status === 'measured' ? '<span class="badge b-verified">measured</span>' : '<span class="badge b-unverified">needs 30 spot checks</span>'}</td></tr>`).join('')}</table><p class="hint" style="padding:0 16px">Unknown values show as a dash, never as zero.</p>` : '<div class="empty small">No answers from real use yet.</div>'}</div>`;
@@ -1667,7 +1996,7 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
       const AST = { firing: 'warning', ok: 'ok', 'insufficient data': 'not enough data' };
       $('#gAlerts').innerHTML = `<div class="card-h"><h3>Warnings</h3><span class="hint">Last ${al.window_min} minutes. ${al.drill ? '<b>Test in progress: every warning shows as on.</b>' : ''}</span><span class="sp"></span><button class="btn sm ghost" id="gDrill" type="button" title="For two minutes every warning turns on, to test that notifications arrive">Test warnings</button></div>
         <div class="card-b" style="padding:0"><table class="t"><tr><th>Warning</th><th>Now</th><th>Limit</th><th>Answers</th><th>State</th></tr>${al.rules.map(r => `<tr><td>${esc(ALERT_NAME[r.rule] || plain(r.description))}</td><td>${r.value == null ? '–' : r.rule.includes('rate') || r.rule.includes('acceptance') ? pct(r.value, 1) : r.rule === 'fast_path_latency' ? fmtMs(r.value) : num(r.value, 0)}</td><td>${esc(r.threshold)}</td><td>${r.n}</td><td><span class="badge ${ST[r.state] || ''}">${esc(AST[r.state] || r.state)}</span></td></tr>`).join('')}</table></div>`;
-      $('#gDrill').onclick = async () => { try { const d = await api.post('/v1/alerts/drill', { seconds: 120 }); toast(`Test: ${d.alerts.firing} warnings on for ${d.drill_seconds} s`); load(); } catch (e) { toast(e.message); } }; }
+      $('#gDrill').onclick = async () => { try { const d = await api.post('/v1/alerts/drill', { seconds: 120 }); toast(`Test: ${d.alerts.firing} warnings on for ${d.drill_seconds} s`); load(); } catch (e) { toastErr(e); } }; }
     const P = pref?.domains || [];
     $('#gPref').innerHTML = `<div class="card-h"><h3>What people prefer</h3><span class="hint">From <b>Compare</b> in Chat: how often people pick the thorough answer.</span></div><div class="card-b" style="padding:0">${P.length ? `<table class="t"><tr><th>Topic</th><th>Comparisons</th><th>Prefer thorough</th><th>95% interval</th><th>Prefer quick</th><th>Same / both poor</th><th>Extra wait</th></tr>${P.map(d => `<tr><td>${esc(d.domain)}</td><td>${d.n}</td><td><b>${pct(d.slow_preferred_rate, 0)}</b></td><td class="small">${d.ci95 ? `${pct(d.ci95[0], 0)}–${pct(d.ci95[1], 0)}` : '–'}</td><td>${d.fast}</td><td>${d.tie} / ${d.both_bad}</td><td>${d.mean_extra_ms == null ? '–' : '+' + fmtMs(d.mean_extra_ms)}</td></tr>`).join('')}</table>` : '<div class="empty small">No comparisons yet. In Chat, choose <b>Compare</b> and pick the better answer.</div>'}</div>`;
     const DD = drift?.domains || []; const spark = (a, b) => { const v = [...(a || []), ...(b || [])]; const m = Math.max(drift?.params?.h || 10, ...v); const W = 160, H = 32;
@@ -1678,9 +2007,12 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
     const A = au?.audits || [];
     $('#gAudits').innerHTML = `<div class="card-h"><h3>Spot checks</h3><span class="hint">${pct(au?.worker?.audit_fraction, 0)} of quick answers are answered again by the thorough model when the computer is idle.</span><span class="sp"></span><button class="btn sm ghost" id="gAud" type="button">Run the next spot check</button></div><div class="card-b" style="padding:0;max-height:420px;overflow:auto">
       ${A.length ? `<table class="t"><tr><th>When</th><th>Topic</th><th>Status</th><th title="Predicted chance that the quick answer was wrong">Risk</th><th>Quick right</th><th>Thorough right</th><th>Agreement</th><th>Time</th><th>Quick answer</th></tr>${A.map(a => `<tr><td>${ago(a.created_at)}</td><td>${esc(a.domain)}</td><td>${esc(a.status)}${a.error ? ` <span class="tiny faint">${esc(a.error)}</span>` : ''}</td><td>${num(a.e1_hat, 2)}</td><td>${a.kept_correct == null ? '–' : a.kept_correct ? '✓' : '✗'}</td><td>${a.slow_correct == null ? '–' : a.slow_correct ? '✓' : '✗'}</td><td>${pct(a.agreement, 0)}</td><td>${fmtMs(a.wall_ms)}</td><td class="small" style="max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.kept_preview)}</td></tr>`).join('')}</table>` : '<div class="empty small">No spot checks yet. About one in twenty quick answers is queued for one.</div>'}</div>`;
-    $('#gAud').onclick = async () => { const b = $('#gAud'); b.disabled = true; b.innerHTML = '<span class="spin"></span> running'; try { const r = await api.post('/v1/audits/run-next'); toast(r.completed ? 'Spot check done' : 'No spot check waiting'); } catch (e) { toast(e.message); } load(); };
+    $('#gAud').onclick = async () => { const b = $('#gAud'); b.disabled = true; b.innerHTML = '<span class="spin"></span> running'; try { const r = await api.post('/v1/audits/run-next'); toast(r.completed ? 'Spot check done' : 'No spot check waiting'); } catch (e) { toastErr(e); } load(); };
   };
-  await load(); const t = setInterval(() => alive() && load(), 20000);
+  await load();
+  // The refresh redraws the cards, so it waits while the tab is hidden, a dialog is open, or a field on the page is in use.
+  const idle = () => !document.hidden && !$('#modal').open && !$('#modal2').open && !(view.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+  const t = setInterval(() => { if (alive() && idle()) load().catch(() => {}); }, 20000);
   return () => { clearInterval(t); clearInterval(ratePoll); };
 } };
 
@@ -1713,9 +2045,9 @@ routes.tazkiya = { title: 'Learning', sub: 'tazkiya · checked answers teach the
       ${reg?.history?.length ? `<table class="t small"><tr><th>When</th><th>Model</th><th>File</th><th>Decision</th></tr>${reg.history.slice(-8).reverse().map(h => `<tr><td>${esc((h.at || '').slice(0, 16))}</td><td>${esc(h.role)}</td><td class="mono tiny">${esc(h.gguf || h.adapter_hash || '')}</td><td>${esc(h.action)}${h.signed_off_by ? ' · ' + esc(h.signed_off_by) : ''}</td></tr>`).join('')}</table>` : '<p class="muted small">No changes yet: the original models are in use. Every replacement and undo is listed here.</p>'}</div>`;
     $('#tzReview').innerHTML = `<div class="card-h"><h3>Waiting for review</h3><span class="hint">Answers that several attempts agreed on are used for learning only after a person approves them.</span></div><div class="card-b" style="padding:0">${q.length ? q.map(x => `<div class="review" data-id="${esc(x.reply_id)}"><div class="row small"><span class="badge b-domain">${esc(x.domain || '')}</span><span class="faint">${ago(x.created_at)}</span><span class="sp"></span><button class="btn sm" data-ok="1">${icon.check}Approve</button><button class="btn sm ghost" data-ok="0">${icon.x}Reject</button></div>
         <div class="q">${esc(x.question || '(question not stored)')}</div><div class="answer small">${md(x.answer)}</div></div>`).join('') : '<div class="empty small">Nothing to review. Agreed answers from real chats appear here.</div>'}</div>`;
-    $$('#tzReview [data-ok]').forEach(b => b.onclick = async () => { const id = b.closest('.review').dataset.id; try { await api.post(`/v1/tazkiya/review/${id}`, { approved: b.dataset.ok === '1', reviewer: store.get('user', 'operator') }); toast(b.dataset.ok === '1' ? 'Approved for learning' : 'Rejected'); load(); } catch (e) { toast(e.message); } });
+    $$('#tzReview [data-ok]').forEach(b => b.onclick = async () => { const id = b.closest('.review').dataset.id; try { await api.post(`/v1/tazkiya/review/${id}`, { approved: b.dataset.ok === '1', reviewer: store.get('user', 'operator') }); toast(b.dataset.ok === '1' ? 'Approved for learning' : 'Rejected'); load(); } catch (e) { toastErr(e); } });
   };
-  await load(); const t = setInterval(() => alive() && load(), 30000); return () => clearInterval(t);
+  await load(); const t = setInterval(() => { if (alive() && !document.hidden) load().catch(() => {}); }, 30000); return () => clearInterval(t);
 } };
 
 // ============================== system ==============================
@@ -1732,10 +2064,10 @@ routes.system = { title: 'Status', sub: 'models, settings and health', adv: true
     <div class="card"><div class="card-h"><h3>For developers</h3></div><div class="card-b small"><a href="/openapi.json" target="_blank">API description (JSON)</a> · <a href="/openapi.yaml" target="_blank">API description (YAML)</a> · <a href="/metrics" target="_blank">Monitoring metrics</a> · <a href="/healthz" target="_blank">Health check</a> · <span class="faint">The API needs the access key when one is configured.</span></div></div></div>`;
   let vpt = 'tests'; const presets = { tests: 'assert add(2, 3) == 5\nassert add(-1, 1) == 0', ref: '42', schema: '{"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}' };
   $$('#vpTabs button').forEach(b => b.onclick = () => { vpt = b.dataset.t; $$('#vpTabs button').forEach(x => x.classList.toggle('on', x === b)); $('#vpIn').value = presets[vpt]; });
-  $('#vpRun').onclick = async () => { const raw = $('#vpIn').value; const v = vpt === 'tests' ? { tests: raw.split('\n').filter(Boolean) } : vpt === 'ref' ? { reference_answer: raw.trim() } : (() => { try { return { json_schema: JSON.parse(raw) }; } catch { toast('The format is not valid JSON'); return null; } })();
+  $('#vpRun').onclick = async () => { const raw = $('#vpIn').value; const v = vpt === 'tests' ? { tests: raw.split('\n').filter(Boolean) } : vpt === 'ref' ? { reference_answer: raw.trim() } : (() => { try { return { json_schema: JSON.parse(raw) }; } catch { toast('The format is not valid JSON', { kind: 'error' }); return null; } })();
     if (!v) { $('#vpOut').innerHTML = '<span class="verif fail">The format is not valid JSON</span>'; $('#vpEv').innerHTML = ''; return; } $('#vpOut').innerHTML = '<span class="spin"></span>';
     try { const r = await api.post('/v1/verify', { answer: $('#vpAns').value, verification: v }); $s('#vpOut').innerHTML = `<span class="verif ${r.passed ? 'pass' : 'fail'}">${r.passed ? icon.check : icon.x} ${r.passed ? 'Passed' : 'Failed'} · ${r.duration_ms} ms</span>`; $s('#vpEv').innerHTML = r.evidence ? `<div class="codebox" style="margin-top:8px">${esc(r.evidence)}</div>` : ''; }
-    catch (e) { $s('#vpOut').textContent = e.message; } };
+    catch (e) { $s('#vpOut').textContent = humanError(e); } };
   const load = async () => {
     const s = await api.get('/v1/system'); const sm = await api.get('/v1/self-model').catch(() => null); if (!alive()) return;
     const hb = (x) => `<div class="row small"><span class="dot ${x.ok ? 'ok' : 'bad'}"></span><b>${x.role === 'system1' ? 'Quick model' : 'Thorough model'}</b><span class="muted">${esc(x.hf_id)}</span><span class="sp"></span><span class="small">${x.ok ? 'ready' : 'not reachable'}</span></div>
@@ -1743,7 +2075,7 @@ routes.system = { title: 'Status', sub: 'models, settings and health', adv: true
     $('#sysTop').innerHTML = s.backends.map(b => `<div class="card"><div class="card-h"><h3 title="${esc(b.label)}">${b.kind === 'vllm' ? 'Alternative model server' : b.kind === 'smiley' ? 'Smiley Core engine (this computer)' : 'Model server on this computer'}</h3>${b.active ? '<span class="badge b-verified">in use</span>' : b.system1.ok && b.system2.ok ? `<button class="btn sm ghost" data-use="${esc(b.name)}">Switch to this</button>` : '<button class="btn sm ghost" disabled title="Its models are not running; start them first (command below)">Not running</button>'}</div><div class="card-b">${hb(b.system1)}${hb(b.system2)}
       ${b.system1.weights || b.system2.weights ? `<div class="tiny faint" style="margin:0 0 6px">Weights: ${esc(b.system1.weights || '–')} (quick) · ${esc(b.system2.weights || '–')} (thorough)${b.system1.weights === 'littlebit' || b.system2.weights === 'littlebit' ? ' · experimental 1-bit' : ''}</div>` : ''}
       <div class="tiny muted">${b.kind === 'vllm' ? 'Alternative model server in a virtual machine. Start it with <code>make up-vllm</code>.' : b.kind === 'smiley' ? 'The project\'s own Rust engine, one stream per model. Start it with <code>make up</code> (or <code>scripts/serve_smiley.sh start</code>).' : 'Model server running directly on this computer. Start it with <code>make up-llama</code>.'}</div></div></div>`).join('');
-    $$('[data-use]').forEach(b => b.onclick = async () => { try { await api.post('/v1/system/backend', { name: b.dataset.use }); toast('Switched model server'); } catch (e) { toast(e.message, 6000); } refreshStatus(); load(); });
+    $$('[data-use]').forEach(b => b.onclick = async () => { try { await api.post('/v1/system/backend', { name: b.dataset.use }); toast('Switched model server'); } catch (e) { toastErr(e); } refreshStatus(); load(); });
     const g = s.gate, st = g.state, cal = st.calibration;
     const MODE_NAME = { fixed: 'simple rule', calibrated: 'learned rule', budget: 'fixed share' };
     $('#sysGate').innerHTML = `<div class="card-h"><h3>Settings in force</h3><span class="badge ${st.effective_rule === 'fixed' ? 'b-consensus' : 'b-verified'}">Auto: ${esc(MODE_NAME[st.effective_rule] || st.effective_rule)}</span><span class="sp"></span><a class="btn sm ghost" href="#/gate">Quality →</a></div><div class="card-b"><dl class="kv">
@@ -1755,7 +2087,7 @@ routes.system = { title: 'Status', sub: 'models, settings and health', adv: true
       <dt>Computer</dt><dd>${esc(s.host.os)}/${esc(s.host.arch)} · ${s.host.cpus} CPUs · running for ${fmtMs(s.uptime_s * 1000)} · ${s.inflight} answers in progress</dd><dt>Settings version</dt><dd class="mono tiny">${esc(s.config_hash)}</dd></dl></div>`;
     $('#sysSelf').innerHTML = `<div class="card-h"><h3>Reliability summary</h3><a class="btn sm ghost" href="#/gate">details →</a></div><div class="card-b" style="padding:0">${sm && sm.domains.length ? `<table class="t"><tr><th>Topic</th><th>Answers</th><th>Thought longer</th><th>Checked</th><th>Declined</th><th title="Estimated share of thorough answers that are right">Thorough right</th><th>Spot checks</th><th>Status</th></tr>${sm.domains.map(d => `<tr><td>${esc(d.domain)}</td><td>${d.n}</td><td>${pct(d.escalation_rate, 0)}</td><td>${d.verified}</td><td>${d.abstained}</td><td>${pct(d.p2_hat)}</td><td>${d.n_audit}</td><td>${d.status === 'measured' ? '<span class="badge b-verified">measured</span>' : '<span class="badge b-unverified">needs 30 spot checks</span>'}</td></tr>`).join('')}</table>` : '<div class="empty small">No answers recorded yet.</div>'}</div>`;
   };
-  await load(); const t = setInterval(() => alive() && load(), 15000); return () => clearInterval(t);
+  await load(); const t = setInterval(() => { if (alive() && !document.hidden && !(view.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) load().catch(() => {}); }, 15000); return () => clearInterval(t);
 } };
 
 route();
