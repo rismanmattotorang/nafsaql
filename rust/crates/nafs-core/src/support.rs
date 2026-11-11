@@ -1,8 +1,8 @@
 //! Is an answer from documents supported by the passages it was given? (Phase 26.)
 //!
 //! An answer written from retrieved passages has no exact verifier, so until now it was always "not checked". This
-//! check needs no model: every sentence of the answer that makes a claim must find its content words in one passage,
-//! and every number it states must occur in the passages (or in the question). A sentence that fails either test is
+//! check needs no model: every sentence of the answer that makes a claim must find its content words in one passage
+//! (or in the question it answers), and every number it states must occur in the passages (or in the question). A sentence that fails either test is
 //! reported with the reason. The check says "this sentence is not in your sources"; it does not say the sentence is
 //! false, and a sentence that only rewords a passage with other words can fail it.
 //!
@@ -185,6 +185,24 @@ const DECLINES: &[&str] = &[
     "do not state",
     "does not state",
     "unable to",
+    "does not provide",
+    "do not provide",
+    "does not contain",
+    "do not contain",
+    "does not explicitly",
+    "do not explicitly",
+    "does not directly",
+    "do not directly",
+    "not explicitly",
+    "does not include",
+    "do not include",
+    "no mention",
+    "cannot determine",
+    "can't determine",
+    "cannot be determined",
+    "cannot provide",
+    "can't provide",
+    "not available",
 ];
 
 const NUMBER_WORDS: &[(&str, &str)] = &[
@@ -333,18 +351,27 @@ pub fn check(answer: &str, passages: &[&str], question: &str, min_overlap: f32) 
         if t.words.len() < 3 && t.numbers.is_empty() {
             continue;
         }
+        // A word the sentence repeats from the question counts as found ("SurrealDB listens on port 8300" answers
+        // "which port does SurrealDB listen on?"); the rest must be in one passage. Measured on 50 questions: without
+        // this, 5 of 42 right answers had a sentence flagged; with it, 1 (`benchmarks/kb_phase26/support.json`).
         let (mut best, mut passage) = (0f32, None);
-        if !t.words.is_empty() {
+        if t.words.is_empty() {
+            best = 1.0;
+        } else {
+            let given = t.words.iter().filter(|w| asked.words.contains(*w)).count();
             for (i, s) in sources.iter().enumerate() {
-                let hit = t.words.iter().filter(|w| s.words.contains(*w)).count();
-                let share = hit as f32 / t.words.len() as f32;
+                let hit = t
+                    .words
+                    .iter()
+                    .filter(|w| !asked.words.contains(*w) && s.words.contains(*w))
+                    .count();
+                let share = (given + hit) as f32 / t.words.len() as f32;
                 if share > best {
                     best = share;
-                    passage = Some(i + 1);
+                    // A passage is named only when it holds a word the question did not give.
+                    passage = (hit > 0).then_some(i + 1);
                 }
             }
-        } else {
-            best = 1.0;
         }
         let mut missing: Vec<String> = t
             .numbers
@@ -421,7 +448,7 @@ mod tests {
     #[test]
     fn numbers_match_across_separators_words_and_the_question() {
         let s = check(
-            "Passages are 1200 characters long. The search runs on 4 cores. Each of the 12 students gets fewer oranges.",
+            "Passages are 1200 characters long. The search runs on 4 cores. Each of the 12 pupils receives fewer apples.",
             &[P2],
             "A class of 12 students shares oranges; how long are passages?",
             0.5,
@@ -444,6 +471,46 @@ mod tests {
         );
         assert_eq!(s.claims, 0, "{s:?}");
         assert_eq!(s.share(), 1.0);
+    }
+
+    #[test]
+    fn words_repeated_from_the_question_count_and_a_sentence_made_only_of_them_needs_a_passage_word(
+    ) {
+        // The passage says "four CPU cores"; the answer restates the question around it.
+        let s = check(
+            "The hybrid search over the knowledge base runs on four CPU cores.",
+            &[P2],
+            "How many cores does the hybrid search over the knowledge base run on?",
+            0.6,
+        );
+        assert_eq!((s.claims, s.supported), (1, 1), "{s:?}");
+        // The same restatement with a fact from nowhere: the number is in no passage.
+        let s = check(
+            "The hybrid search over the knowledge base runs on sixty-four GPU nodes with 512 GB each.",
+            &[P2],
+            "How many cores does the hybrid search over the knowledge base run on?",
+            0.6,
+        );
+        assert_eq!((s.claims, s.supported), (1, 0), "{s:?}");
+        // With no passage at all nothing is supported, whatever the question gave.
+        let s = check(
+            "The hybrid search over the knowledge base runs on many cores.",
+            &[],
+            "How many cores does the hybrid search over the knowledge base run on?",
+            0.6,
+        );
+        assert_eq!((s.supported, s.sentences[0].passage), (0, None));
+    }
+
+    #[test]
+    fn a_sentence_that_says_the_base_does_not_hold_the_answer_is_not_a_claim() {
+        for a in [
+            "The knowledge base does not provide specific information about the overlap between passages.",
+            "The knowledge base does not explicitly mention the licence under which SurrealDB is released.",
+            "The number of parameters is not explicitly stated in the provided knowledge base.",
+        ] {
+            assert_eq!(check(a, &[P1, P2], "What is it?", 0.6).claims, 0, "{a}");
+        }
     }
 
     #[test]

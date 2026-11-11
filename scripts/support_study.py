@@ -49,12 +49,23 @@ def main():
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--out", default="benchmarks/kb_phase26/support.json")
     ap.add_argument("--checker", default="rust/target/release/examples/support_eval")
+    ap.add_argument("--recheck", default="", help="check the stored answers of an earlier run again (no model calls)")
     a = ap.parse_args()
     qs = json.load(open(os.path.join(ROOT, a.questions)))
     if a.limit:
         qs = qs[: a.limit]
-    rows, offline = [], []
-    for i, (q, phrases) in enumerate(qs):
+    rows, offline, answered = [], [], None
+    if a.recheck:
+        # The stored answers and passages of an earlier run, checked again by the current code: no model call.
+        earlier = json.load(open(os.path.join(ROOT, a.recheck)))
+        rows, answered = earlier["rows"], earlier.get("answered", earlier.get("date"))
+        qs = qs[: len(rows)]
+        for i, r in enumerate(rows):
+            for mode in ("rag", "off"):
+                if "answer" in r.get(mode, {}) and "passages" in r.get("rag", {}):
+                    offline.append({"id": [i, mode], "question": r["question"], "answer": r[mode]["answer"],
+                                    "passages": r["rag"]["passages"]})
+    for i, (q, phrases) in enumerate([] if a.recheck else qs):
         row = {"question": q}
         for mode in (("rag", "off") if i % 2 == 0 else ("off", "rag")):
             body = {"messages": [{"role": "user", "content": q}], "ephemeral": True, "retrieve": False, "force_mode": "fast"}
@@ -88,7 +99,8 @@ def main():
         os.unlink(f.name)
         for line in out.splitlines():
             v = json.loads(line)
-            rows[v["id"]]["off"]["support"] = {k: v[k] for k in ("claims", "supported", "share", "unsupported")}
+            i, mode = v["id"] if isinstance(v["id"], list) else (v["id"], "off")
+            rows[i][mode]["support"] = {k: v[k] for k in ("claims", "supported", "share", "unsupported")}
 
     def shares(pick):
         return [r[m]["support"]["share"] for r in rows for m in ("rag", "off")
@@ -126,6 +138,9 @@ def main():
               "date": time.strftime("%Y-%m-%d %H:%M"), "kb": a.kb, "questions": len(qs),
               "host_load_average": [round(x, 1) for x in load], "note": "SHARED MACHINE" if load[0] > 4 else "quiet host",
               "summary": summary, "rows": rows}
+    if answered:
+        report["answered"] = answered
+        report["what"] += "; the answers and passages are those of the run of " + answered + ", checked again by the current rule"
     print(json.dumps(summary, indent=1))
     os.makedirs(os.path.dirname(os.path.join(ROOT, a.out)), exist_ok=True)
     json.dump(report, open(os.path.join(ROOT, a.out), "w"), indent=1)
