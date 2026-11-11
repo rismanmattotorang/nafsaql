@@ -1,0 +1,1809 @@
+{
+ "what": "The support check on answers from passages and on answers made up without them (Phase 26); the answers and passages are those of the run of 2026-11-11 09:09, checked again by the current rule",
+ "date": "2026-11-11 16:22",
+ "kb": "zvazrb4a326upn05d2ke",
+ "questions": 50,
+ "host_load_average": [
+  236.2,
+  275.1,
+  267.6
+ ],
+ "note": "SHARED MACHINE",
+ "summary": {
+  "from passages, right": {
+   "n": 42,
+   "mean_share": 0.988,
+   "median_share": 1.0,
+   "fully_supported": 41
+  },
+  "from passages, wrong": {
+   "n": 5,
+   "mean_share": 0.6,
+   "median_share": 1.0,
+   "fully_supported": 3
+  },
+  "made up (no passages), right": {
+   "n": 0,
+   "mean_share": null,
+   "median_share": null,
+   "fully_supported": 0
+  },
+  "made up (no passages), wrong": {
+   "n": 44,
+   "mean_share": 0.207,
+   "median_share": 0.0,
+   "fully_supported": 6
+  },
+  "auc_wrong_among_answers_from_passages": 0.693,
+  "auc_made_up_against_from_passages": 0.904,
+  "below_threshold": {
+   "0.34": {
+    "answers_from_passages_below": 2,
+    "of_them_wrong": 2,
+    "made_up_answers_below": 36
+   },
+   "0.5": {
+    "answers_from_passages_below": 2,
+    "of_them_wrong": 2,
+    "made_up_answers_below": 36
+   },
+   "0.67": {
+    "answers_from_passages_below": 3,
+    "of_them_wrong": 2,
+    "made_up_answers_below": 38
+   },
+   "0.75": {
+    "answers_from_passages_below": 3,
+    "of_them_wrong": 2,
+    "made_up_answers_below": 38
+   },
+   "1.0": {
+    "answers_from_passages_below": 3,
+    "of_them_wrong": 2,
+    "made_up_answers_below": 38
+   }
+  },
+  "accuracy": {
+   "rag": "42/50",
+   "off": "0/50"
+  }
+ },
+ "rows": [
+  {
+   "question": "How much memory does the engine's prefix store keep per model?",
+   "rag": {
+    "answer": "The engine's prefix store keeps the cache of each finished conversation as a snapshot, with 114\u2013147 KB per position and 768 MB per model. \n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 53.4,
+    "passages": [
+     "**Between kinds of request on one model.** The session held a single cache, so a prompt benefited only when it followed a conversation with the same beginning. Alternating a chat prompt and the code agent\u2019s prompt prefilled the agent prompt in full each time: 266 tokens in 5.8 s on System 1 and 262 tokens in 14 s on System 2, where llama.cpp\u2019s four slots answered in 0.1\u20130.2 s. A prefix store in the engine keeps the cache of each finished conversation as a snapshot (114\u2013147 KB per position, 768 MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt. Alternating or rotating three kinds of request now costs one token and 0.1 s on System 1 and 0.2 s on System 2, as on llama.cpp, and the answers are byte-identical (equal hashes) with the store on and off for both models. It also makes the gateway\u2019s warm-first backend switch effective: it primes 13 prefixes, of which a one-prefix session could keep only the last.",
+     "Between kinds of request on one model. The session held a single cache, so a prompt benefited only when it followed a conversation with the same\nbeginning. Alternating a chat prompt and the code agent's prompt prefilled the agent prompt in full each time: 266 tokens in 5.8\\,s on System 1 and 262 tokens in\n14\\,s on System 2, where llama.cpp's four slots answered in 0.1--0.2\\,s. A prefix store in the engine keeps the cache of each finished conversation as a\nsnapshot (114--147\\,KB per position, 768\\,MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt.\nAlternating or rotating three kinds of request now costs one token and 0.1\\,s on System 1 and 0.2\\,s on System 2, as on llama.cpp, and the answers are\nbyte-identical (equal hashes) with the store on and off for both models. It also makes the gateway's warm-first backend switch effective: it primes 13 prefixes, of which a\none-prefix session could keep only the last.",
+     "## 14. Phase 5 results (2026-11-07): memory tokens through Smiley Core\n\n**Engine.** Three marked additions in `smiley-core`: `State::inputs` (vectors that replace chosen rows' token embeddings\nin the next `forward_rows`), `Model::token_embedding`, and `Engine::admit_with_inputs` (vectors by prompt position,\napplied during prefill; the positions must precede the prompt's last token). The shared prefix store never restores a\ncache past the first supplied vector and never stores one beyond it, so a cache computed from one question's memory is\nnot reused for another's. Test on the real Qwen3-1.7B: supplying each row's own embedding gives exactly the plain\nanswer; nothing past the first vector is restored.",
+     "### What the literature offers\n\nDecode saturating memory with few threads is well supported and is confirmed above. Prompt-lookup and suffix decoding\ndraft tokens by matching recent output against the prompt and past outputs and report large gains where output copies input, such as code editing; the engine's\nspeculation is greedy-only while \\Sys{} samples at 0.3--0.7, so using it needs speculative sampling (accept a deterministic draft token with probability\n$p(d)$, otherwise sample the residual), which is lossless but is engine work with a bounded payoff because System 2's time is reasoning text that does not copy\nthe prompt. Prefix caching of the kind SGLang's RadixAttention describes keeps the cache of earlier prompts and reuses the longest shared\nbeginning; it applies directly and was built."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "The memory usage of the engine's prefix store per model depends on the specific implementation and configuration. Generally, prefix store memory is designed to be efficient and scalable, but exact values can vary. For precise information, refer to the documentation or specifications provided by the model's developers.\n\nAnswer: 1024",
+    "ok": false,
+    "seconds": 6.4,
+    "support": {
+     "claims": 4,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The memory usage of the engine's prefix store per model depends on the specific implementation and configuration.",
+      "Generally, prefix store memory is designed to be efficient and scalable, but exact values can vary.",
+      "For precise information, refer to the documentation or specifications provided by the model's developers.",
+      "Answer: 1024"
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many decode threads beat four in all six interleaved pairs?",
+   "off": {
+    "answer": "To solve this, we need to understand the context of \"decode threads\" and \"interleaved pairs.\" Assuming this refers to a specific problem or scenario in computer architecture or parallel processing, the question is asking how many decode threads can beat four in all six interleaved pairs.\n\nAssuming \"beat four\" means outperforming four in a competition or task, and \"all six interleaved pairs\" refers to six different pairs of inputs or tasks, the number of decode threads needed to beat four in all six pairs would be:\n\nAnswer: 6",
+    "ok": false,
+    "seconds": 13.5,
+    "support": {
+     "claims": 4,
+     "supported": 1,
+     "share": 0.25,
+     "unsupported": [
+      "To solve this, we need to understand the context of \"decode threads\" and \"interleaved pairs.\"",
+      "Assuming this refers to a specific problem or scenario in computer architecture or parallel processing, the question is asking how many decode threads can beat four in all six interleaved pairs.",
+      "Assuming \"beat four\" means outperforming four in a competition or task, and \"all six interleaved pairs\" refers to six different pairs of inputs or tasks, the number of decode threads needed to beat four in all six pairs would be:"
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The knowledge base states that \"Three threads beat four for decode in all six interleaved pairs\" [1]. This indicates that three threads outperform four threads in all six interleaved pairs.\n\nAnswer: 3",
+    "ok": true,
+    "seconds": 62.9,
+    "passages": [
+     "747 s neither is worth optimising. The serial share (norms, rotary 772 s embedding, residuals, activation quantisation) grows from 2 307 s at one thread to 5 % at four.\n\n297 s **Three threads beat four for decode in all six interleaved**\n\n350 s **pairs** (+4 % on System 1, +8 % on System 2 at the median)",
+     "Three threads beat four for decode in all six interleaved pairs (+4\\,% on System 1, +8\\,% on System 2 at the median) while cold prefill, which is\ncompute-bound, is 16--17\\,% slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the\nslowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier\nsandbox and the gateway; a quiet host may prefer four. The engine's own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes\nas the reference, no prefetch loses 11\\,% in two of three rounds and 512 loses 3\\,%, while 2048 and 4096 differ by about $+2$\\,% at the median, inside this\nhost's noise; parking instead of spinning loses 2\\,%.",
+     "297 s **Three threads beat four for decode in all six interleaved**\n\n350 s **pairs** (+4 % on System 1, +8 % on System 2 at the median)\n\n347 s while cold prefill, which is compute-bound, is 16\u201317 % slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the slowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier sandbox and the gateway; a quiet host may prefer four. The engine\u2019s own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes as the reference, no prefetch loses 11 % in two of three rounds and 512 loses 3 %, while 2048 and 4096 differ by about +2 % at the median, inside this host\u2019s noise; parking instead of spinning loses 2",
+     "A candidate is offered no run (it is judged by its files), and a run asked for on System 1 itself gets no cascade. The A/B interleaves the cascade with the Phase 11 default on the same ten tasks (scripts/harness_ab.py -arms s2,cascade). Table XXIX gives the result on the shared host (load 5\u201316): both arms verify all ten tasks with no malformed step; the cascade takes 1,467 s against 1,987 s 26 ) and is faster in 7 of 10 pairs (exact sign test p = 0 17 indicative at n = 10). Six of the ten tasks never reach System 2: a four-candidate System 1 request verifies them in 10\u2013101 s (median 34 s against 85 s for the same tasks on System 2). The other four pay one System 1 step before System 2\u2019s; two still end faster, two slower, within the variance of System 2\u2019s own time (the sequential arm took 342 s and 322 s on two of them). The cascade decodes more tokens in total (5,958 against 4,534) but on the cheap model in one batch; what it saves is System 2 steps, 4 against 12. The default is now harness.cascade = true with four candidates; decision 008 says what re-opens it."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 3,
+     "supported": 3,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "What bandwidth did the streaming read reach with one thread?",
+   "rag": {
+    "answer": "The streaming read reached 1,094 MB on System 1 with one thread. This is cited in the first source [1].",
+    "ok": false,
+    "seconds": 62.5,
+    "passages": [
+     "### How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1\\,GiB) reaches 12.9, 17.2, 18.4 and 19.5\\,GB/s with one to four threads: the fourth core adds 6\\,%.\nDecode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094\\,MB on System 1, 2,503\\,MB on System 2).\nThe engine's own phase split, now reported by the server, puts 86--97\\,% of decode in the matmuls and the output head; sampling is\n0.1--0.3\\,% and attention 1--3\\,% at these context lengths, so neither is worth optimising. The serial share (norms, rotary embedding,\nresiduals, activation quantisation) grows from 2\\,% at one thread to 5\\,% at four.",
+     "A. How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1 GiB) reaches 12.9, 17.2, 18.4 and 19.5 GB/s with one to four threads: the fourth core adds 6 %. Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094 MB on System 1, 2,503 MB on System 2). The engine\u2019s own phase split, now reported by the server, puts 86\u201397  of decode in the matmuls and the output head; sampling is Wall time 0.1\u20130.3 % and attention 1\u20133 % at these context lengths, so",
+     "### Summary\n\nThe engine is within 60--95\\,% of the machine's bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth\ndecode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14\\,s down to 0.1 and 0.2\\,s for a switch of request kind) and the continuation's re-prefill of its own\nreasoning (now exact). Speculative sampling is named as the next engine item.",
+     "E. Summary\n\nThe engine is within 60\u201395 % of the machine\u2019s bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth decode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14 s down to 0.1 and 0.2 s for a switch of request kind) and the continuation\u2019s re-prefill of its own reasoning (now exact). Speculative sampling is named as the next engine item."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am unable to provide specific details about bandwidth usage with a particular thread, as this depends on the specific application, system configuration, and workload. If you have a specific scenario or context in mind, please provide more details so I can assist you better.",
+    "ok": false,
+    "seconds": 11.4,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "If you have a specific scenario or context in mind, please provide more details so I can assist you better."
+     ]
+    }
+   }
+  },
+  {
+   "question": "Which revision of the vendored Smiley Core did Phase 19 replace?",
+   "off": {
+    "answer": "Phase 19 replaced the vendored Smiley Core with the Smiley Core v2.",
+    "ok": false,
+    "seconds": 5.3,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "Phase 19 replaced the vendored Smiley Core revision 7cb6028 with the owner's new one, which was revision 06c2b88. This is stated in [1].",
+    "ok": true,
+    "seconds": 58.3,
+    "passages": [
+     "## Phase 19: The Engine Update and LittleBit\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner's new one (06c2b88), re-applies Nafs-Aql's additions on it,\nintegrates LittleBit, and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md and\nthe research note docs/research/smiley_core_update.md.",
+     "XX. PHASE 19: THE ENGINE UPDATE AND LITTLEBIT\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner\u2019s new one (06c2b88), re-applies Nafs-Aql\u2019s additions on it, integrates LittleBit [184], and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md 34",
+     "## 14. Phase 5 results (2026-11-07): memory tokens through Smiley Core\n\n**Engine.** Three marked additions in `smiley-core`: `State::inputs` (vectors that replace chosen rows' token embeddings\nin the next `forward_rows`), `Model::token_embedding`, and `Engine::admit_with_inputs` (vectors by prompt position,\napplied during prefill; the positions must precede the prompt's last token). The shared prefix store never restores a\ncache past the first supplied vector and never stores one beyond it, so a cache computed from one question's memory is\nnot reused for another's. Test on the real Qwen3-1.7B: supplying each row's own embedding gives exactly the plain\nanswer; nothing past the first vector is restored.",
+     "## Phase 17: Smiley Core's Speed, the Model Switch and the Harness's Cost\n\nPhase 17 (2 November 2026) assesses Smiley Core, the switch from System 1 to System 2, and whether the harness of Phase 16 costs speed. The\nresearch note is docs/research/smiley_engine_perf.md and the decision docs/decisions/011-engine-switching-costs.md. All numbers are\nfrom the shared reference machine with the arms interleaved."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "Which revision is the new Smiley Core that Phase 19 merged?",
+   "rag": {
+    "answer": "The new Smiley Core that Phase 19 merged is revision 06c2b88. This is stated in [1] and [2].",
+    "ok": true,
+    "seconds": 25.3,
+    "passages": [
+     "## Phase 19: The Engine Update and LittleBit\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner's new one (06c2b88), re-applies Nafs-Aql's additions on it,\nintegrates LittleBit, and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md and\nthe research note docs/research/smiley_core_update.md.",
+     "XX. PHASE 19: THE ENGINE UPDATE AND LITTLEBIT\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner\u2019s new one (06c2b88), re-applies Nafs-Aql\u2019s additions on it, integrates LittleBit [184], and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md 34",
+     "Caption: Decode speed of Qwen3-1.7B Q4_K_M (tokens per second, median of five interleaved rounds of 96 tokens, three threads, one slot, shared host).\n\\toprule\nEngine & tok/s\n\n\\midrule\nPrevious (7cb6028 + Phase 18) & 18.7\n\nNew (06c2b88), after the fix & 19.2\n\nNew, before the fix & 4.4--5.0\n\nNew with a LittleBit sidecar & 20.1\n\n\\bottomrule",
+     "## Phase 17: Smiley Core's Speed, the Model Switch and the Harness's Cost\n\nPhase 17 (2 November 2026) assesses Smiley Core, the switch from System 1 to System 2, and whether the harness of Phase 16 costs speed. The\nresearch note is docs/research/smiley_engine_perf.md and the decision docs/decisions/011-engine-switching-costs.md. All numbers are\nfrom the shared reference machine with the arms interleaved."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am not aware of a specific \"new Smiley Core\" that was merged in Phase 19. The term \"Smiley Core\" is not widely recognized in the context of major AI or software updates. If you are referring to a specific product, company, or update, please provide more context so I can assist you accurately.",
+    "ok": false,
+    "seconds": 10.6,
+    "support": {
+     "claims": 3,
+     "supported": 1,
+     "share": 0.3333333432674408,
+     "unsupported": [
+      "The term \"Smiley Core\" is not widely recognized in the context of major AI or software updates.",
+      "If you are referring to a specific product, company, or update, please provide more context so I can assist you accurately."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many nanoseconds per row did the small-batch Q4_K kernel take in the slow build?",
+   "off": {
+    "answer": "I cannot directly access specific build configurations or performance data for the Q4_K kernel. However, based on typical performance characteristics, a small-batch kernel like Q4_K in a slow build might take around 100-200 nanoseconds per row, depending on the workload and hardware. \n\nAnswer: 100",
+    "ok": false,
+    "seconds": 10.3,
+    "support": {
+     "claims": 3,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "I cannot directly access specific build configurations or performance data for the Q4_K kernel.",
+      "However, based on typical performance characteristics, a small-batch kernel like Q4_K in a slow build might take around 100-200 nanoseconds per row, depending on the workload and hardware.",
+      "Answer: 100"
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The small-batch Q4_K kernel took 679 nanoseconds per row in the slow build. \n\nAnswer: 679",
+    "ok": true,
+    "seconds": 53.4,
+    "passages": [
+     "A fourfold slowdown with no kernel change. After the merge Qwen3-1.7B decoded at 4.4--5.0 tokens per second, against 17--20 for the previous\ncommit and 16--18 for upstream's own build, interleaved on the same machine. The dot kernels were byte-identical after formatting, so a code change\ncould not be the cause directly. Bisecting by swapping files between a scratch copy of upstream and the crate showed that merely adding the batching\nengine (never called by the benchmark) was enough; a kernel micro-benchmark isolated it to the small-batch dot kernels (Q4_K, one activation, one\nthread: 679\\,ns per row against 96); disassembly showed a call to core::array::try_from_fn inside the kernel, once per super-block,\nin the slow build only. std::array::from_fn in two helpers marked inline(always) is inlined or not depending on how much unrelated\ncode the crate contains. Spelling the eight-element arrays out restores 96\\,ns per row and 15--20 tokens per second. The lesson is general: a kernel\nwhose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and kbench is now part of the crate for that.",
+     "The dot kernels were byte-identical after formatting, so a code change could not be the cause directly. Bisecting by swap-ping files between a scratch copy of upstream and the crate showed that merely adding the batching engine (never called by the benchmark) was enough; a kernel micro-benchmark isolated it to the small-batch dot kernels (Q4_K, one ac-tivation, one thread: 679 ns per row against 96); disassem-bly showed a call to core::array::try_from_fn in-side the kernel, once per super-block, in the slow build only. std::array::from_fn in two helpers marked inline(always) is inlined or not depending on how much unrelated code the crate contains. Spelling the eight-element arrays out restores 96 ns per row and 15\u201320 tokens per second. The lesson is general: a kernel whose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and kbench is now part of the crate for that. and the research note docs/research/smiley_core_update.md",
+     "Fixed, and visible only because the engine was exercised with the new format. A fourfold slowdown with no kernel change. After the merge Qwen3-1.7B decoded at 4.4\u20135.0 tokens per second, against 17\u201320 for the previous commit and 16\u201318 for up-stream\u2019s own build, interleaved on the same machine. The dot kernels were byte-identical after formatting, so a code change could not be the cause directly.",
+     "B. The merge\n\nNafs-Aql\u2019s vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so the update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The additions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention without touching upstream\u2019s attention kernel (one row per user, so the bit-identity property of Phase 18 holds); top-k and min-p on the position-keyed sampler, in llama.cpp\u2019s order, with upstream\u2019s fast path when both are off. All 370 tests of the workspace pass in release mode, including the batching bit-identity tests, and formatting and the linter are clean."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How many tests of the workspace passed after the Phase 19 merge?",
+   "rag": {
+    "answer": "The knowledge base states that all 370 tests of the workspace passed in release mode after the Phase 19 merge. \n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 34.7,
+    "passages": [
+     "### The merge\n\nNafs-Aql's vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so\nthe update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The\nadditions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention\nwithout touching upstream's attention kernel (one row per user, so the bit-identity property of Phase 18 holds); top-$k$ and min-$p$ on the\nposition-keyed sampler, in llama.cpp's order, with upstream's fast path when both are off. All 370 tests of the workspace pass in release mode,\nincluding the batching bit-identity tests, and formatting and the linter are clean.",
+     "Caption: Decode speed of Qwen3-1.7B Q4_K_M (tokens per second, median of five interleaved rounds of 96 tokens, three threads, one slot, shared host).\n\\toprule\nEngine & tok/s\n\n\\midrule\nPrevious (7cb6028 + Phase 18) & 18.7\n\nNew (06c2b88), after the fix & 19.2\n\nNew, before the fix & 4.4--5.0\n\nNew with a LittleBit sidecar & 20.1\n\n\\bottomrule",
+     "### Is anything else different\n\nThe old and the new engine give the same answers on the exact-answer prompts (9 of 12 on both, the same three misses). One of those misses, a\ntime-of-day sum (3:40\\,pm plus 2\\,h 35\\,min answered 5:45\\,pm, the correct answer being 6:15\\,pm), was first seen in the web interface right after the merge and\nlooked like a regression; the comparison shows it is the 1.7B model's own error, which the gate's confidence signal does not catch because both quick\nsamples repeat it. Re-validation on the final code: contract tests, 26 of 26 security probes (0 open high-severity findings), 59 of 59 Rooms checks, 65 of 65\nend-to-end checks, 53 of 53 harness checks and 9 of 9 acceptance tests pass.",
+     "B. The merge\n\nNafs-Aql\u2019s vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so the update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The additions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention without touching upstream\u2019s attention kernel (one row per user, so the bit-identity property of Phase 18 holds); top-k and min-p on the position-keyed sampler, in llama.cpp\u2019s order, with upstream\u2019s fast path when both are off. All 370 tests of the workspace pass in release mode, including the batching bit-identity tests, and formatting and the linter are clean."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I cannot determine the exact number of tests that passed after the Phase 19 merge without additional information. The number of tests passed would depend on specific test results and the context of the merge.\n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 7.9,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The number of tests passed would depend on specific test results and the context of the merge."
+     ]
+    }
+   }
+  },
+  {
+   "question": "What does LittleBit approximate a weight matrix as?",
+   "off": {
+    "answer": "LittleBit approximates a weight matrix as a 2D array of numbers, where each element represents the strength of a connection between neurons or between a neuron and a node in a neural network. This is commonly used in neural network architectures to represent the weights that determine the strength of connections between neurons.",
+    "ok": false,
+    "seconds": 8.7,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "LittleBit approximates a weight matrix as a 2D array of numbers, where each element represents the strength of a connection between neurons or between a neuron and a node in a neural network.",
+      "This is commonly used in neural network architectures to represent the weights that determine the strength of connections between neurons."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, $\\hat W=\\mathrm{diag}(h)\\,U_{\\pm}\\, \\mathrm{diag}(\\ell)\\,V_{\\pm}^{\\top}\\,\\mathrm{diag}(g)$, summed over stages, stored beside the model as a sidecar file. [4]",
+    "ok": true,
+    "seconds": 67.0,
+    "passages": [
+     "### What the new engine brings\n\nGrouped online-softmax attention, an int8 key--value cache rotated by a Hadamard transform, vectorised math, and sampling whose randomness is keyed by\nposition, so a drafted token is accepted exactly when sequential sampling would have emitted it: speculation becomes lossless at any temperature, not\nonly under argmax. LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, $\\hat W=\\mathrm{diag}(h)\\,U_{\\pm}\\,\n\\mathrm{diag}(\\ell)\\,V_{\\pm}^{\\top}\\,\\mathrm{diag}(g)$, summed over stages, stored beside the model as a sidecar file.",
+     "### LittleBit: integrated, tested, not useful yet\n\nQwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\\,MB of factors for 845.7\\,MB\nof weights ($4.9\\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4_K itself\nis about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \\textbf{the dense model answered 9 correctly and the LittleBit\nmodel 0}; its text is incoherent. Decode was only 5\\,% faster (20.1 against 19.2\\,tok/s), because at this size the matmul is not the whole token. Upstream\nreports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The\nintegration is therefore opt-in (--littlebit, LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a\nmodel cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and\non the Status page. It is ready for trained factors; it is not a result.",
+     "4.4\u20135.0 New with a LittleBit sidecar 20.1\n\nD. LittleBit: integrated, tested, not useful yet Qwen3-1.7B was converted at 1.0 bit per weight with the engine\u2019s post-training (Dual-SVID) converter: 196 projections, 172.7 MB of factors for 845.7 MB of weights (4 9 ), 0.980 bits per weight, 13 minutes on four cores. The mean relative re-construction error of the weights is 0.752 (Q4_K itself is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, **the dense model answered 9 correctly and the LittleBit model 0**; its text is incoherent. Decode was only 5 % faster (20.1 against 19.2 tok/s), because at this size the matmul is not the whole token. Upstream reports the same on a smaller model and attributes the paper\u2019s quality to distillation-based quantisation-aware training, which needs a GPU. The integration is therefore opt-in (-littlebit LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and on the Status page. It is ready for trained factors; it is not a result.",
+     "A. What the new engine brings\n\nGrouped online-softmax attention, an int8 key\u2013value cache rotated by a Hadamard transform, vectorised math, and sam-pling whose randomness is keyed by position, so a drafted token is accepted exactly when sequential sampling would have emitted it: speculation becomes lossless at any tempera-ture, not only under argmax. LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, \u02c6W = diag(h U diag(\u2113 V diag(g , summed over stages, stored beside the model as a sidecar file."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "Which version of core Lean does the verifier run against?",
+   "rag": {
+    "answer": "The Lean verifier runs against core Lean 4.35.0. This is stated in the passage: \"The Lean verifier runs against core Lean 4.35.0\" [2].",
+    "ok": true,
+    "seconds": 50.0,
+    "passages": [
+     "G. Verification\n\n**Real Lean.** Lean 4.35.0 (core, no Mathlib) was installed with elan on the reference machine and the protocol was run against the real binary inside the macOS sandbox (Ta-ble XVIII). Lean resolves its own installation path, which\n\nTABLE XVIII THE LEAN PROTOCOL AGAINST REAL LEAN 4.35.0 R E A L L E A N A C C E P T S P R O O F S A N D R E J E C T S T H E K N O W N A T T A C K S",
+     "**Harness integration.** The Lean verifier runs against core Lean 4.35.0; statements that import Mathlib need a Mathlib build and lean_path, which were not installed. On Linux, Lean runs with user and network namespaces only (A-070). Patch repair is off until the failure rate f of Eq. (5) is measured, and the code agent\u2019s live runs are a handful of tasks on a shared host. The Phase 11 A/B (Section XII) has ten System 1 tasks and three System 2 tasks per arm on a shared host: its verified counts are indicative, not significant, and its tasks are small single-file functions. Grammar constraints fix the syntax of an action, not its sense (a patch that applies can still break the file), and they need llama-server; on vLLM the harness relies on the stream cut alone.",
+     "Harness integration. The Lean verifier runs against core Lean 4.35.0;\nstatements that import Mathlib need a Mathlib build and lean_path, which\nwere not installed. On Linux, Lean runs with user and network namespaces only\n(A-070). Patch repair is off until the\nfailure rate $f$ of Eq. () is measured, and the code agent's live\nruns are a handful of tasks on a shared host.\nThe Phase 11 A/B (Section) has ten System 1 tasks and three\nSystem 2 tasks per arm on a shared host: its verified counts are indicative,\nnot significant, and its tasks are small single-file functions. Grammar\nconstraints fix the syntax of an action, not its sense (a patch that applies can\nstill break the file), and they need llama-server; on vLLM the harness relies on\nthe stream cut alone.",
+     "In an interleaved live A/B the new loop verified 4 of 10 System 1 tasks against 2 for the old one, with malformed steps falling from 23 of 50 to 1 of 41, and all 3 System 2 tasks in one call each, where the old loop verified none in 15 calls; with a smaller reasoning budget on the first step a verified System 2 fix of a small function took 33\u201359 s. Samples are small. Version 2.3 validates the whole system end to end on the final code (190 Rust tests, 26 security probes, 65 API and UI checks, 59 Rooms checks, 40 harness checks, 9 acceptance tests), finds and fixes three defects in the Lean integration, and reports that Qwen3-4B-Thinking cannot yet write valid Lean 4 proofs even for trivial statements, so Lean tasks abstain honestly rather than verify. Version 2.4 asks how far four cores can be pushed in parallel. Batched decode gains 2.7 at short context but only 1.5 at the 1,600 tokens of a repair prompt, so concurrent hedged sampling on System 2 does not pay (we implement and measure it, and keep it off), while cheap concurrent System 1 samples before escalating do: fusing the agreement samples with the draft cuts the time to the gate\u2019s decision by 24**"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, I say I am Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design.\n\nAs for the version of Core Lean the verifier runs against, I do not have specific information about the exact version. However, I can guide you on how to check the version or how to update it if needed. Let me know if you need assistance with that.",
+    "ok": false,
+    "seconds": 13.6,
+    "support": {
+     "claims": 5,
+     "supported": 1,
+     "share": 0.20000000298023224,
+     "unsupported": [
+      "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it.",
+      "If asked who or what you are, I say I am Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design.",
+      "However, I can guide you on how to check the version or how to update it if needed.",
+      "Let me know if you need assistance with that."
+     ]
+    }
+   }
+  },
+  {
+   "question": "What was the median time from the gate's decision to System 2's first reasoning token?",
+   "off": {
+    "answer": "I am not sure about the specific median time from the gate's decision to System 2's first reasoning token. This question seems to be referencing a specific technical or theoretical concept, but I do not have access to that specific information. If you can provide more context or details, I would be happy to help further.",
+    "ok": false,
+    "seconds": 13.4,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "This question seems to be referencing a specific technical or theoretical concept, but I do not have access to that specific information.",
+      "If you can provide more context or details, I would be happy to help further."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The median time from the gate's decision to System 2's first reasoning token is 0.85 seconds, as cited in [1] and [3].",
+    "ok": true,
+    "seconds": 85.4,
+    "passages": [
+     "C. Switching **System 1 to System 2.** Over six escalated requests the gate\u2019s own time was 0.08\u20130.12 s, the decision to System 2\u2019s first reasoning token 0.4\u20131.4 s (median 0.85 s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload; llama.cpp took a median 1.5 s in Phase 14.",
+     "### Switching\n\nSystem 1 to System 2. Over six escalated requests the gate's own time was 0.08--0.12\\,s, the decision to System 2's first reasoning token 0.4--1.4\\,s\n(median 0.85\\,s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload;\nllama.cpp took a median 1.5\\,s in Phase 14.",
+     "Inside a request the switch is the gate: draft, exact check, rescue batch, decision, System 2. scripts/handoff_latency.py times it on the live gateway from the SSE events and both servers\u2019 metrics, with the rescue on and off, interleaved. Four requests whose draft fails its exact check, two with the rescue on and two off, on the shared host (load 7\u201312): the gate\u2019s own work takes 0.8\u20130.9 s (26.9\u201334.5 s when the four-sample rescue batch runs, the batch Phase 13 measured to pay for itself); from the decision to System 2\u2019s first reasoning token 1.1\u20134.7 s (median 1.5 s), with 5\u201327 new prompt tokens against 262\u20131,148 cached; and System 1 reports no busy slot after the decision in any run.",
+     "**2.3 Speed on the CPU**\n\nSkipping cheap System 1 samples when an exact verifier decides cut the median draft time from 13.4  to 7.9 s. Speculative decoding with a 0.6B draft model, or with n-gram lookup, did not help (median 6.5 and 6.6 against 7.3 tokens/s): on four cores the draft competes with the main model for compute and memory bandwidth. The load-test protocol (run"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How long did the gate's own time take when escalating?",
+   "rag": {
+    "answer": "The gate's own time took 0.08\u20130.12 seconds when escalating. This is cited in [3].",
+    "ok": true,
+    "seconds": 62.7,
+    "passages": [
+     "### Switching\n\nSystem 1 to System 2. Over six escalated requests the gate's own time was 0.08--0.12\\,s, the decision to System 2's first reasoning token 0.4--1.4\\,s\n(median 0.85\\,s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload;\nllama.cpp took a median 1.5\\,s in Phase 14.",
+     "### The harness's cost\n\nThe guards of Phase 16 cost nothing in the interleaved A/B over ten tasks, and the compile check takes 37\\,ms per edit against steps of 5 to 230\\,s; the agent's scripted\nloop (86 tests) runs in 0.03\\,s in total. The agent loop is instead a beneficiary of this phase: its steps share a long beginning (the append-only transcript), which the\nprefix store keeps and restores.",
+     "C. Switching **System 1 to System 2.** Over six escalated requests the gate\u2019s own time was 0.08\u20130.12 s, the decision to System 2\u2019s first reasoning token 0.4\u20131.4 s (median 0.85 s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload; llama.cpp took a median 1.5 s in Phase 14.",
+     "Inside a request the switch is the gate: draft, exact check, rescue batch, decision, System 2. scripts/handoff_latency.py times it on the live gateway from the SSE events and both servers\u2019 metrics, with the rescue on and off, interleaved. Four requests whose draft fails its exact check, two with the rescue on and two off, on the shared host (load 7\u201312): the gate\u2019s own work takes 0.8\u20130.9 s (26.9\u201334.5 s when the four-sample rescue batch runs, the batch Phase 13 measured to pay for itself); from the decision to System 2\u2019s first reasoning token 1.1\u20134.7 s (median 1.5 s), with 5\u201327 new prompt tokens against 262\u20131,148 cached; and System 1 reports no busy slot after the decision in any run."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am unable to provide specific information about the time it took for a gate to escalate, as this depends on the context and system in question. If you are referring to a specific system, application, or technical process, please provide more details so I can assist you accurately.",
+    "ok": false,
+    "seconds": 11.3,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "If you are referring to a specific system, application, or technical process, please provide more details so I can assist you accurately."
+     ]
+    }
+   }
+  },
+  {
+   "question": "What median did llama.cpp take for the System 1 to System 2 switch in Phase 14?",
+   "off": {
+    "answer": "I am unable to provide specific information about the median value used by llama.cpp for the System 1 to System 2 switch in Phase 14. This information may not be publicly available or may be proprietary to the project. If you have additional context or sources, I can help you explore that further.",
+    "ok": false,
+    "seconds": 13.8,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "This information may not be publicly available or may be proprietary to the project.",
+      "If you have additional context or sources, I can help you explore that further."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The median time taken by llama.cpp for the System 1 to System 2 switch in Phase 14 is 1.5 seconds, as cited in [2].",
+    "ok": true,
+    "seconds": 55.7,
+    "passages": [
+     "### Switching\n\nSystem 1 to System 2. Over six escalated requests the gate's own time was 0.08--0.12\\,s, the decision to System 2's first reasoning token 0.4--1.4\\,s\n(median 0.85\\,s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload;\nllama.cpp took a median 1.5\\,s in Phase 14.",
+     "C. Switching **System 1 to System 2.** Over six escalated requests the gate\u2019s own time was 0.08\u20130.12 s, the decision to System 2\u2019s first reasoning token 0.4\u20131.4 s (median 0.85 s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload; llama.cpp took a median 1.5 s in Phase 14.",
+     "unchanged 7.1\u20137.8 tok/s in every variant Prompt prefetch for System 2 not built switch costs 1.1\u20134.7 s\n\nXVI. PHASE 15: SMILEY CORE AS THE THIRD INFERENCE BACKEND\n\nPhase 15 (1 November 2026) integrates Smiley Core, the owner\u2019s own CPU inference engine from the Smiley project, as a third backend beside llama.cpp and vLLM. The research note is docs/research/smiley_backend.md and the deci-sion is docs/decisions/009-smiley-backend.md",
+     "Between kinds of request on one model. The session held a single cache, so a prompt benefited only when it followed a conversation with the same\nbeginning. Alternating a chat prompt and the code agent's prompt prefilled the agent prompt in full each time: 266 tokens in 5.8\\,s on System 1 and 262 tokens in\n14\\,s on System 2, where llama.cpp's four slots answered in 0.1--0.2\\,s. A prefix store in the engine keeps the cache of each finished conversation as a\nsnapshot (114--147\\,KB per position, 768\\,MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt.\nAlternating or rotating three kinds of request now costs one token and 0.1\\,s on System 1 and 0.2\\,s on System 2, as on llama.cpp, and the answers are\nbyte-identical (equal hashes) with the store on and off for both models. It also makes the gateway's warm-first backend switch effective: it primes 13 prefixes, of which a\none-prefix session could keep only the last."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "By how much is cold prefill slower at three threads?",
+   "rag": {
+    "answer": "Cold prefill is 16\u201317% slower at three. Answer: [1]",
+    "ok": true,
+    "seconds": 69.6,
+    "passages": [
+     "Three threads beat four for decode in all six interleaved pairs (+4\\,% on System 1, +8\\,% on System 2 at the median) while cold prefill, which is\ncompute-bound, is 16--17\\,% slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the\nslowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier\nsandbox and the gateway; a quiet host may prefer four. The engine's own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes\nas the reference, no prefetch loses 11\\,% in two of three rounds and 512 loses 3\\,%, while 2048 and 4096 differ by about $+2$\\,% at the median, inside this\nhost's noise; parking instead of spinning loses 2\\,%.",
+     "297 s **Three threads beat four for decode in all six interleaved**\n\n350 s **pairs** (+4 % on System 1, +8 % on System 2 at the median)\n\n347 s while cold prefill, which is compute-bound, is 16\u201317 % slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the slowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier sandbox and the gateway; a quiet host may prefer four. The engine\u2019s own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes as the reference, no prefetch loses 11 % in two of three rounds and 512 loses 3 %, while 2048 and 4096 differ by about +2 % at the median, inside this host\u2019s noise; parking instead of spinning loses 2",
+     "### Summary\n\nThe engine is within 60--95\\,% of the machine's bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth\ndecode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14\\,s down to 0.1 and 0.2\\,s for a switch of request kind) and the continuation's re-prefill of its own\nreasoning (now exact). Speculative sampling is named as the next engine item.",
+     "cached r is the prefill rate and r the decode rate. On the reference\n\np\n\nd machine System 2 prefills about r = 31 tokens/s and decodes\n\np rd 6 8 tokens/s (measured 25 October 2026): a cold 1,969-token prompt took 64 s to prefill, and the same prompt with one more exchange appended took 3 s, because only the 21 new tokens were computed. Prefill is therefore not negligible next to decoding, and whether the cache is hit decides it."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "The speed of cold prefill depends on several factors, including the hardware, the specific implementation, and the workload. However, in general, cold prefill is slower than warm prefill because the cache is initially empty and needs to be populated. At three threads, the speed may be slightly slower than at one thread due to increased contention for resources. \n\nAnswer: 10%",
+    "ok": false,
+    "seconds": 14.4,
+    "support": {
+     "claims": 4,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The speed of cold prefill depends on several factors, including the hardware, the specific implementation, and the workload.",
+      "However, in general, cold prefill is slower than warm prefill because the cache is initially empty and needs to be populated.",
+      "At three threads, the speed may be slightly slower than at one thread due to increased contention for resources.",
+      "Answer: 10%"
+     ]
+    }
+   }
+  },
+  {
+   "question": "Which transform is the int8 key-value cache rotated by?",
+   "off": {
+    "answer": "I am not aware of a specific transform that is rotated by the int8 key-value cache. The int8 key-value cache is typically used in transformer models for efficient memory usage, but the exact transformation or rotation mechanism is not a standard or widely documented concept in transformer architecture. If you are referring to a specific model or context, please provide more details for a precise answer.",
+    "ok": false,
+    "seconds": 12.9,
+    "support": {
+     "claims": 3,
+     "supported": 1,
+     "share": 0.3333333432674408,
+     "unsupported": [
+      "The int8 key-value cache is typically used in transformer models for efficient memory usage, but the exact transformation or rotation mechanism is not a standard or widely documented concept in transformer architecture.",
+      "If you are referring to a specific model or context, please provide more details for a precise answer."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The int8 key-value cache is rotated by a **Hadamard transform**. This is mentioned in the first passage:  \n[1] \"Grouped online-softmax attention, an int8 key--value cache rotated by a Hadamard transform...\"",
+    "ok": true,
+    "seconds": 61.6,
+    "passages": [
+     "### What the new engine brings\n\nGrouped online-softmax attention, an int8 key--value cache rotated by a Hadamard transform, vectorised math, and sampling whose randomness is keyed by\nposition, so a drafted token is accepted exactly when sequential sampling would have emitted it: speculation becomes lossless at any temperature, not\nonly under argmax. LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, $\\hat W=\\mathrm{diag}(h)\\,U_{\\pm}\\,\n\\mathrm{diag}(\\ell)\\,V_{\\pm}^{\\top}\\,\\mathrm{diag}(g)$, summed over stages, stored beside the model as a sidecar file.",
+     "A. What the new engine brings\n\nGrouped online-softmax attention, an int8 key\u2013value cache rotated by a Hadamard transform, vectorised math, and sam-pling whose randomness is keyed by position, so a drafted token is accepted exactly when sequential sampling would have emitted it: speculation becomes lossless at any tempera-ture, not only under argmax. LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, \u02c6W = diag(h U diag(\u2113 V diag(g , summed over stages, stored beside the model as a sidecar file.",
+     "A. The engine\n\nSmiley Core is a Rust library of about 8,500 lines with one dependency: a GGUF loader, a byte-level BPE tokenizer checked against llama-tokenize, the llama qwen2 and qwen3 forward passes with AVX2 and FMA kernels, an F16 or int8 KV cache, a chat session with the models\u2019 own templates (including Qwen3\u2019s enable_thinking), prompt-lookup and DSpark speculative decoding, and telemetry that reports the bytes moved per token beside the tokens per second, so a run can be checked against the machine\u2019s memory roofline rather than taken on faith. It decodes one stream per session: no batching across requests, no constrained sampling, no raw continuation. Both Nafs-Aql models pass its compatibility probe.",
+     "K. What a CPU can serve\n\n**Proposition 8** (Decode and prefill ceilings) [exact given the roofline model] For a dense decoder whose active weights occupy W bytes and whose key\u2013value cache at context length \u2113 occupies K \u2113 bytes, the steady-state decode rate on a machine with memory bandwidth \u03b2 is at most \u03b2/ W K \u2113 tokens per second, and the prefill rate on a machine with peak throughput F FLOP/s and P active parameters is at most F/(2P tokens per second."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "Which model abstained on the proof of n plus zero equals n?",
+   "rag": {
+    "answer": "The model that abstained on the proof of $ n + 0 = n $ is Qwen3-4B-Thinking. This is stated in [2] and [3], where it is mentioned that Qwen3-4B-Thinking abstained on $ n + 0 = n $ within its budget.",
+    "ok": true,
+    "seconds": 77.5,
+    "passages": [
+     "C. What the sweep says about the models\n\nWith these fixes the pipeline is correct end to end, which the deterministic integration test shows with the real binary: the System 1 draft fails Lean, System 2\u2019s first proof fails with a Lean error, the error appears in the next prompt, and the second proof is verified. The live models do not reach that point. For the theorem n + 0 = n, which rfl proves, Qwen3-4B-Thinking abstained after three attempts (826 s); streaming the rounds shows Lean 3 syntax from System 1 and, from System 2, induction ... with followed by an identifier, a stray inner by, and the same wrong proof on consecutive attempts. Every verdict was precise and no wrong proof was ever accepted: the system abstained with a notice, as Theorem 1 requires. The honest summary is that a 4B model quantised to 4 bits cannot yet write Lean 4 proofs on this CPU even for trivial statements; the verifier, the repair loop and the abstention are ready for a stronger prover, and the sweep\u2019s model checks therefore assert honesty (verified, or abstained with a notice, never an unchecked proof) rather than success. Code tasks, which the same models handle, verify.",
+     "**Lean proofs need a stronger prover.** The verifier and the repair loop are validated end to end with the real Lean binary, but Qwen3-4B-Thinking (4-bit, CPU) abstained on n 0 = n within its budget (Section XIII); Lean tasks therefore return abstained unless the model writes valid Lean 4. The verified proofs reported are the harness\u2019s own test cases, not model output.",
+     "Lean proofs need a stronger prover. The verifier and the repair loop are\nvalidated end to end with the real Lean binary, but Qwen3-4B-Thinking (4-bit, CPU)\nabstained on $n+0=n$ within its budget (Section); Lean tasks\ntherefore return abstained unless the model writes valid Lean 4. The\nverified proofs reported are the harness's own test cases, not model output.",
+     "B. Defects found and fixed\n\n1) **Inconsistent validation.** /v1/chat refused a Lean task with an unusable statement (400), but /v1/verify re-turned a failed verdict with HTTP 200, so a client could not tell a wrong proof from an ungradable task. Validation is now one function used by both. 2) **Lean tasks were classified as open questions.** The domain classifier knew tests, schemas and reference answers but not verification.lean, so a proof request received the open-question limits (no retries, 512 reasoning tokens) and made a single attempt. Lean tasks are now mathematics (up to three attempts, 1024 tokens); a unit test pins it. 3) **The prompt did not say that Mathlib is absent.** The model wrote import Mathlib, which fails on a core-Lean toolchain. The prompt now states which library is available, and adds a three-line Lean 4 syntax note (a proof is a by block, not begin...end; try rfl simp omega; the induction ... with | zero | succ form)."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am Nafs-Aql, a carefully designed assistant that balances speed and precision. I do not have direct knowledge of specific models or their decisions. If you have a specific question about a model's behavior, I can help explore that further.",
+    "ok": false,
+    "seconds": 10.5,
+    "support": {
+     "claims": 3,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "I am Nafs-Aql, a carefully designed assistant that balances speed and precision.",
+      "I do not have direct knowledge of specific models or their decisions.",
+      "If you have a specific question about a model's behavior, I can help explore that further."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many megabytes per token does System 1 read at decode?",
+   "off": {
+    "answer": "I am unable to determine the specific value of \"megabytes per token\" for System 1 read at decode without additional context or data. \n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 7.1,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The passage [1] states that the decode reads every weight once per token, and the speed is that bandwidth over the bytes per token. Specifically, it mentions that the decode reads every weight once per token, and the speed is that bandwidth over the bytes per token. For System 1, the bytes per token is 1,094 MB.\n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 91.5,
+    "passages": [
+     "### How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1\\,GiB) reaches 12.9, 17.2, 18.4 and 19.5\\,GB/s with one to four threads: the fourth core adds 6\\,%.\nDecode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094\\,MB on System 1, 2,503\\,MB on System 2).\nThe engine's own phase split, now reported by the server, puts 86--97\\,% of decode in the matmuls and the output head; sampling is\n0.1--0.3\\,% and attention 1--3\\,% at these context lengths, so neither is worth optimising. The serial share (norms, rotary embedding,\nresiduals, activation quantisation) grows from 2\\,% at one thread to 5\\,% at four.",
+     "## 1. What Memorilla is\n\nA memory system for a **frozen** LLM. Three operations:\n\n1. **Encode once.** A frozen embedding model maps every document chunk d_i to z_i (h_e wide). The matrix Z_D (N x h_e) is the\n   persistent store; only added or changed chunks are re-encoded. It is the same index dense retrieval builds, so it costs\n   nothing extra over RAG.\n2. **Read per query.** A trainable *memory module* reads all of Z_D, conditioned on the query embedding z_q, and returns\n   K = 16 vectors in the **decoder's input-embedding space** (h_L wide).\n3. **Inject.** The 16 vectors replace the input embeddings at 16 placeholder positions in the prompt. Nothing inside the\n   decoder changes; RoPE runs over the whole sequence as usual.\n\nThe decoder therefore sees 16 \"soft tokens\" instead of thousands of document tokens, whatever N is: 1 or 512 documents\ncost the same at decode time (paper, Table 14: 740 ms vs 739 ms end to end on an H100, while full context grows from 749 ms\nto 19,932 ms).",
+     "A. How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1 GiB) reaches 12.9, 17.2, 18.4 and 19.5 GB/s with one to four threads: the fourth core adds 6 %. Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094 MB on System 1, 2,503 MB on System 2). The engine\u2019s own phase split, now reported by the server, puts 86\u201397  of decode in the matmuls and the output head; sampling is Wall time 0.1\u20130.3 % and attention 1\u20133 % at these context lengths, so",
+     "**Prompt layout** (`memorilla/data.py`): the system prompt gets `\"\\nMemory\" + \"<|memory|>\" * 16 + \"Memory\"` appended; the\nuser turn is the question; the chat template is applied with thinking off; prompts are left-padded in batches. At\ninference the decoder's input embedding matrix is read from the safetensors, the placeholder rows are overwritten\n(`inject_memory`), and vLLM is fed `prompt_embeds`.\n\n**Encoder.** `load_encoder` runs Qwen3-Embedding-4B with vLLM's `embed` task in bf16: the model's own pooler (last token,\nL2-normalised) and **no instruction prefix**, for documents and questions alike. The paper's Table 3 says \"mean-pooled\";\nthe code is what the checkpoints were trained with, so a port follows the code."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 3,
+     "supported": 3,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "What share of decode time goes to the matmuls and the output head?",
+   "rag": {
+    "answer": "The knowledge base indicates that the engine's own phase split puts 86\u201397% of decode in the matmuls and the output head. This is cited in [2].",
+    "ok": true,
+    "seconds": 70.9,
+    "passages": [
+     "A. How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1 GiB) reaches 12.9, 17.2, 18.4 and 19.5 GB/s with one to four threads: the fourth core adds 6 %. Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094 MB on System 1, 2,503 MB on System 2). The engine\u2019s own phase split, now reported by the server, puts 86\u201397  of decode in the matmuls and the output head; sampling is Wall time 0.1\u20130.3 % and attention 1\u20133 % at these context lengths, so",
+     "### How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1\\,GiB) reaches 12.9, 17.2, 18.4 and 19.5\\,GB/s with one to four threads: the fourth core adds 6\\,%.\nDecode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094\\,MB on System 1, 2,503\\,MB on System 2).\nThe engine's own phase split, now reported by the server, puts 86--97\\,% of decode in the matmuls and the output head; sampling is\n0.1--0.3\\,% and attention 1--3\\,% at these context lengths, so neither is worth optimising. The serial share (norms, rotary embedding,\nresiduals, activation quantisation) grows from 2\\,% at one thread to 5\\,% at four.",
+     "### What the literature offers\n\nDecode saturating memory with few threads is well supported and is confirmed above. Prompt-lookup and suffix decoding\ndraft tokens by matching recent output against the prompt and past outputs and report large gains where output copies input, such as code editing; the engine's\nspeculation is greedy-only while \\Sys{} samples at 0.3--0.7, so using it needs speculative sampling (accept a deterministic draft token with probability\n$p(d)$, otherwise sample the residual), which is lossless but is engine work with a bounded payoff because System 2's time is reasoning text that does not copy\nthe prompt. Prefix caching of the kind SGLang's RadixAttention describes keeps the cache of earlier prompts and reuses the longest shared\nbeginning; it applies directly and was built.",
+     "Three threads beat four for decode in all six interleaved pairs (+4\\,% on System 1, +8\\,% on System 2 at the median) while cold prefill, which is\ncompute-bound, is 16--17\\,% slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the\nslowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier\nsandbox and the gateway; a quiet host may prefer four. The engine's own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes\nas the reference, no prefetch loses 11\\,% in two of three rounds and 512 loses 3\\,%, while 2048 and 4096 differ by about $+2$\\,% at the median, inside this\nhost's noise; parking instead of spinning loses 2\\,%."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, I say I am Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design.\n\nAs for the share of decode time going to the matmuls and the output head, this is a specific detail about the architecture of the model. The matmuls are the parallel processing units responsible for the majority of the decoding work, while the output head handles the final prediction step. The exact share of decode time between these components can vary based on the model's configuration and training process. For precise details, I recommend referring to the model's documentation or technical specifications.",
+    "ok": false,
+    "seconds": 19.3,
+    "support": {
+     "claims": 6,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it.",
+      "If asked who or what you are, I say I am Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design.",
+      "As for the share of decode time going to the matmuls and the output head, this is a specific detail about the architecture of the model.",
+      "The matmuls are the parallel processing units responsible for the majority of the decoding work, while the output head handles the final prediction step.",
+      "The exact share of decode time between these components can vary based on the model's configuration and training process.",
+      "For precise details, I recommend referring to the model's documentation or technical specifications."
+     ]
+    }
+   }
+  },
+  {
+   "question": "What did the prefix store bring a switch of request kind down to?",
+   "off": {
+    "answer": "I am not sure about the specific context or reference to \"the prefix store\" and \"switch of request kind.\" Could you provide more details or clarify the question?",
+    "ok": false,
+    "seconds": 6.0,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The prefix store brought a switch of request kind down to 0.1\u20130.2 seconds on System 1 and 0.2 seconds on System 2, as cited in [1].",
+    "ok": true,
+    "seconds": 64.6,
+    "passages": [
+     "Between kinds of request on one model. The session held a single cache, so a prompt benefited only when it followed a conversation with the same\nbeginning. Alternating a chat prompt and the code agent's prompt prefilled the agent prompt in full each time: 266 tokens in 5.8\\,s on System 1 and 262 tokens in\n14\\,s on System 2, where llama.cpp's four slots answered in 0.1--0.2\\,s. A prefix store in the engine keeps the cache of each finished conversation as a\nsnapshot (114--147\\,KB per position, 768\\,MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt.\nAlternating or rotating three kinds of request now costs one token and 0.1\\,s on System 1 and 0.2\\,s on System 2, as on llama.cpp, and the answers are\nbyte-identical (equal hashes) with the store on and off for both models. It also makes the gateway's warm-first backend switch effective: it primes 13 prefixes, of which a\none-prefix session could keep only the last.",
+     "The reasoning budget's continuation. At the budget the server closes the reasoning and continues the turn with the reasoning so far as the assistant's prefix. The\nprefix was <think>, a newline, then the reasoning, which already begins with the newline the model wrote; the first reasoning token became two newlines\ninstead of one, the cache stopped matching there, and every reasoning token was prefilled again. The prefix now repeats the generated text exactly, the\nmatch covers the whole conversation, and the continuation prefills 5 tokens in 0.2\\,s instead of 108 tokens and 2.2\\,s at a budget of 200 (7--30\\,s on System 2 at\n128--512 reasoning tokens). On six escalated requests the cold prefill fell from 700--1,160 tokens (45--78\\,s) to 350--390 (22--24\\,s) and the mean time per request\nfrom 182\\,s to 133\\,s; the runs were not interleaved with the old build, but the prefill token counts are deterministic.",
+     "### Summary\n\nThe engine is within 60--95\\,% of the machine's bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth\ndecode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14\\,s down to 0.1 and 0.2\\,s for a switch of request kind) and the continuation's re-prefill of its own\nreasoning (now exact). Speculative sampling is named as the next engine item.",
+     "E. Summary\n\nThe engine is within 60\u201395 % of the machine\u2019s bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth decode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14 s down to 0.1 and 0.2 s for a switch of request kind) and the continuation\u2019s re-prefill of its own reasoning (now exact). Speculative sampling is named as the next engine item."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "Which version of SurrealDB stores the knowledge base?",
+   "rag": {
+    "answer": "The knowledge base is stored using SurrealDB version 3.3.5, as specified in the decision [1].",
+    "ok": true,
+    "seconds": 58.0,
+    "passages": [
+     "| Wire format | SurrealDB RPC over HTTP in **CBOR**, bound variables only | its JSON decoding turns strings like `\"Caption: Model ...\"` into record ids (found in Phase 1, regression-tested) |\n| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |",
+     "## Context\n\nThe owner asked for a knowledge base (upload PDF, DOCX, TEX, PPTX, HTML and more; store as vectors and a graph in\nSurrealDB), RAG and GraphRAG, and Memorilla (Stanford, arXiv 2610.21375), a learned memory that hands a frozen LLM 16\nquery-dependent soft tokens read from a whole document collection, trained and fine-tuned on uploaded knowledge and\nserved by Smiley Core, implemented with Candle.",
+     "| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |\n| Parsers | `pdf_oxide` (PDF, pure Rust), our own ZIP + XML readers for DOCX and PPTX, `htmd` for HTML, our own LaTeX stripper, plain reads for Markdown and text | pure Rust, auditable, bounded against hostile archives; no PDFium, no Java, no Python |",
+     "## Consequences\n\n- Operators start one more service (`scripts/serve_surreal.sh start`; `make up` does it when `[knowledge].enabled`).\n- SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not\n  redistributed.\n- The knowledge API returns 503 `kb_unavailable` when SurrealDB is down; chat is unaffected.\n- A Memorilla module trained here is tied to System 1's Qwen3-1.7B; changing System 1's model means retraining."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "SurrealDB does not store a traditional knowledge base in the conventional sense. Instead, it is a distributed, scalable, and flexible database system that supports various data models, including key-value, document, and graph databases. The knowledge base concept is not a core feature of SurrealDB, but it can be integrated with other systems or used in custom applications. If you are referring to a specific use case or integration, please provide more context.",
+    "ok": false,
+    "seconds": 20.3,
+    "support": {
+     "claims": 4,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "SurrealDB does not store a traditional knowledge base in the conventional sense.",
+      "Instead, it is a distributed, scalable, and flexible database system that supports various data models, including key-value, document, and graph databases.",
+      "The knowledge base concept is not a core feature of SurrealDB, but it can be integrated with other systems or used in custom applications.",
+      "If you are referring to a specific use case or integration, please provide more context."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many parameters does the memory module for System 1 have?",
+   "off": {
+    "answer": "I am unable to directly access specific system details or internal parameters. However, the memory module for System 1 is typically designed with a certain number of parameters based on its intended functionality. \n\nAnswer: 1000",
+    "ok": false,
+    "seconds": 10.9,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "However, the memory module for System 1 is typically designed with a certain number of parameters based on its intended functionality.",
+      "Answer: 1000"
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The memory module for System 1 has a number of parameters that are not explicitly stated in the provided knowledge base. However, based on the information given, the memory module in Candle mirrors `memory.py` and the parameter names suggest a structure that aligns with the paper's description. The exact number of parameters is not specified in the knowledge base.\n\nAnswer: <number>",
+    "ok": false,
+    "seconds": 87.1,
+    "passages": [
+     "## 13. Phase 4 results (2026-11-07): the memory module in Candle\n\n`nafs_memorilla::MemoryModule` mirrors `memory.py`: the same parameter names (packed `in_proj_weight`, `ffn_layers.i.0/.3`,\n`encoder.layers.i.*`), so a converted state dict loads as is (`training/memorilla/convert_checkpoint.py`).\n\n**Parity without downloading a checkpoint.** `training/memorilla/make_parity_fixtures.py` runs the unmodified reference\nclass (its helper module stubbed, so only torch is needed) with seeded random weights, LayerNorm parameters perturbed, and\none padded row, for three configurations; the fixtures (1 MB) are in the crate, so CI checks parity without Python.\nLargest difference: 1.9e-6 (default), 9.5e-7 (`retrieval_init`), 7.2e-7 (document self-attention); target 1e-4. The\nparameter formula matches the stored tensors and the paper (194,123,776; 190,190,080 for the 4B decoder). Changing the\nvalues of padded documents does not change the memory.",
+     "**Gateway.** Knowledge mode `memory`: the question is embedded **without** the retrieval instruction (as Memorilla was\ntrained), the module reads the base's prepared passage vectors (cached per base until its update time or vector count\nchanges), the system prompt gets Memorilla's `\\nMemory<placeholder>x16Memory`, and every quick-model request of the turn\ncarries the 16 vectors. The request is held on the quick path: the module lives in System 1's embedding space, and System\n2 would see placeholders with no vectors. Measured on 20 passages: prepare 56 ms once, read 26\u201328 ms per question.\n\n**Not yet useful.** No module is trained for Qwen3-1.7B. The end-to-end run used an untrained module\n(`examples/memory_init.rs`), whose tokens carry no knowledge: the model answered that it could not tell. `memory` mode is\ntherefore offered only in Advanced mode, labelled experimental, and only when `[knowledge] memory_checkpoint` names a\nmodule. Phase 6 trains one.",
+     "`memory` and\n  `hybrid` arms are **not measured**: the 1.7B run costs 137-272 s per example on this host (three epochs is 11-34 h)\n  and the machine restarted at step 3. It learns from the first step, and the untrained module reads exactly like no\n  module (claim accuracy 0.692 with and without), so the path is right; the numbers wait for an overnight run.",
+     "| Memorilla in Rust | a new crate `nafs-memorilla` on Candle 0.11 for the module, encoder reference, dataset builder and trainer; Smiley Core gets one marked addition (caller-supplied input vectors for chosen rows) | Smiley Core's P1 principle forbids a tensor framework inside the engine |\n| Released checkpoints | used only for the parity test | they project into Qwen3-8B's 4,096-wide space; ours are 2,048 (System 1) and 2,560 (System 2) |\n| Training on this CPU | fine-tuning on a knowledge base, System 1 decoder, `retrieval_init`; Stage 1\u20132 pre-training is a GPU recipe | about 1.4 TFLOP per example through Qwen3-1.7B; 3.3 M pre-training rows would take months here |\n| Chat integration | a knowledge mode per request: `off`, `rag`, `graph`, `memory`, `hybrid`, `auto`; retrieved material delimited as data; replies carry sources | the paper shows memory and retrieval answer different questions |"
+    ],
+    "in_prompt": false,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "However, based on the information given, the memory module in Candle mirrors memory.py and the parameter names suggest a structure that aligns with the paper's description."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many bits per weight did the LittleBit conversion of Qwen3-1.7B reach?",
+   "rag": {
+    "answer": "The LittleBit conversion of Qwen3-1.7B reached 0.980 bits per weight. \n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 77.9,
+    "passages": [
+     "### LittleBit: integrated, tested, not useful yet\n\nQwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\\,MB of factors for 845.7\\,MB\nof weights ($4.9\\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4_K itself\nis about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \\textbf{the dense model answered 9 correctly and the LittleBit\nmodel 0}; its text is incoherent. Decode was only 5\\,% faster (20.1 against 19.2\\,tok/s), because at this size the matmul is not the whole token. Upstream\nreports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The\nintegration is therefore opt-in (--littlebit, LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a\nmodel cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and\non the Status page. It is ready for trained factors; it is not a result.",
+     "4.4\u20135.0 New with a LittleBit sidecar 20.1\n\nD. LittleBit: integrated, tested, not useful yet Qwen3-1.7B was converted at 1.0 bit per weight with the engine\u2019s post-training (Dual-SVID) converter: 196 projections, 172.7 MB of factors for 845.7 MB of weights (4 9 ), 0.980 bits per weight, 13 minutes on four cores. The mean relative re-construction error of the weights is 0.752 (Q4_K itself is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, **the dense model answered 9 correctly and the LittleBit model 0**; its text is incoherent. Decode was only 5 % faster (20.1 against 19.2 tok/s), because at this size the matmul is not the whole token. Upstream reports the same on a smaller model and attributes the paper\u2019s quality to distillation-based quantisation-aware training, which needs a GPU. The integration is therefore opt-in (-littlebit LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and on the Status page. It is ready for trained factors; it is not a result.",
+     "**from 5.8 s and 14 s of prefill to 0.1 s and 0.2 s with byte-identical output; and the reasoning budget\u2019s continuation no longer re- prefills the reasoning it has just computed. Version 2.9 serves several users from one pass over the weights (identical text to a solo run at every concurrency,** 1 4 **the throughput of llama.cpp at two users) and then updates the engine to its latest revision with LittleBit, a 1-bit-class weight format: the integration is complete and tested, but post-training conversion of Qwen3-1.7B at 0.98 bits per weight answers 0 of 12 exact-answer prompts against 9 for the dense model, so it stays off until trained factors exist; the update also exposed a fourfold decode slowdown caused by a compiler inlining decision in an unchanged kernel, found by bisection and fixed.**",
+     "Caption: Decode speed of Qwen3-1.7B Q4_K_M (tokens per second, median of five interleaved rounds of 96 tokens, three threads, one slot, shared host).\n\\toprule\nEngine & tok/s\n\n\\midrule\nPrevious (7cb6028 + Phase 18) & 18.7\n\nNew (06c2b88), after the fix & 19.2\n\nNew, before the fix & 4.4--5.0\n\nNew with a LittleBit sidecar & 20.1\n\n\\bottomrule"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "The LittleBit conversion of Qwen3-1.7B reached approximately 100 million bits per weight. \n\nAnswer: 100 million",
+    "ok": false,
+    "seconds": 5.9,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The LittleBit conversion of Qwen3-1.7B reached approximately 100 million bits per weight.",
+      "Answer: 100 million"
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many projections were converted to LittleBit factors?",
+   "off": {
+    "answer": "The number of projections converted to LittleBit factors is not provided in the given information. \n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 4.3,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The number of projections converted to LittleBit factors is 196. [1]",
+    "ok": false,
+    "seconds": 17.0,
+    "passages": [
+     "### LittleBit: integrated, tested, not useful yet\n\nQwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\\,MB of factors for 845.7\\,MB\nof weights ($4.9\\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4_K itself\nis about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \\textbf{the dense model answered 9 correctly and the LittleBit\nmodel 0}; its text is incoherent. Decode was only 5\\,% faster (20.1 against 19.2\\,tok/s), because at this size the matmul is not the whole token. Upstream\nreports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The\nintegration is therefore opt-in (--littlebit, LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a\nmodel cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and\non the Status page. It is ready for trained factors; it is not a result.",
+     "4.4\u20135.0 New with a LittleBit sidecar 20.1\n\nD. LittleBit: integrated, tested, not useful yet Qwen3-1.7B was converted at 1.0 bit per weight with the engine\u2019s post-training (Dual-SVID) converter: 196 projections, 172.7 MB of factors for 845.7 MB of weights (4 9 ), 0.980 bits per weight, 13 minutes on four cores. The mean relative re-construction error of the weights is 0.752 (Q4_K itself is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, **the dense model answered 9 correctly and the LittleBit model 0**; its text is incoherent. Decode was only 5 % faster (20.1 against 19.2 tok/s), because at this size the matmul is not the whole token. Upstream reports the same on a smaller model and attributes the paper\u2019s quality to distillation-based quantisation-aware training, which needs a GPU. The integration is therefore opt-in (-littlebit LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and on the Status page. It is ready for trained factors; it is not a result.",
+     "## Phase 19: The Engine Update and LittleBit\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner's new one (06c2b88), re-applies Nafs-Aql's additions on it,\nintegrates LittleBit, and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md and\nthe research note docs/research/smiley_core_update.md.",
+     "### Two defects the integration exposed\n\nA crash. Served through the batching engine, a LittleBit model crashed on its first request: the single-session path sizes the sidecar's scratch\nbuffers and the engine's constructor did not, so the first sidecar matmul wrote through an empty buffer. Fixed, and visible only because the engine\nwas exercised with the new format."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How long did the LittleBit conversion take on four cores?",
+   "rag": {
+    "answer": "The LittleBit conversion took 13 minutes on four cores. This is stated in the passage: \"13 minutes on four cores.\" Therefore, the answer is [1].",
+    "ok": true,
+    "seconds": 65.9,
+    "passages": [
+     "### LittleBit: integrated, tested, not useful yet\n\nQwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\\,MB of factors for 845.7\\,MB\nof weights ($4.9\\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4_K itself\nis about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \\textbf{the dense model answered 9 correctly and the LittleBit\nmodel 0}; its text is incoherent. Decode was only 5\\,% faster (20.1 against 19.2\\,tok/s), because at this size the matmul is not the whole token. Upstream\nreports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The\nintegration is therefore opt-in (--littlebit, LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a\nmodel cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and\non the Status page. It is ready for trained factors; it is not a result.",
+     "## Phase 19: The Engine Update and LittleBit\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner's new one (06c2b88), re-applies Nafs-Aql's additions on it,\nintegrates LittleBit, and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md and\nthe research note docs/research/smiley_core_update.md.",
+     "4.4\u20135.0 New with a LittleBit sidecar 20.1\n\nD. LittleBit: integrated, tested, not useful yet Qwen3-1.7B was converted at 1.0 bit per weight with the engine\u2019s post-training (Dual-SVID) converter: 196 projections, 172.7 MB of factors for 845.7 MB of weights (4 9 ), 0.980 bits per weight, 13 minutes on four cores. The mean relative re-construction error of the weights is 0.752 (Q4_K itself is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, **the dense model answered 9 correctly and the LittleBit model 0**; its text is incoherent. Decode was only 5 % faster (20.1 against 19.2 tok/s), because at this size the matmul is not the whole token. Upstream reports the same on a smaller model and attributes the paper\u2019s quality to distillation-based quantisation-aware training, which needs a GPU. The integration is therefore opt-in (-littlebit LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and on the Status page. It is ready for trained factors; it is not a result.",
+     "XX. PHASE 19: THE ENGINE UPDATE AND LITTLEBIT\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner\u2019s new one (06c2b88), re-applies Nafs-Aql\u2019s additions on it, integrates LittleBit [184], and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md 34"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "Nafs-Aql is built on open Qwen models and is designed for fast and careful reasoning. I am not directly aware of the exact time it takes to convert a LittleBit project on four cores. However, the conversion process typically involves compiling and linking the code, which can take a few minutes depending on the complexity of the project and the size of the codebase. For precise timing, you would need to run the conversion on a real system and measure it.",
+    "ok": false,
+    "seconds": 13.7,
+    "support": {
+     "claims": 4,
+     "supported": 1,
+     "share": 0.25,
+     "unsupported": [
+      "Nafs-Aql is built on open Qwen models and is designed for fast and careful reasoning.",
+      "However, the conversion process typically involves compiling and linking the code, which can take a few minutes depending on the complexity of the project and the size of the codebase.",
+      "For precise timing, you would need to run the conversion on a real system and measure it."
+     ]
+    }
+   }
+  },
+  {
+   "question": "What was the mean relative reconstruction error of the LittleBit weights?",
+   "off": {
+    "answer": "I am not aware of the specific mean relative reconstruction error of the LittleBit weights. The LittleBit weights are a set of weights used in the LittleBit neural network, but I do not have access to detailed performance metrics or specific error values for them. If you have a specific source or context in mind, I can try to provide more information.",
+    "ok": false,
+    "seconds": 10.2,
+    "support": {
+     "claims": 3,
+     "supported": 1,
+     "share": 0.3333333432674408,
+     "unsupported": [
+      "The LittleBit weights are a set of weights used in the LittleBit neural network, but I do not have access to detailed performance metrics or specific error values for them.",
+      "If you have a specific source or context in mind, I can try to provide more information."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The mean relative reconstruction error of the LittleBit weights is 0.752. This value is mentioned in the context of the phase 19 engine update and LittleBit integration, where it is noted that the mean relative reconstruction error of the weights is 0.752 (Q4_K itself is about 0.1). [1]",
+    "ok": true,
+    "seconds": 65.2,
+    "passages": [
+     "### LittleBit: integrated, tested, not useful yet\n\nQwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\\,MB of factors for 845.7\\,MB\nof weights ($4.9\\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4_K itself\nis about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \\textbf{the dense model answered 9 correctly and the LittleBit\nmodel 0}; its text is incoherent. Decode was only 5\\,% faster (20.1 against 19.2\\,tok/s), because at this size the matmul is not the whole token. Upstream\nreports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The\nintegration is therefore opt-in (--littlebit, LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a\nmodel cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and\non the Status page. It is ready for trained factors; it is not a result.",
+     "4.4\u20135.0 New with a LittleBit sidecar 20.1\n\nD. LittleBit: integrated, tested, not useful yet Qwen3-1.7B was converted at 1.0 bit per weight with the engine\u2019s post-training (Dual-SVID) converter: 196 projections, 172.7 MB of factors for 845.7 MB of weights (4 9 ), 0.980 bits per weight, 13 minutes on four cores. The mean relative re-construction error of the weights is 0.752 (Q4_K itself is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, **the dense model answered 9 correctly and the LittleBit model 0**; its text is incoherent. Decode was only 5 % faster (20.1 against 19.2 tok/s), because at this size the matmul is not the whole token. Upstream reports the same on a smaller model and attributes the paper\u2019s quality to distillation-based quantisation-aware training, which needs a GPU. The integration is therefore opt-in (-littlebit LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and on the Status page. It is ready for trained factors; it is not a result.",
+     "### What the new engine brings\n\nGrouped online-softmax attention, an int8 key--value cache rotated by a Hadamard transform, vectorised math, and sampling whose randomness is keyed by\nposition, so a drafted token is accepted exactly when sequential sampling would have emitted it: speculation becomes lossless at any temperature, not\nonly under argmax. LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, $\\hat W=\\mathrm{diag}(h)\\,U_{\\pm}\\,\n\\mathrm{diag}(\\ell)\\,V_{\\pm}^{\\top}\\,\\mathrm{diag}(g)$, summed over stages, stored beside the model as a sidecar file.",
+     "## Phase 19: The Engine Update and LittleBit\n\nPhase 19 (5 November 2026) replaces the vendored Smiley Core (revision 7cb6028) by the owner's new one (06c2b88), re-applies Nafs-Aql's additions on it,\nintegrates LittleBit, and re-validates the system. The decision record is docs/decisions/013-smiley-core-littlebit.md and\nthe research note docs/research/smiley_core_update.md."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How many of the twelve exact-answer prompts did the dense model answer correctly?",
+   "rag": {
+    "answer": "The dense model answered 9 correctly out of the twelve exact-answer prompts. \n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 20.6,
+    "passages": [
+     "### LittleBit: integrated, tested, not useful yet\n\nQwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\\,MB of factors for 845.7\\,MB\nof weights ($4.9\\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4_K itself\nis about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \\textbf{the dense model answered 9 correctly and the LittleBit\nmodel 0}; its text is incoherent. Decode was only 5\\,% faster (20.1 against 19.2\\,tok/s), because at this size the matmul is not the whole token. Upstream\nreports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The\nintegration is therefore opt-in (--littlebit, LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a\nmodel cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and\non the Status page. It is ready for trained factors; it is not a result.",
+     "4.4\u20135.0 New with a LittleBit sidecar 20.1\n\nD. LittleBit: integrated, tested, not useful yet Qwen3-1.7B was converted at 1.0 bit per weight with the engine\u2019s post-training (Dual-SVID) converter: 196 projections, 172.7 MB of factors for 845.7 MB of weights (4 9 ), 0.980 bits per weight, 13 minutes on four cores. The mean relative re-construction error of the weights is 0.752 (Q4_K itself is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, **the dense model answered 9 correctly and the LittleBit model 0**; its text is incoherent. Decode was only 5 % faster (20.1 against 19.2 tok/s), because at this size the matmul is not the whole token. Upstream reports the same on a smaller model and attributes the paper\u2019s quality to distillation-based quantisation-aware training, which needs a GPU. The integration is therefore opt-in (-littlebit LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and on the Status page. It is ready for trained factors; it is not a result.",
+     "**from 5.8 s and 14 s of prefill to 0.1 s and 0.2 s with byte-identical output; and the reasoning budget\u2019s continuation no longer re- prefills the reasoning it has just computed. Version 2.9 serves several users from one pass over the weights (identical text to a solo run at every concurrency,** 1 4 **the throughput of llama.cpp at two users) and then updates the engine to its latest revision with LittleBit, a 1-bit-class weight format: the integration is complete and tested, but post-training conversion of Qwen3-1.7B at 0.98 bits per weight answers 0 of 12 exact-answer prompts against 9 for the dense model, so it stays off until trained factors exist; the update also exposed a fourfold decode slowdown caused by a compiler inlining decision in an unchanged kernel, found by bisection and fixed.**",
+     "E. Is anything else different\n\nThe old and the new engine give the same answers on the exact-answer prompts (9 of 12 on both, the same three misses). One of those misses, a time-of-day sum (3:40 pm plus 2 h 35 min answered 5:45 pm, the correct answer being 6:15 pm), was first seen in the web interface right after the merge and looked like a regression; the comparison shows it is the 1.7B model\u2019s own error, which the gate\u2019s confidence signal does not catch because both quick samples repeat it. Re-validation on the final code: contract tests, 26 of 26 security probes (0 open high-severity findings), 59 of 59 Rooms checks, 65 of 65 end-to-end checks, 53 of 53 harness checks and 9 of 9 acceptance tests pass."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "To determine how many of the twelve exact-answer prompts the dense model answered correctly, I would need access to the specific prompts and the model's responses. Since this information is not provided, I cannot give a definitive count.\n\nAnswer: 0",
+    "ok": false,
+    "seconds": 7.8,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "What decode speed did the model with a LittleBit sidecar reach?",
+   "off": {
+    "answer": "I am unable to provide specific details about the decode speed of a model with a LittleBit sidecar, as this information is not publicly available or widely documented. If you have more context or specific details about the model or sidecar, I can try to help further.",
+    "ok": false,
+    "seconds": 8.3,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "If you have more context or specific details about the model or sidecar, I can try to help further."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The model with a LittleBit sidecar reached a decode speed of 20.1 tokens per second (tok/s), which is the median of five interleaved rounds of 96 tokens, three threads, one slot, and shared host. This speed is slightly higher than the previous version (19.2 tok/s) after the fix. [2]",
+    "ok": true,
+    "seconds": 62.2,
+    "passages": [
+     "Caption: Decode speed of Qwen3-1.7B Q4_K_M (tokens per second, median of five interleaved rounds of 96 tokens, three threads, one slot, shared host).\n\\toprule\nEngine & tok/s\n\n\\midrule\nPrevious (7cb6028 + Phase 18) & 18.7\n\nNew (06c2b88), after the fix & 19.2\n\nNew, before the fix & 4.4--5.0\n\nNew with a LittleBit sidecar & 20.1\n\n\\bottomrule",
+     "4.4\u20135.0 New with a LittleBit sidecar 20.1\n\nD. LittleBit: integrated, tested, not useful yet Qwen3-1.7B was converted at 1.0 bit per weight with the engine\u2019s post-training (Dual-SVID) converter: 196 projections, 172.7 MB of factors for 845.7 MB of weights (4 9 ), 0.980 bits per weight, 13 minutes on four cores. The mean relative re-construction error of the weights is 0.752 (Q4_K itself is about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, **the dense model answered 9 correctly and the LittleBit model 0**; its text is incoherent. Decode was only 5 % faster (20.1 against 19.2 tok/s), because at this size the matmul is not the whole token. Upstream reports the same on a smaller model and attributes the paper\u2019s quality to distillation-based quantisation-aware training, which needs a GPU. The integration is therefore opt-in (-littlebit LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a model cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and on the Status page. It is ready for trained factors; it is not a result.",
+     "### LittleBit: integrated, tested, not useful yet\n\nQwen3-1.7B was converted at 1.0 bit per weight with the engine's post-training (Dual-SVID) converter: 196 projections, 172.7\\,MB of factors for 845.7\\,MB\nof weights ($4.9\\times$), 0.980 bits per weight, 13 minutes on four cores. The mean relative reconstruction error of the weights is 0.752 (Q4_K itself\nis about 0.1). On twelve exact-answer prompts, greedy, interleaved on the same engine, \\textbf{the dense model answered 9 correctly and the LittleBit\nmodel 0}; its text is incoherent. Decode was only 5\\,% faster (20.1 against 19.2\\,tok/s), because at this size the matmul is not the whole token. Upstream\nreports the same on a smaller model and attributes the paper's quality to distillation-based quantisation-aware training, which needs a GPU. The\nintegration is therefore opt-in (--littlebit, LITTLEBIT=1); a missing or corrupt sidecar refuses to start, so a stale file beside a\nmodel cannot switch the weights silently, and the weights in use (dense or LittleBit) are reported in every response, in the backend health check and\non the Status page. It is ready for trained factors; it is not a result.",
+     "C. Two defects the integration exposed A crash. Served through the batching engine, a LittleBit model crashed on its first request: the single-session path sizes the sidecar\u2019s scratch buffers and the engine\u2019s constructor did not, so the first sidecar matmul wrote through an empty buffer. Fixed, and visible only because the engine was exercised with the new format."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 1,
+     "share": 0.5,
+     "unsupported": [
+      "This speed is slightly higher than the previous version (19.2 tok/s) after the fix."
+     ]
+    }
+   }
+  },
+  {
+   "question": "Which function call inside the kernel made the slow build slow?",
+   "rag": {
+    "answer": "The function call inside the kernel that made the slow build slow is `core::array::try_from_fn`, which is called once per super-block in the slow build. This call is part of the dot kernel and is responsible for the slowdown. [1]",
+    "ok": true,
+    "seconds": 59.3,
+    "passages": [
+     "A fourfold slowdown with no kernel change. After the merge Qwen3-1.7B decoded at 4.4--5.0 tokens per second, against 17--20 for the previous\ncommit and 16--18 for upstream's own build, interleaved on the same machine. The dot kernels were byte-identical after formatting, so a code change\ncould not be the cause directly. Bisecting by swapping files between a scratch copy of upstream and the crate showed that merely adding the batching\nengine (never called by the benchmark) was enough; a kernel micro-benchmark isolated it to the small-batch dot kernels (Q4_K, one activation, one\nthread: 679\\,ns per row against 96); disassembly showed a call to core::array::try_from_fn inside the kernel, once per super-block,\nin the slow build only. std::array::from_fn in two helpers marked inline(always) is inlined or not depending on how much unrelated\ncode the crate contains. Spelling the eight-element arrays out restores 96\\,ns per row and 15--20 tokens per second. The lesson is general: a kernel\nwhose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and kbench is now part of the crate for that.",
+     "The dot kernels were byte-identical after formatting, so a code change could not be the cause directly. Bisecting by swap-ping files between a scratch copy of upstream and the crate showed that merely adding the batching engine (never called by the benchmark) was enough; a kernel micro-benchmark isolated it to the small-batch dot kernels (Q4_K, one ac-tivation, one thread: 679 ns per row against 96); disassem-bly showed a call to core::array::try_from_fn in-side the kernel, once per super-block, in the slow build only. std::array::from_fn in two helpers marked inline(always) is inlined or not depending on how much unrelated code the crate contains. Spelling the eight-element arrays out restores 96 ns per row and 15\u201320 tokens per second. The lesson is general: a kernel whose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and kbench is now part of the crate for that. and the research note docs/research/smiley_core_update.md",
+     "Fixed, and visible only because the engine was exercised with the new format. A fourfold slowdown with no kernel change. After the merge Qwen3-1.7B decoded at 4.4\u20135.0 tokens per second, against 17\u201320 for the previous commit and 16\u201318 for up-stream\u2019s own build, interleaved on the same machine. The dot kernels were byte-identical after formatting, so a code change could not be the cause directly.",
+     "F. Summary\n\nTable XXX summarises the phase. Three things changed: the cascade (on), retries with backoff (on), and the warm-first backend switch (on). Three were measured and left alone, with the method and the re-open rule recorded: the engine flags (inconclusive on a shared host), co-scheduling (nothing to arbitrate on four cores), and the switch inside a request (already about 1.5 s; nothing to freeze, no prefetch worth building). Every suite was re-run on the final code (Section XIII lists them); the counts are in the decision record."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am unable to directly determine which function call inside the kernel caused the slow build. To identify the slow function call, you would typically use profiling tools like `cProfile` or `time` in Python to measure the execution time of each function. These tools can help you identify the most time-consuming functions in your code.",
+    "ok": false,
+    "seconds": 8.5,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "To identify the slow function call, you would typically use profiling tools like cProfile or time in Python to measure the execution time of each function.",
+      "These tools can help you identify the most time-consuming functions in your code."
+     ]
+    }
+   }
+  },
+  {
+   "question": "What benchmark guards the kernel's speed against optimiser decisions elsewhere?",
+   "off": {
+    "answer": "Nafs-Aql is built on open Qwen models and is designed to balance speed and accuracy. The kernel's speed is guarded by the **Linux Kernel's Performance Monitoring Units (PMUs)** and **CPU frequency scaling** mechanisms, which ensure that the kernel remains efficient and responsive even when optimized code is used elsewhere.",
+    "ok": false,
+    "seconds": 8.8,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "Nafs-Aql is built on open Qwen models and is designed to balance speed and accuracy.",
+      "The kernel's speed is guarded by the Linux Kernel's Performance Monitoring Units (PMUs) and CPU frequency scaling mechanisms, which ensure that the kernel remains efficient and responsive even when optimized code is used elsewhere."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The benchmark that guards the kernel's speed against optimiser decisions elsewhere is **kbench**. This is explicitly mentioned in the analysis of the dot kernels, where it is stated that a kernel whose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and **kbench is now part of the crate for that**. [1]",
+    "ok": true,
+    "seconds": 54.3,
+    "passages": [
+     "The dot kernels were byte-identical after formatting, so a code change could not be the cause directly. Bisecting by swap-ping files between a scratch copy of upstream and the crate showed that merely adding the batching engine (never called by the benchmark) was enough; a kernel micro-benchmark isolated it to the small-batch dot kernels (Q4_K, one ac-tivation, one thread: 679 ns per row against 96); disassem-bly showed a call to core::array::try_from_fn in-side the kernel, once per super-block, in the slow build only. std::array::from_fn in two helpers marked inline(always) is inlined or not depending on how much unrelated code the crate contains. Spelling the eight-element arrays out restores 96 ns per row and 15\u201320 tokens per second. The lesson is general: a kernel whose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and kbench is now part of the crate for that. and the research note docs/research/smiley_core_update.md",
+     "A fourfold slowdown with no kernel change. After the merge Qwen3-1.7B decoded at 4.4--5.0 tokens per second, against 17--20 for the previous\ncommit and 16--18 for upstream's own build, interleaved on the same machine. The dot kernels were byte-identical after formatting, so a code change\ncould not be the cause directly. Bisecting by swapping files between a scratch copy of upstream and the crate showed that merely adding the batching\nengine (never called by the benchmark) was enough; a kernel micro-benchmark isolated it to the small-batch dot kernels (Q4_K, one activation, one\nthread: 679\\,ns per row against 96); disassembly showed a call to core::array::try_from_fn inside the kernel, once per super-block,\nin the slow build only. std::array::from_fn in two helpers marked inline(always) is inlined or not depending on how much unrelated\ncode the crate contains. Spelling the eight-element arrays out restores 96\\,ns per row and 15--20 tokens per second. The lesson is general: a kernel\nwhose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and kbench is now part of the crate for that.",
+     "### Model Profiles\n\nTable defines three profiles. Profile A is the reference:\ntwo dense Qwen3 checkpoints, one per role, chosen because dense\ngrouped-query attention has the most mature CPU kernels, official GGUF files\nexist, and both are on vLLM's validated CPU list. Profile B serves one\nswitchable Qwen3-4B for both roles, halving resident memory at the price of a\nslower fast path; the gate then decides whether to think, exactly the\ndecision studied by the adaptive-thinking literature. Profile C is the\nupgrade path to Qwen3.5, which is stronger and multimodal but uses hybrid\nlinear attention whose CPU kernels are newer and, on AVX2 without\nAVX-512-BF16 or AMX, unaccelerated in vLLM; Phase 0 of the roadmap benchmarks\nit against Profile A on the target machine before any commitment. The\nupgrade decision is a go/no-go gate with a measurable criterion.",
+     "### The harness's cost\n\nThe guards of Phase 16 cost nothing in the interleaved A/B over ten tasks, and the compile check takes 37\\,ms per edit against steps of 5 to 230\\,s; the agent's scripted\nloop (86 tests) runs in 0.03\\,s in total. The agent loop is instead a beneficiary of this phase: its steps share a long beginning (the append-only transcript), which the\nprefix store keeps and restores."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How many of the 44 textual merge conflicts remained after normalising the formatting?",
+   "rag": {
+    "answer": "The knowledge base states that after normalising both sides with the same formatter, 44 textual conflicts were reduced to 14. This information is cited in [1] and [4].\n\nAnswer: 14",
+    "ok": true,
+    "seconds": 54.7,
+    "passages": [
+     "### The merge\n\nNafs-Aql's vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so\nthe update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The\nadditions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention\nwithout touching upstream's attention kernel (one row per user, so the bit-identity property of Phase 18 holds); top-$k$ and min-$p$ on the\nposition-keyed sampler, in llama.cpp's order, with upstream's fast path when both are off. All 370 tests of the workspace pass in release mode,\nincluding the batching bit-identity tests, and formatting and the linter are clean.",
+     "**A defect in the measurement itself.** The first scoring normalised punctuation away, so `nafs-core` could never match\n`nafs core` in an answer and three questions were marked wrong in every arm. The grader now keeps the punctuation that\ncarries meaning (`-`, `.`, `%`) and normalises the expected phrase the same way; `--regrade` re-scored the stored\nanswers without another run (18/20 and 15/20 above; the paired graph-versus-rag verdict did not change).",
+     "| HTML | `htmd` (HTML -> Markdown) after dropping `script`/`style`/`nav` | keeps headings for chunking | readability 0.3 (stale) |\n| LaTeX | our own stripper (preamble and comments dropped, sectioning -> headings, formatting unwrapped, maths kept as `$..$`) | no maintained crate | pandoc wrapper (external binary) |",
+     "B. The merge\n\nNafs-Aql\u2019s vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so the update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The additions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention without touching upstream\u2019s attention kernel (one row per user, so the bit-identity property of Phase 18 holds); top-k and min-p on the position-keyed sampler, in llama.cpp\u2019s order, with upstream\u2019s fast path when both are off. All 370 tests of the workspace pass in release mode, including the batching bit-identity tests, and formatting and the linter are clean."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "The question refers to a specific task involving textual merge conflicts, but the details of the process or the specific dataset are not provided. Without additional context, it is not possible to determine the exact number of conflicts remaining after normalising the formatting.\n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 9.7,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "Without additional context, it is not possible to determine the exact number of conflicts remaining after normalising the formatting."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many dimensions do the passage vectors have?",
+   "off": {
+    "answer": "The passage vectors in the context of language models typically have a fixed number of dimensions, which is determined by the model's architecture. For example, in the case of the Qwen model, the passage vectors generally have 1280 dimensions. \n\nAnswer: 1280",
+    "ok": false,
+    "seconds": 10.2,
+    "support": {
+     "claims": 3,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The passage vectors in the context of language models typically have a fixed number of dimensions, which is determined by the model's architecture.",
+      "For example, in the case of the Qwen model, the passage vectors generally have 1280 dimensions.",
+      "Answer: 1280"
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The knowledge base does not directly state the number of dimensions for the passage vectors. However, it mentions that `HNSW DIMENSION d DIST COSINE` is used, but the specific value of `d` is not provided. \n\nAnswer: [1]",
+    "ok": false,
+    "seconds": 34.9,
+    "passages": [
+     "SurrealQL verified on this machine (`scripts/serve_surreal.sh spike`): `FULLTEXT ANALYZER a BM25` + `@n@` / `@n,OR@` +\n`search::score(n)`; `HNSW DIMENSION d DIST COSINE` + `<|k,ef|>` + `vector::distance::knn()`; `TYPE RELATION`, `RELATE`,\n`->edge->table->edge->table.field`. `ORDER BY` must name a selected alias (an expression there is a parse error).",
+     "**Gateway.** Knowledge mode `memory`: the question is embedded **without** the retrieval instruction (as Memorilla was\ntrained), the module reads the base's prepared passage vectors (cached per base until its update time or vector count\nchanges), the system prompt gets Memorilla's `\\nMemory<placeholder>x16Memory`, and every quick-model request of the turn\ncarries the 16 vectors. The request is held on the quick path: the module lives in System 1's embedding space, and System\n2 would see placeholders with no vectors. Measured on 20 passages: prepare 56 ms once, read 26\u201328 ms per question.\n\n**Not yet useful.** No module is trained for Qwen3-1.7B. The end-to-end run used an untrained module\n(`examples/memory_init.rs`), whose tokens carry no knowledge: the model answered that it could not tell. `memory` mode is\ntherefore offered only in Advanced mode, labelled experimental, and only when `[knowledge] memory_checkpoint` names a\nmodule. Phase 6 trains one.",
+     "| Graph | entities and relations extracted by System 1 under a JSON Schema (no descriptions, one worked example, grounded in the passage), resolved by name and vector, Louvain communities (own code); LightRAG-style local search; built on request | uses the engines we have; one model call per answer; 17\u201328 s per passage on this CPU |",
+     "| Chat with the knowledge base (quick model) | FactKG question: correct numbers with a citation, against a hedged guess without the base; port question: correct; off-topic question: \"not covered\" note | gateway on :8091 |\n\nWhat the numbers say. Meaning alone misses exact figures and names (the 0.6B encoder places \"84.33\" and \"Qwen3-Embedding-4B\"\npassages below others), words alone miss paraphrases; fusing the two ranks wins on every measure, so **hybrid is the\ndefault** for search and for chat. Off-topic passages scored 0.38 to 0.40 and relevant ones 0.45 to 0.77, so chat keeps\npassages with similarity >= 0.45 (`rag_min_similarity`). Grounding is not perfect: on \"How many training examples did\nMemorilla use in its first stage?\" System 1 read the right passage and still wrote \"15 English Wikipedia articles\" (the\npage number), and the agreement samples marked it Cross-checked. Quality of grounded answers is measured in Phase 7."
+    ],
+    "in_prompt": false,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How many characters of overlap do consecutive passages share?",
+   "rag": {
+    "answer": "The knowledge base does not provide specific information about the overlap between consecutive passages. Therefore, the answer is not available from the provided sources.\n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 20.4,
+    "passages": [
+     "| Chunking | `text-splitter` Markdown splitter, 1,200 characters (about 300 tokens), 150 overlap, heading path per chunk | semantic boundaries; Memorilla's benchmarks use 13\u2013280-token chunks |\n| Embeddings | Qwen3-Embedding-0.6B (1024-d): Smiley Core with a pooling head for serving, Candle as reference and for training | same family as the paper's encoder; `ort` no longer builds for Intel macOS, which rules out fastembed's ONNX models here |",
+     "| Markdown, text | read directly | | |\n| Chunking | `text-splitter` 0.33 `MarkdownSplitter` (headings, paragraphs, sentences), character sizer in Phase 1, Qwen tokenizer sizer later | semantic boundaries, overlap | |\n| Embeddings | Qwen3-Embedding-0.6B (1024-d): Smiley Core pooling head for serving, Candle for training/parity | Qwen3 family, as the paper; `ort` dropped Intel macOS in 2.0.0-rc.11, so fastembed's ONNX models are out here | model2vec (fast, weaker; possible first tier) |",
+     "| HNSW against the exact scan | same top-1 on 20/20 questions, top-5 overlap 1.00; 111 vs 101 ms at 379 vectors | same file |\n| Filtered HNSW (`WHERE kb = .. AND embedding <|k,ef|>`) | returns only the base's rows (it filters during the search), 457 ms on a 30-row base inside 3,000 rows at 64 dims | spike |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "To solve this, I need to determine the number of overlapping characters between consecutive passages. Since the question does not provide specific passages, I cannot calculate the exact number of overlaps. \n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 3.5,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "To solve this, I need to determine the number of overlapping characters between consecutive passages."
+     ]
+    }
+   }
+  },
+  {
+   "question": "On which port does SurrealDB listen?",
+   "off": {
+    "answer": "SurrealDB typically listens on port 8080 by default.",
+    "ok": false,
+    "seconds": 1.6,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "SurrealDB typically listens on port 8080 by default."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "SurrealDB listens on port 8300. This is specified in the knowledge base [2], where it states: \"SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not redistributed. - SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not redistributed. - The knowledge API returns 503 `kb_unavailable` when SurrealDB is down; chat is unaffected. - A Memorilla module trained here is tied to System 1's Qwen3-1.7B; changing System 1's model means retraining.\"",
+    "ok": true,
+    "seconds": 41.7,
+    "passages": [
+     "## Consequences\n\n- Operators start one more service (`scripts/serve_surreal.sh start`; `make up` does it when `[knowledge].enabled`).\n- SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not\n  redistributed.\n- The knowledge API returns 503 `kb_unavailable` when SurrealDB is down; chat is unaffected.\n- A Memorilla module trained here is tied to System 1's Qwen3-1.7B; changing System 1's model means retraining.",
+     "| Question | Decision | Why |\n|---|---|---|\n| Where does SurrealDB run? | Its own server process (3.3.5, `tools/surrealdb`, surrealkv storage, 127.0.0.1:8300), managed by `scripts/serve_surreal.sh`; the gateway calls its RPC over HTTP through `nafs-kb` | No new heavy dependency tree in the gateway; same process model as the engines; restartable on its own; verified spike |",
+     "| Wire format | SurrealDB RPC over HTTP in **CBOR**, bound variables only | its JSON decoding turns strings like `\"Caption: Model ...\"` into record ids (found in Phase 1, regression-tested) |\n| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |",
+     "| Need | Choice | Why | Rejected |\n|---|---|---|---|\n| Database | SurrealDB **3.3.5 server** (`tools/surrealdb`, surrealkv storage) over HTTP | vector (HNSW), full text (BM25) and graph in one store; no new crates in the gateway; same process model as the engines | embedded `surrealdb` crate (huge build; 4.0 drops RocksDB but is 4 days old); `rig-surrealdb` (brute-force cosine, no index, pins 3.x); swiftide (no SurrealDB); langchain-rust (heavy) |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 5,
+     "supported": 5,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "Which licence is SurrealDB released under?",
+   "rag": {
+    "answer": "The knowledge base does not explicitly mention the licence under which SurrealDB is released. Therefore, I cannot provide the specific licence.",
+    "ok": false,
+    "seconds": 20.9,
+    "passages": [
+     "## Consequences\n\n- Operators start one more service (`scripts/serve_surreal.sh start`; `make up` does it when `[knowledge].enabled`).\n- SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not\n  redistributed.\n- The knowledge API returns 503 `kb_unavailable` when SurrealDB is down; chat is unaffected.\n- A Memorilla module trained here is tied to System 1's Qwen3-1.7B; changing System 1's model means retraining.",
+     "| Question | Decision | Why |\n|---|---|---|\n| Where does SurrealDB run? | Its own server process (3.3.5, `tools/surrealdb`, surrealkv storage, 127.0.0.1:8300), managed by `scripts/serve_surreal.sh`; the gateway calls its RPC over HTTP through `nafs-kb` | No new heavy dependency tree in the gateway; same process model as the engines; restartable on its own; verified spike |",
+     "| Wire format | SurrealDB RPC over HTTP in **CBOR**, bound variables only | its JSON decoding turns strings like `\"Caption: Model ...\"` into record ids (found in Phase 1, regression-tested) |\n| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |",
+     "| Memorilla in Rust | a new crate `nafs-memorilla` on Candle 0.11 for the module, encoder reference, dataset builder and trainer; Smiley Core gets one marked addition (caller-supplied input vectors for chosen rows) | Smiley Core's P1 principle forbids a tensor framework inside the engine |\n| Released checkpoints | used only for the parity test | they project into Qwen3-8B's 4,096-wide space; ours are 2,048 (System 1) and 2,560 (System 2) |\n| Training on this CPU | fine-tuning on a knowledge base, System 1 decoder, `retrieval_init`; Stage 1\u20132 pre-training is a GPU recipe | about 1.4 TFLOP per example through Qwen3-1.7B; 3.3 M pre-training rows would take months here |\n| Chat integration | a knowledge mode per request: `off`, `rag`, `graph`, `memory`, `hybrid`, `auto`; retrieved material delimited as data; replies carry sources | the paper shows memory and retrieval answer different questions |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "SurrealDB is released under the MIT License.",
+    "ok": false,
+    "seconds": 2.2,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "SurrealDB is released under the MIT License."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many query-dependent soft tokens does Memorilla hand the frozen model?",
+   "off": {
+    "answer": "Memorilla does not explicitly state the number of query-dependent soft tokens it hands to the frozen model. However, based on its design, it is intended to provide a limited number of soft tokens per query to ensure efficiency and prevent overfitting. \n\nAnswer: 1",
+    "ok": false,
+    "seconds": 8.2,
+    "support": {
+     "claims": 2,
+     "supported": 1,
+     "share": 0.5,
+     "unsupported": [
+      "However, based on its design, it is intended to provide a limited number of soft tokens per query to ensure efficiency and prevent overfitting."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "Memorilla hands the frozen model 16 query-dependent soft tokens. \n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 70.0,
+    "passages": [
+     "## 1. What Memorilla is\n\nA memory system for a **frozen** LLM. Three operations:\n\n1. **Encode once.** A frozen embedding model maps every document chunk d_i to z_i (h_e wide). The matrix Z_D (N x h_e) is the\n   persistent store; only added or changed chunks are re-encoded. It is the same index dense retrieval builds, so it costs\n   nothing extra over RAG.\n2. **Read per query.** A trainable *memory module* reads all of Z_D, conditioned on the query embedding z_q, and returns\n   K = 16 vectors in the **decoder's input-embedding space** (h_L wide).\n3. **Inject.** The 16 vectors replace the input embeddings at 16 placeholder positions in the prompt. Nothing inside the\n   decoder changes; RoPE runs over the whole sequence as usual.\n\nThe decoder therefore sees 16 \"soft tokens\" instead of thousands of document tokens, whatever N is: 1 or 512 documents\ncost the same at decode time (paper, Table 14: 740 ms vs 739 ms end to end on an H100, while full context grows from 749 ms\nto 19,932 ms).",
+     "## Context\n\nThe owner asked for a knowledge base (upload PDF, DOCX, TEX, PPTX, HTML and more; store as vectors and a graph in\nSurrealDB), RAG and GraphRAG, and Memorilla (Stanford, arXiv 2610.21375), a learned memory that hands a frozen LLM 16\nquery-dependent soft tokens read from a whole document collection, trained and fine-tuned on uploaded knowledge and\nserved by Smiley Core, implemented with Candle.",
+     "## 7. The Candle port\n\n| Part | Candle | Notes |\n|---|---|---|\n| `MemoryModule` | `candle-nn` Linear, LayerNorm (eps 1e-5), a hand-written multi-head attention with the packed `in_proj` layout and key padding mask, GELU (erf) | parameter names identical to PyTorch so `memory.pt` converts 1:1 |\n| Checkpoint | `memory.pt` -> safetensors once (Python, `torch.load(weights_only=True)`), `config.json` alongside | Candle cannot read pickles safely |\n| Encoder | Qwen3-Embedding-0.6B: last-token pooling, L2 norm | in Candle for training and parity; at serving time Smiley Core can run it (Qwen3 architecture) with a pooling head, which reuses the engine's AVX2 kernels |\n| Decoder for training | `candle-transformers` Qwen3 reworked to take `inputs_embeds`, f32 safetensors from `models/hf/Qwen3-1.7B` | autograd through a frozen model: `Var` only for the module |\n| Trainer | AdamW from `candle-nn`, warm-up + cosine by hand, global-norm clipping by hand, answer-only cross-entropy | checkpoint per epoch, resume |\n| Parity | random inputs through PyTorch and Candle on the released Stage 3 checkpoint | target: max abs error < 1e-3 in f32 |",
+     "## 2. The module, read from `memorilla/memory.py`\n\n| Step | Operation | Shapes (batch b, slots K, documents N) |\n|---|---|---|\n| 1. Slots | `memory_queries` (1, K, h_e), Xavier-uniform; or, with `retrieval_init`, the K documents with the highest cosine to the query (zero-padded) | (b, K, h_e) |\n| 2. Query conditioning | `slots = LN(slots + MHA(q=slots, k=v=z_q))`; one query vector shifts every slot alike, the residual keeps them apart | (b, K, h_e) |\n| 3. Document encoder | optional `TransformerEncoder` over the documents (0 layers in every released recipe) | (b, N, h_e) |\n| 4. Document norm | `docs = LN(Z_D)` | (b, N, h_e) |\n| 5. Refinement, x2 | `slots += Dropout(MHA(LN(slots), docs, docs, key_padding_mask))`; `slots += FFN(LN(slots))`, FFN = Linear(h_e, 4h_e) GELU Dropout Linear(4h_e, h_e) Dropout | (b, K, h_e) |\n| 6. Projection | `M = Linear(LN(slots))` to h_L | (b, K, h_L) |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How many pre-training rows would the two Memorilla stages need?",
+   "rag": {
+    "answer": "The two Memorilla stages require a total of 1,979,809 + 1,343,993 = 3,323,792 pre-training rows. \n\nAnswer: 3,323,792",
+    "ok": false,
+    "seconds": 82.1,
+    "passages": [
+     "| Memorilla in Rust | a new crate `nafs-memorilla` on Candle 0.11 for the module, encoder reference, dataset builder and trainer; Smiley Core gets one marked addition (caller-supplied input vectors for chosen rows) | Smiley Core's P1 principle forbids a tensor framework inside the engine |\n| Released checkpoints | used only for the parity test | they project into Qwen3-8B's 4,096-wide space; ours are 2,048 (System 1) and 2,560 (System 2) |\n| Training on this CPU | fine-tuning on a knowledge base, System 1 decoder, `retrieval_init`; Stage 1\u20132 pre-training is a GPU recipe | about 1.4 TFLOP per example through Qwen3-1.7B; 3.3 M pre-training rows would take months here |\n| Chat integration | a knowledge mode per request: `off`, `rag`, `graph`, `memory`, `hybrid`, `auto`; retrieved material delimited as data; replies carry sources | the paper shows memory and retrieval answer different questions |",
+     "So on this machine: **fine-tuning** a module on a knowledge base (a few thousand rows, a few epochs) is an overnight job\nfor System 1 \u2014 feasible. **Stage 1 + 2 pre-training** (3.3 M rows) would take about 300\u2013600 days \u2014 not feasible; it is a\nGPU job (estimated 10\u201320 GPU-hours on H100s for a 1.7B decoder, scaled from the paper's 10 hours on 4 H100s for 8B; to be\nre-derived from measured per-example times in Phase 6). Gradients must flow through an f32 decoder in Candle (quantised\nGGUF matmuls are not differentiable); Qwen3-1.7B in f32 is 6.9 GB, which fits in 32 GB.\n\nWithout a pre-trained module, a knowledge-base fine-tune starts from scratch; the paper's FactKG recipe does exactly\nthat (`retrieval_init`, 5 epochs, one GPU) and reaches its best result, so **`retrieval_init` from scratch is the CPU path**\nuntil a GPU pre-train exists.",
+     "| Stage | Data | Rows | Init | lr | Epochs | Max length | Effective batch |\n|---|---|---|---|---|---|---|---|\n| 1 | Wikipedia paraphrase reconstruction, chunks of about 128 tokens, 1.73 chunks per row | 1,979,809 | random | 3e-4 | 1 | 1024 | 128 |\n| 2 | SQuAD v2, DROP, CoQA, PubMedQA, QuAIL, PwC, CNN/DM, SAMSum, DialogSum, MS MARCO | 1,343,993 | Stage 1 | 3e-4 | 1 | 1024 | 128 |\n| 3 | the eight benchmarks' training splits | (per benchmark) | Stage 2 | 1e-4 | 5 | 2048 | 64 |\n| single task / own data | one config | yours | Stage 2 | 1e-4 | 5 | 2048 | 2 x 2 x 4 GPUs |\n\nAbout 6 + 4 + 9 hours on 4 H100s; a personalisation fine-tune takes about 25 minutes.\n\n- **Own data** needs no code change: parquet rows `collection_id, question, answer, documents` (+ `choices` for\n  multiple-choice scoring), one folder per config, `train` required, `validation` optional. Rows sharing a\n  `collection_id` must share their `documents`; each document entry is embedded into **one** vector, so long texts must be\n  split first. Chunk sizes used in the benchmarks: one KG triple (13 tokens) up to one chat session (280 tokens).",
+     "## 10. Risks\n\n| Risk | Likelihood | Mitigation |\n|---|---|---|\n| A module trained from scratch on one small knowledge base overfits or learns nothing | high | reconstruction + graph-claim rows first; validation loss and a held-out question set decide; RAG stays the default |\n| Training time on four cores | high | System 1 decoder only; short sequences (T \u2248 200); measure before promising; GPU recipe for pre-training |\n| Qwen3-Embedding-0.6B is weaker than the paper's 4B encoder | medium | the paper's 4B -> 8B ablation was flat; measure with retrieval recall@5 |\n| Ingestion competes with chat for the four cores | high | background job with low priority, one at a time, pausable |\n| SurrealDB is BSL 1.1 | low | self-hosted use is allowed; recorded in NOTICE |\n| Prefix store reuses a cache across different memory vectors | certain if ignored | digest in the key, tested |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The two Memorilla stages require a total of 1,979,809 + 1,343,993 = 3,323,792 pre-training rows.",
+      "Answer: 3,323,792"
+     ]
+    }
+   },
+   "off": {
+    "answer": "The two Memorilla stages are part of the Qwen model's pre-training process. The number of pre-training rows (tokens) required depends on the specific architecture and training settings. However, the exact number is not publicly specified. \n\nAnswer: 1000000",
+    "ok": false,
+    "seconds": 7.6,
+    "support": {
+     "claims": 4,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The two Memorilla stages are part of the Qwen model's pre-training process.",
+      "The number of pre-training rows (tokens) required depends on the specific architecture and training settings.",
+      "However, the exact number is not publicly specified.",
+      "Answer: 1000000"
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many TFLOP per example does fine-tuning through Qwen3-1.7B cost?",
+   "off": {
+    "answer": "I am unable to directly provide the cost of TFLOP per example for fine-tuning through Qwen3-1.7B. However, fine-tuning costs are typically based on the number of parameters, the size of the dataset, and the training duration. Qwen3-1.7B has 1.7 billion parameters, and fine-tuning costs are generally proportional to the number of parameters and the training examples.\n\nAnswer: 1.7",
+    "ok": false,
+    "seconds": 14.0,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The fine-tuning through Qwen3-1.7B costs approximately 1.4 TFLOP per example. \n\nAnswer: [3]",
+    "ok": true,
+    "seconds": 59.8,
+    "passages": [
+     "So on this machine: **fine-tuning** a module on a knowledge base (a few thousand rows, a few epochs) is an overnight job\nfor System 1 \u2014 feasible. **Stage 1 + 2 pre-training** (3.3 M rows) would take about 300\u2013600 days \u2014 not feasible; it is a\nGPU job (estimated 10\u201320 GPU-hours on H100s for a 1.7B decoder, scaled from the paper's 10 hours on 4 H100s for 8B; to be\nre-derived from measured per-example times in Phase 6). Gradients must flow through an f32 decoder in Candle (quantised\nGGUF matmuls are not differentiable); Qwen3-1.7B in f32 is 6.9 GB, which fits in 32 GB.\n\nWithout a pre-trained module, a knowledge-base fine-tune starts from scratch; the paper's FactKG recipe does exactly\nthat (`retrieval_init`, 5 epochs, one GPU) and reaches its best result, so **`retrieval_init` from scratch is the CPU path**\nuntil a GPU pre-train exists.",
+     "| Memorilla in Rust | a new crate `nafs-memorilla` on Candle 0.11 for the module, encoder reference, dataset builder and trainer; Smiley Core gets one marked addition (caller-supplied input vectors for chosen rows) | Smiley Core's P1 principle forbids a tensor framework inside the engine |\n| Released checkpoints | used only for the parity test | they project into Qwen3-8B's 4,096-wide space; ours are 2,048 (System 1) and 2,560 (System 2) |\n| Training on this CPU | fine-tuning on a knowledge base, System 1 decoder, `retrieval_init`; Stage 1\u20132 pre-training is a GPU recipe | about 1.4 TFLOP per example through Qwen3-1.7B; 3.3 M pre-training rows would take months here |\n| Chat integration | a knowledge mode per request: `off`, `rag`, `graph`, `memory`, `hybrid`, `auto`; retrieved material delimited as data; replies carry sources | the paper shows memory and retrieval answer different questions |",
+     "## 6. Training on this CPU: the cost\n\nBack-propagating to the module needs the decoder's activation gradients but not its weight gradients, so a step costs\nabout two forward passes: **\u2248 4\u00b7P\u00b7T FLOPs** per example (P decoder parameters, T tokens of prompt + 16 + answer).\n\n| Decoder | P | T | FLOPs per example | At 100\u2013200 GFLOP/s (estimate, to be measured) |\n|---|---|---|---|---|\n| Qwen3-0.6B | 0.6 B | 200 | 0.48 T | 2.4\u20134.8 s |\n| Qwen3-1.7B (System 1) | 1.7 B | 200 | 1.36 T | 7\u201314 s |\n| Qwen3-4B (System 2) | 4.0 B | 200 | 3.2 T | 16\u201332 s |",
+     "**6 Training and Fine-Tuning Specification**\n\n**6.1 Data schema (TR-001)**\n\nJSONL, one example per line: id domain prompt (messages array), answer rationale 150 tokens, distilled from the slow trace), assurance verified or consensus_reviewed verifier (name, pass, rates snapshot), source_trace (trace id), synthetic (bool), adapter_hash of the model that produced it, created_at Personal data MUST be redacted before the example is written (SR-004)."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "At what cosine do Smiley Core's Q8_0 embeddings agree with the Candle reference?",
+   "rag": {
+    "answer": "Smiley Core's Q8_0 embeddings agree with the Candle reference at a cosine value of 0.99914 to 0.99959 on six texts, which meets the specification target of 0.999. [3]",
+    "ok": true,
+    "seconds": 53.1,
+    "passages": [
+     "| What | Result | Evidence |\n|---|---|---|\n| Candle reference (f32) on the model card's example | 0.7646, 0.1414 / 0.1355, 0.6000: the card's numbers exactly | `nafs-memorilla` parity test |\n| Smiley Core Q8_0 against the Candle reference | cosine 0.99914 to 0.99959 on six texts (spec target 0.999) | same test |",
+     "- Phase 1 ingestion timings: `benchmarks/kb_ingest.json`.\n- Phase 2 (2026-11-07): Smiley Core's Q8_0 embeddings agree with the Candle f32 reference at cosine >= 0.9991; the Candle\n  reference reproduces the model card's scores exactly. Hybrid search beats words and meaning alone (recall@5 0.90 vs\n  0.85 and 0.55 on 20 questions), so it is the default; chat keeps passages with similarity >= 0.45. Indexing ran at 69\n  tokens/s on a host at load 44\u201360 (`benchmarks/kb_retrieval.json`).",
+     "| Smiley Core Q8_0 against the Candle reference | cosine 0.99914 to 0.99959 on six texts (spec target 0.999) | same test |\n| Pooling | the model's tokenizer appends `<|endoftext|>` (151643) and pools it; the port does the same | `tokenizer.json` post-processor |\n| Indexing throughput | 379 passages, 66,978 tokens in 964 s (69 tokens/s; the server got about 70 % of one core) | `benchmarks/kb_retrieval.json` |",
+     "| Chunking | `text-splitter` Markdown splitter, 1,200 characters (about 300 tokens), 150 overlap, heading path per chunk | semantic boundaries; Memorilla's benchmarks use 13\u2013280-token chunks |\n| Embeddings | Qwen3-Embedding-0.6B (1024-d): Smiley Core with a pooling head for serving, Candle as reference and for training | same family as the paper's encoder; `ort` no longer builds for Intel macOS, which rules out fastembed's ONNX models here |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am unable to directly answer this question as it involves specific technical details about Smiley Core's Q8_0 embeddings and the Candle reference. However, I can provide general information about embeddings and cosine similarity.\n\nEmbeddings are numerical representations of words or phrases, and cosine similarity measures the similarity between two vectors. The cosine similarity between two embeddings is calculated as the dot product of the vectors divided by the product of their magnitudes.\n\nIf you have specific embeddings or references, I can help calculate the cosine similarity between them. Let me know if you'd like assistance with that.",
+    "ok": false,
+    "seconds": 9.4,
+    "support": {
+     "claims": 5,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "However, I can provide general information about embeddings and cosine similarity.",
+      "Embeddings are numerical representations of words or phrases, and cosine similarity measures the similarity between two vectors.",
+      "The cosine similarity between two embeddings is calculated as the dot product of the vectors divided by the product of their magnitudes.",
+      "If you have specific embeddings or references, I can help calculate the cosine similarity between them.",
+      "Let me know if you'd like assistance with that."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many entities did the twenty fixture passages give in the graph?",
+   "off": {
+    "answer": "The twenty fixture passages in the graph contain 20 entities. \n\nAnswer: 20",
+    "ok": false,
+    "seconds": 1.7,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The twenty fixture passages gave 109 entities in the graph. Answer: [2]",
+    "ok": true,
+    "seconds": 25.5,
+    "passages": [
+     "- Phase 3 (2026-11-07): extraction prompt chosen from four measured variants (138 vs 327 output tokens, faithful JSON);\n  grounding removed copied and heading entities; 20 fixture passages -> 109 entities, 73 relations, 18/20 schema-valid\n  replies; graph mode in chat puts the relations around the question's entities before the passages.",
+     "**First full build, and what it showed.** On the five small fixture documents (20 passages) the first build gave 91\nentities, but the most mentioned were the document's own headings (\"Architecture and Design\", \"Components\"), relations\nsuch as `architecture > Components`, and \"LLVM\", copied from the prompt's example into passages that never mention it.\nThree changes, all in `graph.rs`: heading lines are removed from the extraction input; every word of an entity's name\nmust occur in the passage (grounding); generic words (`system`, `architecture`, ...) are not entities. The rebuild\n(`?fresh=true`) kept 109 entities and 73 relations whose top items are the system's real parts (`nafs-core implements\nThe gate`, `SurrealDB uses HNSW`, `Ledger feeds dashboard`, `The gate computes features verifier outcome`). 18 of 20\nreplies passed the JSON Schema both times; 1 entity was merged by meaning in the first build, 0 in the second.",
+     "## 12. Phase 3 results (2026-11-07): the knowledge graph and GraphRAG\n\nShared machine throughout (load average 16 to 86). Extraction model: System 1 (Qwen3-1.7B Q4_K_M on Smiley Core).\n\n**The extraction prompt was measured, not guessed.** Four variants on the same two passages:\n\n| Variant | Output tokens | Result |\n|---|---|---|\n| JSON objects with a description per entity and relation | 327 | faithful, valid; 60 s per passage at load 16\u201323 |\n| `E | name | type` / `R | s | p | t` lines | 155\u2013199 | format broken: literal `name`, predicates as entities |\n| JSON arrays `[name, type]`, `[s, p, t]` | 15\u2013231 | copied the template (`[\"name\",\"type\"]`), split into two objects |\n| **JSON objects without descriptions, one worked example on an unrelated topic** | 138\u2013139 | faithful, valid; adopted |",
+     "**The question set.** Twenty questions written from the fixture base's own five documents (the architecture section,\nthe Knowledge Base design note, the slides, the upload limits, the plain notes), paraphrased so that an arm has to read\nthe base rather than repeat its words, and held out from training: the trainer sees reconstruction and claim rows, never\nthese questions. A question counts as answered when the reply contains the fact."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "Which wire format does the client use to talk to SurrealDB?",
+   "rag": {
+    "answer": "The client uses the SurrealDB RPC over HTTP in **CBOR** format, as specified in the decision [1].",
+    "ok": true,
+    "seconds": 18.2,
+    "passages": [
+     "| Wire format | SurrealDB RPC over HTTP in **CBOR**, bound variables only | its JSON decoding turns strings like `\"Caption: Model ...\"` into record ids (found in Phase 1, regression-tested) |\n| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |",
+     "## Consequences\n\n- Operators start one more service (`scripts/serve_surreal.sh start`; `make up` does it when `[knowledge].enabled`).\n- SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not\n  redistributed.\n- The knowledge API returns 503 `kb_unavailable` when SurrealDB is down; chat is unaffected.\n- A Memorilla module trained here is tied to System 1's Qwen3-1.7B; changing System 1's model means retraining.",
+     "| Question | Decision | Why |\n|---|---|---|\n| Where does SurrealDB run? | Its own server process (3.3.5, `tools/surrealdb`, surrealkv storage, 127.0.0.1:8300), managed by `scripts/serve_surreal.sh`; the gateway calls its RPC over HTTP through `nafs-kb` | No new heavy dependency tree in the gateway; same process model as the engines; restartable on its own; verified spike |",
+     "| Graph | entities and relations extracted by System 1 under a JSON Schema (no descriptions, one worked example, grounded in the passage), resolved by name and vector, Louvain communities (own code); LightRAG-style local search; built on request | uses the engines we have; one model call per answer; 17\u201328 s per passage on this CPU |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am not aware of the specific wire format used by the client to talk to SurrealDB. However, SurrealDB typically uses a protocol called **Surreal Protocol** for communication. This protocol is designed to be efficient and flexible, allowing clients to interact with the database in a structured and scalable manner.\n\nIf you are referring to a specific client or framework, please provide more context, and I can give a more precise answer.",
+    "ok": false,
+    "seconds": 5.8,
+    "support": {
+     "claims": 4,
+     "supported": 1,
+     "share": 0.25,
+     "unsupported": [
+      "However, SurrealDB typically uses a protocol called Surreal Protocol for communication.",
+      "This protocol is designed to be efficient and flexible, allowing clients to interact with the database in a structured and scalable manner.",
+      "If you are referring to a specific client or framework, please provide more context, and I can give a more precise answer."
+     ]
+    }
+   }
+  },
+  {
+   "question": "Which core Lean version does the verifier run against?",
+   "off": {
+    "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. I am built on open Qwen models and am designed to be fast and careful. I will answer your question directly and concisely.",
+    "ok": false,
+    "seconds": 3.8,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it.",
+      "I am built on open Qwen models and am designed to be fast and careful."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The Lean verifier runs against core Lean 4.35.0. This is stated in the passage: \"The Lean verifier runs against core Lean 4.35.0\" [2].",
+    "ok": true,
+    "seconds": 26.9,
+    "passages": [
+     "G. Verification\n\n**Real Lean.** Lean 4.35.0 (core, no Mathlib) was installed with elan on the reference machine and the protocol was run against the real binary inside the macOS sandbox (Ta-ble XVIII). Lean resolves its own installation path, which\n\nTABLE XVIII THE LEAN PROTOCOL AGAINST REAL LEAN 4.35.0 R E A L L E A N A C C E P T S P R O O F S A N D R E J E C T S T H E K N O W N A T T A C K S",
+     "**Harness integration.** The Lean verifier runs against core Lean 4.35.0; statements that import Mathlib need a Mathlib build and lean_path, which were not installed. On Linux, Lean runs with user and network namespaces only (A-070). Patch repair is off until the failure rate f of Eq. (5) is measured, and the code agent\u2019s live runs are a handful of tasks on a shared host. The Phase 11 A/B (Section XII) has ten System 1 tasks and three System 2 tasks per arm on a shared host: its verified counts are indicative, not significant, and its tasks are small single-file functions. Grammar constraints fix the syntax of an action, not its sense (a patch that applies can still break the file), and they need llama-server; on vLLM the harness relies on the stream cut alone.",
+     "Harness integration. The Lean verifier runs against core Lean 4.35.0;\nstatements that import Mathlib need a Mathlib build and lean_path, which\nwere not installed. On Linux, Lean runs with user and network namespaces only\n(A-070). Patch repair is off until the\nfailure rate $f$ of Eq. () is measured, and the code agent's live\nruns are a handful of tasks on a shared host.\nThe Phase 11 A/B (Section) has ten System 1 tasks and three\nSystem 2 tasks per arm on a shared host: its verified counts are indicative,\nnot significant, and its tasks are small single-file functions. Grammar\nconstraints fix the syntax of an action, not its sense (a patch that applies can\nstill break the file), and they need llama-server; on vLLM the harness relies on\nthe stream cut alone.",
+     "In an interleaved live A/B the new loop verified 4 of 10 System 1 tasks against 2 for the old one, with malformed steps falling from 23 of 50 to 1 of 41, and all 3 System 2 tasks in one call each, where the old loop verified none in 15 calls; with a smaller reasoning budget on the first step a verified System 2 fix of a small function took 33\u201359 s. Samples are small. Version 2.3 validates the whole system end to end on the final code (190 Rust tests, 26 security probes, 65 API and UI checks, 59 Rooms checks, 40 harness checks, 9 acceptance tests), finds and fixes three defects in the Lean integration, and reports that Qwen3-4B-Thinking cannot yet write valid Lean 4 proofs even for trivial statements, so Lean tasks abstain honestly rather than verify. Version 2.4 asks how far four cores can be pushed in parallel. Batched decode gains 2.7 at short context but only 1.5 at the 1,600 tokens of a repair prompt, so concurrent hedged sampling on System 2 does not pay (we implement and measure it, and keep it off), while cheap concurrent System 1 samples before escalating do: fusing the agreement samples with the draft cuts the time to the gate\u2019s decision by 24**"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "What did the dense model get on the time-of-day sum that was first thought a regression?",
+   "rag": {
+    "answer": "The dense model (likely referring to the 1.7B model) got the incorrect answer for the time-of-day sum (3:40 pm + 2 h 35 min) which was first thought to be a regression. The correct answer is 6:15 pm, but the model returned 5:45 pm. This error was first observed in the web interface right after the merge and was identified as an error in the 1.7B model, which the gate's confidence signal did not catch because both quick samples repeated it. [1]",
+    "ok": true,
+    "seconds": 30.9,
+    "passages": [
+     "E. Is anything else different\n\nThe old and the new engine give the same answers on the exact-answer prompts (9 of 12 on both, the same three misses). One of those misses, a time-of-day sum (3:40 pm plus 2 h 35 min answered 5:45 pm, the correct answer being 6:15 pm), was first seen in the web interface right after the merge and looked like a regression; the comparison shows it is the 1.7B model\u2019s own error, which the gate\u2019s confidence signal does not catch because both quick samples repeat it. Re-validation on the final code: contract tests, 26 of 26 security probes (0 open high-severity findings), 59 of 59 Rooms checks, 65 of 65 end-to-end checks, 53 of 53 harness checks and 9 of 9 acceptance tests pass.",
+     "### Is anything else different\n\nThe old and the new engine give the same answers on the exact-answer prompts (9 of 12 on both, the same three misses). One of those misses, a\ntime-of-day sum (3:40\\,pm plus 2\\,h 35\\,min answered 5:45\\,pm, the correct answer being 6:15\\,pm), was first seen in the web interface right after the merge and\nlooked like a regression; the comparison shows it is the 1.7B model's own error, which the gate's confidence signal does not catch because both quick\nsamples repeat it. Re-validation on the final code: contract tests, 26 of 26 security probes (0 open high-severity findings), 59 of 59 Rooms checks, 65 of 65\nend-to-end checks, 53 of 53 harness checks and 9 of 9 acceptance tests pass.",
+     "| Wire format | SurrealDB RPC over HTTP in **CBOR**, bound variables only | its JSON decoding turns strings like `\"Caption: Model ...\"` into record ids (found in Phase 1, regression-tested) |\n| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |",
+     "```\n- GET /v1/bench/runs POST /v1/bench/runs GET /v1/bench/runs/{id}\n- GET /v1/eval/runs POST /v1/eval/runs GET /v1/eval/runs/{id}\n- GET /v1/self-model GET /healthz GET /metrics GET /openapi.json\n```\n\n**Streaming.** /v1/chat/stream returns text/event-stream. Event names and payloads:\n\n```\n- token {text, mode, reasoning}\n```"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 3,
+     "supported": 3,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am not sure about the specific details of the dense model's performance on the time-of-day sum task. However, the question seems to be referring to a specific task or model that was initially thought to be a regression problem but was actually a classification task. If you have more context or specific details, I can provide a more accurate answer.",
+    "ok": false,
+    "seconds": 5.3,
+    "support": {
+     "claims": 2,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "However, the question seems to be referring to a specific task or model that was initially thought to be a regression problem but was actually a classification task.",
+      "If you have more context or specific details, I can provide a more accurate answer."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many bytes per token does System 2 read at decode?",
+   "off": {
+    "answer": "System 2 reads 1 byte per token at decode. \n\nAnswer: 1",
+    "ok": false,
+    "seconds": 1.8,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The knowledge base states that the decode reads every weight once per token, and the speed is that bandwidth over the bytes per token. For System 2, the decode reads at 2,503 MB per token. \n\nAnswer: [2]",
+    "ok": true,
+    "seconds": 29.0,
+    "passages": [
+     "A. How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1 GiB) reaches 12.9, 17.2, 18.4 and 19.5 GB/s with one to four threads: the fourth core adds 6 %. Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094 MB on System 1, 2,503 MB on System 2). The engine\u2019s own phase split, now reported by the server, puts 86\u201397  of decode in the matmuls and the output head; sampling is Wall time 0.1\u20130.3 % and attention 1\u20133 % at these context lengths, so",
+     "### How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1\\,GiB) reaches 12.9, 17.2, 18.4 and 19.5\\,GB/s with one to four threads: the fourth core adds 6\\,%.\nDecode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094\\,MB on System 1, 2,503\\,MB on System 2).\nThe engine's own phase split, now reported by the server, puts 86--97\\,% of decode in the matmuls and the output head; sampling is\n0.1--0.3\\,% and attention 1--3\\,% at these context lengths, so neither is worth optimising. The serial share (norms, rotary embedding,\nresiduals, activation quantisation) grows from 2\\,% at one thread to 5\\,% at four.",
+     "K. What a CPU can serve\n\n**Proposition 8** (Decode and prefill ceilings) [exact given the roofline model] For a dense decoder whose active weights occupy W bytes and whose key\u2013value cache at context length \u2113 occupies K \u2113 bytes, the steady-state decode rate on a machine with memory bandwidth \u03b2 is at most \u03b2/ W K \u2113 tokens per second, and the prefill rate on a machine with peak throughput F FLOP/s and P active parameters is at most F/(2P tokens per second.",
+     "A. The engine\n\nSmiley Core is a Rust library of about 8,500 lines with one dependency: a GGUF loader, a byte-level BPE tokenizer checked against llama-tokenize, the llama qwen2 and qwen3 forward passes with AVX2 and FMA kernels, an F16 or int8 KV cache, a chat session with the models\u2019 own templates (including Qwen3\u2019s enable_thinking), prompt-lookup and DSpark speculative decoding, and telemetry that reports the bytes moved per token beside the tokens per second, so a run can be checked against the machine\u2019s memory roofline rather than taken on faith. It decodes one stream per session: no batching across requests, no constrained sampling, no raw continuation. Both Nafs-Aql models pass its compatibility probe."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How fast is the streaming read with four threads?",
+   "rag": {
+    "answer": "The streaming read with four threads reaches 19.5 GB/s on System 1 and 18.4 GB/s on System 2. This is cited in [1].",
+    "ok": true,
+    "seconds": 28.1,
+    "passages": [
+     "### How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1\\,GiB) reaches 12.9, 17.2, 18.4 and 19.5\\,GB/s with one to four threads: the fourth core adds 6\\,%.\nDecode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094\\,MB on System 1, 2,503\\,MB on System 2).\nThe engine's own phase split, now reported by the server, puts 86--97\\,% of decode in the matmuls and the output head; sampling is\n0.1--0.3\\,% and attention 1--3\\,% at these context lengths, so neither is worth optimising. The serial share (norms, rotary embedding,\nresiduals, activation quantisation) grows from 2\\,% at one thread to 5\\,% at four.",
+     "A. How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1 GiB) reaches 12.9, 17.2, 18.4 and 19.5 GB/s with one to four threads: the fourth core adds 6 %. Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094 MB on System 1, 2,503 MB on System 2). The engine\u2019s own phase split, now reported by the server, puts 86\u201397  of decode in the matmuls and the output head; sampling is Wall time 0.1\u20130.3 % and attention 1\u20133 % at these context lengths, so",
+     "747 s neither is worth optimising. The serial share (norms, rotary 772 s embedding, residuals, activation quantisation) grows from 2 307 s at one thread to 5 % at four.\n\n297 s **Three threads beat four for decode in all six interleaved**\n\n350 s **pairs** (+4 % on System 1, +8 % on System 2 at the median)",
+     "Three threads beat four for decode in all six interleaved pairs (+4\\,% on System 1, +8\\,% on System 2 at the median) while cold prefill, which is\ncompute-bound, is 16--17\\,% slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the\nslowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier\nsandbox and the gateway; a quiet host may prefer four. The engine's own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes\nas the reference, no prefetch loses 11\\,% in two of three rounds and 512 loses 3\\,%, while 2048 and 4096 differ by about $+2$\\,% at the median, inside this\nhost's noise; parking instead of spinning loses 2\\,%."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am Nafs-Aql, a fast-and-careful assistant built on open Qwen models. I can provide accurate and concise answers. Regarding the streaming read with four threads, I cannot directly assess the speed, but I can suggest optimizing by distributing the load and using efficient algorithms. Let me know if you need further assistance.",
+    "ok": false,
+    "seconds": 4.6,
+    "support": {
+     "claims": 4,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "I am Nafs-Aql, a fast-and-careful assistant built on open Qwen models.",
+      "I can provide accurate and concise answers.",
+      "Regarding the streaming read with four threads, I cannot directly assess the speed, but I can suggest optimizing by distributing the load and using efficient algorithms.",
+      "Let me know if you need further assistance."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How much of decode time goes to the matmuls and the output head at most?",
+   "off": {
+    "answer": "I am unable to provide specific details about the proportion of decode time that goes to the matmuls and the output head, as this information is not publicly available. \n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 3.7,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The knowledge base states that the engine's own phase split puts 86\u201397% of decode in the matmuls and the output head. Therefore, the answer is:\n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 31.6,
+    "passages": [
+     "### How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1\\,GiB) reaches 12.9, 17.2, 18.4 and 19.5\\,GB/s with one to four threads: the fourth core adds 6\\,%.\nDecode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094\\,MB on System 1, 2,503\\,MB on System 2).\nThe engine's own phase split, now reported by the server, puts 86--97\\,% of decode in the matmuls and the output head; sampling is\n0.1--0.3\\,% and attention 1--3\\,% at these context lengths, so neither is worth optimising. The serial share (norms, rotary embedding,\nresiduals, activation quantisation) grows from 2\\,% at one thread to 5\\,% at four.",
+     "A. How close the engine is to the machine\n\nA multi-threaded streaming read (AVX2, 1 GiB) reaches 12.9, 17.2, 18.4 and 19.5 GB/s with one to four threads: the fourth core adds 6 %. Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094 MB on System 1, 2,503 MB on System 2). The engine\u2019s own phase split, now reported by the server, puts 86\u201397  of decode in the matmuls and the output head; sampling is Wall time 0.1\u20130.3 % and attention 1\u20133 % at these context lengths, so",
+     "Three threads beat four for decode in all six interleaved pairs (+4\\,% on System 1, +8\\,% on System 2 at the median) while cold prefill, which is\ncompute-bound, is 16--17\\,% slower at three. On a shared host the fourth worker is the one the scheduler preempts, and every matmul waits for the\nslowest worker. Decode dominates a request and most prompts are now cache hits, so the default is three threads, which also leaves a core for the verifier\nsandbox and the gateway; a quiet host may prefer four. The engine's own tuning is already near its ceiling: with the software-prefetch distance of 1,024 bytes\nas the reference, no prefetch loses 11\\,% in two of three rounds and 512 loses 3\\,%, while 2048 and 4096 differ by about $+2$\\,% at the median, inside this\nhost's noise; parking instead of spinning loses 2\\,%.",
+     "### What the literature offers\n\nDecode saturating memory with few threads is well supported and is confirmed above. Prompt-lookup and suffix decoding\ndraft tokens by matching recent output against the prompt and past outputs and report large gains where output copies input, such as code editing; the engine's\nspeculation is greedy-only while \\Sys{} samples at 0.3--0.7, so using it needs speculative sampling (accept a deterministic draft token with probability\n$p(d)$, otherwise sample the residual), which is lossless but is engine work with a bounded payoff because System 2's time is reasoning text that does not copy\nthe prompt. Prefix caching of the kind SGLang's RadixAttention describes keeps the cache of earlier prompts and reuses the longest shared\nbeginning; it applies directly and was built."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How much cold prefill does the prefix store save on System 2 when alternating request kinds?",
+   "rag": {
+    "answer": "The prefix store saves cold prefill on System 2 by reducing the prefill token count from 108 tokens to 5 tokens when alternating request kinds. \n\nAnswer: [3]",
+    "ok": false,
+    "seconds": 56.6,
+    "passages": [
+     "Between kinds of request on one model. The session held a single cache, so a prompt benefited only when it followed a conversation with the same\nbeginning. Alternating a chat prompt and the code agent's prompt prefilled the agent prompt in full each time: 266 tokens in 5.8\\,s on System 1 and 262 tokens in\n14\\,s on System 2, where llama.cpp's four slots answered in 0.1--0.2\\,s. A prefix store in the engine keeps the cache of each finished conversation as a\nsnapshot (114--147\\,KB per position, 768\\,MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt.\nAlternating or rotating three kinds of request now costs one token and 0.1\\,s on System 1 and 0.2\\,s on System 2, as on llama.cpp, and the answers are\nbyte-identical (equal hashes) with the store on and off for both models. It also makes the gateway's warm-first backend switch effective: it primes 13 prefixes, of which a\none-prefix session could keep only the last.",
+     "**Between kinds of request on one model.** The session held a single cache, so a prompt benefited only when it followed a conversation with the same beginning. Alternating a chat prompt and the code agent\u2019s prompt prefilled the agent prompt in full each time: 266 tokens in 5.8 s on System 1 and 262 tokens in 14 s on System 2, where llama.cpp\u2019s four slots answered in 0.1\u20130.2 s. A prefix store in the engine keeps the cache of each finished conversation as a snapshot (114\u2013147 KB per position, 768 MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt. Alternating or rotating three kinds of request now costs one token and 0.1 s on System 1 and 0.2 s on System 2, as on llama.cpp, and the answers are byte-identical (equal hashes) with the store on and off for both models. It also makes the gateway\u2019s warm-first backend switch effective: it primes 13 prefixes, of which a one-prefix session could keep only the last.",
+     "The reasoning budget's continuation. At the budget the server closes the reasoning and continues the turn with the reasoning so far as the assistant's prefix. The\nprefix was <think>, a newline, then the reasoning, which already begins with the newline the model wrote; the first reasoning token became two newlines\ninstead of one, the cache stopped matching there, and every reasoning token was prefilled again. The prefix now repeats the generated text exactly, the\nmatch covers the whole conversation, and the continuation prefills 5 tokens in 0.2\\,s instead of 108 tokens and 2.2\\,s at a budget of 200 (7--30\\,s on System 2 at\n128--512 reasoning tokens). On six escalated requests the cold prefill fell from 700--1,160 tokens (45--78\\,s) to 350--390 (22--24\\,s) and the mean time per request\nfrom 182\\,s to 133\\,s; the runs were not interleaved with the old build, but the prefill token counts are deterministic.",
+     "**The reasoning budget\u2019s continuation.** At the budget the server closes the reasoning and continues the turn with the reasoning so far as the assistant\u2019s prefix. The prefix was <think>, a newline, then the reasoning, which already be-gins with the newline the model wrote; the first reasoning token became two newlines instead of one, the cache stopped matching there, and every reasoning token was prefilled again The prefix now repeats the generated text exactly, the match covers the whole conversation, and the continuation prefills 5 tokens in 0.2 s instead of 108 tokens and 2.2 s at a budget of 200 (7\u201330 s on System 2 at 128\u2013512 reasoning tokens). On six escalated requests the cold prefill fell from 700\u20131,160 tokens (45\u201378 s) to 350\u2013390 (22\u201324 s) and the mean time per request from 182 s to 133 s; the runs were not interleaved with the old build, but the prefill token counts are deterministic."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "The question seems to be about a technical or system-specific concept, possibly related to data storage or system performance. However, the details provided are not sufficient to determine a specific numerical answer. Without additional context about the system, the type of data, or the specific request kinds being alternated, it is not possible to calculate the exact savings.\n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 10.1,
+    "support": {
+     "claims": 3,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "The question seems to be about a technical or system-specific concept, possibly related to data storage or system performance.",
+      "However, the details provided are not sufficient to determine a specific numerical answer.",
+      "Without additional context about the system, the type of data, or the specific request kinds being alternated, it is not possible to calculate the exact savings."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many kilobytes per position does a prefix-store snapshot take?",
+   "off": {
+    "answer": "A prefix-store snapshot typically takes 1 kilobyte per position. This is because each position in the prefix store represents a single byte of data, and the snapshot captures the state of the prefix store, which is usually stored in a compressed format that uses 1 KB per position.\n\nAnswer: 1",
+    "ok": false,
+    "seconds": 6.2,
+    "support": {
+     "claims": 3,
+     "supported": 2,
+     "share": 0.6666666865348816,
+     "unsupported": [
+      "This is because each position in the prefix store represents a single byte of data, and the snapshot captures the state of the prefix store, which is usually stored in a compressed format that uses 1 KB per position."
+     ]
+    }
+   },
+   "rag": {
+    "answer": "The prefix-store snapshot takes 114\u2013147 KB per position. \n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 35.6,
+    "passages": [
+     "**Between kinds of request on one model.** The session held a single cache, so a prompt benefited only when it followed a conversation with the same beginning. Alternating a chat prompt and the code agent\u2019s prompt prefilled the agent prompt in full each time: 266 tokens in 5.8 s on System 1 and 262 tokens in 14 s on System 2, where llama.cpp\u2019s four slots answered in 0.1\u20130.2 s. A prefix store in the engine keeps the cache of each finished conversation as a snapshot (114\u2013147 KB per position, 768 MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt. Alternating or rotating three kinds of request now costs one token and 0.1 s on System 1 and 0.2 s on System 2, as on llama.cpp, and the answers are byte-identical (equal hashes) with the store on and off for both models. It also makes the gateway\u2019s warm-first backend switch effective: it primes 13 prefixes, of which a one-prefix session could keep only the last.",
+     "Between kinds of request on one model. The session held a single cache, so a prompt benefited only when it followed a conversation with the same\nbeginning. Alternating a chat prompt and the code agent's prompt prefilled the agent prompt in full each time: 266 tokens in 5.8\\,s on System 1 and 262 tokens in\n14\\,s on System 2, where llama.cpp's four slots answered in 0.1--0.2\\,s. A prefix store in the engine keeps the cache of each finished conversation as a\nsnapshot (114--147\\,KB per position, 768\\,MB per model, least recently used evicted) and restores the one that shares the longest beginning with the new prompt.\nAlternating or rotating three kinds of request now costs one token and 0.1\\,s on System 1 and 0.2\\,s on System 2, as on llama.cpp, and the answers are\nbyte-identical (equal hashes) with the store on and off for both models. It also makes the gateway's warm-first backend switch effective: it primes 13 prefixes, of which a\none-prefix session could keep only the last.",
+     "### The merge\n\nNafs-Aql's vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so\nthe update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The\nadditions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention\nwithout touching upstream's attention kernel (one row per user, so the bit-identity property of Phase 18 holds); top-$k$ and min-$p$ on the\nposition-keyed sampler, in llama.cpp's order, with upstream's fast path when both are off. All 370 tests of the workspace pass in release mode,\nincluding the batching bit-identity tests, and formatting and the linter are clean.",
+     "B. The merge\n\nNafs-Aql\u2019s vendored copy differs from upstream by a batching engine, a prefix store, a continuation prefix, log-probabilities and two sampler cuts, so the update was a three-way merge (base 7cb6028) after normalising both sides with the same formatter, which reduced 44 textual conflicts to 14. The additions were then re-applied on the new engine: a cache snapshot that records whether the cache is rotated; the per-row forward pass and attention without touching upstream\u2019s attention kernel (one row per user, so the bit-identity property of Phase 18 holds); top-k and min-p on the position-keyed sampler, in llama.cpp\u2019s order, with upstream\u2019s fast path when both are off. All 370 tests of the workspace pass in release mode, including the batching bit-identity tests, and formatting and the linter are clean."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How long did the gate's decision to System 2's first reasoning token take at the median?",
+   "rag": {
+    "answer": "The gate's decision to System 2's first reasoning token took a median of 0.85 seconds, as stated in [2].",
+    "ok": true,
+    "seconds": 28.9,
+    "passages": [
+     "Inside a request the switch is the gate: draft, exact check, rescue batch, decision, System 2. scripts/handoff_latency.py times it on the live gateway from the SSE events and both servers\u2019 metrics, with the rescue on and off, interleaved. Four requests whose draft fails its exact check, two with the rescue on and two off, on the shared host (load 7\u201312): the gate\u2019s own work takes 0.8\u20130.9 s (26.9\u201334.5 s when the four-sample rescue batch runs, the batch Phase 13 measured to pay for itself); from the decision to System 2\u2019s first reasoning token 1.1\u20134.7 s (median 1.5 s), with 5\u201327 new prompt tokens against 262\u20131,148 cached; and System 1 reports no busy slot after the decision in any run.",
+     "C. Switching **System 1 to System 2.** Over six escalated requests the gate\u2019s own time was 0.08\u20130.12 s, the decision to System 2\u2019s first reasoning token 0.4\u20131.4 s (median 0.85 s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload; llama.cpp took a median 1.5 s in Phase 14.",
+     "### Switching\n\nSystem 1 to System 2. Over six escalated requests the gate's own time was 0.08--0.12\\,s, the decision to System 2's first reasoning token 0.4--1.4\\,s\n(median 0.85\\,s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload;\nllama.cpp took a median 1.5\\,s in Phase 14.",
+     "Arm\n\nVerified\n\nSystem 2 (Qwen3-4B-Thinking), 6 tasks 512 reasoning tokens every step 6/6  256 on the first step, then 512 6/6\n\ncode blocks, round 3 compared the 512-token budget on every step with 256 tokens on the first step and 512 after a failure, on the same six System 2 tasks (Table XXII). Both arms verified all six, each in one call per task, so the escalation was never needed; the cheap first attempt took 282 s in all against 560  half the time, and decoded 1,961 tokens against 3,499. It is the default (first_step_thinking_budget = 256 same build primes llama-server\u2019s cache with the agent\u2019s system prompt at startup: the first call of round 3 found it cached (207 tokens) where round 1\u2019s first call found 5, and over the round 100 % of the prompt tokens of the faster arm came from the cache (partly because both arms send the same task message, so the second arm of a task finds it cached); prefill was 1  its 282 s. On this machine a verified System 2 fix of a small function now takes 33\u201359 s, against single calls of 500\u20131,041  and no verified task in the Phase 10 live run; the hardware and the models are the same."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am unable to provide specific information about the time it took for the gate's decision to allocate a reasoning token to System 2's first reasoning token. This information is not available in the public domain, and I do not have access to internal system logs or specific performance data.",
+    "ok": false,
+    "seconds": 4.1,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "How many gate decisions of requests were escalated in the six-request timing?",
+   "off": {
+    "answer": "The question is unclear and does not provide sufficient information to determine the number of gate decisions of requests escalated in the six-request timing. \n\nAnswer: <unknown>",
+    "ok": false,
+    "seconds": 2.6,
+    "support": {
+     "claims": 0,
+     "supported": 0,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The knowledge base does not directly state the number of gate decisions of requests that were escalated in the six-request timing. However, it mentions that \"over six escalated requests the gate\u2019s own time was 0.08\u20130.12 s,\" indicating that six requests were escalated. \n\nAnswer: [1]",
+    "ok": true,
+    "seconds": 21.3,
+    "passages": [
+     "C. Switching **System 1 to System 2.** Over six escalated requests the gate\u2019s own time was 0.08\u20130.12 s, the decision to System 2\u2019s first reasoning token 0.4\u20131.4 s (median 0.85 s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload; llama.cpp took a median 1.5 s in Phase 14.",
+     "**Proposition 21** (Rescue break-even) [exact] The saving per request is f rE \u03c1 , positive iff r > \u03c1/E\n\nProof. Of the fraction f with a failed draft, a share r avoids the escalation ( E) and all pay \u03c1\n\nOffline on 60 MBPP+ items the draft passes 46.7 % of the time; of 32 failed drafts, 0, 0, 4 and 6 are rescued by 1, 2, 3 and 4 samples (19 % with four, pass@5 56.7 %), and four samples in one request take 17.5 s against 10.4 s for the draft. Live, in an interleaved A/B of 40 items (rescue off against on, stream closed at the decision), escalations fell from 22 to",
+     "### Switching\n\nSystem 1 to System 2. Over six escalated requests the gate's own time was 0.08--0.12\\,s, the decision to System 2's first reasoning token 0.4--1.4\\,s\n(median 0.85\\,s), and System 1 was idle at the decision. Each model is its own process with its own mapped weights, so there is nothing to freeze, copy or reload;\nllama.cpp took a median 1.5\\,s in Phase 14.",
+     "prompt = context.assemble(request, cap=cfg.max_prompt_tokens) draft, samples = s1.sample(prompt, k=cfg.gate.k_samples)\nfeats = gate.features(draft, samples, request.domain, request.verification) d = gate.decide(feats, cfg) record_decision(d) **if not** d.escalate:\n**if** feats.verifiable:\nv = hub.verify(draft, request.verification) **if** d.rule = \"forced_failed_verification\"; d.escalate = True **else**"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  },
+  {
+   "question": "Which version of SurrealDB was chosen rather than 4.0.0?",
+   "rag": {
+    "answer": "The version of SurrealDB chosen was 3.3.5 rather than 4.0.0. This is specified in the decision [1].",
+    "ok": true,
+    "seconds": 23.8,
+    "passages": [
+     "| Wire format | SurrealDB RPC over HTTP in **CBOR**, bound variables only | its JSON decoding turns strings like `\"Caption: Model ...\"` into record ids (found in Phase 1, regression-tested) |\n| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |",
+     "| Which version? | 3.3.5, not 4.0.0 | 4.0.0 is 4 days old, changes BM25 scoring and needs a one-way store upgrade; revisit after a few weeks |\n| Parsers | `pdf_oxide` (PDF, pure Rust), our own ZIP + XML readers for DOCX and PPTX, `htmd` for HTML, our own LaTeX stripper, plain reads for Markdown and text | pure Rust, auditable, bounded against hostile archives; no PDFium, no Java, no Python |",
+     "| Question | Decision | Why |\n|---|---|---|\n| Where does SurrealDB run? | Its own server process (3.3.5, `tools/surrealdb`, surrealkv storage, 127.0.0.1:8300), managed by `scripts/serve_surreal.sh`; the gateway calls its RPC over HTTP through `nafs-kb` | No new heavy dependency tree in the gateway; same process model as the engines; restartable on its own; verified spike |",
+     "| Memorilla in Rust | a new crate `nafs-memorilla` on Candle 0.11 for the module, encoder reference, dataset builder and trainer; Smiley Core gets one marked addition (caller-supplied input vectors for chosen rows) | Smiley Core's P1 principle forbids a tensor framework inside the engine |\n| Released checkpoints | used only for the parity test | they project into Qwen3-8B's 4,096-wide space; ours are 2,048 (System 1) and 2,560 (System 2) |\n| Training on this CPU | fine-tuning on a knowledge base, System 1 decoder, `retrieval_init`; Stage 1\u20132 pre-training is a GPU recipe | about 1.4 TFLOP per example through Qwen3-1.7B; 3.3 M pre-training rows would take months here |\n| Chat integration | a knowledge mode per request: `off`, `rag`, `graph`, `memory`, `hybrid`, `auto`; retrieved material delimited as data; replies carry sources | the paper shows memory and retrieval answer different questions |"
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 1,
+     "supported": 1,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "off": {
+    "answer": "I am unable to determine the specific version of SurrealDB that was chosen over 4.0.0, as this information is not publicly available. If you have access to the release notes or version history, I recommend checking those for detailed information.",
+    "ok": false,
+    "seconds": 3.9,
+    "support": {
+     "claims": 1,
+     "supported": 0,
+     "share": 0.0,
+     "unsupported": [
+      "If you have access to the release notes or version history, I recommend checking those for detailed information."
+     ]
+    }
+   }
+  },
+  {
+   "question": "How many tokens did the continuation prefill with the exact prefix, instead of 108?",
+   "off": {
+    "answer": "The continuation prefill uses the exact prefix, which is 108 tokens long. Therefore, the answer is:\n\nAnswer: 108",
+    "ok": false,
+    "seconds": 2.7,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   },
+   "rag": {
+    "answer": "The continuation prefill with the exact prefix was 5 tokens instead of 108 tokens. \n\nAnswer: 5",
+    "ok": true,
+    "seconds": 36.6,
+    "passages": [
+     "The reasoning budget's continuation. At the budget the server closes the reasoning and continues the turn with the reasoning so far as the assistant's prefix. The\nprefix was <think>, a newline, then the reasoning, which already begins with the newline the model wrote; the first reasoning token became two newlines\ninstead of one, the cache stopped matching there, and every reasoning token was prefilled again. The prefix now repeats the generated text exactly, the\nmatch covers the whole conversation, and the continuation prefills 5 tokens in 0.2\\,s instead of 108 tokens and 2.2\\,s at a budget of 200 (7--30\\,s on System 2 at\n128--512 reasoning tokens). On six escalated requests the cold prefill fell from 700--1,160 tokens (45--78\\,s) to 350--390 (22--24\\,s) and the mean time per request\nfrom 182\\,s to 133\\,s; the runs were not interleaved with the old build, but the prefill token counts are deterministic.",
+     "**The reasoning budget\u2019s continuation.** At the budget the server closes the reasoning and continues the turn with the reasoning so far as the assistant\u2019s prefix. The prefix was <think>, a newline, then the reasoning, which already be-gins with the newline the model wrote; the first reasoning token became two newlines instead of one, the cache stopped matching there, and every reasoning token was prefilled again The prefix now repeats the generated text exactly, the match covers the whole conversation, and the continuation prefills 5 tokens in 0.2 s instead of 108 tokens and 2.2 s at a budget of 200 (7\u201330 s on System 2 at 128\u2013512 reasoning tokens). On six escalated requests the cold prefill fell from 700\u20131,160 tokens (45\u201378 s) to 350\u2013390 (22\u201324 s) and the mean time per request from 182 s to 133 s; the runs were not interleaved with the old build, but the prefill token counts are deterministic.",
+     "E. Summary\n\nThe engine is within 60\u201395 % of the machine\u2019s bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth decode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14 s down to 0.1 and 0.2 s for a switch of request kind) and the continuation\u2019s re-prefill of its own reasoning (now exact). Speculative sampling is named as the next engine item.",
+     "### Summary\n\nThe engine is within 60--95\\,% of the machine's bandwidth, so more parallelism was not the lever. Three places repeated or waited on work and are fixed: the fourth\ndecode thread (now three), the one-prefix cache (now a prefix store, 5.8 and 14\\,s down to 0.1 and 0.2\\,s for a switch of request kind) and the continuation's re-prefill of its own\nreasoning (now exact). Speculative sampling is named as the next engine item."
+    ],
+    "in_prompt": true,
+    "support": {
+     "claims": 2,
+     "supported": 2,
+     "share": 1.0,
+     "unsupported": []
+    }
+   }
+  }
+ ],
+ "answered": "2026-11-11 09:09"
+}

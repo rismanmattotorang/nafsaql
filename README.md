@@ -32,9 +32,11 @@ Neither tells you which of its answers to trust.
 
 **01 — Checked, or "Not sure".** A small model answers at once. A reasoning model steps in only when the question is worth the wait. Where an answer can be checked (maths, code against tests, data against a schema), a checker decides, not the model. Every answer is labelled *Checked*, *Cross-checked* or *Not checked*.
 
-**02 — Your documents, with sources.** Drop in PDF, Word, PowerPoint, LaTeX, web pages or notes. Ask in plain language. Every claim points at the passage that states it, and a map shows what your documents talk about.
+**02 — Your documents, with sources.** Drop in PDF, Word, PowerPoint, LaTeX, web pages or notes. Ask in plain language. Every claim points at the passage that states it, the answer says which of its sentences are *not* in those passages, and a map shows what your documents talk about.
 
-**03 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
+**03 — It remembers, and shows what it remembers.** Tell it something in one chat and ask in another. It reads its notes only when your question is about you or points back ("my", "last time", "you said"), so other questions are not slowed down. Every note can be read and deleted; private chats and rooms are never remembered.
+
+**04 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
 
 ## Proof
 
@@ -45,6 +47,9 @@ Measured on one shared 4-core Intel i3-8100. Every figure comes from a stored ru
 | **36 %** | of the cost of always reasoning, at the same accuracy on hard questions |
 | **0.15 s** | to search 847 passages by words and meaning together; the search itself takes 0.2 ms, the rest is reading the question |
 | **18 of 20** | held-out questions answered with passages, against 2 of 20 without |
+| **38 of 44** | answers made up without reading are flagged by the check against the passages; it flags 1 of 42 right ones, and it cannot catch a wrong number taken from the right passage |
+| **10×** | as often does a follow-up question ("and how fast is it?") find its passage first, when it is read with the question before it |
+| **14 of 14** | live checks of the memory pass: a fact is found from another chat by its words or its meaning, and is gone when you forget it |
 
 The rest, including what did not work, is in [features and measured results](docs/features_and_results.md).
 
@@ -94,15 +99,15 @@ The gate escalates only when the error it expects to save is worth the waiting t
 </tr>
 </table>
 
-Search runs in memory, beside the store that keeps your files, so it does not slow down when the machine is busy. Reading a file again only re-reads what changed. Uploads are capped and checked, and deleting a library removes what was derived from it. Details: [Knowledge specification](docs/spec/knowledge_base_spec.md) and its [Phase 25 update](docs/spec/knowledge_sota_spec.md).
+Search runs in memory, beside the store that keeps your files, so it does not slow down when the machine is busy. A typing slip in a question is matched to the nearest word your documents contain, and a follow-up such as "and how fast is it?" is searched together with the question before it. Reading a file again only re-reads what changed. Uploads are capped and checked, and deleting a library removes what was derived from it. Details: [Knowledge specification](docs/spec/knowledge_base_spec.md), its [search update](docs/spec/knowledge_sota_spec.md), and [how it compares with vLLM Semantic Router and Memorilla](docs/research/router_memory_gaps.md).
 
 ## Status
 
 A research preview, built in the open, running end to end on a CPU today.
 
 - **Open:** questions worded differently from the document are found in the first eight passages only a quarter of the time. The remedies need larger models than this release ships.
-- **Not done:** the release-scale evaluation and the first distillation cycle need a faster machine.
-- **Did not work, and published:** speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model, score-based fusion, a graph arm in everyday search.
+- **Not done:** the release-scale evaluation, the first distillation cycle and the pre-training of the memory-token module need a faster machine. The learned gate waits for its ledger: 1,294 of the 2,900 checked answers it asks for.
+- **Did not work, and published:** speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model, score-based fusion, a graph arm in everyday search, guessing a question's difficulty before answering it.
 
 Current state: [docs/roadmap/STATUS.md](docs/roadmap/STATUS.md).
 
@@ -111,7 +116,7 @@ Current state: [docs/roadmap/STATUS.md](docs/roadmap/STATUS.md).
 | | |
 |---|---|
 | [User guide](docs/user_guide.md) | the app, rooms, the lab, your documents |
-| [Technical report](docs/report/nafs_aql_report.pdf) | the model, the proofs, every measurement |
+| [Paper](docs/report/nafs_aql_report.pdf) | the formal model and its proofs, the architecture, every measurement |
 | [Features and measured results](docs/features_and_results.md) | everything built, with evidence, and how it compares |
 | [Serving](docs/serving_and_operations.md) · [Runbook](docs/operations/operator_runbook.md) · [API](docs/api/api_reference.md) | running it |
 | [All documents](docs/index.md) | specifications, research notes, decisions |

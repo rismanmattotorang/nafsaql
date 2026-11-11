@@ -1,9 +1,10 @@
 # research
 
-Verified research notes behind the report. Each file ends with a verification log of the URLs that were opened. The canonical bibliography is `docs/report/refs.bib`, assembled from the entries verified in these notes (the per-topic `.bib` files were merged into it and removed).
+Verified research notes behind the report. Each file ends with a verification log of the URLs that were opened. Every entry verified in these notes is in [`refs_all.bib`](refs_all.bib) (217 entries; the per-topic `.bib` files were merged into it). The paper's own bibliography, `docs/report/refs.bib`, holds only the 86 works the paper cites.
 
 | File | Content |
 |------|---------|
+| [Routing, knowledge and memory: the gaps against vLLM Semantic Router and Memorilla](router_memory_gaps.md) · [Decision 019](../decisions/019-routing-knowledge-memory-phase26.md) | Phase 26: the third read of Semantic Router (retrieval, memory, continuity, selection, hallucination) and the second of Memorilla (why our module collapsed), what was built with no further model (typing slips, follow-ups, the support check, the memory of earlier conversations, the trainer recipe and guard), and what was measured and not adopted |
 | [Knowledge module: where it stands and what the state of the art says](knowledge_sota_2026.md) · [Decision 018](../decisions/018-knowledge-index-phase25.md) | Phase 25: the assessment (seven weaknesses with evidence), parsing, chunking, vectors, fusion, graph retrieval, what not to do, the interface audit |
 | `qwen_models.md` | Qwen generations, small variants, GGUF/AWQ/GPTQ availability, llama.cpp support, non-autoregressive Qwen derivatives, embeddings |
 | `lit_s1s2_notes.md` | System 1/System 2, test-time compute, routing, speculative and diffusion decoding: what each paper found, with discrepancies |
