@@ -1,0 +1,137 @@
+{
+ "what": "Prompts read by P threads and tokens written by T, against both on T (Phase 27)",
+ "date": "2026-11-11 19:57",
+ "model": "models/Qwen3-4B-Thinking-2507-Q4_K_M.gguf",
+ "threads": 3,
+ "prefill_threads": 4,
+ "prompt_tokens": 737,
+ "host_load_average": [
+  5.0,
+  5.9,
+  6.6
+ ],
+ "note": "SHARED MACHINE",
+ "summary": {
+  "prompt_tok_s": {
+   "same": 18.45,
+   "wide": 22.65,
+   "ratio": 1.228
+  },
+  "decode_tok_s": {
+   "same": 8.370000000000001,
+   "wide": 8.265,
+   "ratio": 0.987
+  },
+  "total_s": {
+   "same": 43.68,
+   "wide": 36.495,
+   "ratio": 0.836
+  },
+  "wide_faster_prompt_in": "6 of 6",
+  "wide_faster_total_in": "6 of 6"
+ },
+ "rows": [
+  {
+   "prompt": 0,
+   "same": {
+    "prompt_n": 737,
+    "prompt_tok_s": 17.9,
+    "decode_tok_s": 8.36,
+    "predicted_n": 31,
+    "total_s": 44.84
+   },
+   "wide": {
+    "prompt_n": 737,
+    "prompt_tok_s": 22.6,
+    "decode_tok_s": 8.35,
+    "predicted_n": 31,
+    "total_s": 36.3
+   }
+  },
+  {
+   "prompt": 1,
+   "wide": {
+    "prompt_n": 739,
+    "prompt_tok_s": 21.2,
+    "decode_tok_s": 8.19,
+    "predicted_n": 31,
+    "total_s": 38.66
+   },
+   "same": {
+    "prompt_n": 739,
+    "prompt_tok_s": 18.5,
+    "decode_tok_s": 8.34,
+    "predicted_n": 31,
+    "total_s": 43.63
+   }
+  },
+  {
+   "prompt": 2,
+   "same": {
+    "prompt_n": 740,
+    "prompt_tok_s": 18.6,
+    "decode_tok_s": 8.55,
+    "predicted_n": 31,
+    "total_s": 43.41
+   },
+   "wide": {
+    "prompt_n": 740,
+    "prompt_tok_s": 22.7,
+    "decode_tok_s": 7.57,
+    "predicted_n": 31,
+    "total_s": 36.69
+   }
+  },
+  {
+   "prompt": 3,
+   "wide": {
+    "prompt_n": 740,
+    "prompt_tok_s": 21.4,
+    "decode_tok_s": 8.11,
+    "predicted_n": 31,
+    "total_s": 38.35
+   },
+   "same": {
+    "prompt_n": 740,
+    "prompt_tok_s": 18.4,
+    "decode_tok_s": 8.58,
+    "predicted_n": 31,
+    "total_s": 43.73
+   }
+  },
+  {
+   "prompt": 4,
+   "same": {
+    "prompt_n": 740,
+    "prompt_tok_s": 18.6,
+    "decode_tok_s": 8.38,
+    "predicted_n": 31,
+    "total_s": 43.43
+   },
+   "wide": {
+    "prompt_n": 740,
+    "prompt_tok_s": 22.8,
+    "decode_tok_s": 8.46,
+    "predicted_n": 31,
+    "total_s": 36.18
+   }
+  },
+  {
+   "prompt": 5,
+   "wide": {
+    "prompt_n": 740,
+    "prompt_tok_s": 22.8,
+    "decode_tok_s": 8.34,
+    "predicted_n": 31,
+    "total_s": 36.24
+   },
+   "same": {
+    "prompt_n": 740,
+    "prompt_tok_s": 18.2,
+    "decode_tok_s": 8.35,
+    "predicted_n": 31,
+    "total_s": 44.31
+   }
+  }
+ ]
+}

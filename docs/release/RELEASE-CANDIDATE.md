@@ -1,49 +1,55 @@
 # Release candidate status (no tag)
 
-## Status on 2026-11-11: research preview, final for this machine (Phase 26)
+## Release 0.1.0 (2026-11-11): a research preview, final for this machine
 
-This is the state the project is published in. It is **not** the G6 release of the roadmap: three of its gates need
-what this machine cannot give (a GPU for the first adapter, thousands of paired items for the non-inferiority test),
-and the roadmap's own rule is that a gate is reported as it is, not argued away. What is final is everything a
-four-core CPU can settle: the code, its tests, the live sweep, the measurements and the paper.
+Tagged `v0.1.0` from `main`; notes in [`RELEASE-0.1.0.md`](RELEASE-0.1.0.md). It is **not** the G6 release of the
+roadmap: four of its gates need what this machine cannot give (a GPU for the first adapter, thousands of paired items
+for the non-inferiority test, 2,900 labelled drafts), and the roadmap's own rule is that a gate is reported as it is,
+not argued away. What is final is everything a four-core CPU can settle: the code, its tests, the live sweep, the
+measurements and the paper.
 
-**What Phase 26 added** (decision [019](../decisions/019-routing-knowledge-memory-phase26.md)): typing slips and
-follow-up questions in knowledge search, a check of every answer from documents against its passages, a memory of
-earlier conversations that a person can read and delete, the Memorilla trainer on the reference recipe with a guard
-against a module that ignores the question, and the technical report rewritten as the final paper.
+**What the last two phases added.** Phase 26 (decision [019](../decisions/019-routing-knowledge-memory-phase26.md)):
+typing slips and follow-up questions in knowledge search, a check of every answer from documents against its
+passages, a memory of earlier conversations that a person can read and delete, the Memorilla trainer on the reference
+recipe with a guard against a module that ignores the question, and the technical report rewritten as the final
+paper. Phase 27 (decision [020](../decisions/020-speed-phase27.md)): the engines read prompts with every core (+23 %),
+and a faster knowledge prompt is available as an option.
 
-**Validation on the final build** (SHARED MACHINE; another build, a virtual machine and video playback used the same
-four cores, load 40 to 370):
+**Validation on the release build** (SHARED MACHINE; load 6 to 150 from other work during the sweep):
 
 | Check | Result |
 |---|---|
-| Rust tests (`cargo test --workspace --release`) | 504 pass; `cargo fmt --check` and `cargo clippy -D warnings` (all targets) clean |
+| Rust tests (`cargo test --workspace --release`) | 507 pass; `cargo fmt --check` and `cargo clippy -D warnings` (all targets) clean |
+| CI (Ubuntu 24.04 and macOS 15: format, lints, tests; dependency audit; API and schema validation) | green on the release commit |
 | API contract | passed |
 | Security probes | 26 of 26, no open high-severity finding |
 | Rooms | 10 of 10 |
 | End to end (every endpoint and page) | 69 of 69 |
 | Knowledge | 55 passed, 1 skipped |
 | Knowledge security | 33 of 33 |
-| Memory of earlier conversations (`scripts/recall_check.py`) | 14 of 14 |
-| Code-agent harness | 55 of 55 |
-| Acceptance | **7 of 9**: the two that fail are latency targets under this load (first token of a quick reply in 2.6 s against 2.0 s; a verified reasoning answer in 420 s against 240 s). The answers themselves were right. On a quiet host both have passed (9 of 9 on 2026-10-21). |
+| Memory of earlier conversations | 14 of 14 |
+| Code-agent harness | 53 of 53 |
+| Acceptance | 9 of 9 (first token after 152 ms; a verified reasoning answer in 198 s against a 240 s target) |
+
+An earlier sweep the same day, under load 30 to 40, passed everything except two acceptance latency targets (first
+token 2.6 s against 2.0 s; a reasoning answer in 420 s against 240 s).
 
 **Gates** (`GET /v1/gates` after the sweep):
 
 | Gate | Status | Why |
 |---|---|---|
 | G0 Phase-0 exit | pending | the full-scale baseline needs about 190 machine-hours |
-| G1 acceptance and latency | **fail** | 7 of 9 in this sweep; the two failures are the latency targets under load 30 to 40 |
+| G1 acceptance and latency | **pass** | 9 of 9; first token 152 ms, a verified reasoning answer in 198 s |
 | G2 calibrated gate | pending | routing accuracy passes (73 % on 105 items); the calibration has 1,294 of 2,900 labelled drafts; non-inferiority has 133 of 700 pairs |
 | G3 adapter and rollback | pending | training needs a GPU |
 | G4 evaluation suite and load tests | pass | |
 | G5 security and deployment | pass | 0 open high-severity findings |
-| G6 release | pending | the 1-point non-inferiority test (133 pairs) and the scholar's review of the notes on the name in the app and the user guide; the paper no longer carries that material |
+| G6 release | pending | the 1-point non-inferiority test (133 pairs) and the scholar's review of the one paragraph on the name |
 
-**What the owner decides next:** whether to tag this state; whether to spend the idle hours the label stream still
-needs (the learned gate is promoted at 2,900 checked answers; it has 1,294); whether to retrain the memory module with
-the corrected recipe; whether to approve the downloads that the reworded-question gap needs (a reranker or a stronger
-embedder, a public benchmark).
+**What the owner decides next:** whether to spend the idle hours the label stream still needs (the learned gate is
+promoted at 2,900 checked answers; it has 1,294); whether to retrain the memory module with the corrected recipe;
+whether to approve the downloads that the reworded-question gap needs (a reranker or a stronger embedder, a public
+benchmark); whether the faster knowledge prompt should become the default after a larger test.
 
 ---
 

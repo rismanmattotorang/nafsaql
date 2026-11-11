@@ -160,6 +160,24 @@ answer lost); reading every question with the previous turn (the rule gives 0.25
 self-contained questions alone). **Open:** reworded questions (unchanged); a retrain of the memory module; recall
 quality over a long history.
 
+## Phase 27: where the time goes, and what made it shorter (2026-11-11)
+
+Research [`speed_sota_2026.md`](research/speed_sota_2026.md), decision [020](decisions/020-speed-phase27.md).
+SHARED MACHINE (load 4 to 8); files in `benchmarks/engine_phase27/` and `benchmarks/kb_phase27/`.
+
+| Change | Effect | Evidence |
+|---|---|---|
+| The engines read prompts with all four cores and write tokens with three | prompt reading **+23 %** on both models (49.7 → 61.0 and 18.5 → 22.7 tokens/s), decode unchanged, time to the last token **−16 %** | `prefill_threads.json`, `prefill_threads_system2.json` (7 of 8 and 6 of 6 interleaved pairs) |
+| The embedding server on four threads | a question in **252 ms** against 293 ms, a passage in **1.08 s** against 1.27 s | `embed_threads.json` (24 of 24 pairs each) |
+| A faster knowledge prompt (six passages packed into a 2,400-character block, headers counted, titles once), **off by default** | prompts **25 % shorter**, answers **20 to 26 % sooner**; 39 of 50 right against 42 | `rag_budget_ab.json`, `rag_budget_sized.json` |
+
+**Measured and not adopted:** cache-blocking the prompt products and a smaller prompt chunk (within ±3 %); searching
+eight passages for 1,800 characters of text (45 of 50 right against 42, no time saved: a third of the block was
+headers). **Assessed and not built:** cached attention state per passage (TurboRAG, CacheBlend: not the same
+computation, 34 MB a passage), a trained pruner, int8 or truncated vectors (the scan is 0.1 % of a search here),
+PageRank-ordered graph extraction, a 4-bit embedding model. **Where the time is:** four fifths of an answer from
+documents is the model reading the passages, at 50 to 60 tokens a second.
+
 ## The numbers at a glance (moved from the README, Phase 25)
 
 Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so absolute speeds are lower bounds. Every figure comes from a stored run in [`benchmarks/`](../benchmarks/).
@@ -172,7 +190,7 @@ Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so abs
 | Several people at once | **14 → 25 tokens/s** from 1 to 4 users, each answer identical to what they would get alone |
 | Passage retrieval with the right context | closed-book answers **2 of 20** held-out questions; with passages, **18 of 20** |
 | Your documents at scale | 1,000 documents / 50,000 passages: search by meaning in **0.4 s**, listing under **0.3 s**; a security sweep of uploads and deletion passes **36/36** |
-| Security and quality | **504** Rust tests, **26/26** security probes, **69/69** end-to-end checks |
+| Security and quality | **507** Rust tests, **26/26** security probes, **69/69** end-to-end checks |
 
 We also publish what did not work: speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model and more. See [features and measured results](features_and_results.md).
 
