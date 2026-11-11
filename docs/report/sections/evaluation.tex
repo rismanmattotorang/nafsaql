@@ -125,10 +125,12 @@ Agreement samples fused into the draft's batch & time to the gate's decision 23.
 $n$ choices in one request & 39.1\,s against 124.5\,s for four requests \\
 Rescue: four \Sone\ samples after a failed check & 3 escalations avoided in 40 paired items; break-even 106\,s against 250--580\,s per escalation \\
 Three decode threads & $+4\,\%$ (\Sone), $+8\,\%$ (\Stwo), 6 of 6 pairs \\
+Four threads for prompts, three for tokens & prompt reading $+23\,\%$ on both models (49.7 to 61.0 and 18.5 to 22.7 tokens/s), time to the last token $-16\,\%$; 7 of 8 and 6 of 6 pairs \\
 Prefix store & switching the kind of request: 5.8\,s and 14\,s of prefill to 0.1\,s and 0.2\,s \\
 Exact continuation prefix & escalated requests 182\,s to 133\,s on average (not interleaved; prefill counts are deterministic) \\
 Adaptive reasoning exit & 220\,s to 123\,s at equal accuracy ($n=11$) \\
 Embedder keeps a shared prefix & question embedding 297\,ms to 146\,ms, identical vectors \\
+Embedding server on four threads & a question in 252\,ms against 293\,ms, a passage in 1.08\,s against 1.27\,s; 24 of 24 pairs each \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -441,6 +443,8 @@ Model-written query expansion & 8\,s a question; $-0.03$ MRR on quoted questions
 Reranker, near-duplicate removal, AND-first search & answer already in the hybrid top four for 19 of 20 and 57 of 70 questions & nothing to gain on these sets \\
 Memory tokens without pre-training & 0/20 alone; 17/20 with passages against 18/20 for passages & Section~\ref{sec:eval:memory} \\
 A difficulty signal from the question alone (nearest labelled questions; prototype banks \cite{semanticrouter2026}) & AUC for a wrong draft over 810 labelled drafts: domain 0.566, banks 0.573, nearest questions 0.615, the draft's own features 0.682, both together 0.690 & the question adds 0.008 to what the draft already says; skipping the draft would touch 12 of 810 requests \\
+Sentences of six passages packed into a block of 2{,}400 characters, headers counted, in place of four whole passages & prompts 25\,\% shorter and answers 20 to 26\,\% sooner (42 of 50 pairs); 39 of 50 right against 42 ($p=0.38$) & the answers lost took a number from the wrong excerpt; kept as an option \\
+Cache-blocking the prompt's weight products; a smaller prompt chunk & within $\pm3\,\%$ once the benchmark was warmed up & reading a prompt is bound by the kernel's arithmetic, not by the caches \\
 Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.77 passages a prompt (quoted), 3.33 to 2.99 (reworded); the answering passage left one prompt & a tenth of a passage saved for an answer lost \\
 \bottomrule
 \end{tabular}
@@ -448,18 +452,18 @@ Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.7
 
 \subsection{Validation}
 \label{sec:eval:validation}
-The workspace has 504 Rust tests, including the ported upstream suites of the
+The workspace has 507 Rust tests, including the ported upstream suites of the
 patch parser and the Lean rules, bit-identity tests of the batched engine and
 parity tests of the memory module; formatting, lints and dependency audits
 are clean. Live sweeps on the final build pass: the API contract, 26 of 26
 security probes (sandbox escape, injection, authentication, limits) with no
 open high-severity finding, 33 of 33 knowledge-security checks, 69 of 69
 end-to-end checks of every endpoint and page, 10 of 10 chat-room checks, 55
-knowledge checks, 14 of 14 checks of the conversation memory and 55 of 55
-checks of the agent harness. Of the nine acceptance tests seven pass; the two
-that fail are latency targets, missed under a load average of 30 to 40 from
-other workloads (the first token of a quick reply after 2.6\,s against a
-target of 2.0\,s, and a verified deliberate answer after 420\,s against
-240\,s), with correct answers in both; all nine have passed on a quiet host.
-The security suite earlier found one high-severity issue, since fixed:
-sandboxed code could signal other processes.
+knowledge checks, 14 of 14 checks of the conversation memory, 53 of 53 checks
+of the agent harness and all nine acceptance tests (the first token of a
+quick reply after 0.15\,s; a verified deliberate answer after 198\,s against
+a target of 240\,s). The acceptance latencies depend on what else the machine
+is doing: an earlier sweep the same day, under a load average of 30 to 40
+from other workloads, missed both targets (2.6\,s and 420\,s) with correct
+answers. The security suite earlier found one high-severity issue, since
+fixed: sandboxed code could signal other processes.
