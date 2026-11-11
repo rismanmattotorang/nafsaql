@@ -13,4 +13,4 @@ pub mod memory;
 pub mod train;
 
 pub use encoder::{Encoder, END_OF_TEXT};
-pub use memory::{MemoryConfig, MemoryModule};
+pub use memory::{collapse_stats, CheckpointMetrics, CollapseStats, MemoryConfig, MemoryModule};

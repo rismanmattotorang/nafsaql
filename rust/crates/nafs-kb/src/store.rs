@@ -879,7 +879,23 @@ impl Store {
         unreachable!("the last attempt returns")
     }
 
-    /// Recount a document's vectors and record the embedder on its knowledge base.
+    /// The embedding model recorded on a knowledge base, if a vector was ever written for it.
+    pub async fn embedder_of(&self, kb: &str) -> Result<Option<String>, KbError> {
+        let r = self
+            .query(
+                "RETURN type::record('kb', $kb).embedder;",
+                json!({ "kb": kb }),
+            )
+            .await?;
+        Ok(r.last()
+            .and_then(Value::as_str)
+            .filter(|m| !m.is_empty())
+            .map(String::from))
+    }
+
+    /// Recount a document's vectors and record the embedder on its knowledge base. The first model to write a vector
+    /// names the base; it changes only when every vector is cleared (`clear_vectors`), so vectors of two models are
+    /// never taken for one index.
     pub async fn finish_vectors(
         &self,
         kb: &str,
@@ -892,7 +908,7 @@ impl Store {
                 "LET $d = type::record('document', $doc); \
                  LET $n = (SELECT VALUE count() FROM chunk WHERE doc = $d AND embedding != NONE GROUP ALL)[0] ?? 0; \
                  UPDATE $d SET n_embedded = $n, updated_at = time::now(); \
-                 UPDATE type::record('kb', $kb) SET embedder = $model, dims = $dims; \
+                 UPDATE type::record('kb', $kb) SET embedder = embedder ?? $model, dims = $dims; \
                  RETURN $n;",
                 json!({ "doc": doc, "kb": kb, "model": model, "dims": dims }),
             )
@@ -1266,6 +1282,7 @@ impl Store {
                  LET $n = (SELECT VALUE count() FROM chunk WHERE kb = $k AND embedding != NONE GROUP ALL)[0] ?? 0; \
                  UPDATE chunk SET embedding = NONE WHERE kb = $k; \
                  UPDATE document SET n_embedded = 0 WHERE kb = $k; \
+                 UPDATE $k SET embedder = NONE; \
                  RETURN $n;",
                 json!({ "kb": kb }),
             )

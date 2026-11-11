@@ -143,7 +143,8 @@
         "forced_override",
         "uncertified_bin",
         "unknown_escalate",
-        "unknown_keep"
+        "unknown_keep",
+        "unsupported_by_sources"
       ]
     },
     "audit": {

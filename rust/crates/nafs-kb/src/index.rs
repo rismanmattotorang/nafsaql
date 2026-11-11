@@ -100,6 +100,9 @@ pub struct Params {
     pub fusion: Fusion,
     pub prf: Option<Prf>,
     pub ppr: Option<Ppr>,
+    /// Phase 26: a question word the base does not hold is replaced by the nearest word it does hold (one edit away,
+    /// two for a long word), so a typing slip does not cost the passage.
+    pub fuzzy: bool,
 }
 
 impl Default for Params {
@@ -109,8 +112,36 @@ impl Default for Params {
             fusion: Fusion::Rrf { vector_weight: 0.1 },
             prf: None,
             ppr: None,
+            fuzzy: true,
         }
     }
+}
+
+/// The weight of a corrected word against a word found as typed.
+const FUZZY_WEIGHT: f32 = 0.7;
+
+/// Edit distance with adjacent transpositions (optimal string alignment), given up beyond `max`.
+fn edit_distance(a: &[char], b: &[char], max: usize) -> Option<usize> {
+    if a.len().abs_diff(b.len()) > max {
+        return None;
+    }
+    let mut prev2: Vec<usize> = Vec::new();
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    for i in 1..=a.len() {
+        let mut row = vec![i; b.len() + 1];
+        for j in 1..=b.len() {
+            let cost = usize::from(a[i - 1] != b[j - 1]);
+            row[j] = (prev[j] + 1).min(row[j - 1] + 1).min(prev[j - 1] + cost);
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                row[j] = row[j].min(prev2[j - 2] + 1);
+            }
+        }
+        if row.iter().min().is_some_and(|m| *m > max) {
+            return None;
+        }
+        prev2 = std::mem::replace(&mut prev, row);
+    }
+    (prev[b.len()] <= max).then_some(prev[b.len()])
 }
 
 /// `[knowledge]` settings of the index.
@@ -885,9 +916,72 @@ impl Base {
         Some(out)
     }
 
+    /// The word of the base nearest to `term`, when the base does not hold `term` itself: same first letter, one edit
+    /// away (two for a word of eight letters or more), the commonest of the nearest. Only plain words of five letters
+    /// or more are corrected; identifiers and numbers are taken as typed.
+    pub fn nearest_term(&self, term: &str) -> Option<String> {
+        let t: Vec<char> = term.chars().collect();
+        if t.len() < 5 || !t.iter().all(|c| c.is_alphabetic()) {
+            return None;
+        }
+        if self.parts.iter().any(|p| p.postings.contains_key(term)) {
+            return None;
+        }
+        let max = if t.len() >= 8 { 2 } else { 1 };
+        let mut found: HashMap<&str, (usize, usize)> = HashMap::new();
+        let mut cand: Vec<char> = Vec::new();
+        for part in &self.parts {
+            for (word, list) in &part.postings {
+                if let Some(e) = found.get_mut(&**word) {
+                    e.1 += list.len();
+                    continue;
+                }
+                if word.len().abs_diff(term.len()) > max * 4 || !word.starts_with(t[0]) {
+                    continue;
+                }
+                cand.clear();
+                cand.extend(word.chars());
+                if !cand.iter().all(|c| c.is_alphabetic()) {
+                    continue;
+                }
+                if let Some(d) = edit_distance(&t, &cand, max) {
+                    found.insert(word, (d, list.len()));
+                }
+            }
+        }
+        found
+            .into_iter()
+            .min_by(|a, b| {
+                (a.1 .0, std::cmp::Reverse(a.1 .1), a.0).cmp(&(
+                    b.1 .0,
+                    std::cmp::Reverse(b.1 .1),
+                    b.0,
+                ))
+            })
+            .map(|(w, _)| w.to_string())
+    }
+
     /// The query's terms, with the feedback terms of the first passages when `prf` is set.
     fn weighted_terms(&self, an: &Analyzer, query: &str, p: &Params) -> Vec<(String, f32)> {
         let mut terms: Vec<(String, f32)> = an.query(query).into_iter().map(|t| (t, 1.0)).collect();
+        if p.fuzzy {
+            for t in terms.iter_mut() {
+                if let Some(near) = self.nearest_term(&t.0) {
+                    *t = (near, FUZZY_WEIGHT);
+                }
+            }
+            let mut seen: Vec<&str> = Vec::new();
+            let keep: Vec<bool> = terms
+                .iter()
+                .map(|t| {
+                    let new = !seen.contains(&t.0.as_str());
+                    seen.push(&t.0);
+                    new
+                })
+                .collect();
+            let mut keep = keep.into_iter();
+            terms.retain(|_| keep.next().unwrap_or(true));
+        }
         let Some(prf) = p.prf else { return terms };
         let first = top(&self.lexical_scores(&terms, &p.bm25), prf.passages, 0.0);
         if first.is_empty() {
@@ -1734,6 +1828,39 @@ mod tests {
         assert_eq!(h0[0].chunk_id, "a0");
         assert_eq!(h1[0].chunk_id, "a0");
         assert!(h1.iter().any(|h| h.chunk_id == "b0"));
+    }
+
+    #[test]
+    fn a_mistyped_word_finds_the_passage_and_a_known_word_is_left_alone() {
+        let b = base();
+        let an = Analyzer::default();
+        let on = Params::default();
+        let off = Params {
+            fuzzy: false,
+            ..Params::default()
+        };
+        let right = b.search(&an, "listens", None, SearchMode::Lexical, 3, &on);
+        assert!(!right.is_empty(), "the test base must hold the word");
+        for typo in ["lisetns", "listns", "lirtens"] {
+            let hits = b.search(&an, typo, None, SearchMode::Lexical, 3, &on);
+            assert_eq!(
+                hits.first().map(|h| &h.chunk_id),
+                right.first().map(|h| &h.chunk_id),
+                "{typo}"
+            );
+            assert!(b
+                .search(&an, typo, None, SearchMode::Lexical, 3, &off)
+                .is_empty());
+        }
+        assert_eq!(b.nearest_term(&an.query("listens")[0]), None);
+        // A short word, an identifier and a word far from every word of the base are taken as typed.
+        assert_eq!(b.nearest_term("gatx"), None);
+        assert_eq!(b.nearest_term("zzzzzzzzzz"), None);
+        assert_eq!(
+            edit_distance(&['a', 'b', 'c'], &['a', 'c', 'b'], 1),
+            Some(1)
+        );
+        assert_eq!(edit_distance(&['a', 'b', 'c'], &['x', 'y', 'z'], 2), None);
     }
 
     #[test]

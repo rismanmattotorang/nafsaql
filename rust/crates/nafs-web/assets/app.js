@@ -81,6 +81,16 @@ function kbSourcesHTML(sources) {
   // The closest passage is still far from the question: say so, so the answer is read against its sources.
   const scored = hits.filter(x => typeof x.vector_score === 'number');
   if (hits.length && scored.length === hits.length && Math.max(...scored.map(x => x.vector_score)) < WEAK_MATCH) out += kbWeakNote('The closest passages are only loosely related to this question, so read the answer against them.');
+  // Which sentences of the answer the passages hold: a count when all do, the sentences when some do not.
+  const sup = sources.find(x => x.support)?.support;
+  if (sup && +sup.claims > 0) {
+    const miss = sup.unsupported || [];
+    out += miss.length
+      ? `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.search}<span>${+sup.supported} of ${plural(+sup.claims, 'sentence')} ${+sup.claims === 1 ? 'is' : 'are'} in the passages; ${miss.length} ${miss.length === 1 ? 'is' : 'are'} not. Check ${miss.length === 1 ? 'it' : 'them'} against the sources.</span></summary><ul class="kb-facts">${miss.map(m => `<li>${esc(m.text)}<div class="tiny muted">${esc(m.reason ? m.reason[0].toUpperCase() + m.reason.slice(1) : '')}.</div></li>`).join('')}</ul></details>`
+      : `<div class="sources">${icon.check}<span>Every sentence of this answer is in the passages (${plural(+sup.claims, 'sentence')} compared word by word; this does not prove the answer right).</span></div>`;
+  }
+  const rec = sources.find(x => x.recall)?.recall || [];
+  if (rec.length) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.book}<span>Used ${plural(rec.length, 'note')} from earlier conversations</span></summary><ul class="kb-facts">${rec.map(n => `<li><span class="faint">${esc(String(n.created_at || '').slice(0, 10))}</span><div class="kb-ptext">${esc(n.text || '')}</div></li>`).join('')}</ul><div class="tiny faint">Read or delete what is remembered in Settings, under Memory.</div></details>`;
   if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src" data-n="${+x.n || 0}"><summary><span class="kb-n">${+x.n || 0}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${+x.page ? ` <span class="faint">· page ${+x.page}</span>` : ''}</span>${advanced() && typeof x.vector_score === 'number' ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
   return out;
 }
@@ -364,6 +374,10 @@ function openSettings() {
       <section><h4>Appearance</h4>
         <div class="seg" id="stTheme">${[['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button type="button" data-t="${k}" class="${theme === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       </section>
+      <section><h4>Memory</h4>
+        <p class="small muted" id="stMemSay">Checking what is remembered…</p>
+        <p class="row" style="gap:8px;flex-wrap:wrap"><button class="btn ghost" type="button" id="stMemOpen">Show what is remembered</button></p>
+      </section>
       <section><h4>Privacy</h4>
         <p class="small muted">Chats may be used to improve answers after personal details are removed. To keep a chat out, open it and choose <b>Don't use to improve answers</b> from its menu.</p>
       </section>
@@ -383,6 +397,28 @@ function openSettings() {
   $('#stAdv').onchange = (e) => { setAdvanced(e.target.checked); route(); };
   $('#stTok').onchange = (e) => { store.set('token', e.target.value.trim()); toast(e.target.value.trim() ? 'Access key saved' : 'Access key removed'); refreshStatus(); };
   $('#stAdv').setAttribute('aria-describedby', 'stAdvHint');
+  $('#stMemOpen').onclick = guard(openMemory, 'The memory could not be opened.');
+  api.get('/v1/memory?limit=1').then(m => { const el = $('#stMemSay'); if (el) el.textContent = memorySummary(m); }).catch(() => { const el = $('#stMemSay'); if (el) el.textContent = 'What is remembered could not be read just now.'; });
+}
+// The memory of earlier conversations: a note per finished turn, read back when a question says "my", "last time" or
+// "you said". A person can read every note, delete one, delete all, or add one.
+const memorySummary = (m) => !m.enabled ? 'Remembering earlier conversations is turned off on this service.'
+  : m.count ? `${plural(m.count, 'note')} from earlier conversations ${m.count === 1 ? 'is' : 'are'} kept on this computer. A question that says “my”, “last time” or “you said” is answered with the notes that match it. Private chats and rooms are never remembered.`
+  : 'Nothing is remembered yet. Each finished turn of a saved chat becomes a short note; private chats and rooms are never remembered. Start a message with “Remember that …” to keep something on purpose.';
+const MEM_KIND = { turn: 'From a chat', window: 'Several turns of a chat', note: 'You asked to keep this' };
+async function openMemory() {
+  const m = await api.get('/v1/memory?limit=200');
+  const rows = (m.items || []).map(x => `<li data-id="${esc(x.id)}"><div class="row" style="justify-content:space-between;gap:8px"><span class="tiny faint">${esc(MEM_KIND[x.kind] || 'Note')} · ${ago(x.created_at)}${+x.access_count ? ` · used ${plural(+x.access_count, 'time')}` : ''}</span><button class="btn ghost sm" type="button" data-forget="${esc(x.id)}" aria-label="Forget this note">Forget</button></div><div class="kb-ptext">${esc(x.text)}</div></li>`).join('');
+  modal(`<h3 style="margin-top:0">Memory</h3><p class="small muted">${esc(memorySummary(m))}</p>
+    <div class="row" style="gap:8px;margin:10px 0"><input id="memText" type="text" maxlength="4000" placeholder="Something to remember, for example: my server listens on port 8443" aria-label="A note to remember" style="flex:1"><button class="btn" type="button" id="memAdd">Remember</button></div>
+    ${rows ? `<ul class="kb-facts" id="memList" style="padding-left:0;list-style:none;max-height:50vh;overflow:auto">${rows}</ul>${m.count > (m.items || []).length ? `<p class="tiny faint">Showing the newest ${m.items.length} of ${m.count}.</p>` : ''}
+    <p class="row" style="gap:8px;margin-top:10px"><button class="btn ghost" type="button" id="memTidy">Merge repeated notes</button><button class="btn danger" type="button" id="memForget">Forget everything</button></p>` : ''}`);
+  // The dialog is itself a form, so this is a button and a key handler, not a form of its own.
+  const addNote = guard(async () => { const t = $('#memText').value.trim(); if (!t) return; await api.post('/v1/memory', { text: t }); toast('Remembered'); await openMemory(); }, 'The note could not be saved.');
+  $('#memAdd').onclick = addNote; $('#memText').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); addNote(); } };
+  $$('#memList [data-forget]').forEach(b => b.onclick = guard(async () => { await api.del(`/v1/memory/${b.dataset.forget}`); b.closest('li').remove(); toast('Forgotten'); }, 'The note could not be removed.'));
+  if ($('#memTidy')) $('#memTidy').onclick = guard(async () => { const r = await api.post('/v1/memory/tidy'); toast(r.merged ? `${plural(r.merged, 'repeated note')} merged` : 'No repeated notes found'); await openMemory(); }, 'The notes could not be merged.');
+  if ($('#memForget')) $('#memForget').onclick = guard(async () => { if (!await confirmDialog({ title: 'Forget everything?', body: '<p>Every note from earlier conversations is deleted. Your chats themselves are kept. This cannot be undone.</p>', ok: 'Forget everything' })) return; await api.del('/v1/memory'); toast('Everything was forgotten'); await openMemory(); }, 'The memory could not be cleared.');
 }
 $('#settingsBtn').onclick = openSettings; $('#settingsTop').onclick = openSettings;
 // Phones: the Insights pages sit behind "More" so the bottom bar keeps a few large targets.

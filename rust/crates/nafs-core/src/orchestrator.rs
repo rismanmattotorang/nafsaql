@@ -934,6 +934,8 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         }
         // FR-K20..K25: passages of a knowledge base, numbered and delimited as data (Phase 20).
         let mut sources: Vec<Value> = vec![];
+        // Phase 26: the text of each passage as it reached the prompt, for the support check of the answer.
+        let mut source_texts: Vec<String> = vec![];
         // FR-K23: memory tokens for every quick-model request of this turn, and the token that marks their
         // positions in the prompt (Phase 20).
         let mut memory: Option<Arc<Vec<Vec<f32>>>> = None;
@@ -1004,8 +1006,36 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 let pmode = if want_memory { "rag" } else { kmode };
                 match (&retriever, serve_passages) {
                     (Some(r), true) => {
-                        match r.retrieve(&kq.kb, &user.content, pk, pmode).await {
+                        // Phase 26: a question that leans on the previous turn is searched together with it.
+                        let previous = history.iter().rev().find(|m| m.role == "user");
+                        let (search_text, joined) = if cfg.knowledge.followup_context {
+                            crate::continuity::search_text(
+                                &user.content,
+                                previous.map(|m| m.content.as_str()),
+                            )
+                        } else {
+                            (user.content.clone(), false)
+                        };
+                        match r.retrieve(&kq.kb, &search_text, pk, pmode).await {
                             Ok(found) => {
+                                if joined {
+                                    sources.push(json!({"note": "This question was read together with your previous one.", "kb": kq.kb}));
+                                }
+                                for u in crate::knowledge::pack_units(
+                                    &found,
+                                    &user.content,
+                                    cfg.knowledge.rag_max_chars,
+                                ) {
+                                    let p = &found.passages[u.passage - 1];
+                                    while source_texts.len() < u.passage {
+                                        source_texts.push(String::new());
+                                    }
+                                    source_texts[u.passage - 1] =
+                                        format!("{} {} {}", p.doc_title, p.heading, u.text);
+                                }
+                                source_texts.extend(found.facts.iter().map(|f| {
+                                    format!("{} {} {} {}", f.source, f.predicate, f.target, f.quote)
+                                }));
                                 // SR-K05: nothing outside the memory block may carry the placeholder token, or the engine
                                 // counts more memory positions than there are vectors and refuses the request. The whole
                                 // block is cleaned, not only the passage text: the base's name, a document title and a
@@ -1050,6 +1080,75 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 ms: tk.elapsed().as_millis() as u64,
                 ..Default::default()
             });
+        }
+        // Phase 26: the memory of earlier conversations. Not for a private request, the Lab, a room (what is said there
+        // is shared by its members) or a caller that turned retrieval off; and a turn that reads memory tokens keeps
+        // the prompt its module was trained with.
+        let personal = cfg.recall.enabled
+            && !ephemeral
+            && !req.lab
+            && req.retrieve != Some(false)
+            && conv.is_some_and(|c| !self.store.in_room(c));
+        // A message that asked for something to be kept is the note itself; its turn is not stored a second time.
+        let mut noted = false;
+        if personal && memory.is_none() {
+            if let Some(note) = nafs_memory::recall::note_request(&user.content) {
+                match self.store.remember_note(note) {
+                    Ok(_) => {
+                        noted = true;
+                        system.push_str("\n\nThis person asked you to remember what they just wrote. It has been saved and will be available in later conversations. Confirm that in one short sentence.");
+                        sources.push(json!({"note": "Saved to memory. Everything remembered can be read and deleted under Memory."}));
+                    }
+                    Err(e) => tracing::warn!(error = %e, "could not save the note"),
+                }
+            } else if nafs_memory::recall::should_recall(
+                &user.content,
+                source_texts.iter().any(|t| !t.is_empty()),
+            ) {
+                let tr = Instant::now();
+                let embedder = self
+                    .knowledge
+                    .read()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .clone();
+                let qv = match (&embedder, cfg.recall.vectors) {
+                    (Some(k), true) => k.embed(&user.content).await,
+                    _ => None,
+                };
+                let opts = nafs_memory::recall::RecallOpts {
+                    limit: cfg.recall.limit,
+                    min_score: cfg.recall.min_score,
+                    half_life_days: cfg.recall.half_life_days,
+                    budget_chars: cfg.recall.budget_chars,
+                    ..Default::default()
+                };
+                match self
+                    .store
+                    .recall(&user.content, qv.as_deref(), conv, &opts, Utc::now())
+                {
+                    Ok(items) if !items.is_empty() => {
+                        system.push_str("\n\n");
+                        system.push_str(&delimit(
+                            "recalled",
+                            &nafs_memory::recall::recall_block(&items),
+                            cfg.recall.budget_chars + 400,
+                        ));
+                        metrics::counter!("nafs_recall_notes_total").increment(items.len() as u64);
+                        sources.push(json!({"recall": items.iter().map(|i| json!({
+                            "id": i.id, "created_at": i.created_at, "kind": i.kind, "score": i.score,
+                            "text": i.text.chars().take(400).collect::<String>()})).collect::<Vec<_>>()}));
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!(error = %e, "the memory of earlier conversations could not be read")
+                    }
+                }
+                stages.push(StageTiming {
+                    stage: "recall".into(),
+                    ms: tr.elapsed().as_millis() as u64,
+                    ..Default::default()
+                });
+            }
         }
         if let Some(ph) = memory_ph.as_deref().filter(|_| memory.is_some()) {
             // SR-K05: only the memory block may carry the placeholder. A question, an earlier turn or a retrieved
@@ -1159,8 +1258,13 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 messages: prompt.clone(),
                 early_stop,
                 max_tokens: req.max_tokens.unwrap_or(cfg.deliberation.draft_max_tokens),
-                temperature: cfg.deliberation.draft_temperature,
-                top_p: 0.8,
+                // Phase 26: an answer read from memory tokens is decoded greedily, as Memorilla evaluates its own.
+                temperature: if memory.is_some() {
+                    0.0
+                } else {
+                    cfg.deliberation.draft_temperature
+                },
+                top_p: if memory.is_some() { 1.0 } else { 0.8 },
                 logprobs: true,
                 thinking: Some(pair.s1.cfg.thinking),
                 cancel: Some(cancel.clone()),
@@ -1481,6 +1585,34 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             None => gate::decide(&feats, &ctx),
         };
         let mut gd = gd;
+        // Phase 26: a quick answer from documents that states what the passages do not goes to the reasoning model,
+        // which answers from the same passages. Only when the caller left the path to the gate.
+        let below = cfg.knowledge.support_escalate_below as f32;
+        if let (true, Some(d)) = (
+            below > 0.0
+                && !gd.escalate
+                && req.force_mode.is_none()
+                && cfg.knowledge.support_check
+                && source_texts.iter().any(|t| !t.is_empty()),
+            draft.as_ref(),
+        ) {
+            let refs: Vec<&str> = source_texts.iter().map(String::as_str).collect();
+            let s = crate::support::check(
+                &d.content,
+                &refs,
+                &user.content,
+                cfg.knowledge.support_min_overlap as f32,
+            );
+            if s.claims > 0 && s.share() < below {
+                gd.escalate = true;
+                gd.rule = GateRule::UnsupportedBySources;
+                gd.explanation = format!(
+                    "{} of {} sentences of the quick answer are not in the passages; the reasoning model answers from the same passages.",
+                    s.claims - s.supported,
+                    s.claims
+                );
+            }
+        }
         if let Some(d) = draft
             .as_ref()
             .filter(|d| d.finish_reason == "early_escalation")
@@ -2337,6 +2469,23 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             }
         }
 
+        // Phase 26: which sentences of the answer the passages support. Reported, never used to change the text.
+        if cfg.knowledge.support_check
+            && source_texts.iter().any(|t| !t.is_empty())
+            && assurance != Assurance::Abstained
+        {
+            let refs: Vec<&str> = source_texts.iter().map(String::as_str).collect();
+            let s = crate::support::check(
+                &final_text,
+                &refs,
+                &user.content,
+                cfg.knowledge.support_min_overlap as f32,
+            );
+            metrics::counter!("nafs_knowledge_claims_total").increment(s.claims as u64);
+            metrics::counter!("nafs_knowledge_claims_unsupported_total")
+                .increment((s.claims - s.supported) as u64);
+            sources.push(s.row());
+        }
         usage.wall_ms = t0.elapsed().as_millis() as u64;
         usage.stages = stages;
         let trace_state = *states.last().unwrap();
@@ -2388,6 +2537,42 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         }
         if let Err(e) = self.store.save_reply(&reply, ephemeral || req.lab, req.lab) {
             tracing::warn!(error = %e, reply = %reply.reply_id, "could not store the reply");
+        }
+        // Phase 26: the turn becomes a note that a later conversation can find. An answer that declined is not one.
+        if let (true, Some(c), false) =
+            (personal && !noted, conv, assurance == Assurance::Abstained)
+        {
+            match self
+                .store
+                .remember_turn(c, &user.content, &final_text, Utc::now())
+            {
+                Ok(ids) if !ids.is_empty() => {
+                    let _ = self.store.trim_episodes(cfg.recall.max_episodes);
+                    let embedder = self
+                        .knowledge
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .clone();
+                    if let (Some(k), true) = (embedder, cfg.recall.vectors) {
+                        // After the reply, off the request: the note's meaning vector, from its first thousand
+                        // characters (a second of the embedding server, not ten).
+                        let store = self.store.clone();
+                        tokio::spawn(async move {
+                            for (id, text) in store.episodes_without_vector(4).unwrap_or_default() {
+                                let head: String = text.chars().take(1000).collect();
+                                match k.embed(&head).await {
+                                    Some(v) => {
+                                        let _ = store.set_episode_vector(id, &v);
+                                    }
+                                    None => break,
+                                }
+                            }
+                        });
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => tracing::warn!(error = %e, "could not remember the turn"),
+            }
         }
         if let (false, Some(c), Assurance::Verified) = (ephemeral, conv, assurance) {
             let vname = reply

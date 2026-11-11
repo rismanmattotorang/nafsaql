@@ -230,6 +230,8 @@ pub struct Kb {
     index: Arc<index::Index>,
     /// Vectors of recent questions (FR-K69): a repeated question, and the graph search after the plain one, embed once.
     questions: std::sync::Mutex<HashMap<String, (Vec<f32>, u64)>>,
+    /// Phase 26: per base, the embedding model its vectors were made by when that is not the one running now.
+    foreign: std::sync::Mutex<HashMap<String, Option<String>>>,
 }
 
 /// Questions whose vectors are remembered.
@@ -258,6 +260,7 @@ impl Kb {
             vcache: vcache::VectorCache::new(vector_cache_mb),
             index: index::Index::new(index_memory_mb),
             questions: std::sync::Mutex::new(HashMap::new()),
+            foreign: std::sync::Mutex::new(HashMap::new()),
         });
         tokio::spawn(worker(Arc::downgrade(&kb), rx_fast));
         tokio::spawn(worker(Arc::downgrade(&kb), rx_slow));
@@ -456,6 +459,7 @@ impl Kb {
         // Out of use at once; its rows go in the background (under an hour at 50,000 passages), and a restart resumes it.
         self.store.mark_kb_deleting(kb).await?;
         self.index.remove_kb(kb);
+        self.foreign.lock().expect("embedder identity").remove(kb);
         let _ = tokio::fs::remove_dir_all(self.kb_dir(kb)).await;
         let (store, id) = (self.store.clone(), kb.to_string());
         tokio::spawn(async move {
@@ -579,6 +583,23 @@ impl Kb {
         self.embedder.as_ref().map_or(0, |e| e.cfg.dims)
     }
 
+    /// Phase 26: the model a base's vectors were made by, when it is not the one running now. Vectors of two models
+    /// cannot be compared, even at the same width, so such a base is searched by its words until its meaning index is
+    /// rebuilt. The store is asked once per base; a rebuild or a deletion forgets the answer.
+    async fn foreign_embedder(&self, kb: &str) -> Option<String> {
+        let ours = &self.embedder.as_ref()?.cfg.model;
+        if let Some(known) = self.foreign.lock().expect("embedder identity").get(kb) {
+            return known.clone();
+        }
+        // A store that cannot be asked is not remembered: the next search asks again.
+        let other = foreign_model(self.store.embedder_of(kb).await.ok()?, ours);
+        self.foreign
+            .lock()
+            .expect("embedder identity")
+            .insert(kb.to_string(), other.clone());
+        other
+    }
+
     /// Give a document's passages that lack one a vector (state `embedding`). Returns a plain-language note when the
     /// embedder is off or failed: the document stays searchable by its words, and `reindex` finishes it later.
     async fn embed_document(&self, kb: &str, doc: &str, title: &str) -> Result<u64, String> {
@@ -671,6 +692,7 @@ impl Kb {
                 self.vcache.drop_kb(base);
                 self.store.clear_vectors(base).await?;
                 self.index.drop_kb(base);
+                self.foreign.lock().expect("embedder identity").remove(base);
             }
         }
         let docs = self.store.documents_missing_vectors(kb).await?;
@@ -949,7 +971,7 @@ impl Kb {
                 let mut params = self.cfg.index.params;
                 params.ppr = Some(params.ppr.unwrap_or_default());
                 let r = self
-                    .search_indexed(ix, query, k, SearchMode::Hybrid, params)
+                    .search_indexed(kb, ix, query, k, SearchMode::Hybrid, params)
                     .await;
                 return Ok((Vec::new(), r));
             }
@@ -1262,6 +1284,7 @@ impl Kb {
     /// A search answered from the in-process index: no round trip to the store, and the question is embedded once.
     async fn search_indexed(
         &self,
+        kb: &str,
         base: Arc<index::Base>,
         query: &str,
         k: usize,
@@ -1277,6 +1300,9 @@ impl Kb {
             None
         } else if base.vectors() == 0 {
             fallback = Some("this knowledge base has no meaning index yet".to_string());
+            None
+        } else if let Some(other) = self.foreign_embedder(kb).await {
+            fallback = Some(foreign_note(&other));
             None
         } else {
             match self.question_vector(query).await {
@@ -1332,7 +1358,7 @@ impl Kb {
             if let index::Lookup::Ready(base) = self.index.get(&self.store, kb, self.dims()).await?
             {
                 let mut r = self
-                    .search_indexed(base, query, k, mode, self.cfg.index.params)
+                    .search_indexed(kb, base, query, k, mode, self.cfg.index.params)
                     .await;
                 r.took_ms = t0.elapsed().as_millis() as u64;
                 return Ok(r);
@@ -1346,6 +1372,9 @@ impl Kb {
             let n = self.store.vector_count(kb).await?;
             if n == 0 {
                 fallback = Some("this knowledge base has no meaning index yet".to_string());
+                None
+            } else if let Some(other) = self.foreign_embedder(kb).await {
+                fallback = Some(foreign_note(&other));
                 None
             } else {
                 let te = Instant::now();
@@ -1592,6 +1621,69 @@ fn hex(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
+/// The recorded model of a base when it differs from the one running (`ours`); a base with none recorded has no
+/// vectors yet, and whatever is written next is ours.
+fn foreign_model(recorded: Option<String>, ours: &str) -> Option<String> {
+    recorded.filter(|m| m != ours)
+}
+
+/// What a search says when a base's vectors were made by another model.
+fn foreign_note(model: &str) -> String {
+    format!("this knowledge base's meaning index was made by another embedding model ({model}); rebuild the meaning index to search by meaning again")
+}
+
+/// The relevance filter between a search and the prompt (FR-K20), here so the evaluation can run it without a server.
+///
+/// A passage is kept when its meaning similarity reaches `min_similarity`, **or** when its words match strongly
+/// (`lexical_rescue`, a BM25 score; 0 turns this off); a search that fell back to words keeps every match. At most `k`
+/// are kept. Phase 26: with `elbow_gap > 0`, the kept passages are then cut at the largest drop in meaning similarity
+/// when that drop is at least `elbow_gap` (the threshold sits in the middle of the drop); the first passage and a
+/// passage whose words match strongly are never cut. A prompt then carries the passages that stand out, not always
+/// `k` of them, and on a CPU every passage left out is a second or more of reading time.
+pub fn keep_for_chat(
+    hits: Vec<Hit>,
+    mode: SearchMode,
+    min_similarity: f64,
+    lexical_rescue: f64,
+    k: usize,
+    elbow_gap: f64,
+) -> Vec<Hit> {
+    let rescued =
+        |h: &Hit| lexical_rescue > 0.0 && h.lexical_score.is_some_and(|l| l >= lexical_rescue);
+    let mut kept: Vec<Hit> = hits
+        .into_iter()
+        .filter(|h| {
+            mode == SearchMode::Lexical
+                || h.vector_score.is_some_and(|v| v >= min_similarity)
+                || rescued(h)
+        })
+        .take(k)
+        .collect();
+    if elbow_gap <= 0.0 || kept.len() < 3 {
+        return kept;
+    }
+    let mut sims: Vec<f64> = kept.iter().filter_map(|h| h.vector_score).collect();
+    if sims.len() < 3 {
+        return kept;
+    }
+    sims.sort_by(|a, b| b.total_cmp(a));
+    let (mut gap, mut at) = (0.0, 0);
+    for i in 1..sims.len() {
+        if sims[i - 1] - sims[i] > gap {
+            (gap, at) = (sims[i - 1] - sims[i], i);
+        }
+    }
+    if gap < elbow_gap {
+        return kept;
+    }
+    let threshold = sims[at - 1] - gap / 2.0;
+    let mut first = true;
+    kept.retain(|h| {
+        std::mem::take(&mut first) || rescued(h) || h.vector_score.is_none_or(|v| v >= threshold)
+    });
+    kept
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1679,5 +1771,95 @@ mod tests {
         assert_eq!(display_name("..hidden\u{7}.md"), "hidden.md");
         assert_eq!(display_name(""), "untitled");
         assert_eq!(safe_key("ab-c_1/../x"), "ab-c_1x");
+    }
+    #[test]
+    fn a_base_made_by_another_embedding_model_is_recognised() {
+        let ours = "Qwen3-Embedding-0.6B";
+        assert_eq!(foreign_model(None, ours), None);
+        assert_eq!(foreign_model(Some(ours.to_string()), ours), None);
+        assert_eq!(
+            foreign_model(Some("Qwen3-Embedding-4B".to_string()), ours).as_deref(),
+            Some("Qwen3-Embedding-4B")
+        );
+        assert!(foreign_note("Qwen3-Embedding-4B").contains("rebuild the meaning index"));
+    }
+
+    #[test]
+    fn the_elbow_cuts_the_passages_after_the_largest_drop_but_not_a_strong_word_match() {
+        let hit = |id: &str, sim: f64, lex: f64| Hit {
+            chunk_id: id.into(),
+            doc_id: "d".into(),
+            doc_title: "t".into(),
+            ord: 0,
+            heading: String::new(),
+            page: None,
+            text: String::new(),
+            score: 0.0,
+            rank: 0,
+            lexical_score: Some(lex),
+            vector_score: Some(sim),
+        };
+        let hits = || {
+            vec![
+                hit("a", 0.71, 3.0),
+                hit("b", 0.69, 2.0),
+                hit("c", 0.52, 1.0),
+                hit("d", 0.50, 12.0),
+            ]
+        };
+        let ids = |v: Vec<Hit>| v.into_iter().map(|h| h.chunk_id).collect::<Vec<_>>();
+        assert_eq!(
+            ids(keep_for_chat(
+                hits(),
+                SearchMode::Hybrid,
+                0.45,
+                10.0,
+                4,
+                0.0
+            )),
+            ["a", "b", "c", "d"]
+        );
+        // The drop of 0.17 between b and c cuts c; d is below it too but its words match strongly.
+        assert_eq!(
+            ids(keep_for_chat(
+                hits(),
+                SearchMode::Hybrid,
+                0.45,
+                10.0,
+                4,
+                0.08
+            )),
+            ["a", "b", "d"]
+        );
+        // No drop that large: nothing is cut.
+        assert_eq!(
+            ids(keep_for_chat(
+                hits(),
+                SearchMode::Hybrid,
+                0.45,
+                10.0,
+                4,
+                0.2
+            ))
+            .len(),
+            4
+        );
+        // The first passage stays even when it is the low one.
+        let low_first = vec![
+            hit("x", 0.50, 1.0),
+            hit("y", 0.80, 1.0),
+            hit("z", 0.79, 1.0),
+        ];
+        assert_eq!(
+            ids(keep_for_chat(
+                low_first,
+                SearchMode::Hybrid,
+                0.45,
+                10.0,
+                4,
+                0.08
+            )),
+            ["x", "y", "z"]
+        );
     }
 }

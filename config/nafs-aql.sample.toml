@@ -172,6 +172,15 @@ enabled = false
 top_k = 2
 min_score = 0.35
 
+[recall]                               # memory of earlier conversations: notes of finished turns, read back when a question says "my", "last time", "you said"
+enabled = true
+limit = 3                              # most notes in one prompt
+min_score = 0.35                       # lowest relevance (0..1) a note needs
+half_life_days = 30.0                  # a note counts half after this many days
+budget_chars = 1500                    # most characters of notes in one prompt
+vectors = true                         # embed each note after the reply, so a question in other words finds it
+max_episodes = 5000                    # the never-recalled oldest go first; 0 = no limit
+
 [verifiers]                            # FR-030..FR-035
 python = "python3"
 cpu_time_s = 20                        # EvalPlus suites need several CPU-seconds on a loaded host
@@ -231,6 +240,12 @@ bm25_weights = [1.0, 1.0, 1.0, 1.0]    # FR-K68: BM25F weights of the title, the
 fusion = "rrf"                         # FR-K70: "rrf" (by rank, the meaning weighted vector_weight) or "convex" (by normalised score, the meaning's share fusion_alpha)
 fusion_alpha = 0.2
 graph_arm_weight = 0.0                 # FR-K72: the walk over the passage-and-term graph as a third arm (0 = off)
+fuzzy_terms = true                     # a mistyped question word is replaced by the nearest word the base holds (one edit; two for long words)
+followup_context = true                # a question that leans on the previous turn ("and how fast is it?") is searched together with it
+rag_elbow_gap = 0.0                    # cut the passages after a drop in similarity of at least this (0 = off; measured: saves 0.1 passage, loses an answer)
+support_check = true                   # say which sentences of an answer from documents are in the passages it was given (no model)
+support_min_overlap = 0.6              # share of a sentence's content words one passage must hold
+support_escalate_below = 0.0           # a quick answer with fewer supported sentences than this share goes to the reasoning model (0 = never)
 memory_checkpoint = ""                 # Phase 5: Memorilla module trained for System 1 (dir with config.json + weights.safetensors); "" = memory mode off
 memory_placeholder = "<|fim_pad|>"     # the token at the 16 memory positions of the prompt
 memory_trainer = "rust/target/release/memorilla-train"   # Phase 6: cargo build --release -p nafs-memorilla

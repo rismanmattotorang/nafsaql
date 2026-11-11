@@ -31,6 +31,9 @@ pub struct Config {
     pub alerts: AlertsCfg,
     #[serde(default)]
     pub retrieval: RetrievalCfg,
+    /// Memory of earlier conversations (Phase 26).
+    #[serde(default)]
+    pub recall: RecallCfg,
     /// Math and code harness (FR-090..FR-093): the code agent endpoint.
     #[serde(default)]
     pub harness: HarnessCfg,
@@ -126,6 +129,20 @@ pub struct KnowledgeCfg {
     pub fusion_alpha: f64,
     /// FR-K72: how much the walk over the passage-and-term graph counts against the fused search (0 = off).
     pub graph_arm_weight: f64,
+    /// Phase 26: a question word the base does not hold is replaced by the nearest word it does hold (a typing slip).
+    pub fuzzy_terms: bool,
+    /// Phase 26, chat: among the passages that pass the relevance filter, those after the largest drop in meaning
+    /// similarity are left out when that drop is at least this large (0 = keep all `rag_k`).
+    pub rag_elbow_gap: f64,
+    /// Phase 26, chat: a question that leans on the previous turn ("and how fast is it?") is searched together with
+    /// that turn.
+    pub followup_context: bool,
+    /// Phase 26, chat: every sentence of an answer from documents is checked against the passages it was given.
+    pub support_check: bool,
+    /// The share of a sentence's content words a passage must hold for the sentence to count as supported.
+    pub support_min_overlap: f64,
+    /// A quick-model answer with fewer than this share of supported sentences goes to the reasoning model (0 = never).
+    pub support_escalate_below: f64,
     /// Memorilla (Phase 5): a memory-module checkpoint (`config.json` + `weights.safetensors`) trained for System 1;
     /// empty turns `memory` mode off.
     pub memory_checkpoint: String,
@@ -190,6 +207,12 @@ impl Default for KnowledgeCfg {
             fusion: "rrf".into(),
             fusion_alpha: 0.2,
             graph_arm_weight: 0.0,
+            fuzzy_terms: true,
+            rag_elbow_gap: 0.0,
+            followup_context: true,
+            support_check: true,
+            support_min_overlap: 0.6,
+            support_escalate_below: 0.0,
             memory_checkpoint: String::new(),
             memory_placeholder: "<|fim_pad|>".into(),
             memory_trainer: "rust/target/release/memorilla-train".into(),
@@ -437,6 +460,42 @@ impl Default for RetrievalCfg {
             enabled: false,
             top_k: 2,
             min_score: 0.35,
+        }
+    }
+}
+
+/// Memory of earlier conversations (Phase 26): each finished turn of a stored conversation is kept as a short note,
+/// and a question that speaks in the first person or points back ("my", "last time", "you said") is answered with
+/// the notes that match it, quoted as data. No model call: words by BM25, meaning by the embedding server when it
+/// runs. A private (`ephemeral`) request, a room and the Lab neither write to this memory nor read it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct RecallCfg {
+    pub enabled: bool,
+    /// Most notes put in one prompt.
+    pub limit: usize,
+    /// Lowest relevance (0 to 1) a note needs.
+    pub min_score: f64,
+    /// Days after which a note counts half.
+    pub half_life_days: f64,
+    /// Most characters of notes in one prompt; on a CPU every thousand characters is seconds of reading.
+    pub budget_chars: usize,
+    /// Give each note a meaning vector (one embedding call after the reply), so a question in other words finds it.
+    pub vectors: bool,
+    /// Most notes kept; the never-recalled oldest go first, and notes a person asked for are never removed (0 = no
+    /// limit).
+    pub max_episodes: usize,
+}
+impl Default for RecallCfg {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            limit: 3,
+            min_score: 0.35,
+            half_life_days: 30.0,
+            budget_chars: 1500,
+            vectors: true,
+            max_episodes: 5000,
         }
     }
 }

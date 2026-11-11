@@ -60,6 +60,9 @@ fn exit_status(dir: &Path) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// What a run's page says when its module learnt nothing about the question.
+const UNUSABLE_NOTE: &str = "This run's memory is the same whatever is asked, so it would not help answer questions. Chat will use passages instead; train again, for longer or on more passages.";
+
 /// A run as the API reports it: what was asked, its state, and the progress so far.
 fn describe(dir: &Path) -> Option<Value> {
     let id = dir.file_name()?.to_string_lossy().to_string();
@@ -124,6 +127,7 @@ fn describe(dir: &Path) -> Option<Value> {
         "start_val_loss": start.as_ref().and_then(|s| s["val_loss"].as_f64()),
         "loss": steps.iter().map(|s| json!([s["step"], s["loss"]])).collect::<Vec<_>>(),
         "val_loss": epochs.iter().map(|e| json!([e["epoch"], e["val_loss"]])).collect::<Vec<_>>(),
+        "question_cosine": epochs.iter().filter(|e| e["question_cosine"].is_number()).map(|e| json!([e["epoch"], e["question_cosine"]])).collect::<Vec<_>>(),
         "seconds_per_example": if sec_per_example.is_empty() { Value::Null } else { json!(sec_per_example.iter().sum::<f64>() / sec_per_example.len() as f64) },
         "final_val_loss": last_of("done").and_then(|d| d["val_loss"].as_f64()),
     });
@@ -132,6 +136,20 @@ fn describe(dir: &Path) -> Option<Value> {
         .join("best")
         .join("weights.safetensors")
         .exists());
+    // Phase 26: what the trainer measured about the checkpoint that would be activated. `memory_usable` false means
+    // its memory is the same whatever is asked, and chat will answer from passages instead.
+    if let Some(m) = ["best", "stopped", "last"]
+        .iter()
+        .map(|d| dir.join("out").join(d))
+        .find(|p| p.join("weights.safetensors").exists())
+        .and_then(|p| nafs_memorilla::CheckpointMetrics::read(&p))
+    {
+        run["memory_usable"] = json!(!m.collapsed);
+        run["checkpoint"] = json!(m);
+        if m.collapsed {
+            run["note"] = json!(UNUSABLE_NOTE);
+        }
+    }
     if run["error"].is_null() && state == "failed" && building {
         run["error"] = json!("the server stopped while the questions were being prepared");
     }
@@ -225,12 +243,16 @@ pub struct NewRun {
     #[serde(default)]
     max_examples: usize,
     lr: Option<f64>,
+    /// Examples per optimiser step.
+    accumulation: Option<usize>,
 }
 fn d_kind() -> String {
     "train".into()
 }
+/// The reference's from-scratch recipe (Phase 26): 5 epochs at 1e-4 with 16 examples per optimiser step. The first
+/// recipe here (3 epochs at 3e-4, 4 examples a step) trained a module that gave every question the same memory.
 fn d_epochs() -> usize {
-    3
+    nafs_memorilla::train::DEFAULT_EPOCHS
 }
 
 /// Run directories, in every base or in one, whose trainer is being prepared or is going.
@@ -379,9 +401,13 @@ pub async fn start(
         }
         taken.ok_or_else(|| KbError::Io("no free run directory".into()))?
     };
-    let lr =
-        b.lr.unwrap_or(if b.kind == "finetune" { 1e-4 } else { 3e-4 });
+    let lr = b.lr.unwrap_or(nafs_memorilla::train::DEFAULT_LR);
+    let accumulation = b
+        .accumulation
+        .unwrap_or(nafs_memorilla::train::DEFAULT_ACCUMULATION)
+        .clamp(1, 64);
     let mut run = json!({ "id": id, "kb": kb, "kind": b.kind, "epochs": b.epochs.clamp(1, 20), "max_examples": b.max_examples, "lr": lr,
+        "accumulation": accumulation,
         "init": init, "created_at": chrono::Utc::now().to_rfc3339(), "state": "building", "pid": 0,
         // The gateway building the dataset: without it a run interrupted by a restart would stay "building" and block
         // every later run for this base.
@@ -428,6 +454,8 @@ pub async fn start(
                     &run["epochs"].to_string(),
                     "--lr",
                     &lr.to_string(),
+                    "--accumulation",
+                    &accumulation.to_string(),
                 ])
                 .args(["--max-examples", &run["max_examples"].to_string()]);
                 if let Some(i) = run["init"].as_str() {
@@ -513,11 +541,21 @@ pub async fn activate(
     for f in ["config.json", "weights.safetensors"] {
         std::fs::copy(ckpt.join(f), tmp.join(f)).map_err(io)?;
     }
+    // What the trainer measured goes with the weights: the reader decides from it whether the module may answer.
+    let metrics = nafs_memorilla::CheckpointMetrics::read(&ckpt);
+    if let Some(m) = &metrics {
+        m.write(&tmp).map_err(KbError::Io)?;
+    }
     let _ = std::fs::remove_dir_all(&dest);
     std::fs::rename(&tmp, &dest).map_err(io)?;
     let abs = std::fs::canonicalize(&dest).map_err(io)?;
     std::fs::write(home.join("active"), abs.to_string_lossy().as_bytes()).map_err(io)?;
-    Ok(Json(json!({ "active": abs, "from": ckpt })))
+    let mut out = json!({ "active": abs, "from": ckpt });
+    if metrics.is_some_and(|m| m.collapsed) {
+        out["memory_usable"] = json!(false);
+        out["note"] = json!(UNUSABLE_NOTE);
+    }
+    Ok(Json(out))
 }
 
 #[cfg(test)]

@@ -92,6 +92,7 @@ fn index_config(k: &nafs_core::config::KnowledgeCfg) -> nafs_kb::IndexConfig {
                 }
             },
             prf: None,
+            fuzzy: k.fuzzy_terms,
             ppr: (k.graph_arm_weight > 0.0).then(|| Ppr {
                 weight: k.graph_arm_weight,
                 ..Ppr::default()
@@ -715,6 +716,8 @@ pub struct ChatKnowledge {
     kb: Arc<Kb>,
     min_similarity: f64,
     lexical_rescue: f64,
+    /// Phase 26: the drop in similarity that cuts the passages after it (0 = off).
+    elbow_gap: f64,
     graph_facts: usize,
     memory: Option<Arc<MemoryReader>>,
     /// FR-K24: the order `auto` tries modes in (`[knowledge] auto_order`).
@@ -741,6 +744,45 @@ pub struct MemoryReader {
     /// Held while a base's documents are prepared: the work costs seconds of CPU and the whole base's memory, so two
     /// questions arriving together must not each do it.
     preparing: tokio::sync::Mutex<()>,
+    /// Phase 26: whether a module's memory says anything about the question (`true`), by checkpoint and write time,
+    /// so the files are read (or an older module probed) once.
+    verdicts: std::sync::Mutex<std::collections::HashMap<Key, bool>>,
+}
+
+/// Three unrelated questions an older module (saved without `metrics.json`) is asked once: a module whose memories
+/// for them are the same vector says nothing about what was asked.
+const MEMORY_PROBE_QUESTIONS: [&str; 3] = [
+    "Who wrote this, and when was it published?",
+    "What is the main result, in numbers?",
+    "Which steps does the method take, in order?",
+];
+
+/// Why a module is passed over, in words that read inside the chat note "Memory could not be read (...); the
+/// passages were used instead."
+const MEMORY_UNINFORMATIVE: &str = "the memory of this knowledge base carries no information about the question, because it was trained too briefly";
+
+/// Phase 26: whether a memory module may answer. What the trainer saved beside the weights decides; a module saved
+/// before it wrote any is judged by the memories it gives the probe questions; with neither, nothing is known yet.
+pub fn memory_usable(
+    saved: Option<&nafs_memorilla::CheckpointMetrics>,
+    probe: Option<&nafs_memorilla::CollapseStats>,
+) -> Option<bool> {
+    match (saved, probe) {
+        (Some(m), _) => Some(!m.collapsed),
+        (None, Some(p)) => Some(!p.collapsed()),
+        (None, None) => None,
+    }
+}
+
+/// A knowledge base's module with its documents prepared: what a question is read against.
+struct ReadyMemory {
+    reader: Arc<MemoryReader>,
+    ckpt: Key,
+    module: Arc<nafs_memorilla::MemoryModule>,
+    kb_name: String,
+    prepared: Arc<nafs_memorilla::memory::PreparedDocs>,
+    documents: usize,
+    prepare_ms: u64,
 }
 
 impl MemoryReader {
@@ -773,6 +815,7 @@ impl MemoryReader {
             loaded: Default::default(),
             prepared: Default::default(),
             preparing: Default::default(),
+            verdicts: Default::default(),
         })
     }
 
@@ -787,6 +830,42 @@ impl MemoryReader {
             .map(|d| d.as_millis())
             .unwrap_or(0);
         (p.to_path_buf(), t)
+    }
+
+    /// The checkpoint a knowledge base would be answered from, without loading it: its activated run, else the
+    /// global one.
+    fn checkpoint_for(&self, kb: &str) -> Option<Key> {
+        crate::memory_runs::active_checkpoint(&self.files_dir, kb)
+            .or_else(|| self.global.as_ref().map(|(p, _)| p.clone()))
+            .map(|p| Self::stamp(&p))
+    }
+
+    /// The verdict on a checkpoint that needs no model: a cached one, else what the trainer saved beside the weights.
+    fn known_verdict(&self, ckpt: &Key) -> Option<bool> {
+        if let Some(v) = self
+            .verdicts
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(ckpt)
+        {
+            return Some(*v);
+        }
+        let saved = nafs_memorilla::CheckpointMetrics::read(&ckpt.0);
+        let v = memory_usable(saved.as_ref(), None)?;
+        self.remember_verdict(ckpt, v);
+        Some(v)
+    }
+
+    fn remember_verdict(&self, ckpt: &Key, usable: bool) {
+        let mut map = self.verdicts.lock().unwrap_or_else(|e| e.into_inner());
+        // Only the current module of a base is ever asked about; old write times of the same path pile up otherwise.
+        if map.len() >= 16 {
+            map.clear();
+        }
+        map.insert(ckpt.clone(), usable);
+        if !usable {
+            tracing::warn!(checkpoint = %ckpt.0.display(), "memory module collapsed (the same memory for every question); not used");
+        }
     }
 
     /// The module for a knowledge base: its activated run, else the global checkpoint. Loading one reads hundreds of
@@ -830,6 +909,13 @@ impl MemoryReader {
 }
 
 impl ChatKnowledge {
+    /// Phase 26: cut the kept passages at the largest drop in similarity of at least `gap` (`[knowledge]
+    /// rag_elbow_gap`).
+    pub fn with_elbow(mut self, gap: f64) -> ChatKnowledge {
+        self.elbow_gap = gap.max(0.0);
+        self
+    }
+
     pub fn new(
         kb: Arc<Kb>,
         min_similarity: f64,
@@ -842,6 +928,7 @@ impl ChatKnowledge {
             kb,
             min_similarity,
             lexical_rescue,
+            elbow_gap: 0.0,
             graph_facts: graph_facts.max(1),
             memory: memory.map(Arc::new),
             auto_order,
@@ -853,6 +940,154 @@ impl ChatKnowledge {
     fn has_memory(&self, kb: &str) -> bool {
         self.memory.as_ref().is_some_and(|m| {
             m.global.is_some() || crate::memory_runs::active_checkpoint(&m.files_dir, kb).is_some()
+        })
+    }
+
+    /// Phase 26: whether `auto` may choose memory for this base: it has a module, and the module's memory depends on
+    /// the question. A module saved with its metrics is judged from that file (no model is loaded); an older one is
+    /// probed once, which loads it and prepares the base's passages, work a memory answer would do anyway. When the
+    /// probe cannot run (the embedding server is down, say) the module is offered as before and the read decides.
+    async fn has_usable_memory(&self, kb: &str) -> bool {
+        if !self.has_memory(kb) {
+            return false;
+        }
+        let Some(reader) = self.memory.as_ref() else {
+            return false;
+        };
+        if let Some(v) = reader
+            .checkpoint_for(kb)
+            .and_then(|c| reader.known_verdict(&c))
+        {
+            return v;
+        }
+        match self.ready_memory(kb).await {
+            Ok(r) => self.verdict(&r).await.unwrap_or(true),
+            Err(_) => true,
+        }
+    }
+
+    /// The verdict on a loaded module: cached or saved, else from the probe questions (once per module).
+    async fn verdict(&self, r: &ReadyMemory) -> Result<bool, String> {
+        if let Some(v) = r.reader.known_verdict(&r.ckpt) {
+            return Ok(v);
+        }
+        let mut memories = Vec::with_capacity(MEMORY_PROBE_QUESTIONS.len());
+        for question in MEMORY_PROBE_QUESTIONS {
+            let q = self
+                .kb
+                .embed_plain(question)
+                .await
+                .map_err(|e| e.to_string())?;
+            let (m, p) = (r.module.clone(), r.prepared.clone());
+            memories.push(
+                tokio::task::spawn_blocking(move || m.read_rows(&p, &q))
+                    .await
+                    .map_err(|e| e.to_string())??,
+            );
+        }
+        let stats = nafs_memorilla::collapse_stats(&memories);
+        tracing::info!(checkpoint = %r.ckpt.0.display(), slot_cosine = stats.slot_cosine, question_cosine = stats.question_cosine,
+            memory_norm = stats.mean_norm, "memory module probed (no saved metrics)");
+        let usable = memory_usable(None, Some(&stats)).unwrap_or(true);
+        r.reader.remember_verdict(&r.ckpt, usable);
+        Ok(usable)
+    }
+
+    /// The base's module, loaded, and its passages prepared for it (reused until the base or the module changes).
+    async fn ready_memory(&self, kb: &str) -> Result<ReadyMemory, String> {
+        let reader = self
+            .memory
+            .as_ref()
+            .ok_or("searching by meaning is turned off, so memory cannot be read")?;
+        // Loading a module reads hundreds of megabytes from disk, so it never runs on a runtime thread.
+        let (ckpt, module) = {
+            let (r, base) = (reader.clone(), kb.to_string());
+            tokio::task::spawn_blocking(move || r.module_for(&base))
+                .await
+                .map_err(|e| e.to_string())??
+        };
+        let base = self
+            .kb
+            .store()
+            .get_kb(kb)
+            .await
+            .map_err(|e| e.to_string())?;
+        let dims = self
+            .kb
+            .embed_dims()
+            .ok_or("searching by meaning is turned off")?;
+        // Prepared documents are reused until the base changes (its update time) or its vector count does.
+        let n_vec = self
+            .kb
+            .store()
+            .vector_count(kb)
+            .await
+            .map_err(|e| e.to_string())? as usize;
+        // The prepared keys and values come from the module's own weights, so the checkpoint's write time is
+        // part of the stamp: re-activating a run after more training reuses the same directory.
+        let stamp = format!(
+            "{}|{n_vec}|{}|{}",
+            base.updated_at,
+            ckpt.0.display(),
+            ckpt.1
+        );
+        let cached = reader
+            .prepared
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(kb)
+            .filter(|c| c.0 == stamp)
+            .map(|c| (c.1.clone(), c.2));
+        let t0 = std::time::Instant::now();
+        let (prepared, documents, prepare_ms) = match cached {
+            Some((p, n)) => (p, n, 0),
+            None => {
+                // One preparation at a time: it costs seconds of CPU and the whole base's vectors in memory, and
+                // two questions arriving together would otherwise each do all of it.
+                let _one_at_a_time = reader.preparing.lock().await;
+                // The guard is dropped at the end of this statement, before any await below.
+                let hit = reader
+                    .prepared
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(kb)
+                    .filter(|c| c.0 == stamp)
+                    .map(|c| (c.1.clone(), c.2));
+                if let Some((p, n)) = hit {
+                    (p, n, 0)
+                } else {
+                    let (rows, n) = self
+                        .kb
+                        .store()
+                        .vectors_of(kb, dims)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if n == 0 {
+                        return Err("this knowledge base has no meaning index yet".into());
+                    }
+                    let m = module.clone();
+                    let p = tokio::task::spawn_blocking(move || m.prepare_rows(&rows, n))
+                        .await
+                        .map_err(|e| e.to_string())??;
+                    let p = Arc::new(p);
+                    let mut map = reader.prepared.lock().unwrap_or_else(|e| e.into_inner());
+                    // Only the base being asked about is worth keeping: each entry holds every passage's keys and
+                    // values (about 20 KB per passage), so a few bases would be the gateway's whole memory.
+                    map.clear();
+                    map.insert(kb.to_string(), (stamp, p.clone(), n));
+                    drop(map);
+                    (p, n, t0.elapsed().as_millis() as u64)
+                }
+            }
+        };
+        Ok(ReadyMemory {
+            reader: reader.clone(),
+            ckpt,
+            module,
+            kb_name: base.name,
+            prepared,
+            documents,
+            prepare_ms,
         })
     }
 
@@ -892,7 +1127,7 @@ pub fn auto_mode(order: &[String], has_memory: bool, has_graph: bool) -> String 
         .unwrap_or_else(|| "rag".to_string())
 }
 
-/// The relevance filter, separate so it can be tested without a store.
+/// The relevance filter without the elbow cut, as chat used it before Phase 26; the tests below pin its two rules.
 ///
 /// A passage is kept when its meaning similarity reaches `min_similarity`, **or** when its words match strongly
 /// (`lexical_rescue`, a BM25 score; 0 turns this off). The second rule exists because the vector arm misses some
@@ -900,24 +1135,22 @@ pub fn auto_mode(order: &[String], has_memory: bool, has_graph: bool) -> String 
 /// outside its top 20, and one of them, ranked first by the words, was dropped by the similarity test and the question
 /// went unanswered). Off-topic questions scored at most 8.0 on the same base against at least 10.8 for the answering
 /// passages, so the default sits between them.
-pub fn keep_for_chat(
+#[cfg(test)]
+fn keep_for_chat(
     hits: Vec<nafs_kb::Hit>,
     mode: nafs_kb::SearchMode,
     min_similarity: f64,
     lexical_rescue: f64,
     k: usize,
 ) -> Vec<nafs_kb::Hit> {
-    hits.into_iter()
-        .filter(|h| {
-            mode == nafs_kb::SearchMode::Lexical
-                || h.vector_score.is_some_and(|v| v >= min_similarity)
-                || (lexical_rescue > 0.0 && h.lexical_score.is_some_and(|l| l >= lexical_rescue))
-        })
-        .take(k)
-        .collect()
+    nafs_kb::keep_for_chat(hits, mode, min_similarity, lexical_rescue, k, 0.0)
 }
 
 impl nafs_core::knowledge::Knowledge for ChatKnowledge {
+    fn embed<'a>(&'a self, text: &'a str) -> nafs_core::knowledge::BoxFuture<'a, Option<Vec<f32>>> {
+        Box::pin(async move { self.kb.embed_plain(text).await.ok() })
+    }
+
     fn forget(&self, kb: &str) {
         if let Some(m) = &self.memory {
             // The prepared documents are vectors read from the base's passages: gone with the base.
@@ -938,9 +1171,10 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
             if asked != "auto" {
                 return asked.to_string();
             }
-            // Both checks are cheap (a file test and one count query), and `graph` is only asked for when the order
-            // reaches it.
-            let memory = self.has_memory(kb);
+            // Both checks are cheap (file tests and one count query; a module saved without metrics is probed the
+            // first time only), and `graph` is only asked for when the order reaches it.
+            // Phase 26: a module whose memory does not depend on the question does not count as memory.
+            let memory = self.has_usable_memory(kb).await;
             let graph = self.auto_order.iter().any(|m| m == "graph") && self.has_graph(kb).await;
             auto_mode(&self.auto_order, memory, graph)
         })
@@ -985,12 +1219,13 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                     .take(k)
                     .collect()
             } else {
-                keep_for_chat(
+                nafs_kb::keep_for_chat(
                     r.results,
                     r.mode,
                     self.min_similarity,
                     self.lexical_rescue,
                     k,
+                    self.elbow_gap,
                 )
             };
             let facts: Vec<nafs_core::knowledge::Fact> = facts
@@ -1067,91 +1302,31 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
     ) -> nafs_core::knowledge::BoxFuture<'a, Result<nafs_core::knowledge::MemoryReadout, String>>
     {
         Box::pin(async move {
-            let reader = self
-                .memory
-                .as_ref()
-                .ok_or("searching by meaning is turned off, so memory cannot be read")?;
-            // Loading a module reads hundreds of megabytes from disk, so it never runs on a runtime thread.
-            let (ckpt, module) = {
-                let (r, base) = (reader.clone(), kb.to_string());
-                tokio::task::spawn_blocking(move || r.module_for(&base))
-                    .await
-                    .map_err(|e| e.to_string())??
-            };
-            let base = self
-                .kb
-                .store()
-                .get_kb(kb)
-                .await
-                .map_err(|e| e.to_string())?;
-            let dims = self
-                .kb
-                .embed_dims()
-                .ok_or("searching by meaning is turned off")?;
-            // Prepared documents are reused until the base changes (its update time) or its vector count does.
-            let n_vec = self
-                .kb
-                .store()
-                .vector_count(kb)
-                .await
-                .map_err(|e| e.to_string())? as usize;
-            // The prepared keys and values come from the module's own weights, so the checkpoint's write time is
-            // part of the stamp: re-activating a run after more training reuses the same directory.
-            let stamp = format!(
-                "{}|{n_vec}|{}|{}",
-                base.updated_at,
-                ckpt.0.display(),
-                ckpt.1
-            );
-            let cached = reader
-                .prepared
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .get(kb)
-                .filter(|c| c.0 == stamp)
-                .map(|c| (c.1.clone(), c.2));
-            let t0 = std::time::Instant::now();
-            let (prepared, documents, prepare_ms) = match cached {
-                Some((p, n)) => (p, n, 0),
-                None => {
-                    // One preparation at a time: it costs seconds of CPU and the whole base's vectors in memory, and
-                    // two questions arriving together would otherwise each do all of it.
-                    let _one_at_a_time = reader.preparing.lock().await;
-                    // The guard is dropped at the end of this statement, before any await below.
-                    let hit = reader
-                        .prepared
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .get(kb)
-                        .filter(|c| c.0 == stamp)
-                        .map(|c| (c.1.clone(), c.2));
-                    if let Some((p, n)) = hit {
-                        (p, n, 0)
-                    } else {
-                        let (rows, n) = self
-                            .kb
-                            .store()
-                            .vectors_of(kb, dims)
-                            .await
-                            .map_err(|e| e.to_string())?;
-                        if n == 0 {
-                            return Err("this knowledge base has no meaning index yet".into());
-                        }
-                        let m = module.clone();
-                        let p = tokio::task::spawn_blocking(move || m.prepare_rows(&rows, n))
-                            .await
-                            .map_err(|e| e.to_string())??;
-                        let p = Arc::new(p);
-                        let mut map = reader.prepared.lock().unwrap_or_else(|e| e.into_inner());
-                        // Only the base being asked about is worth keeping: each entry holds every passage's keys and
-                        // values (about 20 KB per passage), so a few bases would be the gateway's whole memory.
-                        map.clear();
-                        map.insert(kb.to_string(), (stamp, p.clone(), n));
-                        drop(map);
-                        (p, n, t0.elapsed().as_millis() as u64)
-                    }
+            // A module known to say nothing about the question is not even loaded.
+            if let Some(reader) = &self.memory {
+                if reader
+                    .checkpoint_for(kb)
+                    .and_then(|c| reader.known_verdict(&c))
+                    == Some(false)
+                {
+                    return Err(MEMORY_UNINFORMATIVE.to_string());
                 }
-            };
+            }
+            // Phase 26: a module whose memory is the same whatever is asked (older ones are probed here, once) is
+            // not used; the caller then answers from passages and says so.
+            let ready = self.ready_memory(kb).await?;
+            if !self.verdict(&ready).await? {
+                return Err(MEMORY_UNINFORMATIVE.to_string());
+            }
+            let ReadyMemory {
+                reader,
+                module,
+                kb_name,
+                prepared,
+                documents,
+                prepare_ms,
+                ..
+            } = ready;
             let q = self
                 .kb
                 .embed_plain(query)
@@ -1163,7 +1338,7 @@ impl nafs_core::knowledge::Knowledge for ChatKnowledge {
                 .await
                 .map_err(|e| e.to_string())??;
             Ok(nafs_core::knowledge::MemoryReadout {
-                kb_name: base.name,
+                kb_name,
                 vectors,
                 placeholder: reader.placeholder.clone(),
                 system: nafs_memorilla::train::SYSTEM_PROMPT.to_string(),
@@ -1196,6 +1371,91 @@ mod tests {
         assert_eq!(auto_mode(&[], false, false), "rag");
         assert_eq!(auto_mode(&order(&["memory"]), false, false), "rag");
         assert_eq!(auto_mode(&order(&["nonsense", "rag"]), true, true), "rag");
+    }
+
+    /// Phase 26: a module whose memory is the same for every question is not used, whether the trainer said so or
+    /// (for a module saved before it did) the probe questions show it.
+    #[test]
+    fn a_module_that_says_nothing_about_the_question_is_not_used() {
+        use nafs_memorilla::{collapse_stats, CheckpointMetrics};
+        let saved = |collapsed| CheckpointMetrics {
+            collapsed,
+            ..Default::default()
+        };
+        // The collapsed Phase 20 module: one vector of norm 63 at all 16 slots for all three probe questions.
+        let same: Vec<Vec<Vec<f32>>> = (0..3).map(|_| vec![vec![63.0f32 / 8.0; 64]; 16]).collect();
+        let dead = collapse_stats(&same);
+        let differing: Vec<Vec<Vec<f32>>> = (0..3)
+            .map(|q| {
+                (0..16)
+                    .map(|s| {
+                        (0..64)
+                            .map(|i| (((q * 7919 + s * 104729 + i * 31) % 97) as f32 / 97.0) - 0.5)
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+        let alive = collapse_stats(&differing);
+        assert!(dead.collapsed() && !alive.collapsed());
+
+        assert_eq!(memory_usable(Some(&saved(true)), None), Some(false));
+        assert_eq!(memory_usable(Some(&saved(false)), None), Some(true));
+        // What the trainer saved outranks a probe.
+        assert_eq!(memory_usable(Some(&saved(false)), Some(&dead)), Some(true));
+        assert_eq!(memory_usable(None, Some(&dead)), Some(false));
+        assert_eq!(memory_usable(None, Some(&alive)), Some(true));
+        assert_eq!(memory_usable(None, None), None);
+
+        // `auto` then falls through to the next mode the base can serve.
+        let order: Vec<String> = ["hybrid", "graph", "rag"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let usable = memory_usable(Some(&saved(true)), None).unwrap_or(true);
+        assert_eq!(auto_mode(&order, usable, false), "rag");
+        // The note chat shows is plain language.
+        assert!(
+            !MEMORY_UNINFORMATIVE.contains("collaps") && !MEMORY_UNINFORMATIVE.contains("cosine")
+        );
+    }
+
+    /// The verdict is read from the checkpoint's own metrics file, once, and kept per checkpoint and write time.
+    #[test]
+    fn the_saved_verdict_is_read_without_loading_the_module() {
+        let dir = std::env::temp_dir().join(format!("nafs-verdict-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("weights.safetensors"), b"not read").unwrap();
+        let reader = MemoryReader {
+            global: None,
+            files_dir: String::new(),
+            embed_dims: 8,
+            placeholder: String::new(),
+            loaded: Default::default(),
+            prepared: Default::default(),
+            preparing: Default::default(),
+            verdicts: Default::default(),
+        };
+        let key = MemoryReader::stamp(&dir);
+        // No metrics file (a module saved before Phase 26): nothing known until it is probed.
+        assert_eq!(reader.known_verdict(&key), None);
+        nafs_memorilla::CheckpointMetrics {
+            collapsed: true,
+            ..Default::default()
+        }
+        .write(&dir)
+        .unwrap();
+        assert_eq!(reader.known_verdict(&key), Some(false));
+        // Cached: the file is not needed again.
+        std::fs::remove_file(dir.join("metrics.json")).unwrap();
+        assert_eq!(reader.known_verdict(&key), Some(false));
+        // New weights under the same path are another module.
+        let later = (key.0.clone(), key.1 + 1);
+        assert_eq!(reader.known_verdict(&later), None);
+        reader.remember_verdict(&later, true);
+        assert_eq!(reader.known_verdict(&later), Some(true));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     fn hit(id: &str, v: Option<f64>) -> Hit {
