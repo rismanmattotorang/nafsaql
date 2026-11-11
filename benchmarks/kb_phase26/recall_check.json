@@ -1,0 +1,89 @@
+{
+ "what": "Live check of the memory of earlier conversations (Phase 26)",
+ "date": "2026-11-11 08:20",
+ "host_load_average": [
+  19.6,
+  54.4,
+  65.0
+ ],
+ "note": "SHARED MACHINE",
+ "passed": 14,
+ "checks": [
+  {
+   "check": "the memory is on",
+   "ok": true,
+   "detail": "0 notes held before the check"
+  },
+  {
+   "check": "a 'Remember that' message is saved as a note",
+   "ok": true,
+   "detail": "I have remembered that the staging server of project Halcyon listens on port 8443."
+  },
+  {
+   "check": "a turn that states a fact reads no memory when none matches",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "check": "both facts are held as notes",
+   "ok": true,
+   "detail": "2 notes"
+  },
+  {
+   "check": "the conversation that holds the fact answers from its own history, not from the memory",
+   "ok": true,
+   "detail": "You said your sister's dog is called **Biscuit**."
+  },
+  {
+   "check": "a fact told in one conversation is recalled in another",
+   "ok": true,
+   "detail": "recall 580 ms"
+  },
+  {
+   "check": "and the answer uses it",
+   "ok": true,
+   "detail": "The staging server for Project Halcyon listens on port 8443."
+  },
+  {
+   "check": "a fact stated inside a turn is recalled",
+   "ok": true,
+   "detail": "recall 493 ms"
+  },
+  {
+   "check": "and the answer uses it",
+   "ok": true,
+   "detail": "Your sister's dog is called **Biscuit**."
+  },
+  {
+   "check": "a question in other words finds the note (meaning arm)",
+   "ok": true,
+   "detail": "recall 463 ms; answer: Your sibling owns a dog, and it is called **Biscuit**."
+  },
+  {
+   "check": "an impersonal question does not read the memory",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "check": "a private request does not read the memory",
+   "ok": true,
+   "detail": ""
+  },
+  {
+   "check": "a forgotten note, and the notes of a deleted conversation, are not recalled",
+   "ok": true,
+   "detail": "I am not aware of the specific port your staging server for Halcyon listens on. To determine this, y"
+  },
+  {
+   "check": "deleting the conversations removes their notes",
+   "ok": true,
+   "detail": "0 notes after, 0 before"
+  }
+ ],
+ "recall_ms": [
+  580,
+  493,
+  463,
+  132
+ ]
+}

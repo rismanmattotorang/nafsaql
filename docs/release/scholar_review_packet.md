@@ -50,7 +50,7 @@
 
 ### 2.4 Documents
 
-- **Technical report:** `docs/report/sections/background.tex`, subsections on the *nafs* and its Qur'anic stages and on al-Ghazālī's account of *qalb*, *rūḥ*, *nafs* and *ʿaql*.
+- **Technical report:** since 2026-11-11 the paper carries one paragraph (`docs/report/sections/intro.tex`, "Inspiration") that names *nafs* and *ʿaql* as a naming analogy and makes no theological statement; the background section this packet was written for was removed (it is in the repository history at `518a374`).
 - **Slides:** `docs/slides/nafs_aql_slides.tex`, the analogy slide.
 - **Research notes:** `docs/research/islamic_sources.md`, with verified sources and a verification log (375 lines).
 

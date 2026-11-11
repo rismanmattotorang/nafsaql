@@ -64,7 +64,22 @@ Open **Knowledge** in the left bar to give the assistant documents of your own. 
 - **Passages** opens a document's passages, each with the heading it sits under; the circular arrow reads a document again (after a parser or chunking change; passages that did not change keep their meaning index), and the cross removes it with its passages.
 - **The knowledge graph** card shows a map of your documents as soon as they are read: the names, acronyms and identifiers they share, linked when passages mention both (drawn from the text, no waiting). Scroll to zoom, drag to move, click a legend entry to show one group. For relations with the sentence that states each, build the full graph with *Build the graph* (it reads every passage with the quick model, so it takes about a minute per passage on a 4-core CPU and runs in the background). Pick a thing to see its relations, each with the sentence that states it; a relation is kept only when that sentence really occurs in the passage. The list of types the graph is read under can be changed through the API (`PUT /v1/kb/{kb}/ontology`).
 - **Ask about a base** from Chat: pick it in the box under the composer, then choose *Passages* (the answer cites numbered passages), *Passages and graph* (relations are shown above the passages, and a question that needs two steps follows the chain), or *Choose for me*. Every answer says which searches ran and why any was skipped, and lists the passages it used, so a claim can be checked against its source: click a number such as [2] in the answer to read that passage. If nothing in the base matches the question well, the answer says *No strong match*. You can leave the Chat page while an answer is being written; it keeps going and is there when you return.
-- **Memory** modes (experimental, *Advanced* only) use a module trained on the base's documents; they appear once a module has been trained and activated from the *Memory* card.
+- **Is the answer in the documents?** Under an answer from documents you see either *Every sentence of this answer is in the passages* or how many are not, with those sentences listed. The comparison is by words and numbers, with no model: it catches a number or a claim the passages do not contain; it does not prove an answer right.
+- **Follow-up questions** such as "And how fast is it?" are searched together with your previous question, and the answer says so.
+- **Typing slips** in a question ("converetr") are matched to the nearest word your documents contain.
+- **Memory** modes (experimental, *Advanced* only) use a module trained on the base's documents; they appear once a module has been trained and activated from the *Memory* card. A module that gives the same memory whatever is asked is recognised and not used; the answer then comes from passages and says why.
+
+## What it remembers
+
+The assistant keeps a short note of each finished turn of your saved chats, so that something you told it in one chat can be found in another. Nothing is sent anywhere; the notes are in the same local database as your chats.
+
+- **When it looks.** Only when your question is about you or points back: it says *my*, *we*, *last time*, *you said*, *remember*. A general question ("what is a B-tree?") is answered without the notes, so it is not slowed down by them. When a knowledge base is selected, the documents answer and the notes are left out.
+- **Keep something on purpose.** Start a message with *Remember that …* ("Remember that the staging server is on port 8443"). Such a note is never removed by the size limit.
+- **See and delete.** *Settings → Memory → Show what is remembered* lists every note with a *Forget* button, *Merge repeated notes*, and *Forget everything* (your chats themselves are kept). Deleting a chat deletes its notes.
+- **What is never remembered.** Private chats, rooms (what is said there is shared by its members) and the Lab.
+- When an answer used notes it says so under the answer (*Used 2 notes from earlier conversations*) and shows them.
+
+Turn the whole feature off with `[recall] enabled = false` in the configuration.
 
 ## Privacy
 

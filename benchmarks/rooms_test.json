@@ -1,5 +1,5 @@
 {
- "measured_at": "2026-11-10T12:57:00Z",
+ "measured_at": "2026-11-11T09:25:05Z",
  "base": "http://127.0.0.1:8080",
  "slow": false,
  "passed": 10,
@@ -8,27 +8,27 @@
   {
    "check": "create: name is trimmed and collapsed, 201",
    "pass": true,
-   "detail": "201 T-31c5ff Alpha"
+   "detail": "201 T-b9625d Alpha"
   },
   {
    "check": "create: the room starts empty",
    "pass": true,
-   "detail": "{'busy': False, 'conversation_id': 'f0d112a3-78e9-470f-80cb-8c4216cc266f', 'created_at': '2026-11-10T12:57:00.813471+00:00', 'last_activity': '2026-11-10T12:57:00.813471+00:00', 'members': 0, 'name': 'T-31c5ff Alpha', 'profile': 'A', 'questions': 0, 'queued': 0, 'room_id': '4db8f686-7b4b-4590-a19c-2"
+   "detail": "{'busy': False, 'conversation_id': '5cf75d95-8bc7-4c15-9ab5-15843def556d', 'created_at': '2026-11-11T09:25:05.046091+00:00', 'last_activity': '2026-11-11T09:25:05.046091+00:00', 'members': 0, 'name': 'T-b9625d Alpha', 'profile': 'A', 'questions': 0, 'queued': 0, 'room_id': '15b2c52f-5b0b-4689-98f3-7"
   },
   {
-   "check": "create: duplicate 't-31c5ff alpha' is a 409 conflict",
+   "check": "create: duplicate 't-b9625d alpha' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-31c5ff alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 't-b9625d alpha' already exists\"}"
   },
   {
-   "check": "create: duplicate 'T-31c5ff    ALPHA' is a 409 conflict",
+   "check": "create: duplicate 'T-b9625d    ALPHA' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-31c5ff ALPHA' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-b9625d ALPHA' already exists\"}"
   },
   {
-   "check": "create: duplicate ' T-31c5ff Alpha ' is a 409 conflict",
+   "check": "create: duplicate ' T-b9625d Alpha ' is a 409 conflict",
    "pass": true,
-   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-31c5ff Alpha' already exists\"}"
+   "detail": "409 {'code': 'E_CONFLICT', 'message': \"conflict: a room named 'T-b9625d Alpha' already exists\"}"
   },
   {
    "check": "create: empty name is a 400",

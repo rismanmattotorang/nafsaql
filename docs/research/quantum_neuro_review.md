@@ -1,6 +1,6 @@
 # Quantum consciousness, neuroscience and Nafs-Aql: what transfers, what does not (Phase 8)
 
-Written 2026-10-20. Companion artefacts: `rust/crates/nafs-core/src/sequential.rs` (the rules), `scripts/confidence_signal_study.py` and `benchmarks/confidence_signal_study.json` (the measurement), `docs/report/sections/phase8.tex` (the same results in the technical report), ASSUMPTIONS A-054 to A-058.
+Written 2026-10-20. Companion artefacts: `rust/crates/nafs-core/src/sequential.rs` (the rules), `scripts/confidence_signal_study.py` and `benchmarks/confidence_signal_study.json` (the measurement), the paper's sections on sequential evidence (`docs/report/sections/gate.tex`, `model.tex`), ASSUMPTIONS A-054 to A-058.
 
 ## 0. Method
 

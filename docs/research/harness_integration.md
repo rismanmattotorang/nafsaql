@@ -197,5 +197,5 @@ What the data say, and what they do not:
 - **Speed came from fewer and shorter calls**: one call per task instead of six, nothing decoded after the action, and
   a cheap first reasoning budget. A verified System 2 fix of a small function now takes 33–59 s on this host.
 - Samples are small (10 and 6 tasks, small single-file functions) and the host was shared: verified counts are
-  indicative, not significant. Generated report tables: `docs/report/sections/harness_ab_tables.tex`
-  (`scripts/gen_harness_ab.py`).
+  indicative, not significant. `scripts/gen_harness_ab.py` prints these tables as LaTeX into `benchmarks/gen/`; the paper carries the
+  numbers in its consolidated agent table.

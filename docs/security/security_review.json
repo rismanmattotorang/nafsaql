@@ -1,5 +1,5 @@
 {
-  "reviewed_at": "2026-11-10T12:57:00Z",
+  "reviewed_at": "2026-11-11T09:25:03Z",
   "base": "http://127.0.0.1:8080",
   "tests": [
     {
@@ -87,7 +87,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Read a file in the user's home",
       "pass": true,
-      "detail": "passed=False in 0.1s",
+      "detail": "passed=False in 0.2s",
       "severity_if_failed": "high"
     },
     {
@@ -103,7 +103,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Write outside the sandbox",
       "pass": true,
-      "detail": "passed=False in 0.1s",
+      "detail": "passed=False in 0.2s",
       "severity_if_failed": "high"
     },
     {
@@ -111,7 +111,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Open a network connection",
       "pass": true,
-      "detail": "passed=False in 0.1s",
+      "detail": "passed=False in 0.4s",
       "severity_if_failed": "high"
     },
     {
@@ -135,7 +135,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Memory bomb (3 GB)",
       "pass": true,
-      "detail": "passed=False in 0.7s",
+      "detail": "passed=False in 2.8s",
       "severity_if_failed": "high"
     },
     {
@@ -143,7 +143,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: CPU spin",
       "pass": true,
-      "detail": "passed=False in 22.2s",
+      "detail": "passed=False in 59.8s",
       "severity_if_failed": "high"
     },
     {
@@ -151,7 +151,7 @@
       "area": "sandbox",
       "test": "Escape attempt fails closed: Kill the parent gateway",
       "pass": true,
-      "detail": "passed=False in 0.1s",
+      "detail": "passed=False in 1.4s",
       "severity_if_failed": "high"
     },
     {

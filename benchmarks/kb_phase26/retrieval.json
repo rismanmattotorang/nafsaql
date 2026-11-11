@@ -1,0 +1,199 @@
+{
+  "elbow": {
+    "multihop": {
+      "0": {
+        "answer_in_prompt": 0.82,
+        "passages_per_prompt": 4.0
+      },
+      "0.03": {
+        "answer_in_prompt": 0.82,
+        "passages_per_prompt": 3.98
+      },
+      "0.05": {
+        "answer_in_prompt": 0.82,
+        "passages_per_prompt": 3.98
+      },
+      "0.08": {
+        "answer_in_prompt": 0.82,
+        "passages_per_prompt": 3.98
+      },
+      "0.12": {
+        "answer_in_prompt": 0.82,
+        "passages_per_prompt": 4.0
+      }
+    },
+    "offtopic": {
+      "0": {
+        "answer_in_prompt": 0.0,
+        "passages_per_prompt": 0.0
+      },
+      "0.03": {
+        "answer_in_prompt": 0.0,
+        "passages_per_prompt": 0.0
+      },
+      "0.05": {
+        "answer_in_prompt": 0.0,
+        "passages_per_prompt": 0.0
+      },
+      "0.08": {
+        "answer_in_prompt": 0.0,
+        "passages_per_prompt": 0.0
+      },
+      "0.12": {
+        "answer_in_prompt": 0.0,
+        "passages_per_prompt": 0.0
+      }
+    },
+    "para": {
+      "0": {
+        "answer_in_prompt": 0.185,
+        "passages_per_prompt": 3.33
+      },
+      "0.03": {
+        "answer_in_prompt": 0.178,
+        "passages_per_prompt": 2.99
+      },
+      "0.05": {
+        "answer_in_prompt": 0.178,
+        "passages_per_prompt": 3.04
+      },
+      "0.08": {
+        "answer_in_prompt": 0.178,
+        "passages_per_prompt": 3.2
+      },
+      "0.12": {
+        "answer_in_prompt": 0.185,
+        "passages_per_prompt": 3.31
+      }
+    },
+    "quoted": {
+      "0": {
+        "answer_in_prompt": 0.967,
+        "passages_per_prompt": 3.9
+      },
+      "0.03": {
+        "answer_in_prompt": 0.967,
+        "passages_per_prompt": 3.77
+      },
+      "0.05": {
+        "answer_in_prompt": 0.967,
+        "passages_per_prompt": 3.8
+      },
+      "0.08": {
+        "answer_in_prompt": 0.967,
+        "passages_per_prompt": 3.82
+      },
+      "0.12": {
+        "answer_in_prompt": 0.967,
+        "passages_per_prompt": 3.87
+      }
+    }
+  },
+  "followup": {
+    "alone": {
+      "MRR": 0.073,
+      "R@1": 0.025,
+      "R@4": 0.125,
+      "R@8": 0.225,
+      "n": 40
+    },
+    "by_rule": {
+      "MRR": 0.285,
+      "R@1": 0.25,
+      "R@4": 0.325,
+      "R@8": 0.375,
+      "n": 40
+    },
+    "n": 40,
+    "rule_fired": 37,
+    "with_previous": {
+      "MRR": 0.31,
+      "R@1": 0.275,
+      "R@4": 0.35,
+      "R@8": 0.4,
+      "n": 40
+    }
+  },
+  "kb": "zvazrb4a326upn05d2ke",
+  "passages": 847,
+  "rule_on_self_contained": {
+    "multihop": {
+      "leans": 0,
+      "n": 50
+    },
+    "offtopic": {
+      "leans": 4,
+      "n": 20
+    },
+    "para": {
+      "leans": 1,
+      "n": 146
+    },
+    "quoted": {
+      "leans": 0,
+      "n": 60
+    }
+  },
+  "typo": {
+    "rows": {
+      "as written / hybrid / correction off": {
+        "MRR": 0.85,
+        "R@1": 0.767,
+        "R@4": 0.967,
+        "R@8": 1.0,
+        "n": 60
+      },
+      "as written / hybrid / correction on": {
+        "MRR": 0.85,
+        "R@1": 0.767,
+        "R@4": 0.967,
+        "R@8": 1.0,
+        "n": 60
+      },
+      "as written / words / correction off": {
+        "MRR": 0.926,
+        "R@1": 0.883,
+        "R@4": 0.983,
+        "R@8": 1.0,
+        "n": 60
+      },
+      "as written / words / correction on": {
+        "MRR": 0.926,
+        "R@1": 0.883,
+        "R@4": 0.983,
+        "R@8": 1.0,
+        "n": 60
+      },
+      "mistyped / hybrid / correction off": {
+        "MRR": 0.831,
+        "R@1": 0.75,
+        "R@4": 0.95,
+        "R@8": 0.967,
+        "n": 60
+      },
+      "mistyped / hybrid / correction on": {
+        "MRR": 0.844,
+        "R@1": 0.75,
+        "R@4": 0.983,
+        "R@8": 1.0,
+        "n": 60
+      },
+      "mistyped / words / correction off": {
+        "MRR": 0.917,
+        "R@1": 0.867,
+        "R@4": 0.967,
+        "R@8": 0.967,
+        "n": 60
+      },
+      "mistyped / words / correction on": {
+        "MRR": 0.929,
+        "R@1": 0.883,
+        "R@4": 0.983,
+        "R@8": 1.0,
+        "n": 60
+      }
+    },
+    "words_changed_in_as_written": 0,
+    "words_corrected_in_mistyped": 40
+  }
+}

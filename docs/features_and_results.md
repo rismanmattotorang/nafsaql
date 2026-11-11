@@ -138,6 +138,28 @@ feedback terms (quoted R@1 0.883 → 0.750), the PageRank arm in the default sea
 R@20 0.329 → up to 0.377). **Open:** a reworded question finds its passage first 12 % of the time and in the first 8
 24 % of the time.
 
+## Phase 26: routing, knowledge and memory against vLLM Semantic Router and Memorilla (2026-11-11)
+
+Research [`router_memory_gaps.md`](research/router_memory_gaps.md), decision [019](decisions/019-routing-knowledge-memory-phase26.md).
+SHARED MACHINE (another build used the same four cores; load 20 to 150); 847-passage base; files in `benchmarks/kb_phase26/`
+and `benchmarks/router_phase26/`. Nothing here adds a model: rules, word statistics and the embedder already running.
+
+| Change | Effect | Evidence |
+|---|---|---|
+| A mistyped question word is matched to the nearest word the base holds | answer within 8 passages for **0.967 → 1.000** of 60 mistyped questions; no word of the questions as written is changed | `retrieval.json` |
+| A follow-up question is searched together with the previous turn | answer first for **0.025 → 0.250** of 40 follow-ups, within 8 for 0.225 → 0.375; the rule fires on 1 of 256 self-contained questions | `retrieval.json`, `scripts/kb_p26_followup.json` |
+| Every answer from documents says which of its sentences are in its passages (words and numbers, no model) | **41 of 42** right answers from passages have every sentence supported; **38 of 44** answers made up without passages are flagged (AUC 0.90); a wrong number taken from the right passage is not caught (3 of 5) | `support.json`, `scripts/support_study.py` |
+| A memory of earlier conversations, read only when a question is in the first person or points back | live check **14 of 14**: recalled across conversations by words and by meaning, not read by impersonal or private requests, gone when forgotten or when the conversation is deleted; 0.13 to 0.58 s when read, nothing otherwise | `recall_check.json` |
+| The Memorilla trainer on the reference recipe, with a test for a memory that ignores the question | the Phase 20 module is recognised as one (cosine 0.999998 between questions) and not used; chat answers from passages and says why | unit and parity tests; no retrain |
+| A base records the embedding model that made its vectors | a base made by another model is searched by words until rebuilt, instead of comparing vectors of two models | unit test |
+
+**Measured and not adopted:** a difficulty signal from the question alone (AUC for a wrong draft 0.615 by nearest
+labelled questions and 0.573 by prototype banks, against 0.682 for the draft's own features and 0.690 together, over
+810 labelled drafts); cutting the passages of a prompt at the largest drop in similarity (a tenth of a passage saved, one
+answer lost); reading every question with the previous turn (the rule gives 0.250 against 0.275 and leaves
+self-contained questions alone). **Open:** reworded questions (unchanged); a retrain of the memory module; recall
+quality over a long history.
+
 ## The numbers at a glance (moved from the README, Phase 25)
 
 Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so absolute speeds are lower bounds. Every figure comes from a stored run in [`benchmarks/`](../benchmarks/).
@@ -150,7 +172,7 @@ Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so abs
 | Several people at once | **14 → 25 tokens/s** from 1 to 4 users, each answer identical to what they would get alone |
 | Passage retrieval with the right context | closed-book answers **2 of 20** held-out questions; with passages, **18 of 20** |
 | Your documents at scale | 1,000 documents / 50,000 passages: search by meaning in **0.4 s**, listing under **0.3 s**; a security sweep of uploads and deletion passes **36/36** |
-| Security and quality | **451** Rust tests, **26/26** security probes, **67/67** end-to-end checks |
+| Security and quality | **504** Rust tests, **26/26** security probes, **69/69** end-to-end checks |
 
 We also publish what did not work: speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model and more. See [features and measured results](features_and_results.md).
 

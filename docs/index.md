@@ -4,11 +4,11 @@
 
 | | |
 |---|---|
-| [Technical report](report/nafs_aql_report.pdf) | the model, the proofs, the implementation and its measured results |
+| [Technical report](report/nafs_aql_report.pdf) | the paper: the formal model and its proofs, the architecture, and every measured result |
 | [Slides](slides/nafs_aql_slides.pdf) | the same story in 40 slides |
 | [Specification](spec/nafs_aql_spec.pdf) | 100 requirements with identifiers, interfaces and a traceability matrix |
 | [Roadmap](roadmap/nafs_aql_roadmap.pdf) · [Status](roadmap/STATUS.md) | phases, gates, what is done and what is not |
-| [Assumptions](../ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-130) |
+| [Assumptions](../ASSUMPTIONS.md) | every judgement call and its impact if wrong (A-001 to A-158) |
 | [Results write-up](publication/nafs_aql_lab_results.pdf) | numbers generated from stored runs |
 | [Quantum consciousness and neuroscience review](research/quantum_neuro_review.md) | Phase 8: what transfers (sequential evidence) and what does not (quantum mechanisms), with proofs and measurements |
 | [Parallel and concurrent inference](research/parallel_inference.md) · [Decision 007](decisions/007-parallel-inference.md) | Phase 13: batch scaling at depth, what was adopted (fused samples, System 1 rescue, `n`-choice rounds, 4 slots) and what was measured and left off |
@@ -17,6 +17,7 @@
 | [Knowledge base specification](spec/knowledge_base_spec.md) · [Decision 014](decisions/014-knowledge-base-memorilla.md) · [Memorilla and knowledge research](research/memorilla_knowledge.md) | Phase 20: documents into passages, vectors and a graph in SurrealDB; the six knowledge modes; Memorilla memory tokens in Candle and Smiley Core; what was measured and what waits for a GPU |
 | [OntoSmith comparison](research/ontosmith_comparison.md) · [Graph RAG upgrade spec](spec/graph_rag_upgrade_spec.md) | Phase 21: OntoSmith read in full against the knowledge base, the twelve gaps, the nine closed (graph as a fused arm, contextual BM25, sentence packer, ontology as data, verified quotes, two-hop walk) and the three deferred |
 | [Knowledge hardening and retrieval at scale](decisions/016-knowledge-hardening-phase8.md) · [What this machine cannot do](roadmap/machine_bound_plan.md) | Phase 23: the eight hardening gaps, the retrieval measurements (fusion weight, query expansion, passage size, scale), the three open measurements, and the plan for what needs another machine |
+| [Routing, knowledge and memory gaps](research/router_memory_gaps.md) · [Decision 019](decisions/019-routing-knowledge-memory-phase26.md) · [The prompt](prompts/ROUTING_KNOWLEDGE_MEMORY_PROMPT.md) | Phase 26: vLLM Semantic Router and Memorilla read again; typing slips, follow-up questions, a check of each answer against its passages, a memory of earlier conversations, the Memorilla trainer and its guard; what was measured and not adopted; the final paper |
 | [Knowledge module: state of the art and assessment](research/knowledge_sota_2026.md) · [Specification](spec/knowledge_sota_spec.md) · [Decision 018](decisions/018-knowledge-index-phase25.md) | Phase 25: the in-process index (words 177 ms to 0.086 ms), a graph of every base with no model call, a 256-question sweep with what it adopted and what it rejected, the interface audit, and the open reworded-question gap |
 | [Head to head with Semantic Router and DeepSeek Harness](research/semantic_router_deepseek_h2h.md) · [Specification](spec/headtohead_spec.md) · [Decision 017](decisions/017-embedder-and-headtohead.md) | Phase 24: what each project is, a measured comparison of the same work on both sides, the gaps closed and the ones left open, and why a larger embedder was not adopted |
 | [Semantic Router and DeepSeek Harness comparison](research/router_harness_comparison.md) · [Router and harness upgrade spec](spec/router_harness_upgrade_spec.md) · [Decision 015](decisions/015-router-harness-phase22.md) | Phase 22: where the gate and the harness were already ahead, the pure mechanisms copied (certified per-bin risk, a declared unknown, reask, polarity guard, anchored meter, prune-then-compact, repeat notice, two-lane ingestion), and what was not |
