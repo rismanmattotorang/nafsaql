@@ -1,34 +1,95 @@
-% ---------------------------------------------------------------------------
-% Section: Phase 13 -- parallel and concurrent inference on four CPU cores
-% ---------------------------------------------------------------------------
-\section{Phase 13: Parallel and Concurrent Inference on Four CPU Cores}
+\section{Inference on Four Cores}
 \label{sec:inference}
 
-Phase~13 (30--31 October 2026) asked how far the four cores can be pushed by running work in parallel. The assessment of the
-100-prompt run (Section~\ref{sec:impl}) is the starting point: the gate and the exact checks are not the cost (under 2.5\,\% of
-model time); decode is, with System~2's thinking at 77.6\,\% and drafts at 17.9\,\%, and six prompts (failed code and timeouts)
-used 52\,\%. The research note is \texttt{docs/research/parallel\_inference.md} and the decision is
-\texttt{docs/decisions/007-parallel-inference.md}.
+The reference machine is an Intel Core i3-8100: four cores, no simultaneous
+multithreading, AVX2 and FMA, no AVX-512, 32\,GB of dual-channel DDR4. A
+multi-threaded streaming read reaches 12.9, 17.2, 18.4 and 19.5\,GB/s with one
+to four threads. By Proposition~\ref{prop:roofline} decode speed is that
+bandwidth over the bytes read per token (1{,}094\,MB for \Sone, 2{,}503\,MB for
+\Stwo), and prefill is bound by arithmetic. Table~\ref{tab:measured} gives
+the baseline throughput. Everything in this section follows from one fact:
+\emph{decode is memory-bound and prefill is compute-bound}, so the gains are in
+not repeating work, not in more threads.
 
-\subsection{Literature and what transfers}
+\begin{table}[t]
+\caption{Baseline throughput on the reference machine (llama.cpp, 4 threads, 512-token prefill, 128-token decode; mean $\pm$ s.d. over 3 runs)}
+\label{tab:measured}
+\centering\scriptsize
+\begin{tabular}{@{}llrr@{}}
+\toprule
+Model (GGUF) & Size & Prefill tok/s & Decode tok/s \\
+\midrule
+Qwen3-0.6B Q8\_0 & 604\,MiB & $180.6\pm2.4$ & $32.6\pm1.8$ \\
+Qwen3-1.7B Q4\_K\_M & 1.26\,GiB & $94.1\pm9.5$ & $15.5\pm3.4$ \\
+\MEASUREDROWS
+\bottomrule
+\end{tabular}
+\end{table}
 
-Repeated sampling with an exact verifier raises coverage log-linearly with the number of samples
-\cite{brown2024monkeys}; hedged requests send a request to several replicas, keep the first answer and cancel the rest
-\cite{dean2013tail}; parallel streams over shared parameters behave like a larger model at a fraction of the cost of parameter
-scaling \cite{chen2025parscale}; confidence can cut parallel traces early \cite{fu2025deepconf}; instances can attend to a
-shared cache \cite{rodionov2025hogwild}; model-free speculation drafts from earlier text \cite{oliaro2024suffix}; table-lookup
-kernels speed low-bit models on CPUs \cite{wei2024tmac}. The first two need only what \Sys{} has (an exact verifier and a
-batching server) and were implemented. The others need trained transformations, models that cooperate (small ones are reported
-not to), or a different runtime, and were not.
+\subsection{The engine}
+\label{sec:engine}
+The default backend is Smiley Core, our own CPU inference engine: a Rust
+library with a GGUF loader, a byte-level BPE tokenizer, the Qwen forward
+passes with AVX2 and FMA kernels, an F16 or int8 key--value cache, grouped
+online-softmax attention, and telemetry that reports the bytes moved per
+token beside the tokens per second, so that a run can be checked against the
+memory roofline. A thin server exposes it through the same OpenAI-compatible
+contract as \texttt{llama-server}, with log-probabilities for the gate,
+top-$k$ and min-$p$ sampling, and a reasoning budget enforced by closing the
+reasoning span and continuing the turn. The engine's phase split puts 86 to
+97\,\% of decode in the matrix products and the output head; sampling is 0.1
+to 0.3\,\% and attention 1 to 3\,\% at these context lengths. It runs within
+60 to 95\,\% of the machine's bandwidth.
 
-\subsection{The measurement that decides: batching and context depth}
+\textbf{Three threads, not four.} Three decode threads beat four in all six
+interleaved pairs ($+4\,\%$ on \Sone, $+8\,\%$ on \Stwo\ at the median), while
+cold prefill is 16 to 17\,\% slower at three. On a shared host the fourth
+worker is the one the scheduler preempts, and every matrix product waits for
+its slowest worker. Decode dominates a request and most prompts are cache
+hits, so three is the default; it also leaves a core for the sandbox and the
+gateway.
 
-llama-server decodes its slots in one batch. Table~\ref{tab:batch} gives the throughput of $N$ concurrent streams on Qwen3-4B-Thinking
-(decode only, prompt cached) at three context depths, and Qwen3-1.7B at short context.
+\textbf{A prefix store.} A session with a single cache benefits only when a
+prompt follows a conversation with the same beginning; alternating a chat
+prompt and the agent's prompt prefilled the latter in full each time. The
+engine keeps the cache of each finished conversation as a snapshot (114 to
+147\,KB per position, 768\,MB per model, least recently used evicted) and
+restores the one that shares the longest beginning with the new prompt, in
+the manner of prefix-sharing caches \cite{zheng2024sglang}. The answers are
+byte-identical with the store on and off.
+
+\textbf{Several users in one pass over the weights.} A decode step reads
+every weight once, so serving $n$ users one after another reads the model $n$
+times where one pass would do. Decode is bound by memory (19.5\,GB/s) and not
+by arithmetic (about 460\,GFLOP/s), and Q4\_K needs 0.56 bytes per weight, so
+the roofline ridge sits near seven rows: up to about seven users, another row
+costs almost no extra time. The forward pass takes a position and a cache
+\emph{per row}; rows of different users share one read of the weights while
+each attends only to its own history, one row at a time, so a user's logits
+are bit-identical to a solo run's. A slot scheduler runs either one chunk of
+one prompt or one token for every ready user in a step, in the manner of
+vLLM's serving core \cite{kwon2023pagedattention}, and the prefix store is
+shared by all slots.
+
+\textbf{A kernel guard.} Updating the engine once produced a fourfold decode
+slowdown with byte-identical kernels: a helper built with
+\texttt{std::array::from\_fn} was inlined or not depending on how much
+unrelated code the crate contained, which put a function call inside the dot
+kernel (679\,ns per row against 96). A kernel whose speed depends on an
+optimiser decision about code elsewhere has to be guarded by a benchmark; one
+is now part of the crate.
+
+\subsection{Batching and context depth}
+\label{sec:batching}
+A server that decodes its slots in one batch makes a few more streams cheap,
+until compute saturates. Let $c(N)$ be the cost of a batch of $N$ streams in
+units of one stream. Table~\ref{tab:batch} shows that the gain falls with
+context: from 2.7$\times$ to 1.5$\times$ for \Stwo, and a repair prompt (the
+earlier candidate and the verifier's evidence) is about 1{,}600 tokens deep.
 
 \begin{table}[t]
 \centering
-\caption{Batched decode, $N=4$ streams against one (reference machine, idle).}
+\caption{Batched decode, four streams against one (llama.cpp slots, idle machine, tokens/s).}
 \label{tab:batch}
 \scriptsize
 \begin{tabular}{@{}lrrrr@{}}
@@ -43,132 +104,72 @@ System 2, 1,600 tokens & 4.09 & 6.14 & 1.50$\times$ & 3.40 \\
 \end{tabular}
 \end{table}
 
-One stream is bandwidth-bound (about 16\,GB/s of weights per second at both sizes), so a few more streams are cheap, until
-compute saturates; but the gain falls with context, from 2.7$\times$ to 1.5$\times$ for System~2, and a repair prompt (the earlier
-candidate and the verifier's evidence) is about 1,600 tokens deep. A quantised KV cache with flash attention does not restore it
-(7.94 against 9.17 tok/s at 800 tokens, 6.36 against 6.14 at 1,600). Self-speculation does not help either: four llama.cpp
-n-gram modes gained at most 1.12$\times$ (code repair, 71\,\% of drafted tokens accepted) and lost up to 16\,\% (JSON), because
-verifying $k$ drafted tokens costs about $k$ steps on a compute-bound CPU.
+\textbf{One request with $n$ choices.} Candidates sent as separate requests
+each prefill the whole prompt, and prefill gains nothing from batching. With a
+703-token prompt and a 24-token answer one request takes 31.7\,s, four
+separate concurrent requests 124.5\,s and one request with $n=4$ 39.1\,s: the
+server prefills once and forks the cache. Every multi-candidate round is sent
+this way, and each choice is verified as its own stream ends.
 
-\subsection{One request with $n$ choices}
-
-Candidates sent as separate requests make every slot prefill the whole prompt, and prefill (31 tok/s on System~2) is
-compute-bound and gains nothing from batching. With a 703-token prompt and a 24-token answer one request takes 31.7\,s, four separate
-concurrent requests 124.5\,s ($3.9\times$) and one request with $n=4$ 39.1\,s ($1.23\times$): llama-server prefills once and forks
-the KV cache. \texttt{Backend::stream\_n} sends a round as one such request and delivers each choice when its own stream ends, so
-it can be verified while the others decode. The first live hedging runs, which used separate requests, were slow for exactly this reason.
-
-\subsection{Fusing the agreement samples with the draft}
-
-For an unverified maths draft the gate always draws $k=2$ cheap samples (A-060), after the draft: $1+c(2)=2.33$ draft times.
-Drawn in the draft's batch they cost $c(3)=1.78$, and they are dropped when the draft is stopped early (it is going to System~2
-whatever they say). In an interleaved A/B (14 GSM8K prompts, two repetitions, the stream closed at the gate's decision so no
-System~2 run is started) the median time to the decision fell from 23.1\,s to 17.9\,s ($-24\,\%$), with the fused arm faster in 23
-of 28 pairs (exact sign test $p=0.0005$). Escalations were 7 and 5 of 28 (discordant pairs 4 to 2, McNemar $p=0.69$), and the
-decision flips between two repeats of the same arm as often (6 of 28) as between arms, so the difference is sampling noise.
-
-\subsection{When does a concurrent round pay?}
-
-Take $R+1$ rounds, one-attempt success probability $p$ and batch cost factor $c(N)$, and let candidates be independent. A round
-of $N$ succeeds with $1-(1-p)^N$, so
+\textbf{When does a concurrent round pay?} Take $R+1$ rounds, one-attempt
+success probability $p$ and independent candidates. The verified answers per
+single-attempt time are
 \begin{equation}
-U(N)=\frac{1-(1-p)^{N(R+1)}}{c(N)\sum_{k=0}^{R}(1-p)^{Nk}}
+U(N)=\frac{1-(1-p)^{N(R+1)}}{c(N)\sum_{k=0}^{R}(1-p)^{Nk}} .
 \label{eq:util}
 \end{equation}
-is the verified answers per single-attempt time. Widening to $N$ pays iff $U(N)>U(1)$.
-
 \begin{proposition}[Limits of widening] \textnormal{[exact]}
 \label{prop:wide}
-As $p\to0$, $U(N)/U(1)\to N/c(N)$: widening pays iff the batch is cheaper than the same streams in series. As $p\to1$,
-$U(N)/U(1)\to 1/c(N)<1$ for any $c(N)>1$: it never pays.
+As $p\to0$, $U(N)/U(1)\to N/c(N)$: widening pays iff the batch is cheaper than
+the same streams in series. As $p\to1$, $U(N)/U(1)\to 1/c(N)<1$: it never pays.
 \end{proposition}
 \begin{proof}
-For small $p$, $1-(1-p)^{N(R+1)}\approx N(R+1)p$ and $\sum_k(1-p)^{Nk}\approx R+1$, so $U(N)\approx Np/c(N)$ and $U(1)\approx p$.
-For $p\to1$ the numerator tends to 1 for every $N$, and the sum to 1, so $U(N)\to1/c(N)$. \qed
+For small $p$, $1-(1-p)^{N(R+1)}\approx N(R+1)p$ and the sum tends to $R+1$, so
+$U(N)\approx Np/c(N)$ and $U(1)\approx p$. For $p\to1$ numerator and sum tend
+to 1. \qed
 \end{proof}
+With the short-context costs the policy widens for $p\le0.48$; with the
+1{,}600-token costs it widens only for $p\le0.07$. Concurrent hedging on
+\Stwo\ is implemented and off (Section~\ref{sec:eval:negative}).
 
-\emph{Consequence.} With the short-context costs the policy widens for $p\le0.48$; with the 1,600-token costs
-$[1.0,2.4,3.1,3.4]$ it widens only for $p\le0.07$ (hopeless tasks), because $c(4)=3.4$ is close to 4. The 100-prompt
-run also shows that attempts are not independent: of the eight code items that reached System~2, four passed on the first attempt
-and four failed all three, and no repair rescued one.
-
-\subsection{Hedging on System 2: implemented, measured, off}
-
-\texttt{nafs\_core::parallel} and the System~2 loop implement it: one future per candidate that generates, applies a patch and
-verifies, so verification overlaps the other candidates' decoding; candidates consumed in completion order; the first that passes
-wins and dropping the rest cancels their streams; the width from Eq.~(\ref{eq:util}) with an online Beta estimate of $p$; a
-\texttt{repair\_rounds} override; \texttt{hedge\_after\_failure}, which runs the first attempt alone; and a round deadline 5\,s inside the
-request cap. Table~\ref{tab:hedge} is the live A/B on those eight items (System~2 forced, idle host).
-
-\begin{table}[t]
-\centering
-\caption{Eight hard code items, System~2 forced (wall time in s; the sequential loop was run twice).}
-\label{tab:hedge}
-\scriptsize
-\begin{tabular}{@{}p{3.3cm}rr@{}}
-\toprule
-Arm & Verified & Wall \\
-\midrule
-sequential (1 + 2 serial repairs), run 1 & 4/8 & 4,052 \\
-sequential, run 2 & 3/8 & 4,523 \\
-four fresh at once, separate requests & 4/8 & 3,308 \\
-first alone, then four, one $n=4$ request & 4/7 & 3,558 \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Four concurrent fresh candidates cost the easy items $+44$ to $+87\,\%$ and saved only on failing ones; the one-request variant was no
-faster on the failing items (872--930\,s against 636--901\,s), because a round at repair depth costs 2.2 to 3.4 single attempts
-(Table~\ref{tab:batch}). The two sequential runs disagree with each other (4/8 and 3/8), so no accuracy difference can be claimed
-at this size. Hedging on System~2 is therefore \emph{not} adopted: \texttt{deliberation.parallel.enabled = false}. Running it also exposed
-three defects, all fixed: separate requests prefilling $W$ times; the next attempt's budget sized from the single-stream speed,
-which let a round overrun the request cap (HTTP 504); and an error in a round's last candidate discarding the best candidate so far.
-
-\subsection{Cheap concurrent samples before System~2}
-
-Where batching is cheap (System~1, short context) and the verifier is exact, the cores are better spent \emph{before} the
-expensive model. When a draft fails its exact check, \Sys{} now draws $k=4$ System~1 samples in one request, verifies each as it finishes and
-keeps the first that passes. Let $f$ be the share of requests whose draft fails, $r$ the share of those that a sample rescues,
-$\rho$ the cost of the rescue stage (paid on every failed draft) and $E$ the cost of an escalation.
-
+\textbf{Cheap samples before the expensive model.} Where batching is cheap
+(\Sone, short context) and the verifier is exact, the cores are better spent
+\emph{before} \Stwo. When a draft fails its exact check, four \Sone\ samples
+are drawn in one request, each verified as it finishes, and the first that
+passes is kept.
 \begin{proposition}[Rescue break-even] \textnormal{[exact]}
 \label{prop:rescue}
-The saving per request is $f\,(rE-\rho)$, positive iff $r>\rho/E$.
+Let $f$ be the share of requests whose draft fails, $r$ the share of those
+that a sample rescues, $\rho$ the cost of the rescue stage and $E$ the cost of
+an escalation. The saving per request is $f\,(rE-\rho)$, positive iff
+$r>\rho/E$.
 \end{proposition}
-\begin{proof}
-Of the fraction $f$ with a failed draft, a share $r$ avoids the escalation ($-E$) and all pay $\rho$. \qed
-\end{proof}
+The agreement samples of the gate are fused into the draft's batch for the
+same reason: drawn after the draft they cost $1+c(2)=2.33$ draft times, in its
+batch $c(3)=1.78$.
 
-Offline on 60 MBPP+ items the draft passes 46.7\,\% of the time; of 32 failed drafts, 0, 0, 4 and 6 are rescued by 1, 2, 3 and 4
-samples (19\,\% with four, pass@5 56.7\,\%), and four samples in one request take 17.5\,s against 10.4\,s for the draft. Live, in an
-interleaved A/B of 40 items (rescue off against on, stream closed at the decision), escalations fell from 22 to 20 (three avoided,
-one in the other direction, since the draft itself is random); the rescue added a median 14.5\,s when it ran and 317\,s in all.
-Break-even is $317/3=106$\,s per avoided escalation, against 250--580\,s measured for an escalation (the eight code items of the
-100-prompt run: median 289\,s, mean 580\,s), so the rescue nets $+10.8$ to $+35.6$\,s per code item and trades no accuracy: every
-rescued answer passed the exact check. The sample is small and the two studies agree on the rate; it is on by default
-(\texttt{gate.rescue\_samples = 4}), and Lemma~1's call bound gains that term.
+\subsection{The model switch}
+Both models are resident, each in its own process with its own mapped
+weights, so a switch inside a request is routing plus a warm prefix: there is
+nothing to freeze, copy or reload. From the gate's decision to \Stwo's first
+reasoning token takes 0.4 to 1.4\,s (median 0.85\,s over six escalated
+requests). When both servers decode at once each keeps about half to two
+thirds of its solo rate and the pair writes 7.1 to 7.8 tokens/s together
+under every thread and polling setting tried; the cores are the bottleneck
+and no co-scheduling policy was worth building. At the reasoning budget the
+server continues the turn with the reasoning so far as the assistant's
+prefix; the prefix must repeat the generated text exactly, or every reasoning
+token is prefilled again (5 tokens and 0.2\,s when exact, against 108 tokens
+and 2.2\,s at a budget of 200 when one newline differed).
 
-\subsection{Serving topology and summary}
-
-System~2 now has four slots and 24,576 tokens of context (6,144 per slot) where it had two, since the 100-prompt run lost 476\,s
-to waiting for a System~2 slot. Table~\ref{tab:p13} summarises what was adopted and what was not. Every suite was re-run on the final code (31 October 2026): 206 Rust tests with real Lean, security 26/26, end-to-end 65/65, Rooms 59/59, the harness sweep 50/50 (it now covers the rescue, the parallel settings and their validation), and the nine acceptance tests, where Lemma~1's call bound for the maths request is $1+k+\text{rescue}+N(R+1)=10$ and 8 calls were used.
-
-\begin{table}[t]
-\centering
-\caption{Phase~13 outcomes.}
-\label{tab:p13}
-\scriptsize
-\begin{tabular}{@{}p{3.0cm}p{1.6cm}p{2.1cm}@{}}
-\toprule
-Change & Default & Evidence \\
-\midrule
-Fused agreement samples & on & $-24\,\%$, $p=0.0005$ \\
-System~1 rescue (4 samples) & on & 3 of 19 avoided; break-even 106\,s \\
-System~2 with 4 slots & on & 2.7$\times$ to 1.5$\times$ decode \\
-Concurrent hedging, System~2 & off & no width pays at depth \\
-$n$-choice requests & used & 39.1 against 124.5\,s \\
-n-gram speculation & no & $\le1.12\times$, down to $0.84\times$ \\
-q8\_0 KV cache & no & no gain at depth \\
-\bottomrule
-\end{tabular}
-\end{table}
+\subsection{Alternative backends}
+\texttt{llama-server} keeps four things the default engine's server does not
+expose: decoding grammars, $n$-choice requests, a raw continuation endpoint
+and four parallel slots per model. With Smiley Core as the backend the rescue
+and the cascade therefore have one candidate instead of four, the agent
+relies on the free-text parser, and the adaptive reasoning exit is off;
+llama.cpp is one command away and is the choice for a workload dominated by
+the code agent. vLLM's CPU backend runs the same API in a Linux container; on
+an AVX2-only host it must run in FP32 with a small context and is a
+portability profile, not a speed contest. Ollama is not supported because its
+OpenAI endpoint does not return log-probabilities, which the gate requires.

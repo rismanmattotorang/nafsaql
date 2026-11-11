@@ -1,0 +1,140 @@
+\section{The Gate}
+\label{sec:gate}
+
+The gate is the decision of Theorem~\ref{thm:gate}: after the draft, escalate
+if and only if $L(\hat e_1-\hat e_2)>\lambda\,\Delta c$, where $\lambda$ is a
+price of latency in real units that the user sets with one ``speed--care''
+control (Proposition~\ref{prop:frontier}). It adds no model call to a request:
+its features are by-products of the draft, and its own time is 0.08 to
+0.12\,s per escalated request.
+
+\subsection{Three rules, one decision record}
+\label{sec:gate:rules}
+\textbf{Verifier first.} On a verifiable task the exact verifier's verdict on
+the draft decides: a passing draft is kept as \texttt{verified}, a failing one
+is never kept. By Theorem~\ref{thm:precision} no confidence signal can add to
+an exact verdict, so the cheap samples are skipped there.
+
+\textbf{The fixed rule.} Without a verdict and without a promoted calibration,
+the gate compares the draft's mean token log-probability with a threshold
+derived from $\lambda$ ($-0.175$ at the default) and, inside an uncertainty
+band of 0.10 around it, the agreement of $k=2$ cheap \Sone\ samples with the
+draft. Unverified mathematics drafts always get their samples, whatever their
+token confidence says, because their token confidence does not separate right
+from wrong (Section~\ref{sec:eval:gate}). The samples are decoded in the
+draft's own batch and dropped if the draft is stopped early.
+
+\textbf{The calibrated rule.} A fitted calibration maps the features (mean,
+minimum and lowest-window log-probability, agreement, domain, reask) to
+$\hat e_1$; $\hat e_2$ is a per-domain estimate from the audit
+stream. The calibration is fitted from the ledger's labelled drafts and is
+\emph{promoted} to decide only when its held-out expected calibration error is
+at most 0.05 on enough samples (Proposition~\ref{prop:miscal}); until then the
+fixed rule decides and the calibrated estimate is only logged. A budget mode
+solves for the multiplier $\lambda^\star$ that meets a target escalation rate
+(Theorem~\ref{thm:gate}(ii)).
+
+Every decision is recorded with the rule that made it, the features, the
+estimates and the price, so a later refit can learn from it and a person can
+read why a request was or was not escalated.
+
+\subsection{Certified per-bin risk}
+\label{sec:gate:bins}
+A small calibration error bounds the \emph{average} miscalibration. A stronger
+guarantee, taken from vLLM Semantic Router's cascade
+\cite{semanticrouter2026}, bounds each score bin separately. The fitted
+calibration keeps $B$ equal-mass bins of the held-out $\hat e_1$ (about one per
+hundred drafts, two to five) with their counts and, for each, the one-sided
+Clopper--Pearson \cite{clopper1934} upper bound on its error rate at level
+$\alpha/B$: the smallest $u$ with $I_u(k{+}1,\,n{-}k)\ge 1-\alpha/B$, found by
+bisection on the regularised incomplete beta function ($u=1-(\alpha/B)^{1/n}$
+when $k=0$). A draft is kept only in a bin whose bound is at or below a
+configured risk; otherwise the decision says \texttt{uncertified\_bin} with
+the bound, and a calibration with no certified bin is not promoted. Our exact
+verifiers supply the error counts at no cost. With $\alpha=0.05$ and five
+bins, a bin of twenty drafts none of which was wrong still bounds its error at
+0.21, so a young ledger certifies little and escalates more; the bound
+tightens with the ledger by itself. The rule applies to the calibrated mode
+only: budget mode fixes the escalation rate by design.
+
+\subsection{Unknown features and repeated questions}
+A draft without log-probabilities (a backend that does not return them, a
+failed sample) must not look like a confident draft. The gate applies a
+declared policy, \texttt{on\_unknown} = \texttt{escalate} (default),
+\texttt{keep} or \texttt{fixed}, and the decision names the missing feature. A
+user turn whose content words overlap the previous user turn's at Jaccard
+$\ge0.6$ is a \emph{reask}: asking again is evidence that the last answer
+failed. A reask of an unverified draft escalates under the fixed rule, and
+the feature is logged so a refit can learn its weight. The test is lexical
+rather than a cosine, so the gate runs without the embedding server.
+
+\subsection{Sequential evidence}
+\label{sec:gate:seq}
+Three mechanisms read a stream of evidence and stop on a bound.
+
+\begin{proposition}[Exact early escalation on a running minimum] \textnormal{[exact]}
+\label{prop:n2}
+Let $w(n)$ be the lowest mean log-probability over complete windows of $W$
+consecutive tokens among the first $n$ tokens of a draft. Then $w$ is
+non-increasing in $n$, so for the rule ``escalate iff $w(N)<\theta$'' the
+stopping time $T=\min\{n:w(n)<\theta\}$ gives exactly the full draft's decision,
+and no rule on the same stream escalates such a draft earlier without a
+non-zero disagreement rate.
+\end{proposition}
+\begin{proof}
+A minimum over a growing set; $w(N)\le w(T)<\theta$; before $T$ every window is
+$\ge\theta$. \qed
+\end{proof}
+A draft that the gate will reject anyway can therefore be stopped at the
+crossing and handed to \Stwo. On the mean-log-probability rule the same idea
+is only a heuristic (a draft whose running mean is below the threshold minus a
+margin is stopped), and Wald's bound shows it cannot be made more aggressive:
+with the measured per-token spread $\sigma\approx0.28$ and margin 0.04, any
+sequential test at 5\,\% errors needs about 260 tokens, against drafts of 47
+to 291.
+
+\begin{proposition}[Posterior stopping with a collapsing bound] \textnormal{[exact for the rule; strong for optimality]}
+\label{prop:n4}
+With $k$ probed answers clustered into categories, counts $v$ and a uniform
+Dirichlet prior, the posterior probability that the plurality answer is the
+majority answer is
+$1-I_{1/2}(v_{\mathrm{top}}+1,\,k-v_{\mathrm{top}}+1)$.
+Under a per-probe cost and a hard budget the Bayes-optimal rule stops at the
+first $k$ with this probability at or above a bound $\theta(t_k)$ that is
+non-increasing in the budget used \cite{frazier2007deadline}.
+\end{proposition}
+
+\begin{proposition}[Optimal probe interval] \textnormal{[exact under an exponential model]}
+\label{prop:n5}
+If the reasoning length at which the answer becomes available is exponential
+with mean $m$ tokens, a probe costs $c_p$ seconds and decoding runs at $v$
+tokens per second, the periodic interval minimising probe cost plus overshoot is
+$\Delta^\star=\sqrt{2c_pvm}$.
+\end{proposition}
+
+\textbf{Adaptive reasoning exit.} The deliberate path is almost entirely
+\Stwo\ reasoning, so the largest saving is to shorten the reasoning itself.
+\Stwo\ reasons in chunks on a raw continuation endpoint, which keeps the
+prefix cached. At a reflection cue (``Wait'', ``Alternatively''), with a
+minimum gap of 64 tokens and at the latest every 256, the reasoning is closed
+provisionally and the model is asked for its answer in a few tokens (0.6 to
+0.8\,s). On a verifiable task the exact verifier judges that probe and, if it
+passes, the reasoning stops; on factual tasks two consecutive agreeing probes
+stop it, or optionally the posterior rule of Proposition~\ref{prop:n4}. The
+final answer is then generated after the reasoning as on the standard path, so
+the exit changes only how much reasoning is generated. The gap of 64 tokens is
+within 1\,\% of the optimum of Proposition~\ref{prop:n5} at the measured
+values ($c_p\approx0.7$\,s, $v\approx8$, $m\approx300$ give
+$\Delta^\star\approx58$).
+
+\subsection{Learning from its own traffic}
+\label{sec:gate:labels}
+The calibrated rule needs labelled drafts, and Proposition~\ref{prop:audit}
+says routed traffic alone gives biased ones. Two mechanisms supply labels
+without a \Stwo\ call. A \emph{probe} is a forced-fast draft that still draws
+its agreement samples and is judged by the exact verifier. A \emph{label
+stream} runs probes on verifiable practice tasks while no user request is in
+flight; a user arriving cancels the draft in progress. At about 90 labels an
+hour the 2,900 held-out samples that a five-bin calibration estimate needs
+are about 32 hours of idle time. The quality page shows how many checked
+answers are held and whether the learned rule has been promoted.

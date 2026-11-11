@@ -1,74 +1,76 @@
-\section{Limitations and Ethical Considerations}
+\section{Limitations}
 \label{sec:limits}
-\textbf{Indicative results.} Section~\ref{sec:impl} reports measurements on
-one shared four-core machine with tens of items per comparison, far below the
-sample sizes of Section~\ref{sec:eval}; the quality claims remain hypotheses
-until the release-scale runs. The formal results hold under their stated assumptions, several of
-which (conditional independence of verifiers, a Beta prior on acceptance,
+\textbf{Indicative results.} Every measurement comes from one shared
+four-core machine with tens to a few hundred items per comparison. Verified
+counts that differ by one or two tasks are within sampling noise (the same
+ten agent tasks verified four and five times in two rounds of the same arm).
+A release-scale evaluation needs thousands of paired items and a quiet or
+faster host. The formal results hold under their stated assumptions, several
+of which (conditional independence of verifiers, a Beta prior on acceptance,
 homogeneous refinement dynamics, concave budget returns) are modelling
-choices to be checked.
+choices.
 
-\textbf{Harness integration.} The Lean verifier runs against core Lean~4.35.0;
-statements that import Mathlib need a Mathlib build and \texttt{lean\_path}, which
-were not installed. On Linux, Lean runs with user and network namespaces only
-(A-070). Patch repair is off until the
-failure rate $f$ of Eq.~(\ref{eq:patch}) is measured, and the code agent's live
-runs are a handful of tasks on a shared host.
-The Phase~11 A/B (Section~\ref{sec:harness2}) has ten System~1 tasks and three
-System~2 tasks per arm on a shared host: its verified counts are indicative,
-not significant, and its tasks are small single-file functions. Grammar
-constraints fix the syntax of an action, not its sense (a patch that applies can
-still break the file), and they need llama-server; on vLLM the harness relies on
-the stream cut alone.
+\textbf{The calibrated gate is not yet in force.} The ledger holds 1{,}294
+labelled drafts of the 2{,}900 its promotion rule asks for, and only one of
+five bins is certified at the default bound, so the fixed rule decides. Token confidence is a weak signal for these models on
+mathematics; a draft whose samples all repeat the same wrong answer is kept.
 
-\textbf{Lean proofs need a stronger prover.} The verifier and the repair loop are
-validated end to end with the real Lean binary, but Qwen3-4B-Thinking (4-bit, CPU)
-abstained on $n+0=n$ within its budget (Section~\ref{sec:sweep}); Lean tasks
-therefore return \emph{abstained} unless the model writes valid Lean~4. The
-verified proofs reported are the harness's own test cases, not model output.
+\textbf{Verifiers are partial.} Only code, mathematics, structured output and
+Lean statements have exact verifiers; everything else is at best a consensus
+or judge assurance, which Theorem~\ref{thm:plurality} shows has a floor.
+Test-based verification can be gamed by overfitting to visible tests, which is
+why tests are hidden and the code verifier's false-accept rate is measured by
+mutation. The 4B model does not write valid Lean~4 proofs, so Lean tasks
+abstain; Mathlib is not installed.
 
-\textbf{Parallelism results are small-sample.} The rescue (40 live pairs, 3 avoided escalations,
-60 offline items) and the hedging comparison (8 items; the sequential loop itself gave 4/8 and 3/8) are indicative; the batch-scaling
-numbers are medians of two or three repetitions on one machine. Hedging on System~2 is off because of what was measured here;
-a host with a cheaper batch at depth could change that (Section~\ref{sec:inference}).
+\textbf{Shared weights.} The fast and slow paths come from one model family
+and make correlated errors; the collision term of
+Proposition~\ref{prop:collision} is not small a priori, and the judge shares
+the bias, which is why exact verifiers carry the safety case.
 
-\textbf{Shared weights.} Fast and slow paths from one model family make
-correlated errors; the collision term is measured rather than assumed small,
-and the judge shares the same bias, which is why exact verifiers carry the
-safety case.
+\textbf{The CPU.} A deliberate answer takes minutes. The default engine's
+server lacks grammars, $n$-choice requests and raw continuation, so the
+rescue, the cascade and the adaptive exit run at full strength only on the
+llama.cpp backend. Engine-flag studies were inconclusive under shared load.
+Distillation of the quick model and pre-training of the memory module need a
+GPU and were not run.
 
-\textbf{CPU constraint.} On the reference machine the slow path takes
-minutes; the design is honest about this and makes interactive deliberation
-a GPU-profile feature. Published AVX2 throughput data are sparse; our own
-measurements cover two models and one machine.
+\textbf{Knowledge.} Questions worded differently from the document are found
+in the first eight passages only a quarter of the time. The remedies
+(a reranker, a stronger embedder, questions written for each passage at
+indexing time) need larger models or hours of the quick model. No public
+retrieval benchmark was run, so there is no comparison with published
+systems. The model-built graph costs a model call per passage, and community
+summaries are not built. The \LaTeX\ reader leaks macro names inside
+mathematics. At 50{,}000 passages search by words through the store is slow
+under load. The support check compares words and numbers: it flags a sentence
+that is not in the passages, and it passes a wrong sentence assembled from
+the passages' own words. The rule for follow-up questions reads one previous
+turn and is written for English.
 
-\textbf{Verifiers are partial.} Only code, mathematics and structured output
-have exact verifiers; everything else is at best a consensus or judge
-assurance, which Theorem~\ref{thm:plurality} shows has a floor. Test-based
-code verification can be gamed by overfitting to visible tests; hidden tests
-and mutation testing are required.
+\textbf{Memory.} Memory tokens do not work without pre-training, and no
+module trained with the corrected recipe exists yet. The memory of earlier
+conversations is one person's: outside chat rooms the system has no accounts,
+so everyone who can reach an installation shares it. Its gate is a word list,
+so a question that needs an earlier conversation without saying so is
+answered without it.
 
-\textbf{Security.} The system executes model-written code in a sandbox and
-consumes untrusted text; prompt injection through retrieved memory or tool
-output is a first-class threat \cite{greshake2023injection,perez2022ignore}.
-The specification isolates the sandbox, strips instructions from retrieved
-content, and never lets observed content change controller parameters.
+\textbf{The agent.} Tasks are single-file functions; there are no subagents,
+no plan mode and no byte-exact replay of a prompt from the trace. Grammar
+constraints fix the syntax of an action, not its sense.
 
-\textbf{Religious content.} The classical vocabulary is used as analogy and
-the components have plain names in code. We do not claim that the software
-has a soul, consciousness or moral standing; we do not model the
-\emph{ruh}; and we cite scripture and hadith by number from named
-translations. The analogy section should be reviewed by scholars of the
-tradition, and users of the chat system who ask religious questions receive
-answers with the same assurance labelling as any other non-verifiable
-domain, with no claim of authority.
+\textbf{Security and privacy.} The system executes model-written code in a
+sandbox and consumes untrusted text; prompt injection through retrieved
+passages or tool output is a first-class threat
+\cite{greshake2023injection,perez2022ignore}. Retrieved content is delimited
+as data, relations enter a prompt only with a verbatim quote, and observed
+content never changes controller parameters; classifiers for jailbreaks and
+personal data are pattern-based, not trained. Conversation traces feed the
+ledger; using them for training requires consent, retention limits and
+redaction.
 
-\textbf{Data and privacy.} Conversation traces feed the self-model and the
-distillation set; the specification requires consent, retention limits,
-redaction of personal data before training, and exclusion of any
-conversation from training on request.
-
-\textbf{Hallucination and faithfulness.} Separating reasoning content from
-the answer does not make the reasoning faithful
-\cite{turpin2023unfaithful,ji2023hallucination}; we treat the trace as
-evidence for debugging and distillation, not as an explanation to the user.
+\textbf{Faithfulness.} Separating the reasoning from the answer does not make
+the reasoning faithful \cite{turpin2023unfaithful,ji2023hallucination}; the
+trace is evidence for debugging, not an explanation to the user. The system
+makes no claim of consciousness or moral standing; its name is an analogy
+(Section~\ref{sec:intro}).

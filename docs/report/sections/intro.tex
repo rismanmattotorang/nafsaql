@@ -7,63 +7,61 @@ candidates, and verify or vote among them
 \cite{wei2022cot,wang2023selfconsistency,snell2024scaling,deepseek2025r1}. The
 gain is real but expensive, and it is wasted on the many requests that a direct
 answer would have handled \cite{chen2024overthinking,zhang2025adaptthink}. This
-is the engineering form of a very old observation: cognition has a fast,
+is the engineering form of an old observation about cognition: there is a fast,
 automatic mode and a slow, effortful one, and competence lies in knowing when to
 switch \cite{kahneman2011thinking,evans2013dual,sloman1996two}.
 
-The Islamic intellectual tradition developed a rich vocabulary for the same
-observation long before dual-process psychology. The Qur'an speaks of the
-\emph{nafs} that ``commands to evil'' (Q~12:53), the \emph{nafs} that reproaches
-itself (Q~75:2) and the \emph{nafs} ``at rest'' (Q~89:27)
-\cite{AbdelHaleem2008Quran}; al-Ghazali describes the heart (\emph{qalb}) as a
-king whose vizier is the intellect (\emph{\textquoteleft aql}) and whose unruly
-soldiers are appetite and anger \cite{Ghazali2010Marvels}; and the Sufi
-disciplines of \emph{muraqaba} (vigilance) and \emph{muhasaba} (self-accounting)
-institutionalise the daily audit of one's own conduct
-\cite{Picken2011,Qushayri2007Epistle}. We use this vocabulary as a design
-metaphor. We make no claim about the metaphysics of the soul, and we say so
-once here and again in Section~\ref{sec:islamic}: every mapping in this paper is
-an analogy between a classical \emph{description of a faculty} and an
-\emph{engineering component}.
-
 \subsection{Problem}
-The project that this report serves has a concrete constraint set: build a
-dual-process assistant from pretrained Qwen models, serve it on a CPU-only
-machine, fine-tune it with Unsloth, and expose it through a Rust web
-application with a chat room, a performance-test console and an evaluation
-dashboard. An existing draft design \cite{draft2026} targeted 27B--35B models
-on 80\,GB GPUs and reviewed twelve formal results; it did not address CPU
-feasibility, the model roster, the serving stack, or a buildable
-specification. This report assesses that draft, keeps what is sound, corrects
-what is not, and extends it into a mathematically principled and feasible
-design.
+Small models are fast and wrong too often. Large models are careful and need a
+GPU or a remote service. Neither says which of its answers to trust. We ask what
+can be built under a hard constraint: pretrained, openly licensed Qwen models of
+at most 4B parameters, a machine with four CPU cores and no accelerator, and
+nothing leaving that machine. Under this constraint a reasoning model decodes
+5 to 8 tokens per second, so a deliberate answer takes minutes; the system must
+spend that time only where it buys correctness, and must be able to say when it
+did not get a checked answer.
+
+\subsection{Inspiration}
+The name joins two terms from the classical philosophy of mind of the Islamic
+intellectual tradition: \emph{nafs}, the impulsive self that acts first, and
+\emph{\textquoteleft aql}, the faculty of reason that restrains and corrects it.
+We use the pair only as a naming analogy for a fast process and a deliberate
+one, in the same spirit as the System~1 and System~2 of dual-process
+psychology. Nothing in the design depends on the analogy, and every component
+has a plain engineering name.
 
 \subsection{Contributions}
 \begin{enumerate}
-\item A faithful, sourced account of the classical concepts we borrow, with
-the disagreements among scholars noted and the analogy kept separate from
-theology (Section~\ref{sec:islamic}).
-\item A formal model of a verifier-gated dual-process system with
-seventeen stated results, each with explicit assumptions and an engineering
-consequence (Section~\ref{sec:math}). The results correct two defects of the
-draft: its router rule was hand-tuned rather than derived, and its
-self-refinement loop was not shown to be stable.
-\item A verified feasibility study of the stack as of October 2026: which Qwen
-variants exist below 9B parameters, which run in vLLM-CPU and llama.cpp, what
-Unsloth can and cannot do without a GPU, which Rust crates to use, and what a
-four-core AVX2 machine actually delivers (Sections~\ref{sec:stack} and
-\ref{sec:feasibility}).
-\item A component architecture with a termination guarantee, an assurance-level
-model for answers, and a self-model that is unbiased under routing
-(Section~\ref{sec:arch}).
-\item An evaluation plan whose gates are statistically sized, and a summary of
-the companion specification and roadmap (Sections~\ref{sec:spec} and
-\ref{sec:eval}).
+\item A formal model of a verifier-gated dual-process system with seventeen
+stated results, each with explicit assumptions and the design decision it
+fixes (Section~\ref{sec:math}).
+\item An architecture in which acceptance needs evidence: an expected-loss gate
+with certified per-bin risk, exact verifiers whose verdict is final, bounded
+loops, and an assurance level on every reply
+(Sections~\ref{sec:arch} and~\ref{sec:gate}).
+\item A verifier-scored agent harness for small models: a best-first candidate
+tree, an append-only transcript that keeps the engine's prompt cache valid, a
+per-step decoding grammar that leaves the reasoning span free, and a cascade
+that tries the quick model first (Section~\ref{sec:harness}).
+\item A CPU inference layer, including an engine that serves several users in
+one pass over the weights with output identical to a solo run, and a measured
+account of which forms of parallelism pay on four cores
+(Section~\ref{sec:inference}).
+\item A knowledge base that searches documents by words and meaning from an
+in-process index, builds a graph of a document set without a model call,
+answers with numbered sources and says which sentences of an answer its
+sources hold; and two memories that need no model, one of verified answers
+and one of earlier conversations (Sections~\ref{sec:knowledge}
+and~\ref{sec:memory}).
+\item Measurements of all of the above on one shared machine, with interleaved
+comparisons and the negative results reported beside the positive ones
+(Section~\ref{sec:eval}), and a comparison with related open systems
+(Section~\ref{sec:comparison}).
 \end{enumerate}
 
-\subsection{What this report does not claim}
-No accuracy, calibration or cost result for \Sys\ has been measured. Where a
-number appears it is (a) a measurement of an existing model on the reference
-machine, clearly marked, (b) a value quoted from a cited paper, or (c) a target
-or estimate. The roadmap (Section~\ref{sec:spec}) schedules every hypothesis
-for validation.
+\subsection{What this paper does not claim}
+The quality results are indicative: comparisons use tens to a few hundred
+items, far below what a release decision needs, and every time was measured on
+a machine shared with other workloads. No public retrieval benchmark was run,
+so the knowledge results are measured changes against our own earlier versions,
+not against published systems. Section~\ref{sec:limits} lists what remains open.

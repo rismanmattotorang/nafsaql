@@ -1,0 +1,98 @@
+\section{Memory}
+\label{sec:memory}
+
+\subsection{A memory of verified answers}
+\label{sec:mem:verified}
+The context manager keeps conversations in SQLite and assembles each prompt
+within a context cap, with cache-affinity so that the engine's prefix store
+is hit. A retrieval memory holds earlier answers and offers them to later
+questions, under one rule: \emph{only verified answers are stored}. A cache
+that keeps every successful response would, by
+Proposition~\ref{prop:distill}, feed unverified text back as if it were
+knowledge. A hit is dropped when its stored question differs from the query
+by at most two content words with a negation cue or an antonym pair on one
+side only, so ``is caching enabled'' does not retrieve the stored answer to
+``is caching disabled'' (a guard after vLLM Semantic Router
+\cite{semanticrouter2026}). Retrieved memory enters the prompt with its
+provenance and, like any retrieved text, as data.
+
+\subsection{A memory of earlier conversations}
+\label{sec:mem:recall}
+The second memory holds what was said, so that a fact told in one conversation
+can be found in a later one. It makes no model call.
+
+\emph{Writing.} Each finished turn of a stored conversation becomes a note
+(the question and the answer, reasoning removed, the answer clipped to
+1{,}200 characters), and every third turn also a window over the last five.
+A greeting, a turn of under 30 characters and an answer that declined are not
+stored. A message that opens with ``Remember that'' is kept as a note that
+the size limit never removes.
+
+\emph{Reading.} Notes are read only when the question speaks in the first
+person or points back (``my'', ``last time'', ``you said''), and never when
+passages from a knowledge base are already in the prompt: on a CPU every
+thousand characters of prompt is seconds of reading, so an impersonal question
+pays nothing. Candidates come from BM25 over the notes and, when the
+embedding server runs, from the cosine of note vectors, fused by reciprocal
+rank. A note that answers the opposite question is dropped by the polarity
+guard of Section~\ref{sec:mem:verified}. The tail below the largest drop in
+relevance is cut. What remains is ordered by relevance, kind and age (a
+half-life of 30 days), cleared of duplicates, and cut to three notes and
+1{,}500 characters. Two notes are duplicates when their word sets overlap by
+0.9 \emph{and} their numbers are bound to the same words, so ``budget 10K''
+and ``budget 12K'' stay apart. The notes enter the prompt delimited as data.
+
+\emph{Whose memory.} A private request, an experiment and a chat room neither
+write nor read this memory; what is said in a room is shared by its members.
+Deleting a conversation deletes its notes. A person can read every note,
+delete one or all, add one, and merge repeated ones. At most 5{,}000 notes
+are kept; those never recalled go first, oldest first.
+
+The extraction, the gate, the elbow and the number-aware duplicate test follow
+the conversation memory of vLLM Semantic Router \cite{semanticrouter2026}.
+The polarity guard, the exclusion of rooms and private chats, a size limit
+that uses the access counts, and the person's view of every note are added
+here; a model-written rewrite of the query is left out. A live check is in
+Section~\ref{sec:eval:recall}.
+
+\subsection{The audit ledger as self-knowledge}
+\label{sec:mem:ledger}
+The ledger is the system's memory of its own performance: gate decisions,
+verifier verdicts and audit outcomes per domain. It is what the calibrated
+gate is fitted from (Section~\ref{sec:gate:labels}), and capabilities with no
+audited data are reported as unmeasured, never as zero
+(Proposition~\ref{prop:audit}). Verified deliberate traces are also the raw
+material of distillation into the quick model, under the promotion rule of
+Proposition~\ref{prop:distill}; training needs a GPU and was not run.
+
+\subsection{Memory tokens}
+\label{sec:mem:tokens}
+Memorilla \cite{memorilla2026} compresses a document collection into a few
+vectors that a frozen decoder reads in place of the embeddings of placeholder
+tokens. Our port is a 31.5\,M-parameter module (sixteen slots, two
+cross-attention blocks, eight heads, a projection from the embedder's width
+to the decoder's) written in Candle, with forward-pass parity to the
+unmodified PyTorch reference within $1.9\times10^{-6}$ on three
+configurations. The engine admits requests whose placeholder positions carry
+supplied vectors, and a trainer fits the module to a knowledge base through a
+differentiable Qwen3 decoder (logits within $2\times10^{-5}$ of a reference
+implementation). Document keys and values are prepared once per collection. The
+\texttt{memory} chat mode uses the module alone and \texttt{hybrid} adds it to
+retrieved passages; answers read from memory tokens are decoded greedily, as
+the reference evaluates its own.
+
+The module needs pre-training that a CPU cannot do, and the one module
+fine-tuned here \emph{collapsed}: all sixteen memory vectors are one vector,
+whatever the question (Section~\ref{sec:eval:memory}). Two measures follow.
+The trainer now uses the reference's from-scratch recipe (learning rate
+$10^{-4}$, sixteen examples per step, five epochs, a warm-up from zero over a
+tenth of the steps, dropout 0.1 at the reference's four sites, a token-level
+loss). And the trainer computes at every validation the mean cosine between
+the slots of one question and between the memories of different questions,
+saves both beside the weights, and orders checkpoints by whether the memory
+depends on the question, then by the gain in claim accuracy over no memory,
+and only then by validation loss. A module whose
+memories for different questions have a cosine of 0.98 or more is not used:
+the automatic mode answers from passages, and an explicit request for memory
+falls back to passages and says why. A module saved without these statistics
+is probed once with three fixed questions. The modes stay off by default.

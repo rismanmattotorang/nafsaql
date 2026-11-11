@@ -1,0 +1,110 @@
+\section{Comparison with Related Systems}
+\label{sec:comparison}
+
+Five open projects were read in full against this system, and mechanisms were
+taken from each where they cost no model call. This section says what each
+is, where the designs differ, and what was measured side by side.
+
+\textbf{Codex and Open Math Harness.} Codex \cite{openaicodex2026} is a
+coding agent whose turn loop assumes a frontier model with native tool calls;
+Open Math Harness \cite{openmathharness2026} is a capability microkernel for
+mathematics research. Neither was embedded. From Codex we took the patch
+language with its lenient parser and fuzzy matcher, the append-only history,
+grammar-constrained patches, truncation on insertion, budget reminders and
+retry backoff; from Open Math Harness the Lean protocol, the scoring of
+partial results and the candidate tree. What changed for small models on a
+CPU is in Section~\ref{sec:harness}: compaction is written by the harness
+rather than by the model, the grammar is rebuilt per step and leaves the
+reasoning free, and the edit format is chosen by file length.
+
+\textbf{vLLM Semantic Router} \cite{semanticrouter2026} is a decision layer
+in front of many models: about twenty signal types, Boolean rules over them
+that pick a decision, and a selection algorithm inside it. Its decision rule
+is lexicographic and hand-weighted; ours is one rule derived from expected
+loss with a price of latency in real units. It decides correctness by model
+confidence, self-rating or peer agreement; ours by exact verifiers. Its
+cascade serves the last response when none passes a threshold; ours returns
+the best-scoring candidate or abstains. Its semantic cache stores every
+successful response; our memory stores verified answers only. It reports its
+own gate at 79\,ms to 9.8\,s per request on a CPU, because the signals come
+from a model of 0.3B parameters or more; ours costs about 0.1\,s from
+features the draft already produced. From it we took certified per-bin risk,
+a declared policy for unknown features, the reask signal and the polarity
+guard; and from its retrieval and memory code the model-free parts of a
+conversation memory (the notes, the gate that decides when to read them, the
+elbow threshold, duplicates that respect numbers) and the idea of a
+topic-continuity signal, reduced to one rule for follow-up questions. Its
+document search re-ranks the vector hits with BM25 and character trigrams
+computed over those hits only; ours runs words and meaning as independent
+arms over the whole base, which is what finds a passage the embedder missed.
+Its check of an answer against its context is a token classifier of 150 to
+300\,M parameters; ours is a rule over words and numbers
+(Section~\ref{sec:kb:chat}). Its selection algorithms choose among many
+models (Elo, nearest labelled queries, Thompson sampling, session-aware
+switching); with two models there is nothing to select, and the one
+question-only signal we could test did not add to the draft's own
+(Table~\ref{tab:negative}). Its repository commits speed records and no
+quality measurement for retrieval, memory, cache precision or selection. It
+remains ahead on breadth: Envoy and Kubernetes integration, trained jailbreak
+and personal-data classifiers, per-user memory isolation, a management
+dashboard. Those need a classifier model per request or a service mesh, and
+are outside what a single-binary assistant on four cores should carry.
+
+\textbf{Memorilla} \cite{memorilla2026} trains a small module that reads a
+document collection into sixteen vectors for a frozen decoder, on GPUs and
+for decoders of 8B parameters. Our port has forward-pass parity with it and
+serves its vectors through our own engine; what it cannot have on a CPU is
+the pre-training (3.3 million rows in two stages). The comparison of the two
+code bases explained our one failed module: a learning rate three times the
+reference's at a quarter of its batch, no dropout, and checkpoint selection
+by validation loss, which rewarded a module that had learnt a constant. The
+reference has no test for that failure; the collapse statistics and the
+activation guard of Section~\ref{sec:mem:tokens} are ours. Memorilla has no
+run-time memory management (no write, forget or consolidation); that role is
+taken here by the note memory of Section~\ref{sec:mem:recall}.
+
+\textbf{DeepSeek Harness} \cite{deepseekharness2026} is a ReAct loop over an
+event-sourced session log from which any prompt can be rebuilt byte for byte.
+A run ends on the model's own claim; it has no verifier, no search over
+candidates, no rollback and no step limit, and its sandbox does not unshare
+the network. From it we took the anchored token meter, pruning before
+compaction, the refusal of an edit from a truncated reply and the
+repeat-attempt notice. It remains ahead on byte-exact prompt replay,
+subagents at scale and browser tools.
+
+\textbf{OntoSmith} \cite{ontosmith2026} builds a governed knowledge graph
+under a human-approved, pinned ontology with deterministic gates and a
+published precision record. Its served retrieval path has no BM25, fixed
+windows without overlap and no rank fusion, where ours had all three. What it
+does better, and what we took, is the role of the graph: the graph
+\emph{supplies candidates} to the ranking instead of overriding it; an
+ontology stored as data; and a quote for every relation.
+
+\textbf{Measured side by side.} The benchmarks of Semantic Router that
+compile offline were run interleaved with Rust counterparts, five rounds,
+median (Table~\ref{tab:h2h}). Two results go against a simple reading. Their
+hand-written AVX2 assembly is 1.3 to 1.5 times faster than our intrinsics for
+long dot products; the difference is 50 to 60\,ns on a vector scan that costs
+18 to 22\,ms a query. And the per-request cost of both signal layers is
+negligible beside one model call, so what separates the projects is how an
+answer comes to be accepted, not these numbers.
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{Per-request work, five interleaved rounds (load 24 to 29). The routing row is not the same computation (their 30 keyword rules against our domain classifier); the compression rows are; the last row compares host overhead only, against the other project's own budget.}
+\label{tab:h2h}
+\begin{tabular}{@{}p{3.3cm}rrr@{}}
+\toprule
+Workload & Other & Nafs-Aql & Ratio \\
+\midrule
+Routing signal, 2\,KB prompt & 197.7\,\textmu s & 2.2\,\textmu s & 90$\times$ \\
+Extractive compression, 500 tok. & 745\,\textmu s & 310\,\textmu s & 2.4$\times$ \\
+Extractive compression, 2K tok. & 5.07\,ms & 1.16\,ms & 4.4$\times$ \\
+Extractive compression, 16K tok. & 50.3\,ms & 8.96\,ms & 5.6$\times$ \\
+Dot product, $n=768$, AVX2 & 99\,ns & 145\,ns & 0.68$\times$ \\
+Dot product, $n=1024$, AVX2 & 135\,ns & 199\,ns & 0.68$\times$ \\
+Dot product, $n=1024$, portable & 1.20\,\textmu s & 1.21\,\textmu s & 0.99$\times$ \\
+Agent host overhead, 100 turns & budget 900\,ms & 1.75\,ms & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
