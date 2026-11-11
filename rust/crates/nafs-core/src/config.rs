@@ -143,6 +143,11 @@ pub struct KnowledgeCfg {
     pub support_min_overlap: f64,
     /// A quick-model answer with fewer than this share of supported sentences goes to the reasoning model (0 = never).
     pub support_escalate_below: f64,
+    /// Phase 27, chat: `rag_max_chars` is the size of the whole passage block (each source's header counted), and a
+    /// document's title is written once, not on each of its passages. Off: the budget is the passage text alone.
+    /// Off by default: with `rag_k = 6` and `rag_max_chars = 2400` it made prompts 25 % shorter and answers 20 to 26 %
+    /// sooner, and 39 of 50 answers were right against 42 (wrong numbers taken from excerpts).
+    pub rag_compact_sources: bool,
     /// Memorilla (Phase 5): a memory-module checkpoint (`config.json` + `weights.safetensors`) trained for System 1;
     /// empty turns `memory` mode off.
     pub memory_checkpoint: String,
@@ -213,6 +218,7 @@ impl Default for KnowledgeCfg {
             support_check: true,
             support_min_overlap: 0.6,
             support_escalate_below: 0.0,
+            rag_compact_sources: false,
             memory_checkpoint: String::new(),
             memory_placeholder: "<|fim_pad|>".into(),
             memory_trainer: "rust/target/release/memorilla-train".into(),

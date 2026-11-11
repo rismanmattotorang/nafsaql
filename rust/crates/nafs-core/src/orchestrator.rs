@@ -1021,11 +1021,13 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                 if joined {
                                     sources.push(json!({"note": "This question was read together with your previous one.", "kb": kq.kb}));
                                 }
-                                for u in crate::knowledge::pack_units(
-                                    &found,
-                                    &user.content,
-                                    cfg.knowledge.rag_max_chars,
-                                ) {
+                                // Phase 27: with compact sources the budget is the whole block, headers counted.
+                                let pack = if cfg.knowledge.rag_compact_sources {
+                                    crate::knowledge::pack_units_for_prompt
+                                } else {
+                                    crate::knowledge::pack_units
+                                };
+                                for u in pack(&found, &user.content, cfg.knowledge.rag_max_chars) {
                                     let p = &found.passages[u.passage - 1];
                                     while source_texts.len() < u.passage {
                                         source_texts.push(String::new());
@@ -1040,11 +1042,13 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                                 // counts more memory positions than there are vectors and refuses the request. The whole
                                 // block is cleaned, not only the passage text: the base's name, a document title and a
                                 // heading all reach the prompt, and a crafted document would break the base for everyone.
-                                let block = crate::knowledge::prompt_block_for(
-                                    &found,
-                                    &user.content,
-                                    cfg.knowledge.rag_max_chars,
-                                );
+                                let render = if cfg.knowledge.rag_compact_sources {
+                                    crate::knowledge::prompt_block_sized
+                                } else {
+                                    crate::knowledge::prompt_block_for
+                                };
+                                let block =
+                                    render(&found, &user.content, cfg.knowledge.rag_max_chars);
                                 system.push_str(&crate::knowledge::strip_placeholder(
                                     &block,
                                     memory_ph.as_deref().unwrap_or(""),
