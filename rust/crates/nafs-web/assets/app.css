@@ -204,7 +204,6 @@ dialog::backdrop{background:rgba(10,15,25,.45)}
 .threadbar .t1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50%}
 .privacy{font-size:11px;color:var(--faint);padding:6px 2px 0}
 kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--surface-2)}
-.automaton .s .ar{font-style:italic;font-weight:400;color:var(--faint);margin-left:4px;font-size:11px}
 .actions .sep{width:1px;align-self:stretch;background:var(--border);margin:0 4px}
 .actions .fb.on{color:var(--accent);background:var(--fast-bg)}
 .actions [data-a=down].on{color:var(--bad);background:var(--bad-bg)}
@@ -407,7 +406,6 @@ body{font-size:var(--fs-2)}
 .journey .jstep{display:inline-flex;align-items:center;gap:7px;padding:3px 10px 3px 4px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--faint);font-size:var(--fs-0);line-height:18px}
 .journey .jstep .n{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-family:var(--mono);font-size:10.5px;font-weight:700;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
 .journey .jstep .n svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
-.journey .jstep .ar{font-style:italic;font-weight:400;color:var(--faint);margin-left:2px}
 .journey .jstep.done{color:var(--muted);background:var(--surface-2)} .journey .jstep.done .n{background:var(--ok-bg);color:var(--ok);border-color:transparent}
 .journey .jstep.cur{color:var(--text);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--surface));box-shadow:var(--ring)}
 .journey .jstep.cur .n{background:var(--accent);color:var(--accent-ink);border-color:transparent;animation:pulse 1.3s infinite}

@@ -87,24 +87,14 @@ Chats may be used to improve answers, after personal details are removed and a p
 
 ## The name
 
-Nafs-Aql borrows classical terms of the self as an **analogy**, not as a religious claim:
-
-- *nafs*: the first impulse (the quick answer);
-- *lawwāma*: self-reproach (a quick answer flagged for a second look);
-- *ʿaql*: reflection (thinking it through);
-- *muṭmaʾinna*: at rest (an accepted answer);
-- *tawaqquf*: withholding judgement (*Not sure*);
-- *muḥāsaba*: self-accounting (the Quality page);
-- *tazkiya*: purification (the Learning page).
-
-Click the logo for the notes on the name and their sources. A scholar's review of this text is part of the release process.
+Nafs-Aql joins two classical terms, *nafs* (the impulse that acts first) and *ʿaql* (the reason that restrains and corrects it), as a naming analogy for a quick answer and a considered one. Nothing in how the assistant works depends on the analogy. Click the logo for the same note in the app.
 
 ## Insights (Advanced mode)
 
 The Insights pages are for the people who run and study Nafs-Aql. On a phone they sit behind *More*.
 
-- **Quality** (*muḥāsaba*): how Auto decides when to think longer, how trustworthy each check is, reliability by topic, what people prefer in Compare, whether quality is changing, warnings and spot checks.
-- **Learning** (*tazkiya*): which checked answers the quick model can learn from, the review queue, the models in use, and the operator steps to train and replace a model.
+- **Quality**: how Auto decides when to think longer, how trustworthy each check is, reliability by topic, what people prefer in Compare, whether quality is changing, warnings and spot checks.
+- **Learning**: which checked answers the quick model can learn from, the review queue, the models in use, and the operator steps to train and replace a model.
 - **Experiments:** ready-made experiments (routing, speed against care, independence, thinking time, the full service, strong code tests, early stopping). *Which strategy wins?* shows the best strategy per topic at each speed weight, pooled over every experiment. *Release readiness* tracks the release milestones. Reports download as Markdown and CSV.
 - **Speed:** load tests, the standard load test with 1, 2 and 4 users, and *Where the time goes*: the share of time per step of recent answers, with how fast the models read and write and how much of each question they could reuse.
 - **Status:** whether both models are ready, the settings in force, a reliability summary, and *Try a check* for running the exact checks on any answer. Three model servers can be switched here: Smiley Core (the default, the project's own Rust engine, started by `make up`), llama.cpp (`make up-llama`; it serves several people at once better) and vLLM; the switch warms the new servers before it takes effect, and answers already being written finish on the old one.

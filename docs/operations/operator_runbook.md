@@ -27,9 +27,9 @@ The gateway refuses to listen on a non-loopback address without tokens (SR-006).
 - **Health:** `GET /healthz` reports `ok`, or `degraded` when System 2 is down. In degraded mode, answers fall back to the unverified System 1 draft (MR-004).
 - **Dashboards:**
   - Prometheus scrapes `/metrics`; the rules are in `deploy/monitoring/alerts.yml` and the dashboard in `deploy/monitoring/grafana-dashboard.json`.
-  - Without Prometheus, the Muhasaba page shows the same five alert rules: fast-path latency, error rate, escalation rate, verifier acceptance and calibration drift.
+  - Without Prometheus, the Quality page shows the same five alert rules: fast-path latency, error rate, escalation rate, verifier acceptance and calibration drift.
   - The alerts describe live traffic only. Evaluation runs and load-test protocols started from the Lab or Performance pages are stored as lab traffic and do not trigger them (A-043).
-- **Alert drill:** press *Run alert drill* on the Muhasaba page, or call `POST /v1/alerts/drill {"seconds": 120}`. Every rule reports firing for two minutes, so notification paths can be tested.
+- **Alert drill:** press *Run alert drill* on the Quality page, or call `POST /v1/alerts/drill {"seconds": 120}`. Every rule reports firing for two minutes, so notification paths can be tested.
 - **Retention:** conversations, replies, feedback, audits and the retrieval memory older than `storage.retention_days` (default 90) are deleted daily (SR-004).
 - **Restarts:** evaluation runs interrupted by a restart resume automatically, keeping their completed items. You can also resume one with the Resume button or `POST /v1/eval/runs/{id}/resume`.
 - **Shared hosts:** llama-server, vLLM and the gateway compete for the same cores. Run one backend set at a time, and check `uptime` before benchmarking.
@@ -52,7 +52,7 @@ The gateway refuses to listen on a non-loopback address without tokens (SR-006).
 | Error rate high | a backend down or timing out | `scripts/serve_llama.sh status`; restart the failing server; read `logs/system*.log` |
 | Escalation rate high | gate too cautious (λ low), harder traffic, uncalibrated rule | review the Lab insights; raise λ or switch to budget mode once a calibration is promoted |
 | Verifier acceptance low | model regression, prompt change, broken tests | run the regression suite; compare with the baseline run |
-| Calibration drift | the traffic or the model changed | recalibrate (Muhasaba page); confirm on a fresh evaluation run |
+| Calibration drift | the traffic or the model changed | recalibrate (Quality page); confirm on a fresh evaluation run |
 | Degraded mode | System 2 unavailable | restart System 2; answers are labelled unverified meanwhile |
 
 ## 4. Changes and releases
