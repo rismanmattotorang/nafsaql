@@ -4,6 +4,7 @@ Verified research notes behind the report. Each file ends with a verification lo
 
 | File | Content |
 |------|---------|
+| [Where the time goes: the engine, vectors, graphs and RAG](speed_sota_2026.md) · [Decision 020](../decisions/020-speed-phase27.md) | Phase 27: the time budget of an answer from documents, what TurboRAG, CacheBlend, Provence, KET-RAG and vector quantisation offer and which of it applies on four cores, the separate thread width for reading prompts (adopted), the header-counting prompt budget (built, off), and what was measured and not adopted |
 | [Routing, knowledge and memory: the gaps against vLLM Semantic Router and Memorilla](router_memory_gaps.md) · [Decision 019](../decisions/019-routing-knowledge-memory-phase26.md) | Phase 26: the third read of Semantic Router (retrieval, memory, continuity, selection, hallucination) and the second of Memorilla (why our module collapsed), what was built with no further model (typing slips, follow-ups, the support check, the memory of earlier conversations, the trainer recipe and guard), and what was measured and not adopted |
 | [Knowledge module: where it stands and what the state of the art says](knowledge_sota_2026.md) · [Decision 018](../decisions/018-knowledge-index-phase25.md) | Phase 25: the assessment (seven weaknesses with evidence), parsing, chunking, vectors, fusion, graph retrieval, what not to do, the interface audit |
 | `qwen_models.md` | Qwen generations, small variants, GGUF/AWQ/GPTQ availability, llama.cpp support, non-autoregressive Qwen derivatives, embeddings |

@@ -48,6 +48,7 @@ Measured on one shared 4-core Intel i3-8100. Every figure comes from a stored ru
 | **0.15 s** | to search 847 passages by words and meaning together; the search itself takes 0.2 ms, the rest is reading the question |
 | **18 of 20** | held-out questions answered with passages, against 2 of 20 without |
 | **38 of 44** | answers made up without reading are flagged by the check against the passages; it flags 1 of 42 right ones, and it cannot catch a wrong number taken from the right passage |
+| **+23 %** | faster reading of a prompt, by reading with all four cores and writing with three; an answer from documents arrives 16 % sooner |
 | **10×** | as often does a follow-up question ("and how fast is it?") find its passage first, when it is read with the question before it |
 | **14 of 14** | live checks of the memory pass: a fact is found from another chat by its words or its meaning, and is gone when you forget it |
 
@@ -103,11 +104,11 @@ Search runs in memory, beside the store that keeps your files, so it does not sl
 
 ## Status
 
-A research preview, built in the open, running end to end on a CPU today.
+A research preview, built in the open, running end to end on a CPU today. Current release: **0.1.0** ([notes](docs/release/RELEASE-0.1.0.md)).
 
 - **Open:** questions worded differently from the document are found in the first eight passages only a quarter of the time. The remedies need larger models than this release ships.
 - **Not done:** the release-scale evaluation, the first distillation cycle and the pre-training of the memory-token module need a faster machine. The learned gate waits for its ledger: 1,294 of the 2,900 checked answers it asks for.
-- **Did not work, and published:** speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model, score-based fusion, a graph arm in everyday search, guessing a question's difficulty before answering it.
+- **Did not work, and published:** speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model, score-based fusion, a graph arm in everyday search, guessing a question's difficulty before answering it, cache-blocking the engine's prompt reading. A shorter knowledge prompt is 20 to 26 % faster and is left off: it cost 3 right answers in 50.
 
 Current state: [docs/roadmap/STATUS.md](docs/roadmap/STATUS.md).
 

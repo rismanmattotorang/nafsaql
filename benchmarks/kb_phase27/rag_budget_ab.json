@@ -1,0 +1,1199 @@
+{
+ "what": "Knowledge prompts with fewer, better-chosen sentences: arm b against arm a (Phase 27)",
+ "date": "2026-11-11 21:24",
+ "kb": "zvazrb4a326upn05d2ke",
+ "questions": 50,
+ "host_load_average": [
+  8.3,
+  6.4,
+  6.1
+ ],
+ "note": "SHARED MACHINE",
+ "summary": {
+  "a": {
+   "k": 4,
+   "max_chars": 4800,
+   "compact_sources": false,
+   "right": 42,
+   "of": 50,
+   "median_prompt_tokens": 1140.5,
+   "median_ttft_ms": 16729.5,
+   "median_seconds": 19.925,
+   "median_passages": 4.0,
+   "median_seconds_asked_first": 21.9,
+   "median_ttft_ms_asked_first": 19123
+  },
+  "b": {
+   "k": 6,
+   "max_chars": 2400,
+   "compact_sources": true,
+   "right": 39,
+   "of": 50,
+   "median_prompt_tokens": 851.5,
+   "median_ttft_ms": 10448.0,
+   "median_seconds": 13.26,
+   "median_passages": 6.0,
+   "median_seconds_asked_first": 17.52,
+   "median_ttft_ms_asked_first": 14168
+  },
+  "pairs": {
+   "b_right_a_wrong": 1,
+   "a_right_b_wrong": 4,
+   "mcnemar_p": 0.375,
+   "b_faster_in": "42 of 50",
+   "median_time_ratio_b_over_a": 0.72
+  }
+ },
+ "rows": [
+  {
+   "question": "How much memory does the engine's prefix store keep per model?",
+   "a": {
+    "answer": "The engine's prefix store keeps the cache of each finished conversation as a snapshot, with 114\u2013147 KB per position and 768 MB per model. \n\nAnswer: [1]",
+    "seconds": 33.49,
+    "prompt_tokens": 1267,
+    "ttft_ms": 25567,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The engine's prefix store keeps 768 MB per model. This is cited in source [2]. \n\nAnswer: [2]",
+    "seconds": 17.03,
+    "prompt_tokens": 860,
+    "ttft_ms": 14740,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many decode threads beat four in all six interleaved pairs?",
+   "b": {
+    "answer": "The knowledge base states that three decode threads beat four for decode in all six interleaved pairs. This is cited in source [2] and [3]. \n\nAnswer: [2][3]",
+    "seconds": 15.5,
+    "prompt_tokens": 833,
+    "ttft_ms": 12761,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The knowledge base states that \"Three threads beat four for decode in all six interleaved pairs\" [1]. This indicates that three threads outperform four threads in all six interleaved pairs.\n\nAnswer: 3",
+    "seconds": 16.89,
+    "prompt_tokens": 1316,
+    "ttft_ms": 13814,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What bandwidth did the streaming read reach with one thread?",
+   "a": {
+    "answer": "The streaming read reached 1,094 MB on System 1 with one thread. This is cited in the first source [1].",
+    "seconds": 21.03,
+    "prompt_tokens": 1018,
+    "ttft_ms": 18980,
+    "passages": 4,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "b": {
+    "answer": "The streaming read reached 1,094 MB on System 1 with one thread. This is cited in the first source: [1].",
+    "seconds": 6.57,
+    "prompt_tokens": 918,
+    "ttft_ms": 4564,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "Which revision of the vendored Smiley Core did Phase 19 replace?",
+   "b": {
+    "answer": "Phase 19 replaced the vendored Smiley Core revision 7cb6028 with the owner's new one, which was revision 06c2b88. This is cited in [1].",
+    "seconds": 18.62,
+    "prompt_tokens": 897,
+    "ttft_ms": 15518,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "Phase 19 replaced the vendored Smiley Core revision 7cb6028 with the owner's new one, which was revision 06c2b88. This is stated in [1].",
+    "seconds": 9.57,
+    "prompt_tokens": 897,
+    "ttft_ms": 6567,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which revision is the new Smiley Core that Phase 19 merged?",
+   "a": {
+    "answer": "The new Smiley Core that Phase 19 merged is revision 06c2b88. This is stated in [1] and [2].",
+    "seconds": 9.06,
+    "prompt_tokens": 794,
+    "ttft_ms": 6793,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The new Smiley Core that Phase 19 merged is revision 06c2b88, as stated in [1] and [2].",
+    "seconds": 11.05,
+    "prompt_tokens": 913,
+    "ttft_ms": 8944,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many nanoseconds per row did the small-batch Q4_K kernel take in the slow build?",
+   "b": {
+    "answer": "The small-batch Q4_K kernel took 679 nanoseconds per row in the slow build. This is cited in source [1]. \n\nAnswer: [1]",
+    "seconds": 17.52,
+    "prompt_tokens": 797,
+    "ttft_ms": 14986,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The small-batch Q4_K kernel took 679 nanoseconds per row in the slow build. \n\nAnswer: 679",
+    "seconds": 17.97,
+    "prompt_tokens": 1264,
+    "ttft_ms": 15942,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many tests of the workspace passed after the Phase 19 merge?",
+   "a": {
+    "answer": "The knowledge base states that all 370 tests of the workspace passed in release mode after the Phase 19 merge. \n\nAnswer: [1]",
+    "seconds": 21.16,
+    "prompt_tokens": 1070,
+    "ttft_ms": 18892,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The knowledge base states that all 370 tests of the workspace passed in release mode after the Phase 19 merge. \n\nAnswer: [4]",
+    "seconds": 12.57,
+    "prompt_tokens": 867,
+    "ttft_ms": 10482,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What does LittleBit approximate a weight matrix as?",
+   "b": {
+    "answer": "LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, $\\hat W = \\mathrm{diag}(h)\\,U_{\\pm}\\, \\mathrm{diag}(\\ell)\\,V_{\\pm}^{\\top}\\,\\mathrm{diag}(g)$, summed over stages, stored beside the model as a sidecar file. [4]",
+    "seconds": 18.67,
+    "prompt_tokens": 826,
+    "ttft_ms": 13608,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "LittleBit approximates a weight matrix as a product of sign matrices and small scale vectors, $\\hat W=\\mathrm{diag}(h)\\,U_{\\pm}\\, \\mathrm{diag}(\\ell)\\,V_{\\pm}^{\\top}\\,\\mathrm{diag}(g)$, summed over stages, stored beside the model as a sidecar file. [4]",
+    "seconds": 27.38,
+    "prompt_tokens": 1291,
+    "ttft_ms": 21601,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which version of core Lean does the verifier run against?",
+   "a": {
+    "answer": "The Lean verifier runs against core Lean 4.35.0. This is stated in the passage: \"The Lean verifier runs against core Lean 4.35.0\" [2].",
+    "seconds": 25.19,
+    "prompt_tokens": 1141,
+    "ttft_ms": 22122,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The verifier runs against core Lean 4.35.0. This is stated in [1], where it mentions: \"Lean resolves its own installation path, which TABLE XVIII THE LEAN PROTOCOL AGAINST REAL LEAN 4.35.0 R E A L L E A N A C C E P T S P R O O F S A N D R E J E C T S T H E K N O W N A T T A C K S.\"",
+    "seconds": 16.43,
+    "prompt_tokens": 800,
+    "ttft_ms": 9831,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What was the median time from the gate's decision to System 2's first reasoning token?",
+   "b": {
+    "answer": "The median time from the gate's decision to System 2's first reasoning token was 0.85 seconds, as cited in [1].",
+    "seconds": 19.39,
+    "prompt_tokens": 898,
+    "ttft_ms": 17268,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The median time from the gate's decision to System 2's first reasoning token is 0.85 seconds, as cited in [1] and [3].",
+    "seconds": 10.03,
+    "prompt_tokens": 929,
+    "ttft_ms": 7784,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How long did the gate's own time take when escalating?",
+   "a": {
+    "answer": "The gate's own time took 0.08\u20130.12 seconds when escalating. This is cited in [3].",
+    "seconds": 18.33,
+    "prompt_tokens": 934,
+    "ttft_ms": 16428,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The gate's own time took 0.08\u20130.12 seconds when escalating. This is cited in [3].",
+    "seconds": 13.52,
+    "prompt_tokens": 850,
+    "ttft_ms": 11624,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What median did llama.cpp take for the System 1 to System 2 switch in Phase 14?",
+   "b": {
+    "answer": "The median time taken by llama.cpp for the System 1 to System 2 switch in Phase 14 is 1.5 seconds. This is cited in the following source:\n\n[2] Nafs-Aql: A Verifier-Gated Dual-Process Architecture on Small Qwen Models for CPU-Only Deployment > B E N C H M A R K S H A, page 33",
+    "seconds": 17.74,
+    "prompt_tokens": 886,
+    "ttft_ms": 12446,
+    "passages": 6,
+    "support": 0.5,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The median time taken by llama.cpp for the System 1 to System 2 switch in Phase 14 is 1.5 seconds, as cited in [2].",
+    "seconds": 13.39,
+    "prompt_tokens": 1029,
+    "ttft_ms": 11139,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "By how much is cold prefill slower at three threads?",
+   "a": {
+    "answer": "Cold prefill is 16\u201317% slower at three. Answer: [1]",
+    "seconds": 21.9,
+    "prompt_tokens": 1059,
+    "ttft_ms": 20165,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "Cold prefill is 16\u201317% slower at three threads. [2]",
+    "seconds": 9.11,
+    "prompt_tokens": 835,
+    "ttft_ms": 7729,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which transform is the int8 key-value cache rotated by?",
+   "b": {
+    "answer": "The int8 key-value cache is rotated by a **Hadamard transform**. This is mentioned in [1] and [2].",
+    "seconds": 10.65,
+    "prompt_tokens": 750,
+    "ttft_ms": 8792,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The int8 key-value cache is rotated by a **Hadamard transform**. This is mentioned in the first passage:  \n[1] \"Grouped online-softmax attention, an int8 key--value cache rotated by a Hadamard transform...\"",
+    "seconds": 11.88,
+    "prompt_tokens": 940,
+    "ttft_ms": 8618,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which model abstained on the proof of n plus zero equals n?",
+   "a": {
+    "answer": "The model that abstained on the proof of $ n + 0 = n $ is Qwen3-4B-Thinking. This is stated in [2] and [3], where it is mentioned that Qwen3-4B-Thinking abstained on $ n + 0 = n $ within its budget.",
+    "seconds": 23.49,
+    "prompt_tokens": 1100,
+    "ttft_ms": 19276,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The model that abstained on the proof of $ n + 0 = n $ is the System 1 draft. This is indicated in the passage: \"the System 1 draft fails Lean, System 2\u2019s first proof fails with a Lean error, the error appears in the next prompt, and the second proof is verified.\" [1]",
+    "seconds": 9.93,
+    "prompt_tokens": 749,
+    "ttft_ms": 5373,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "How many megabytes per token does System 1 read at decode?",
+   "b": {
+    "answer": "From source [1], it states: \"Decode reads every weight once per token, so its speed is that bandwidth over the bytes per token (1,094 MB on System 1, 2,503 MB on System 2).\"\n\nAnswer: [1] 1,094",
+    "seconds": 20.63,
+    "prompt_tokens": 941,
+    "ttft_ms": 16415,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The passage [1] states that the decode reads every weight once per token, and the speed is that bandwidth over the bytes per token. Specifically, it mentions that the decode reads every weight once per token, and the speed is that bandwidth over the bytes per token. For System 1, the bytes per token is 1,094 MB.\n\nAnswer: [1]",
+    "seconds": 23.41,
+    "prompt_tokens": 1291,
+    "ttft_ms": 18193,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What share of decode time goes to the matmuls and the output head?",
+   "a": {
+    "answer": "The knowledge base indicates that the engine's own phase split puts 86\u201397% of decode in the matmuls and the output head. This is cited in [2].",
+    "seconds": 21.71,
+    "prompt_tokens": 1137,
+    "ttft_ms": 19123,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The knowledge base indicates that the engine's own phase split puts 86\u201397% of decode in the matmuls and the output head. This is cited in [1] and [2].",
+    "seconds": 8.34,
+    "prompt_tokens": 851,
+    "ttft_ms": 5578,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What did the prefix store bring a switch of request kind down to?",
+   "b": {
+    "answer": "The prefix store brought the switch of request kind down to 0.1\u20130.2 seconds on System 1 and 0.2 seconds on System 2, as cited in [1].",
+    "seconds": 19.21,
+    "prompt_tokens": 853,
+    "ttft_ms": 16333,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The prefix store brought a switch of request kind down to 0.1\u20130.2 seconds on System 1 and 0.2 seconds on System 2, as cited in [1].",
+    "seconds": 16.56,
+    "prompt_tokens": 1107,
+    "ttft_ms": 13882,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which version of SurrealDB stores the knowledge base?",
+   "a": {
+    "answer": "The knowledge base is stored using SurrealDB version 3.3.5, as specified in the decision [1].",
+    "seconds": 16.56,
+    "prompt_tokens": 894,
+    "ttft_ms": 14885,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The version of SurrealDB that stores the knowledge base is **3.3.5**, as specified in the decision [1].",
+    "seconds": 10.44,
+    "prompt_tokens": 774,
+    "ttft_ms": 8768,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many parameters does the memory module for System 1 have?",
+   "b": {
+    "answer": "The memory module in System 1 has a parameter count that is not explicitly stated in the provided knowledge base. However, based on the information given, the parameter count is inferred from the context of the memory module in the Candle model, which is part of the Nafs-Aql system. The knowledge base does not provide a direct count of the parameters in the memory module for System 1.\n\nAnswer: <number>",
+    "seconds": 21.02,
+    "prompt_tokens": 861,
+    "ttft_ms": 15714,
+    "passages": 6,
+    "support": 0.0,
+    "ok": false,
+    "first": true
+   },
+   "a": {
+    "answer": "The memory module for System 1 has a number of parameters that are not explicitly stated in the provided knowledge base. However, based on the information given, the memory module in Candle mirrors `memory.py` and the parameter names suggest a structure that aligns with the paper's description. The exact number of parameters is not specified in the knowledge base.\n\nAnswer: <number>",
+    "seconds": 22.22,
+    "prompt_tokens": 1339,
+    "ttft_ms": 17031,
+    "passages": 4,
+    "support": 0.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "How many bits per weight did the LittleBit conversion of Qwen3-1.7B reach?",
+   "a": {
+    "answer": "The LittleBit conversion of Qwen3-1.7B reached 0.980 bits per weight. \n\nAnswer: [1]",
+    "seconds": 26.33,
+    "prompt_tokens": 1334,
+    "ttft_ms": 24200,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The LittleBit conversion of Qwen3-1.7B reached 0.980 bits per weight. This is cited in source [1]. \n\nAnswer: [1]",
+    "seconds": 11.27,
+    "prompt_tokens": 835,
+    "ttft_ms": 8922,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many projections were converted to LittleBit factors?",
+   "b": {
+    "answer": "The number of projections converted to LittleBit factors is 196. This is stated in source [1]. \n\nAnswer: [1]",
+    "seconds": 4.36,
+    "prompt_tokens": 874,
+    "ttft_ms": 2448,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "a": {
+    "answer": "The number of projections converted to LittleBit factors is 196. [1]",
+    "seconds": 7.05,
+    "prompt_tokens": 1172,
+    "ttft_ms": 5805,
+    "passages": 4,
+    "support": 1.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "How long did the LittleBit conversion take on four cores?",
+   "a": {
+    "answer": "The LittleBit conversion took 13 minutes on four cores. This is stated in the passage: \"13 minutes on four cores.\" Therefore, the answer is [1].",
+    "seconds": 26.46,
+    "prompt_tokens": 1242,
+    "ttft_ms": 24010,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The LittleBit conversion took 13 minutes on four cores. This is stated in the first source: \"13 minutes on four cores\" [1].",
+    "seconds": 9.34,
+    "prompt_tokens": 852,
+    "ttft_ms": 7287,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What was the mean relative reconstruction error of the LittleBit weights?",
+   "b": {
+    "answer": "The mean relative reconstruction error of the LittleBit weights was 0.752. This is cited in the first source [1].",
+    "seconds": 24.04,
+    "prompt_tokens": 869,
+    "ttft_ms": 21549,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The mean relative reconstruction error of the LittleBit weights is 0.752. This value is mentioned in the context of the phase 19 engine update and LittleBit integration, where it is noted that the mean relative reconstruction error of the weights is 0.752 (Q4_K itself is about 0.1). [1]",
+    "seconds": 18.05,
+    "prompt_tokens": 1237,
+    "ttft_ms": 11858,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many of the twelve exact-answer prompts did the dense model answer correctly?",
+   "a": {
+    "answer": "The dense model answered 9 correctly out of the twelve exact-answer prompts. \n\nAnswer: [1]",
+    "seconds": 11.51,
+    "prompt_tokens": 1446,
+    "ttft_ms": 9207,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The dense model answered 9 correctly out of the 12 exact-answer prompts. This is cited in [2] and [5]. \n\nAnswer: 9",
+    "seconds": 8.01,
+    "prompt_tokens": 829,
+    "ttft_ms": 5771,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What decode speed did the model with a LittleBit sidecar reach?",
+   "b": {
+    "answer": "The model with a LittleBit sidecar reached a decode speed of 20.1 tokens per second, based on the data provided in [2] and [4].",
+    "seconds": 17.44,
+    "prompt_tokens": 828,
+    "ttft_ms": 14496,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The model with a LittleBit sidecar reached a decode speed of 20.1 tokens per second (tok/s), which is the median of five interleaved rounds of 96 tokens, three threads, one slot, and shared host. This speed is slightly higher than the previous version (19.2 tok/s) after the fix. [2]",
+    "seconds": 22.96,
+    "prompt_tokens": 1225,
+    "ttft_ms": 18213,
+    "passages": 4,
+    "support": 0.5,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which function call inside the kernel made the slow build slow?",
+   "a": {
+    "answer": "The function call inside the kernel that made the slow build slow is `core::array::try_from_fn`, which is called once per super-block in the slow build. This call is part of the dot kernel and is responsible for the slowdown. [1]",
+    "seconds": 27.45,
+    "prompt_tokens": 1188,
+    "ttft_ms": 23646,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The function call inside the kernel that made the slow build slow is `core::array::try_from_fn`, as demonstrated in the disassembly. This call is made once per super-block in the slow build only, and it is part of the small-batch dot kernels (Q4_K). [1]",
+    "seconds": 8.91,
+    "prompt_tokens": 784,
+    "ttft_ms": 4935,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What benchmark guards the kernel's speed against optimiser decisions elsewhere?",
+   "b": {
+    "answer": "The benchmark that guards the kernel's speed against optimiser decisions elsewhere is **kbench**. This is explicitly mentioned in the knowledge base [1] and [2], where it is stated that a kernel whose speed depends on an optimiser decision about code elsewhere must be guarded by a benchmark, and **kbench is now part of the crate for that**.",
+    "seconds": 17.38,
+    "prompt_tokens": 796,
+    "ttft_ms": 12758,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The benchmark that guards the kernel's speed against optimiser decisions elsewhere is **kbench**. This is explicitly mentioned in the analysis of the dot kernels, where it is stated that a kernel whose speed depends on an optimiser decision about code elsewhere has to be guarded by a benchmark, and **kbench is now part of the crate for that**. [1]",
+    "seconds": 17.83,
+    "prompt_tokens": 1149,
+    "ttft_ms": 13163,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many of the 44 textual merge conflicts remained after normalising the formatting?",
+   "a": {
+    "answer": "The knowledge base states that after normalising both sides with the same formatter, 44 textual conflicts were reduced to 14. This information is cited in [1] and [4].\n\nAnswer: 14",
+    "seconds": 22.9,
+    "prompt_tokens": 1059,
+    "ttft_ms": 19874,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The knowledge base states that after normalising both sides with the same formatter, 44 textual conflicts were reduced to 14. This information is cited in source [1].\n\nAnswer: [1]",
+    "seconds": 11.14,
+    "prompt_tokens": 808,
+    "ttft_ms": 8536,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many dimensions do the passage vectors have?",
+   "b": {
+    "answer": "The knowledge base does not explicitly state the number of dimensions for the passage vectors. However, it mentions that `HNSW DIMENSION d DIST COSINE` is used, and `d` is not specified. Therefore, the answer is not directly provided.\n\nAnswer: <unknown>",
+    "seconds": 17.9,
+    "prompt_tokens": 879,
+    "ttft_ms": 14355,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "a": {
+    "answer": "The knowledge base does not directly state the number of dimensions for the passage vectors. However, it mentions that `HNSW DIMENSION d DIST COSINE` is used, but the specific value of `d` is not provided. \n\nAnswer: [1]",
+    "seconds": 21.8,
+    "prompt_tokens": 1175,
+    "ttft_ms": 17765,
+    "passages": 4,
+    "support": 1.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "How many characters of overlap do consecutive passages share?",
+   "a": {
+    "answer": "The knowledge base does not provide specific information about the overlap between consecutive passages. Therefore, the answer is not available from the provided sources.\n\nAnswer: <unknown>",
+    "seconds": 15.52,
+    "prompt_tokens": 818,
+    "ttft_ms": 13420,
+    "passages": 3,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "b": {
+    "answer": "The knowledge base does not provide specific information about the overlap between consecutive passages. Therefore, the answer is: \n\nAnswer: <unknown>",
+    "seconds": 5.39,
+    "prompt_tokens": 793,
+    "ttft_ms": 3667,
+    "passages": 3,
+    "support": 1.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "On which port does SurrealDB listen?",
+   "b": {
+    "answer": "SurrealDB listens on port 8300. This is specified in the knowledge base [2].",
+    "seconds": 15.71,
+    "prompt_tokens": 836,
+    "ttft_ms": 14168,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "SurrealDB listens on port 8300. This is specified in the knowledge base [2], where it states: \"SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not redistributed. - SurrealDB is BSL 1.1 (self-hosting allowed); it is recorded in NOTICE as a separately downloaded binary, not redistributed. - The knowledge API returns 503 `kb_unavailable` when SurrealDB is down; chat is unaffected. - A Memorilla module trained here is tied to System 1's Qwen3-1.7B; changing System 1's model means retraining.\"",
+    "seconds": 20.77,
+    "prompt_tokens": 940,
+    "ttft_ms": 11831,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which licence is SurrealDB released under?",
+   "a": {
+    "answer": "The knowledge base does not explicitly mention the licence under which SurrealDB is released. Therefore, I cannot provide the specific licence.",
+    "seconds": 11.58,
+    "prompt_tokens": 1022,
+    "ttft_ms": 9258,
+    "passages": 4,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "b": {
+    "answer": "The knowledge base does not explicitly state the licence under which SurrealDB is released. However, it mentions that SurrealDB is \"self-hosting allowed\" and is recorded in NOTICE as a \"separately downloaded binary, not redistributed.\" This suggests that SurrealDB is released under a permissive licence, likely similar to the Apache License or a similar open-source licence, but the exact licence is not specified in the provided knowledge base.",
+    "seconds": 7.73,
+    "prompt_tokens": 746,
+    "ttft_ms": 2626,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "How many query-dependent soft tokens does Memorilla hand the frozen model?",
+   "b": {
+    "answer": "Memorilla hands the frozen model 16 query-dependent soft tokens. This is stated in [1]. \n\nAnswer: 16",
+    "seconds": 18.94,
+    "prompt_tokens": 906,
+    "ttft_ms": 16877,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "Memorilla hands the frozen model 16 query-dependent soft tokens. \n\nAnswer: [1]",
+    "seconds": 19.5,
+    "prompt_tokens": 1474,
+    "ttft_ms": 17990,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many pre-training rows would the two Memorilla stages need?",
+   "a": {
+    "answer": "The two Memorilla stages require a total of 1,979,809 + 1,343,993 = 3,323,792 pre-training rows. \n\nAnswer: 3,323,792",
+    "seconds": 34.42,
+    "prompt_tokens": 1585,
+    "ttft_ms": 30253,
+    "passages": 4,
+    "support": 0.0,
+    "ok": false,
+    "first": true
+   },
+   "b": {
+    "answer": "The knowledge base states that Stage 1 + 2 pre-training (3.3 M rows) would take about 300\u2013600 days, and this is not feasible. Therefore, the two Memorilla stages would need about 3.3 million pre-training rows.\n\nAnswer: [2]",
+    "seconds": 13.0,
+    "prompt_tokens": 874,
+    "ttft_ms": 8309,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many TFLOP per example does fine-tuning through Qwen3-1.7B cost?",
+   "b": {
+    "answer": "The fine-tuning through Qwen3-1.7B costs approximately 2.4\u20134.8 s per example. \n\nAnswer: [3]",
+    "seconds": 21.19,
+    "prompt_tokens": 973,
+    "ttft_ms": 18826,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "a": {
+    "answer": "The fine-tuning through Qwen3-1.7B costs approximately 1.4 TFLOP per example. \n\nAnswer: [3]",
+    "seconds": 17.48,
+    "prompt_tokens": 1273,
+    "ttft_ms": 15512,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "At what cosine do Smiley Core's Q8_0 embeddings agree with the Candle reference?",
+   "a": {
+    "answer": "Smiley Core's Q8_0 embeddings agree with the Candle reference at a cosine value of 0.99914 to 0.99959 on six texts, which meets the specification target of 0.999. [3]",
+    "seconds": 22.95,
+    "prompt_tokens": 1046,
+    "ttft_ms": 19448,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "Smiley Core's Q8_0 embeddings agree with the Candle reference at a cosine similarity of 0.99914 to 0.99959 on six texts, which meets the specification target of 0.999. [3]",
+    "seconds": 8.11,
+    "prompt_tokens": 952,
+    "ttft_ms": 4797,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many entities did the twenty fixture passages give in the graph?",
+   "b": {
+    "answer": "The twenty fixture passages gave 18 entities in the graph. \n\nAnswer: [2]",
+    "seconds": 12.9,
+    "prompt_tokens": 807,
+    "ttft_ms": 11628,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "a": {
+    "answer": "The twenty fixture passages gave 109 entities in the graph. Answer: [2]",
+    "seconds": 13.23,
+    "prompt_tokens": 1163,
+    "ttft_ms": 11985,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which wire format does the client use to talk to SurrealDB?",
+   "a": {
+    "answer": "The client uses the SurrealDB RPC over HTTP in **CBOR** format, as specified in the decision [1].",
+    "seconds": 15.66,
+    "prompt_tokens": 860,
+    "ttft_ms": 14048,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The client uses the SurrealDB RPC over HTTP in **CBOR** format, as specified in the wire format section of the decision. This format is bound variables only and is used for communication with SurrealDB via the gateway. [1]",
+    "seconds": 11.87,
+    "prompt_tokens": 763,
+    "ttft_ms": 8110,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which core Lean version does the verifier run against?",
+   "b": {
+    "answer": "The Lean verifier runs against core Lean 4.35.0, as stated in [1].",
+    "seconds": 14.46,
+    "prompt_tokens": 799,
+    "ttft_ms": 13109,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The Lean verifier runs against core Lean 4.35.0. This is stated in the passage: \"The Lean verifier runs against core Lean 4.35.0\" [2].",
+    "seconds": 18.04,
+    "prompt_tokens": 1140,
+    "ttft_ms": 15611,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "What did the dense model get on the time-of-day sum that was first thought a regression?",
+   "a": {
+    "answer": "The dense model (likely referring to the 1.7B model) got the incorrect answer for the time-of-day sum (3:40 pm + 2 h 35 min) which was first thought to be a regression. The correct answer is 6:15 pm, but the model returned 5:45 pm. This error was first observed in the web interface right after the merge and was identified as an error in the 1.7B model, which the gate's confidence signal did not catch because both quick samples repeated it. [1]",
+    "seconds": 24.38,
+    "prompt_tokens": 994,
+    "ttft_ms": 17581,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The dense model got the incorrect answer for the time-of-day sum (3:40 pm plus 2 h 35 min) as 5:45 pm, while the correct answer should have been 6:15 pm. This error was first observed in the web interface right after the merge and was considered a regression. The error was identified as being inherent to the 1.7B model, which the gate's confidence signal did not catch because both quick samples repeated the error.",
+    "seconds": 9.61,
+    "prompt_tokens": 855,
+    "ttft_ms": 3851,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many bytes per token does System 2 read at decode?",
+   "b": {
+    "answer": "The decode speed for System 2 is described as 2,503 MB per token. Therefore, the number of bytes per token is 2,503.\n\nAnswer: [2]",
+    "seconds": 17.87,
+    "prompt_tokens": 884,
+    "ttft_ms": 15428,
+    "passages": 6,
+    "support": 0.5,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The knowledge base states that the decode reads every weight once per token, and the speed is that bandwidth over the bytes per token. For System 2, the decode reads at 2,503 MB per token. \n\nAnswer: [2]",
+    "seconds": 20.78,
+    "prompt_tokens": 1084,
+    "ttft_ms": 17749,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How fast is the streaming read with four threads?",
+   "a": {
+    "answer": "The streaming read with four threads reaches 19.5 GB/s on System 1 and 18.4 GB/s on System 2. This is cited in [1].",
+    "seconds": 20.68,
+    "prompt_tokens": 1105,
+    "ttft_ms": 18288,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The streaming read with four threads reaches 19.5 GB/s, as stated in the passage [1].",
+    "seconds": 4.86,
+    "prompt_tokens": 856,
+    "ttft_ms": 3495,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How much of decode time goes to the matmuls and the output head at most?",
+   "b": {
+    "answer": "The knowledge base states that the engine's own phase split puts 86\u201397% of decode in the matmuls and the output head. Therefore, the answer is:\n\nAnswer: [1]",
+    "seconds": 8.27,
+    "prompt_tokens": 894,
+    "ttft_ms": 5732,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The knowledge base states that the engine's own phase split puts 86\u201397% of decode in the matmuls and the output head. Therefore, the answer is:\n\nAnswer: [1]",
+    "seconds": 11.77,
+    "prompt_tokens": 1154,
+    "ttft_ms": 9268,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How much cold prefill does the prefix store save on System 2 when alternating request kinds?",
+   "a": {
+    "answer": "The prefix store saves cold prefill on System 2 by reducing the prefill token count from 108 tokens to 5 tokens when alternating request kinds. \n\nAnswer: [3]",
+    "seconds": 27.17,
+    "prompt_tokens": 1423,
+    "ttft_ms": 24523,
+    "passages": 4,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "b": {
+    "answer": "The prefix store saves cold prefill on System 2 by reducing the cold prefill from 700--1,160 tokens to 350--390 tokens. This results in a saving of 350--390 tokens on System 2 when alternating request kinds. \n\nAnswer: [2]",
+    "seconds": 14.34,
+    "prompt_tokens": 858,
+    "ttft_ms": 10414,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": false
+   }
+  },
+  {
+   "question": "How many kilobytes per position does a prefix-store snapshot take?",
+   "b": {
+    "answer": "The prefix-store snapshot takes 114\u2013147 KB per position. \n\nAnswer: [1]",
+    "seconds": 14.64,
+    "prompt_tokens": 846,
+    "ttft_ms": 13009,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The prefix-store snapshot takes 114\u2013147 KB per position. \n\nAnswer: [1]",
+    "seconds": 17.59,
+    "prompt_tokens": 1304,
+    "ttft_ms": 16139,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How long did the gate's decision to System 2's first reasoning token take at the median?",
+   "a": {
+    "answer": "The gate's decision to System 2's first reasoning token took a median of 0.85 seconds, as stated in [2].",
+    "seconds": 27.04,
+    "prompt_tokens": 1206,
+    "ttft_ms": 25017,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The gate's decision to System 2's first reasoning token took a median of 0.85 seconds, as stated in [2] and [3].",
+    "seconds": 10.95,
+    "prompt_tokens": 877,
+    "ttft_ms": 8774,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many gate decisions of requests were escalated in the six-request timing?",
+   "b": {
+    "answer": "The knowledge base does not contain the specific number of gate decisions of requests that were escalated in the six-request timing. \n\nAnswer: <unknown>",
+    "seconds": 16.0,
+    "prompt_tokens": 921,
+    "ttft_ms": 13939,
+    "passages": 6,
+    "support": 1.0,
+    "ok": false,
+    "first": true
+   },
+   "a": {
+    "answer": "The knowledge base does not directly state the number of gate decisions of requests that were escalated in the six-request timing. However, it mentions that \"over six escalated requests the gate\u2019s own time was 0.08\u20130.12 s,\" indicating that six requests were escalated. \n\nAnswer: [1]",
+    "seconds": 15.31,
+    "prompt_tokens": 940,
+    "ttft_ms": 11335,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "Which version of SurrealDB was chosen rather than 4.0.0?",
+   "a": {
+    "answer": "The version of SurrealDB chosen was 3.3.5 rather than 4.0.0. This is specified in the decision [1].",
+    "seconds": 20.35,
+    "prompt_tokens": 1029,
+    "ttft_ms": 18345,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "b": {
+    "answer": "The version of SurrealDB chosen was 3.3.5, rather than 4.0.0. This is stated in the decision [1].",
+    "seconds": 10.35,
+    "prompt_tokens": 787,
+    "ttft_ms": 8400,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  },
+  {
+   "question": "How many tokens did the continuation prefill with the exact prefix, instead of 108?",
+   "b": {
+    "answer": "The continuation prefilled 5 tokens instead of 108 tokens. [2]",
+    "seconds": 14.41,
+    "prompt_tokens": 826,
+    "ttft_ms": 13154,
+    "passages": 6,
+    "support": 1.0,
+    "ok": true,
+    "first": true
+   },
+   "a": {
+    "answer": "The continuation prefill with the exact prefix was 5 tokens instead of 108 tokens. \n\nAnswer: 5",
+    "seconds": 15.47,
+    "prompt_tokens": 1143,
+    "ttft_ms": 13875,
+    "passages": 4,
+    "support": 1.0,
+    "ok": true,
+    "first": false
+   }
+  }
+ ]
+}

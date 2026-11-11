@@ -1,0 +1,684 @@
+{
+  "kb": "zvazrb4a326upn05d2ke",
+  "multihop": {
+    "k4_b1600": {
+      "answer_in_prompt": 0.76,
+      "answers": 38,
+      "block_chars_per_prompt": 1822,
+      "chars_per_prompt": 1127,
+      "questions": 50,
+      "sources_per_prompt": 2.9
+    },
+    "k4_b2000": {
+      "answer_in_prompt": 0.8,
+      "answers": 40,
+      "block_chars_per_prompt": 2189,
+      "chars_per_prompt": 1433,
+      "questions": 50,
+      "sources_per_prompt": 3.3
+    },
+    "k4_b2400": {
+      "answer_in_prompt": 0.82,
+      "answers": 41,
+      "block_chars_per_prompt": 2569,
+      "chars_per_prompt": 1753,
+      "questions": 50,
+      "sources_per_prompt": 3.7
+    },
+    "k4_b2800": {
+      "answer_in_prompt": 0.82,
+      "answers": 41,
+      "block_chars_per_prompt": 2889,
+      "chars_per_prompt": 2058,
+      "questions": 50,
+      "sources_per_prompt": 3.8
+    },
+    "k4_b3200": {
+      "answer_in_prompt": 0.82,
+      "answers": 41,
+      "block_chars_per_prompt": 3159,
+      "chars_per_prompt": 2306,
+      "questions": 50,
+      "sources_per_prompt": 3.9
+    },
+    "k4_b3600": {
+      "answer_in_prompt": 0.82,
+      "answers": 41,
+      "block_chars_per_prompt": 3329,
+      "chars_per_prompt": 2469,
+      "questions": 50,
+      "sources_per_prompt": 4.0
+    },
+    "k4_b4000": {
+      "answer_in_prompt": 0.82,
+      "answers": 41,
+      "block_chars_per_prompt": 3433,
+      "chars_per_prompt": 2570,
+      "questions": 50,
+      "sources_per_prompt": 4.0
+    },
+    "k6_b1600": {
+      "answer_in_prompt": 0.82,
+      "answers": 41,
+      "block_chars_per_prompt": 1812,
+      "chars_per_prompt": 1087,
+      "questions": 50,
+      "sources_per_prompt": 3.2
+    },
+    "k6_b2000": {
+      "answer_in_prompt": 0.86,
+      "answers": 43,
+      "block_chars_per_prompt": 2189,
+      "chars_per_prompt": 1372,
+      "questions": 50,
+      "sources_per_prompt": 4.0
+    },
+    "k6_b2400": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 2573,
+      "chars_per_prompt": 1707,
+      "questions": 50,
+      "sources_per_prompt": 4.3
+    },
+    "k6_b2800": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 2955,
+      "chars_per_prompt": 2007,
+      "questions": 50,
+      "sources_per_prompt": 4.9
+    },
+    "k6_b3200": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 3342,
+      "chars_per_prompt": 2363,
+      "questions": 50,
+      "sources_per_prompt": 5.1
+    },
+    "k6_b3600": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 3711,
+      "chars_per_prompt": 2686,
+      "questions": 50,
+      "sources_per_prompt": 5.5
+    },
+    "k6_b4000": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 4059,
+      "chars_per_prompt": 2996,
+      "questions": 50,
+      "sources_per_prompt": 5.7
+    },
+    "k8_b1600": {
+      "answer_in_prompt": 0.84,
+      "answers": 42,
+      "block_chars_per_prompt": 1813,
+      "chars_per_prompt": 1083,
+      "questions": 50,
+      "sources_per_prompt": 3.3
+    },
+    "k8_b2000": {
+      "answer_in_prompt": 0.86,
+      "answers": 43,
+      "block_chars_per_prompt": 2188,
+      "chars_per_prompt": 1358,
+      "questions": 50,
+      "sources_per_prompt": 4.1
+    },
+    "k8_b2400": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 2563,
+      "chars_per_prompt": 1651,
+      "questions": 50,
+      "sources_per_prompt": 4.7
+    },
+    "k8_b2800": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 2936,
+      "chars_per_prompt": 1933,
+      "questions": 50,
+      "sources_per_prompt": 5.4
+    },
+    "k8_b3200": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 3324,
+      "chars_per_prompt": 2263,
+      "questions": 50,
+      "sources_per_prompt": 5.9
+    },
+    "k8_b3600": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 3696,
+      "chars_per_prompt": 2563,
+      "questions": 50,
+      "sources_per_prompt": 6.4
+    },
+    "k8_b4000": {
+      "answer_in_prompt": 0.88,
+      "answers": 44,
+      "block_chars_per_prompt": 4069,
+      "chars_per_prompt": 2883,
+      "questions": 50,
+      "sources_per_prompt": 6.8
+    }
+  },
+  "paper50": {
+    "k4_b1600": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 1834,
+      "chars_per_prompt": 1076,
+      "questions": 50,
+      "sources_per_prompt": 2.6
+    },
+    "k4_b2000": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2220,
+      "chars_per_prompt": 1379,
+      "questions": 50,
+      "sources_per_prompt": 3.1
+    },
+    "k4_b2400": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2572,
+      "chars_per_prompt": 1672,
+      "questions": 50,
+      "sources_per_prompt": 3.5
+    },
+    "k4_b2800": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2911,
+      "chars_per_prompt": 1971,
+      "questions": 50,
+      "sources_per_prompt": 3.7
+    },
+    "k4_b3200": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 3183,
+      "chars_per_prompt": 2224,
+      "questions": 50,
+      "sources_per_prompt": 3.9
+    },
+    "k4_b3600": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 3411,
+      "chars_per_prompt": 2441,
+      "questions": 50,
+      "sources_per_prompt": 4.0
+    },
+    "k4_b4000": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 3536,
+      "chars_per_prompt": 2566,
+      "questions": 50,
+      "sources_per_prompt": 4.0
+    },
+    "k6_b1600": {
+      "answer_in_prompt": 0.94,
+      "answers": 47,
+      "block_chars_per_prompt": 1831,
+      "chars_per_prompt": 1049,
+      "questions": 50,
+      "sources_per_prompt": 2.7
+    },
+    "k6_b2000": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2217,
+      "chars_per_prompt": 1340,
+      "questions": 50,
+      "sources_per_prompt": 3.5
+    },
+    "k6_b2400": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2595,
+      "chars_per_prompt": 1615,
+      "questions": 50,
+      "sources_per_prompt": 4.1
+    },
+    "k6_b2800": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2968,
+      "chars_per_prompt": 1919,
+      "questions": 50,
+      "sources_per_prompt": 4.5
+    },
+    "k6_b3200": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 3332,
+      "chars_per_prompt": 2220,
+      "questions": 50,
+      "sources_per_prompt": 4.9
+    },
+    "k6_b3600": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 3701,
+      "chars_per_prompt": 2517,
+      "questions": 50,
+      "sources_per_prompt": 5.3
+    },
+    "k6_b4000": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 4058,
+      "chars_per_prompt": 2836,
+      "questions": 50,
+      "sources_per_prompt": 5.5
+    },
+    "k8_b1600": {
+      "answer_in_prompt": 0.94,
+      "answers": 47,
+      "block_chars_per_prompt": 1834,
+      "chars_per_prompt": 1030,
+      "questions": 50,
+      "sources_per_prompt": 2.9
+    },
+    "k8_b2000": {
+      "answer_in_prompt": 0.94,
+      "answers": 47,
+      "block_chars_per_prompt": 2222,
+      "chars_per_prompt": 1327,
+      "questions": 50,
+      "sources_per_prompt": 3.5
+    },
+    "k8_b2400": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2594,
+      "chars_per_prompt": 1576,
+      "questions": 50,
+      "sources_per_prompt": 4.3
+    },
+    "k8_b2800": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 2956,
+      "chars_per_prompt": 1860,
+      "questions": 50,
+      "sources_per_prompt": 4.9
+    },
+    "k8_b3200": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 3331,
+      "chars_per_prompt": 2148,
+      "questions": 50,
+      "sources_per_prompt": 5.4
+    },
+    "k8_b3600": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 3696,
+      "chars_per_prompt": 2439,
+      "questions": 50,
+      "sources_per_prompt": 5.9
+    },
+    "k8_b4000": {
+      "answer_in_prompt": 0.96,
+      "answers": 48,
+      "block_chars_per_prompt": 4063,
+      "chars_per_prompt": 2741,
+      "questions": 50,
+      "sources_per_prompt": 6.3
+    }
+  },
+  "para": {
+    "k4_b1600": {
+      "answer_in_prompt": 0.13,
+      "answers": 19,
+      "block_chars_per_prompt": 1701,
+      "chars_per_prompt": 1008,
+      "questions": 146,
+      "sources_per_prompt": 2.6
+    },
+    "k4_b2000": {
+      "answer_in_prompt": 0.137,
+      "answers": 20,
+      "block_chars_per_prompt": 1992,
+      "chars_per_prompt": 1249,
+      "questions": 146,
+      "sources_per_prompt": 3.0
+    },
+    "k4_b2400": {
+      "answer_in_prompt": 0.158,
+      "answers": 23,
+      "block_chars_per_prompt": 2268,
+      "chars_per_prompt": 1499,
+      "questions": 146,
+      "sources_per_prompt": 3.1
+    },
+    "k4_b2800": {
+      "answer_in_prompt": 0.158,
+      "answers": 23,
+      "block_chars_per_prompt": 2500,
+      "chars_per_prompt": 1723,
+      "questions": 146,
+      "sources_per_prompt": 3.2
+    },
+    "k4_b3200": {
+      "answer_in_prompt": 0.171,
+      "answers": 25,
+      "block_chars_per_prompt": 2695,
+      "chars_per_prompt": 1907,
+      "questions": 146,
+      "sources_per_prompt": 3.3
+    },
+    "k4_b3600": {
+      "answer_in_prompt": 0.178,
+      "answers": 26,
+      "block_chars_per_prompt": 2832,
+      "chars_per_prompt": 2043,
+      "questions": 146,
+      "sources_per_prompt": 3.3
+    },
+    "k4_b4000": {
+      "answer_in_prompt": 0.185,
+      "answers": 27,
+      "block_chars_per_prompt": 2910,
+      "chars_per_prompt": 2121,
+      "questions": 146,
+      "sources_per_prompt": 3.3
+    },
+    "k6_b1600": {
+      "answer_in_prompt": 0.123,
+      "answers": 18,
+      "block_chars_per_prompt": 1699,
+      "chars_per_prompt": 987,
+      "questions": 146,
+      "sources_per_prompt": 2.8
+    },
+    "k6_b2000": {
+      "answer_in_prompt": 0.137,
+      "answers": 20,
+      "block_chars_per_prompt": 1992,
+      "chars_per_prompt": 1206,
+      "questions": 146,
+      "sources_per_prompt": 3.2
+    },
+    "k6_b2400": {
+      "answer_in_prompt": 0.171,
+      "answers": 25,
+      "block_chars_per_prompt": 2266,
+      "chars_per_prompt": 1438,
+      "questions": 146,
+      "sources_per_prompt": 3.5
+    },
+    "k6_b2800": {
+      "answer_in_prompt": 0.171,
+      "answers": 25,
+      "block_chars_per_prompt": 2518,
+      "chars_per_prompt": 1660,
+      "questions": 146,
+      "sources_per_prompt": 3.8
+    },
+    "k6_b3200": {
+      "answer_in_prompt": 0.178,
+      "answers": 26,
+      "block_chars_per_prompt": 2774,
+      "chars_per_prompt": 1891,
+      "questions": 146,
+      "sources_per_prompt": 4.0
+    },
+    "k6_b3600": {
+      "answer_in_prompt": 0.185,
+      "answers": 27,
+      "block_chars_per_prompt": 3011,
+      "chars_per_prompt": 2110,
+      "questions": 146,
+      "sources_per_prompt": 4.1
+    },
+    "k6_b4000": {
+      "answer_in_prompt": 0.185,
+      "answers": 27,
+      "block_chars_per_prompt": 3213,
+      "chars_per_prompt": 2294,
+      "questions": 146,
+      "sources_per_prompt": 4.2
+    },
+    "k8_b1600": {
+      "answer_in_prompt": 0.123,
+      "answers": 18,
+      "block_chars_per_prompt": 1697,
+      "chars_per_prompt": 983,
+      "questions": 146,
+      "sources_per_prompt": 2.8
+    },
+    "k8_b2000": {
+      "answer_in_prompt": 0.137,
+      "answers": 20,
+      "block_chars_per_prompt": 1991,
+      "chars_per_prompt": 1203,
+      "questions": 146,
+      "sources_per_prompt": 3.3
+    },
+    "k8_b2400": {
+      "answer_in_prompt": 0.164,
+      "answers": 24,
+      "block_chars_per_prompt": 2265,
+      "chars_per_prompt": 1426,
+      "questions": 146,
+      "sources_per_prompt": 3.6
+    },
+    "k8_b2800": {
+      "answer_in_prompt": 0.164,
+      "answers": 24,
+      "block_chars_per_prompt": 2517,
+      "chars_per_prompt": 1638,
+      "questions": 146,
+      "sources_per_prompt": 3.9
+    },
+    "k8_b3200": {
+      "answer_in_prompt": 0.171,
+      "answers": 25,
+      "block_chars_per_prompt": 2771,
+      "chars_per_prompt": 1858,
+      "questions": 146,
+      "sources_per_prompt": 4.2
+    },
+    "k8_b3600": {
+      "answer_in_prompt": 0.192,
+      "answers": 28,
+      "block_chars_per_prompt": 3006,
+      "chars_per_prompt": 2063,
+      "questions": 146,
+      "sources_per_prompt": 4.4
+    },
+    "k8_b4000": {
+      "answer_in_prompt": 0.185,
+      "answers": 27,
+      "block_chars_per_prompt": 3221,
+      "chars_per_prompt": 2253,
+      "questions": 146,
+      "sources_per_prompt": 4.5
+    }
+  },
+  "passages": 847,
+  "quoted": {
+    "k4_b1600": {
+      "answer_in_prompt": 0.933,
+      "answers": 56,
+      "block_chars_per_prompt": 1803,
+      "chars_per_prompt": 1126,
+      "questions": 60,
+      "sources_per_prompt": 2.9
+    },
+    "k4_b2000": {
+      "answer_in_prompt": 0.967,
+      "answers": 58,
+      "block_chars_per_prompt": 2149,
+      "chars_per_prompt": 1431,
+      "questions": 60,
+      "sources_per_prompt": 3.3
+    },
+    "k4_b2400": {
+      "answer_in_prompt": 0.967,
+      "answers": 58,
+      "block_chars_per_prompt": 2462,
+      "chars_per_prompt": 1695,
+      "questions": 60,
+      "sources_per_prompt": 3.6
+    },
+    "k4_b2800": {
+      "answer_in_prompt": 0.967,
+      "answers": 58,
+      "block_chars_per_prompt": 2726,
+      "chars_per_prompt": 1933,
+      "questions": 60,
+      "sources_per_prompt": 3.8
+    },
+    "k4_b3200": {
+      "answer_in_prompt": 0.967,
+      "answers": 58,
+      "block_chars_per_prompt": 2900,
+      "chars_per_prompt": 2092,
+      "questions": 60,
+      "sources_per_prompt": 3.9
+    },
+    "k4_b3600": {
+      "answer_in_prompt": 0.967,
+      "answers": 58,
+      "block_chars_per_prompt": 3046,
+      "chars_per_prompt": 2232,
+      "questions": 60,
+      "sources_per_prompt": 3.9
+    },
+    "k4_b4000": {
+      "answer_in_prompt": 0.967,
+      "answers": 58,
+      "block_chars_per_prompt": 3120,
+      "chars_per_prompt": 2305,
+      "questions": 60,
+      "sources_per_prompt": 3.9
+    },
+    "k6_b1600": {
+      "answer_in_prompt": 0.95,
+      "answers": 57,
+      "block_chars_per_prompt": 1798,
+      "chars_per_prompt": 1090,
+      "questions": 60,
+      "sources_per_prompt": 3.1
+    },
+    "k6_b2000": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 2170,
+      "chars_per_prompt": 1387,
+      "questions": 60,
+      "sources_per_prompt": 3.7
+    },
+    "k6_b2400": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 2514,
+      "chars_per_prompt": 1657,
+      "questions": 60,
+      "sources_per_prompt": 4.3
+    },
+    "k6_b2800": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 2849,
+      "chars_per_prompt": 1946,
+      "questions": 60,
+      "sources_per_prompt": 4.7
+    },
+    "k6_b3200": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 3180,
+      "chars_per_prompt": 2221,
+      "questions": 60,
+      "sources_per_prompt": 5.1
+    },
+    "k6_b3600": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 3497,
+      "chars_per_prompt": 2507,
+      "questions": 60,
+      "sources_per_prompt": 5.3
+    },
+    "k6_b4000": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 3772,
+      "chars_per_prompt": 2769,
+      "questions": 60,
+      "sources_per_prompt": 5.4
+    },
+    "k8_b1600": {
+      "answer_in_prompt": 0.95,
+      "answers": 57,
+      "block_chars_per_prompt": 1803,
+      "chars_per_prompt": 1080,
+      "questions": 60,
+      "sources_per_prompt": 3.2
+    },
+    "k8_b2000": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 2172,
+      "chars_per_prompt": 1368,
+      "questions": 60,
+      "sources_per_prompt": 3.9
+    },
+    "k8_b2400": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 2511,
+      "chars_per_prompt": 1625,
+      "questions": 60,
+      "sources_per_prompt": 4.6
+    },
+    "k8_b2800": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 2853,
+      "chars_per_prompt": 1906,
+      "questions": 60,
+      "sources_per_prompt": 5.2
+    },
+    "k8_b3200": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 3197,
+      "chars_per_prompt": 2186,
+      "questions": 60,
+      "sources_per_prompt": 5.7
+    },
+    "k8_b3600": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 3538,
+      "chars_per_prompt": 2477,
+      "questions": 60,
+      "sources_per_prompt": 6.1
+    },
+    "k8_b4000": {
+      "answer_in_prompt": 1.0,
+      "answers": 60,
+      "block_chars_per_prompt": 3862,
+      "chars_per_prompt": 2749,
+      "questions": 60,
+      "sources_per_prompt": 6.4
+    }
+  }
+}
