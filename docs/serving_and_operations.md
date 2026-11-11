@@ -97,5 +97,5 @@ Phases 0–13 of the roadmap are implemented on the CPU reference machine; GPU t
 | G5 security and deployment | ✅ | 26/26 security probes, 0 open high findings, deployment checks pass |
 | G0, G2, G3, G6 | ⏳ | need release-scale runs (thousands of items), the first GPU training cycle, and the scholar review |
 
-**Next:** evidence at scale on a faster host, the first Tazkiya (distillation) cycle, adaptive early exit across more domains, a learned router built from the policy map and human preferences, and the scholar review. The details, with estimates, are in the [roadmap](docs/roadmap/nafs_aql_roadmap.pdf).
+**Next:** evidence at scale on a faster host, the first distillation cycle, adaptive early exit across more domains, a learned router built from the policy map and human preferences, and the scholar review. The details, with estimates, are in the [roadmap](docs/roadmap/nafs_aql_roadmap.pdf).
 

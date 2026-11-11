@@ -37,7 +37,7 @@ Everything the project has built and measured, phase by phase, with the evidence
 <td width="50%"><img src="shared/screenshots/performance_stages.png" alt="Performance: where the time goes, per stage"><br><sub><b>Performance.</b> Where every second goes, with prefill, decode and cache reuse.</sub></td>
 </tr>
 <tr>
-<td width="50%"><img src="shared/screenshots/muhasaba_drift_alerts.png" alt="Muhasaba: drift monitor and alerts"><br><sub><b>Muhasaba.</b> Drift per domain, alert rules over live traffic.</sub></td>
+<td width="50%"><img src="shared/screenshots/muhasaba_drift_alerts.png" alt="The Quality page: drift monitor and alerts"><br><sub><b>Quality.</b> Drift per domain, alert rules over live traffic.</sub></td>
 <td width="50%"><img src="shared/screenshots/lab_gates.png" alt="Roadmap gates computed from stored evidence"><br><sub><b>Gates.</b> Go / no-go computed from stored runs, never typed in by hand.</sub></td>
 </tr>
 <tr>

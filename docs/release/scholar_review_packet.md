@@ -1,5 +1,12 @@
 # Scholar review packet (SR-005, gate G6)
 
+> **Superseded in part on 2026-11-11.** Sections 2.1 to 2.4 quote copy that is no longer shipped. The app no longer
+> shows the Arabic terms on the steps of an answer or under the page titles, and its "About the name" note is one
+> paragraph: the name joins *nafs* (the impulse that acts first) and *ʿaql* (the reason that restrains and corrects
+> it) as a naming analogy. The user guide and the paper say the same in one paragraph each, with no scriptural
+> references and no mapping of further terms. What a reviewer would now read is that paragraph; the slides and the
+> specification PDF still carry the longer analogy. The earlier copy is in the repository history at `1156b5b`.
+
 **Purpose.** SR-005 requires that user-facing copy describe the *nafs* and *ʿaql* terms as analogies, claim no religious authority, and be reviewed by a scholar of the tradition before release. This packet collects every place the vocabulary appears, the sources the team relied on, and the questions we ask the reviewer. Review is blocking for the analogy text only; the engineering behaviour does not depend on it.
 
 ## 1. What the reviewer is asked to judge

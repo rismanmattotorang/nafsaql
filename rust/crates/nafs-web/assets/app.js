@@ -38,19 +38,19 @@ const icon = {
   leaf: '<svg viewBox="0 0 24 24"><path d="M5 19c0-8 5-14 15-15-1 10-7 15-15 15z"/><path d="M5 19 13 11"/></svg>',
 };
 
-// ============================== design vocabulary (analogy, not theology: ASSUMPTIONS A-010) ==============================
+// ============================== the steps of an answer ==============================
 const STATIONS = {
-  A: { en: 'Draft', ar: 'nafs', tip: 'The quick model answers at once: the first, unexamined response.' },
-  L: { en: 'Flagged', ar: 'lawwāma', tip: 'Self-reproach (Q 75:2): the routing or a check finds the draft wanting.' },
-  M: { en: 'Thinking', ar: '\u02bfaql', tip: 'Reflection: the thorough model reasons within a budget, without seeing the draft.' },
-  T: { en: 'Accepted', ar: 'muṭmaʾinna', tip: 'At rest (Q 89:27): the answer is accepted with a stated assurance.' },
-  X: { en: 'Abstain', ar: 'tawaqquf', tip: 'Judgement withheld: no candidate earned acceptance within the budget.' },
+  A: { en: 'Draft', tip: 'The quick model answers at once: the first, unexamined response.' },
+  L: { en: 'Flagged', tip: 'The routing or a check finds the draft wanting.' },
+  M: { en: 'Thinking', tip: 'The thorough model reasons within a budget, without seeing the draft.' },
+  T: { en: 'Accepted', tip: 'The answer is accepted with a stated assurance.' },
+  X: { en: 'Abstain', tip: 'Judgement withheld: no candidate earned acceptance within the budget.' },
 };
 // The answer's journey as steps (OpenUI Steps): visited steps are ticked, the live step pulses with its stage label.
 function journeyHTML(seq, visited, cur, label, elapsedMs) {
   const steps = seq.map((k, i) => { const st = STATIONS[k]; const done = visited.includes(k) && k !== cur; const isCur = k === cur;
     const n = done ? icon.check : isCur ? `<span class="spin" style="width:10px;height:10px;border-width:1.5px;border-color:rgba(255,255,255,.5);border-top-color:#fff"></span>` : k;
-    return `${i ? `<span class="jlink ${done || isCur ? 'done' : ''}"></span>` : ''}<span class="jstep ${done ? 'done' : ''} ${isCur ? 'cur' : ''} ${k === 'X' ? 'x' : ''}" title="${esc(st.tip)}"><span class="n">${n}</span>${st.en}<i class="ar">${st.ar}</i></span>`; }).join('');
+    return `${i ? `<span class="jlink ${done || isCur ? 'done' : ''}"></span>` : ''}<span class="jstep ${done ? 'done' : ''} ${isCur ? 'cur' : ''} ${k === 'X' ? 'x' : ''}" title="${esc(st.tip)}"><span class="n">${n}</span>${st.en}</span>`; }).join('');
   const live = cur ? `<span class="jlive"><span>${esc(label || '')}</span><span class="el">${fmtMs(elapsedMs || 0)}</span></span>` : '';
   return steps + live;
 }
@@ -104,17 +104,9 @@ function followupsHTML(t) {
   return `<span class="fu-l">Next:</span>` + f.map(([k, i, l, tip]) => `<button type="button" data-f="${k}" title="${esc(tip)}">${i}${esc(l)}</button>`).join('');
 }
 function designNotes() {
-  modal(`<h3 style="margin-top:0">${icon.book} About the name: nafs and \u02bfaql</h3>
-    <p class="small">Nafs-Aql pairs a quick first response (<i>nafs</i>, the first impulse) with careful thought (<i>\u02bfaql</i>, the intellect that restrains it). The classical vocabulary of the self is used as a <b>design analogy</b>, not as a theological claim.</p>
-    <table class="t small"><tr><th>Term</th><th>Source</th><th>In Nafs-Aql</th></tr>
-      <tr><td><i>nafs</i> (self; first impulse)</td><td>Q 12:53 (al-nafs al-ammāra)</td><td>The quick answer</td></tr>
-      <tr><td><i>lawwāma</i> (self-reproaching)</td><td>Q 75:2</td><td>A quick answer is flagged for a second look</td></tr>
-      <tr><td><i>\u02bfaql</i> (intellect, restraint)</td><td>al-Ghazālī, <i>Iḥyāʾ</i> Book 21: the counsellor of the heart</td><td>Deciding when to think longer, and the careful answer</td></tr>
-      <tr><td><i>muṭmaʾinna</i> (at rest)</td><td>Q 89:27</td><td>An answer is accepted, with how sure it is</td></tr>
-      <tr><td><i>tawaqquf</i> (withholding judgement)</td><td>usage in jurisprudence and theology</td><td>No answer is certain enough, so it comes with a caution</td></tr>
-      <tr><td><i>muḥāsaba</i> (self-accounting)</td><td>Sufi practice of examining the self</td><td>Measuring how reliable the answers are (Quality)</td></tr>
-      <tr><td><i>tazkiya</i> (purification)</td><td>Q 91:9</td><td>Checked careful answers teach the quick model (Learning)</td></tr></table>
-    <p class="tiny muted">Rūḥ, ilhām and the Active Intellect are deliberately not mapped.</p>`);
+  modal(`<h3 style="margin-top:0">${icon.book} About the name</h3>
+    <p class="small">Nafs-Aql pairs a quick first response with careful thought. The name joins two classical terms, <i>nafs</i> (the impulse that acts first) and <i>\u02bfaql</i> (the reason that restrains and corrects it), as a naming analogy for a fast process and a deliberate one. Nothing in how the assistant works depends on the analogy.</p>
+    <p class="small muted">A quick model answers at once. When a question is worth the wait, a reasoning model thinks it through. Where an answer can be checked, a checker decides, and every answer says how sure it is.</p>`);
 }
 
 // Notices stack in a queue (newest last, at most four). A success or a note leaves on its own; an error stays
@@ -868,7 +860,7 @@ routes.chat = { title: 'Chat', async render(view, alive) {
   const scrollDown = () => { msgs.scrollTop = msgs.scrollHeight; };
   const welcome = () => { inner.innerHTML = `<div class="welcome"><h2>Fast when it can, careful when it must.</h2><p>Simple questions get an instant answer. Hard ones get time to think. Answers that can be checked exactly are marked <b>Checked</b>.</p>
       <div class="starters">${EXAMPLES.map((x, i) => `<div class="starter ex" data-i="${i}" tabindex="0" role="button"><span class="st-ico">${icon[x.i] || icon.bolt}</span><div><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div></div>`).join('')}</div>
-      <div class="journey adv-only" aria-label="How an answer is made">${journeyHTML(['A', 'L', 'M', 'T'], ['A', 'L', 'M', 'T'], null, null, null)}<span class="jlive"><span class="faint">or</span></span><span class="jstep x" title="${esc(STATIONS.X.tip)}"><span class="n">X</span>${STATIONS.X.en}<i class="ar">${STATIONS.X.ar}</i></span></div>
+      <div class="journey adv-only" aria-label="How an answer is made">${journeyHTML(['A', 'L', 'M', 'T'], ['A', 'L', 'M', 'T'], null, null, null)}<span class="jlive"><span class="faint">or</span></span><span class="jstep x" title="${esc(STATIONS.X.tip)}"><span class="n">X</span>${STATIONS.X.en}</span></div>
       <p class="tiny faint" style="margin-top:10px"><button class="linkbtn" id="dnBtn">About the name Nafs-Aql</button></p></div>`;
     $('#dnBtn') && ($('#dnBtn').onclick = designNotes);
     $$('.ex', inner).forEach(el => { const go = () => { const x = EXAMPLES[+el.dataset.i]; input.value = x.prompt; autosize(); fillVerification(x.v || null); input.focus(); }; el.onclick = go; }); };
@@ -1956,7 +1948,7 @@ async function deriveDialog(ids) {
 }
 
 // ============================== gate and ledger ==============================
-routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers are', adv: true, async render(view, alive) {
+routes.gate = { title: 'Quality', sub: 'how reliable the answers are', adv: true, async render(view, alive) {
   view.innerHTML = `<div class="page grid" style="gap:16px">
     ${pageIntro({ ico: 'shield', title: 'How reliable are the answers?', lead: 'How Auto decides when to think longer, how trustworthy the checks are, how often answers are right per topic, and early warnings when quality slips. Numbers come from real use and spot checks; experiments are kept apart.', steps: ['How Auto decides', 'How good the checks are', 'Reliability by topic', 'Warnings'] })}
     <div class="grid g4" id="gSummary"></div>
@@ -2052,8 +2044,8 @@ routes.gate = { title: 'Quality', sub: 'muḥāsaba · how reliable the answers 
   return () => { clearInterval(t); clearInterval(ratePoll); };
 } };
 
-// ============================== tazkiya (Phase 3: distillation) ==============================
-routes.tazkiya = { title: 'Learning', sub: 'tazkiya · checked answers teach the quick model', adv: true, async render(view, alive) {
+// ============================== Learning (Phase 3: distillation) ==============================
+routes.tazkiya = { title: 'Learning', sub: 'checked answers teach the quick model', adv: true, async render(view, alive) {
   view.innerHTML = `<div class="page grid" style="gap:16px">
     ${pageIntro({ ico: 'leaf', title: 'How the quick model improves', lead: 'Thorough answers that passed an exact check become examples the quick model learns from, so more questions can be answered quickly and correctly. Review answers, watch the examples grow, and replace a model only after it proves itself.', steps: ['Collect checked answers', 'Train on a separate computer', 'Prove the new model', 'Undo with one command'] })}
     <div class="card"><div class="card-h"><h2>${icon.leaf} What the quick model learns from</h2></div><div class="card-b small">
