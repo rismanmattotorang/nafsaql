@@ -1,33 +1,29 @@
 \section{Conclusion}
 \label{sec:conclusion}
-\Sys\ is a buildable dual-process system: a small Qwen model answers fast, a
-calibrated gate decides when deliberation pays, a second model (or the same
-model in thinking mode) deliberates under a budget, exact verifiers decide
-what counts as known, and an audited ledger keeps the system honest about
-itself. The classical account of the self supplied the vocabulary and, more
-usefully, three disciplines that translate directly into engineering: the
-intellect arbitrates on cost and risk, the self is corrected under an external
-standard, and dispositions change slowly through verified practice. The
-mathematics turned those disciplines into a threshold gate, a verifier-bounded
-precision, a stable loop and a sized set of release gates. The feasibility
-study showed what October 2026 permits on a four-core machine: Qwen3 and
-Qwen3.5 below 9B parameters, llama-server or vLLM-CPU behind one API,
-Unsloth on a rented GPU, and a Rust gateway. The specification and roadmap
-that accompany this report give the team requirements with identifiers,
-machine-readable interfaces, and a phased plan with measurable gates. The
-first three actions are to run the Phase-0 baseline at the required sample
-size, to measure the verifiers' false-accept rates by mutation testing, and
-to benchmark the Qwen3.5 hybrid models against dense Qwen3 on the target
-CPU before choosing the upgrade path. The second and third are done and
-the first runs only at a scaled-down size on one CPU. With the system built,
-the cascade runs end to end on a shared four-core CPU, the verifiers are
-measured, Profile~C was evaluated and not adopted, and latency is
-attributed by stage, which points the next work at decode speed (EAGLE-3 and
-repacked weights) and at release-scale evaluation on a faster host.
+\Sys\ shows that a useful dual-process assistant fits on four CPU cores: a
+small Qwen model answers at once, a gate derived from expected loss decides
+when deliberation pays, a reasoning model deliberates under a budget, exact
+verifiers decide what counts as known, and an audited ledger keeps the system
+honest about itself. The mathematics fixed the design before the
+measurements did: precision on checkable tasks is the verifier's, not the
+model's; agreement is a flag and never proof; every loop is bounded; and a
+loop that accepts only on a verifier's pass is stable whatever the model
+does inside it.
 
-Phase~11 adds one lesson about agent harnesses for small models. What made
-Codex's loop work here was not its tools but its discipline: an action language
-the server can enforce, a history that is never rewritten, and a hard budget.
-With the action constrained and the edit format chosen by file length, the 1.7B
-and 4B models stopped losing steps to malformed replies; that, more than any
-saving in prefill, is where the speed of a verified answer came from.
+Three lessons recur across the measurements. First, on a CPU the gains are
+in not repeating work. Decode runs at the memory roofline, so more threads,
+speculation and hedging did not pay, while prefix reuse, shared prefill
+across candidates, one pass over the weights for several users and an
+in-process index did, by factors from 1.2 to three orders of magnitude.
+Second, what makes small models usable as agents is discipline imposed by
+the harness: an action language the engine enforces, a history that is never
+rewritten, an exact verifier after every change and a hard budget. Third,
+cheap candidates from the quick model, judged by an exact verifier before the
+expensive model is consulted, are the best use of idle cores, in the chat
+path and in the agent alike.
+
+The open work is stated in Section~\ref{sec:limits}: a ledger large enough to
+promote the calibrated gate, retrieval for reworded questions, evaluation at
+release scale and on public benchmarks, and the training steps that need a
+GPU. The system, its tests and every stored run behind the figures in this
+paper are available with the source.

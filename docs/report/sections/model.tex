@@ -4,15 +4,12 @@
 \section{Mathematical Formulation}
 \label{sec:math}
 
-This section turns the inspiration of Section~\ref{sec:background} into a formal
-model. Nothing here depends on the metaphysical reading: the objects are
-policies, verifiers, costs and losses. Each result ends with its
-\emph{engineering consequence}, which the specification (Section~\ref{sec:spec})
-turns into a parameter or an algorithm. Results are labelled by the strength of
+The objects of the model are policies, verifiers, costs and losses. Each
+result ends with its \emph{engineering consequence}: the parameter or the
+algorithm of the system that it fixes. Results are labelled by the strength of
 their assumptions: \textbf{[exact]} holds under the stated model without further
 hypotheses; \textbf{[strong]} needs an assumption that must be checked
-empirically; \textbf{[conjecture]} is a design hypothesis scheduled for
-validation in the roadmap.
+empirically.
 
 \subsection{Objects}
 \label{sec:objects}
@@ -26,8 +23,7 @@ schema validity); otherwise it is \emph{non-verifiable}.
 \end{definition}
 
 \begin{definition}[Fast and slow paths]
-The \emph{fast path} (System~1, the analogue of the impulsive
-\emph{nafs}) is a stochastic policy $\pi_1(y\mid x)$ with expected cost
+The \emph{fast path} (System~1) is a stochastic policy $\pi_1(y\mid x)$ with expected cost
 $c_1(x)$ and correctness probability $p_1(x)=\Pr_{y\sim\pi_1}[\kappa(x,y)=1]$.
 The \emph{slow path} (System~2, deliberation) is a policy $\pi_2(y\mid x,b)$
 parametrised by a \emph{thinking budget} $b\in\mathbb N$ (maximum reasoning
@@ -44,8 +40,7 @@ $\varphi>0$ and must publish measured $(r,\varphi)$.
 \end{definition}
 
 \begin{definition}[Gate and trace state]
-After the fast path has run, the \emph{controller} (the \emph{\textquoteleft aql}
-analogue) observes a feature vector $s=\sigma(x,\text{trace}_1)\in\mathcal S$
+After the fast path has run, the \emph{controller} observes a feature vector $s=\sigma(x,\text{trace}_1)\in\mathcal S$
 (token log-probabilities, agreement among cheap samples, verifier outcome,
 domain class) and chooses, with probability $\gamma(s)\in[0,1]$, to
 \emph{escalate} to the slow path. The lifecycle of one request is a finite
@@ -55,9 +50,7 @@ Fig.~\ref{fig:nafs-automaton}: $\mathsf A$ (an unverified draft),
 $\mathsf L$ (the draft has been flagged by the gate or a verifier),
 $\mathsf M$ (a deliberate retry conditioned on evidence), $\mathsf T$ (an
 accepted answer) and $\mathsf X$ (abstention with an explicit uncertainty
-notice). The labels are mnemonic for the four classical stages of the
-\emph{nafs} (Section~\ref{sec:islamic}); the automaton itself is an ordinary
-bounded retry loop.
+notice). The automaton is an ordinary bounded retry loop.
 \end{definition}
 
 \begin{definition}[Losses and objective]
@@ -85,9 +78,9 @@ verifier calls before reaching $\mathsf T$ or $\mathsf X$.
 Each transition of the automaton either consumes one of the $N(R{+}1)$ slow
 samples or terminates; the fast path is called once. \qed
 \end{proof}
-\emph{Consequence.} Every request has a hard upper bound on latency
-(NFR-001 in the specification); the gateway MUST enforce $N$ and $R$ as
-configuration limits rather than letting the model decide when to stop.
+\emph{Consequence.} Every request has a hard upper bound on latency; the
+gateway enforces $N$ and $R$ as configuration limits rather than letting the
+model decide when to stop.
 
 \subsection{Precision of a verified answer}
 
@@ -112,8 +105,8 @@ factorises the joint acceptance probabilities. \qed
 \end{proof}
 \emph{Consequence.} The precision of the system on verifiable tasks is
 bounded by the verifier's false-accept rate, not by the strength of either
-model. Every verifier in the hub MUST publish $(r,\varphi)$ measured by
-mutation testing on a held-out set (FR-030), and the per-verifier acceptance
+model. Every verifier publishes $(r,\varphi)$ measured by
+mutation testing on a held-out set, and the per-verifier acceptance
 threshold is $1.0$ for exact verifiers. For hard tasks ($p=0.1$) a $1\%$
 precision target requires $\varphi\le1.1\times10^{-3}$: only exact verifiers
 qualify, which is why consensus (Theorem~\ref{thm:plurality}) is a flag and not
@@ -155,8 +148,7 @@ set with randomisation on the boundary. (iii) Immediate from (i). \qed
 $\hat e_1(s)$ (logistic or isotonic regression on the fast-path features),
 a per-domain estimate $\hat e_2$, and the comparison \eqref{eq:gate}. The only
 tunable is the cost ratio $\lambda\Delta c/L$ (or equivalently the budget $B$),
-which the operator sets; the threshold is \emph{derived}, not hand-tuned
-(FR-010--FR-013). The rule coincides with Chow's optimal reject rule
+which the operator sets; the threshold is \emph{derived}, not hand-tuned. The rule coincides with Chow's optimal reject rule
 \cite{chow1970reject} and with the expected-value-of-control account of
 cognitive control \cite{shenhav2013evc}, with ``reject'' read as
 ``deliberate''.
@@ -174,7 +166,7 @@ $|L(e_1-e_2)-\lambda\Delta c|\le L(\epsilon_1+\epsilon_2)$, and the loss from a
 wrong decision equals that absolute difference. Taking expectations over $s$
 gives the bound. \qed
 \end{proof}
-\emph{Consequence.} The calibration target of the gate (NFR-020) is set from
+\emph{Consequence.} The calibration target of the gate is set from
 the regret the operator tolerates: a maximum calibration error of $0.05$ on
 $\hat e_1$ bounds the excess loss by $0.05L$ per request.
 
@@ -191,7 +183,7 @@ functionals, each of which is minimised by a threshold gate by
 Theorem~\ref{thm:gate}. \qed
 \end{proof}
 \emph{Consequence.} The user-facing ``speed--care'' control in the chat UI is
-a single scalar $\lambda$ (FR-014); no other knob can reach a better point.
+a single scalar $\lambda$; no other knob can reach a better point.
 
 \subsection{Deliberation: sampling, stopping and retries}
 
@@ -218,7 +210,7 @@ $\mathbb E[(1-a)^M]\ge(1-\bar a)^M$. \qed
 \end{proof}
 \emph{Consequence.} More samples buy \emph{coverage}, never \emph{precision}:
 the number of draws is chosen from a coverage target and the per-task
-heterogeneity of $a$ must be measured, not averaged (Phase~0 of the roadmap).
+heterogeneity of $a$ must be measured, not averaged.
 
 \begin{proposition}[Optimal number of draws under uncertainty about $a$]
 \textnormal{[strong: Beta prior, monotone stopping]}
@@ -244,15 +236,14 @@ one-step look-ahead rule is optimal \cite{chow1971great}. The draws made are exa
 $m<\alpha L_a/c_p-\alpha-\beta$, whose count is the ceiling. \qed
 \end{proof}
 \emph{Consequence.} The retry limit $R$ and the samples per round $N$
-(with $M=N(R{+}1)$) are derived per domain from the Phase-0 fit of
-$(\alpha,\beta)$ and the operator's cost ratio $c_p/L_a$ (FR-021). The Beta
-model is a modelling choice; the roadmap validates it against the empirical
-distribution of acceptance rates (hypothesis H3).
+(with $M=N(R{+}1)$) are derived per domain from a fit of
+$(\alpha,\beta)$ on baseline runs and the operator's cost ratio $c_p/L_a$. The
+Beta model is a modelling choice, to be checked against the empirical
+distribution of acceptance rates.
 
 \subsection{Self-monitoring: why the loop must be verifier-gated}
 
-The classical \emph{muhasaba} (self-accounting) is a loop in which a draft is
-re-examined and amended. Let $u$ be the probability that one unverified
+Self-monitoring is a loop in which a draft is re-examined and amended. Let $u$ be the probability that one unverified
 refinement turns a wrong answer into a right one and $d$ the probability that
 it turns a right answer into a wrong one.
 
@@ -273,8 +264,7 @@ help tasks whose first draft is worse than the fixed point; for a strong first
 draft it \emph{harms}. This is consistent with the empirical finding that
 language models do not reliably self-correct without external feedback
 \cite{huang2024selfcorrect,kamoi2024survey}. Nafs-Aql therefore never accepts an
-unverified refinement: on non-verifiable tasks the loop is capped at $R=1$
-(FR-022).
+unverified refinement: on non-verifiable tasks the loop is capped at $R=1$.
 
 \begin{theorem}[Verifier-gated loop is stable] \textnormal{[exact]}
 \label{thm:gatedloop}
@@ -321,9 +311,9 @@ $\Pr[\sum_iD_i\le0]\le\exp(-2N(q-\bar q)^2/4)$. \qed
 \emph{Consequence.} Agreement among samples cannot repair tasks on which the
 model is confidently wrong; the mass of such tasks is a floor that no $N$
 removes. Consensus is therefore recorded as an \emph{assurance level}
-(\texttt{consensus}) distinct from \texttt{verified} (FR-031), is never used
+(\texttt{consensus}) distinct from \texttt{verified}, is never used
 to write training data without a human check, and the number of samples for a
-consensus flag is set from the margin $q-\bar q$ measured in Phase~0.
+consensus flag is set from the measured margin $q-\bar q$.
 
 \subsection{Independence of the two paths}
 
@@ -337,9 +327,9 @@ rate below $5\%$ at confidence $95\%$ with zero observed adoptions needs at
 least $\lceil\ln0.05/\ln0.95\rceil=59$ trials; with observed adoptions the
 Clopper--Pearson interval \cite{clopper1934} applies.
 \end{proposition}
-\emph{Consequence.} The slow path is \emph{draft-blind} by default
-(FR-023); draft-conditioned deliberation is an ablation, and the coupling test
-(hypothesis H5) is a release gate. Because both paths may share weights (the
+\emph{Consequence.} The slow path is \emph{draft-blind} by default;
+draft-conditioned deliberation is an ablation, and a coupling test measures
+the adoption rate. Because both paths may share weights (the
 single-model profile of Section~\ref{sec:models}), the collision term is not
 small a priori and is measured.
 
@@ -362,8 +352,8 @@ sampling probabilities $1$ and $\epsilon$; the variance of each stratum mean is
 at most $1/(4\,n_{\text{stratum}})$ with $n_{\text{esc}}=ng$ and
 $n_{\text{audit}}=n(1-g)\epsilon$. \qed
 \end{proof}
-\emph{Consequence.} The self-model (the \emph{muhasaba} ledger) is built only
-from traces plus a $5\%$ audit stream (FR-040); capabilities with no audited
+\emph{Consequence.} The self-model (the audit ledger) is built only
+from traces plus a $5\%$ audit stream; capabilities with no audited
 data are reported as \emph{unmeasured}, never as zero. With $n=10^4$, $g=0.3$
 and $\epsilon=0.05$ the standard error is at most $0.019$.
 
@@ -384,13 +374,14 @@ $n\ge(z_\alpha+z_\beta)^2\,\delta/m^2$ pairs.
 at confidence $1-\delta$ needs $n\ge\ln\delta/\ln(1-\varepsilon)$ trials.
 \end{enumerate}
 \end{proposition}
-\emph{Consequence.} The Phase-0 baseline is at least $4\,600$ tasks
-($\varepsilon=0.02$, $\delta=0.05$), the one-point non-inferiority gate needs
-about $6\,200$ pairs at $\delta=0.1$ (or $700$ for a three-point margin), and
-every release gate in the roadmap states its sample size. With $n=500$ the
-escalation rate is known only to $\pm6$ points.
+\emph{Consequence.} A baseline that fixes the escalation rate to within two points
+needs at least $4\,600$ tasks ($\varepsilon=0.02$, $\delta=0.05$); a one-point
+non-inferiority claim needs about $6\,200$ pairs at $\delta=0.1$ (or $700$ for
+a three-point margin). With $n=500$ the escalation rate is known only to
+$\pm6$ points. The measurements of Section~\ref{sec:eval} are below these
+sizes and are labelled indicative for that reason.
 
-\subsection{Distillation (\emph{tazkiya}) without self-deception}
+\subsection{Distillation without self-deception}
 
 \begin{proposition}[Label noise and verifier-inflated gains] \textnormal{[exact]}
 \label{prop:distill}
@@ -413,7 +404,7 @@ paired binomial. \qed
 \end{proof}
 \emph{Consequence.} Promotion of a distilled fast-path adapter requires a
 confidence-bound gain on a verifier that was never used for data collection,
-plus a per-domain non-regression bound and human sign-off (FR-050--FR-053).
+plus a per-domain non-regression bound and human sign-off.
 
 \subsection{What a CPU can serve}
 
@@ -437,9 +428,9 @@ $\beta\approx38$\,GB/s; AVX2, four cores) a 4-billion-parameter model in 4-bit
 GGUF ($W\approx2.5$\,GB) cannot exceed about 15 tokens/s, a 1.7B model about
 35 tokens/s, and a 1000-token prefill of the 4B model takes seconds to tens of
 seconds. These ceilings fix the model sizes, the thinking-budget cap, the
-context cap and the prompt-cache requirement (NFR-002--NFR-006). Measured
-values on the reference machine are reported in Section~\ref{sec:feasibility}
-and are below the ceilings, as expected.
+context cap and the prompt-cache requirement. Measured
+values on the reference machine (Section~\ref{sec:inference}) are below the
+ceilings, as expected.
 
 \begin{proposition}[Thinking budget] \textnormal{[strong: concave returns]}
 \label{prop:budget}
@@ -450,7 +441,7 @@ $L\,\partial_bp_2(x,b^\star)=\lambda\kappa_{\text{tok}}$ (or the boundary if
 no interior solution exists).
 \end{proposition}
 \emph{Consequence.} The thinking budget is a per-domain configuration value
-estimated from the Phase-0 accuracy-versus-budget curve (hypothesis H4);
+estimated from the accuracy-versus-budget curve;
 when the budget is exhausted the controller forces the answer by closing the
 reasoning span \cite{muennighoff2025s1} rather than returning nothing.
 
@@ -471,8 +462,7 @@ is therefore part of the safety case.
 
 \subsection{Summary of engineering consequences}
 Table~\ref{tab:consequences} lists each result with the parameter or
-algorithm it determines; the specification's traceability matrix repeats the
-mapping by requirement ID.
+algorithm it determines.
 
 \begin{table}[t]
 \caption{Formal results and what they determine}
@@ -492,9 +482,9 @@ Prop.~\ref{prop:stopping} & $R$, $N$ from Beta fit and $c_p/L_a$ \\
 Thm.~\ref{thm:selfrefine} & No unverified refinement; $R=1$ on non-verifiable tasks \\
 Thm.~\ref{thm:gatedloop} & Loop risk $\le\varphi\,\mathbb E[T]$; prompt changes need no new safety case \\
 Thm.~\ref{thm:plurality} & Consensus is an assurance flag; $N$ from margin \\
-Prop.~\ref{prop:collision} & Draft-blind slow path; coupling test gate \\
+Prop.~\ref{prop:collision} & Draft-blind slow path; coupling test \\
 Prop.~\ref{prop:audit} & $5\%$ audit stream; ``unmeasured'' label \\
-Prop.~\ref{prop:samples} & Phase-0 size $\ge4\,600$; gate sample sizes \\
+Prop.~\ref{prop:samples} & Baseline size $\ge4\,600$; sample sizes of claims \\
 Prop.~\ref{prop:distill} & Promotion gate: held-out verifier, confidence bounds \\
 Prop.~\ref{prop:roofline} & Model sizes, context cap, prompt cache, budget cap \\
 Prop.~\ref{prop:budget} & Per-domain thinking budget; budget forcing \\

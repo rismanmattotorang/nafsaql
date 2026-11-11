@@ -1,80 +1,465 @@
-\section{Evaluation Plan and Metrics}
+\section{Evaluation}
 \label{sec:eval}
-No result in this section has been measured; the section defines what will be
-measured, how, and what counts as success. The full definitions, formulas and
-test plans are in the specification (Section~10 there).
 
-\subsection{Metrics}
-\begin{itemize}
-\item \textbf{Quality.} Exact-match or test-pass accuracy on verifiable
-benchmarks; pairwise win rate against the slow-only baseline by a held-out
-judge on non-verifiable prompts; abstention rate and accuracy among
-non-abstained answers (selective accuracy at coverage).
-\item \textbf{Routing.} Escalation rate $g$; routing accuracy, defined as the
-fraction of requests on which the gate's decision agrees with the oracle
-decision of Theorem~\ref{thm:gate} computed from labelled outcomes; the
-area under the cost--accuracy curve as $\lambda$ varies
-(Proposition~\ref{prop:frontier}).
-\item \textbf{Cost and latency.} Tokens and CPU-seconds per request by path;
-time to first token and total latency at p50, p95 and p99; throughput under
-load.
-\item \textbf{Calibration.} Expected calibration error of $\hat e_1$ with
-five bins and $n\ge2\,900$ (the noise floor of a ten-bin estimate at $n=500$
-is $0.034$, above the target), and Brier score.
-\item \textbf{Verifier quality.} $(r,\varphi)$ per verifier from mutation
-tests, with Clopper--Pearson intervals \cite{clopper1934}.
-\item \textbf{Faithfulness.} Agreement between the reasoning trace and the
-answer on perturbation tests \cite{turpin2023unfaithful,lanham2023faithfulness},
-and adoption rate of a wrong fast draft by the slow path
-(Proposition~\ref{prop:collision}).
-\item \textbf{Robustness.} Accuracy under paraphrase and under prompt
-injection probes \cite{greshake2023injection,zou2023universal,wei2023jailbroken}.
-\end{itemize}
+\subsection{Setup and method}
+\label{sec:eval:setup}
+All measurements were taken on the reference machine of
+Section~\ref{sec:inference}, which was shared with other workloads throughout
+(load average typically 5 to 30 on four cores, at times above 100). Absolute
+times are therefore pessimistic lower bounds on speed; token counts, verdicts
+and rankings do not depend on load. Three rules were applied to every
+comparison. (i)~Arms are \emph{interleaved} on the same items, with their
+order rotated, so that a drift in load hits every arm; twice a sequential run
+suggested a gain (30\,\% from a cache format, a recall gain from a graph arm)
+that an interleaved or re-based repeat removed. (ii)~A change becomes a
+default only on a measured gain; otherwise it stays off and is reported.
+(iii)~Sample sizes are stated; they are far below those of
+Proposition~\ref{prop:samples}, so quality differences are indicative.
+Benchmarks are GSM8K \cite{cobbe2021gsm8k} for mathematics, MBPP \cite{austin2021mbpp} for code, a JSON-Schema task set, and
+question sets over this paper's own sources for retrieval.
 
-\subsection{Benchmarks}
-GSM8K \cite{cobbe2021gsm8k} and MATH \cite{hendrycks2021math} (mathematics,
-exact verifiers), HumanEval \cite{chen2021humaneval} and MBPP
-\cite{austin2021mbpp} (code, test verifiers), a JSON-Schema task set generated
-from public schemas (format verifier), MMLU and GPQA
-\cite{hendrycks2021mmlu,rein2024gpqa} (knowledge, label verifier),
-TruthfulQA and SimpleQA \cite{lin2022truthfulqa,wei2024simpleqa} (factuality),
-BIG-Bench Hard \cite{suzgun2022bbh} and LiveCodeBench
-\cite{jain2025livecodebench} as contamination-resistant checks, and MT-Bench
-style judged conversations \cite{zheng2023mtbench}. Licences are MIT,
-Apache-2.0 or CC-BY-4.0 (GPQA is gated). Public routing data from RouteLLM
-\cite{ong2025routellm} seeds the gate's calibration set.
+\subsection{Does the gate buy accuracy at a lower cost?}
+\label{sec:eval:gate}
+\textbf{Policies.} Table~\ref{tab:policies} runs five ways of combining the
+two models on the same mixed tasks. With the verifier visible, the gate
+matched reasoning-only accuracy at \GatedCostRatio{} of its cost. With the
+verifier hidden, the uncalibrated gate routed correctly on only
+\BlindRouting{} of items, because cheap samples agreed with wrong drafts:
+agreement is a flag, not evidence (Theorem~\ref{thm:plurality}). Pooled over
+\PolicyMapRuns{} stored runs, the policy with the lowest expected loss
+$L(1-\mathrm{acc})+\lambda c$ is, per domain: \PolicyMapSummary.
 
-\subsection{Protocol}
-Phase~0 runs the fast-only and slow-only baselines on at least $4\,600$ tasks
-across domains (Proposition~\ref{prop:samples}) to estimate $q$, $(r,\varphi)$,
-$e_1(s)$, $e_2(s)$, the cost ratio and the discordance rate. Every later
-comparison is paired on the same tasks, reports the difference with a
-$95\%$ confidence interval, and uses a non-inferiority margin of three points
-(about $700$ pairs) during development and one point (about $6\,200$ pairs)
-for release. Gates for rates that must be below a threshold use the
-zero-failure binomial rule or the Clopper--Pearson upper bound. Drift in the
-self-model is monitored with a CUSUM chart \cite{page1954cusum} and a negative
-control. Multiple comparisons across five domains use a Bonferroni-corrected
-$z=2.326$.
+\begin{table}[t]
+\centering\caption{Policies on a mixed task set ($n=6$ per policy; indicative)}\label{tab:policies}
+\resizebox{\columnwidth}{!}{\PhaseTwoTable}
+\end{table}
 
-\begin{figure}[t]
+\textbf{Verifiers.} Table~\ref{tab:verifiers} gives measured true- and
+false-accept rates. Mathematics meets $\varphi\le0.01$; the code $\varphi$ is
+an upper bound inflated by behaviourally equivalent mutants. A judge on the
+quick model was measured as a cheaper alternative and rejected: \JudgeCompare.
+
+\begin{table}[t]
+\centering\caption{Verifier quality: $r$ from correct answers, $\varphi$ from seeded mutants}\label{tab:verifiers}
+\resizebox{\columnwidth}{!}{\VerifierTable}
+\end{table}
+
+\textbf{Which confidence signal predicts a wrong draft?} 150 GSM8K items were
+drafted by \Sone\ under production settings and scored by the exact verifier
+(31 wrong). The best token signal is the single lowest token log-probability
+(AUROC 0.646 [0.539, 0.746]); the mean log-probability, on which the fixed
+rule rests, has 0.564 [0.449, 0.672], and at its production threshold it
+escalates none of the 150 drafts, because mathematics drafts have a mean of
+about $-0.03$ whether right or wrong. Agreement with two cheap samples is the
+stronger signal: on 60 of the drafts (12 wrong) its AUROC is 0.759 [0.618,
+0.901], and 0.823 with ties broken by the lowest token; the rule ``any
+disagreement'' escalates 25\,\% of drafts and catches 8 of the 12 wrong ones
+(precision 0.53), which raises the expected cascade accuracy from 0.800 to
+0.908--0.933. This is why unverified mathematics drafts always get their
+samples. The precision is still below the 0.65 that
+Theorem~\ref{thm:gate} requires at the default price, so a promoted
+calibration will price the signal rather than apply it unconditionally.
+
+\textbf{Certified bins on a live ledger.} Probes on 204 GSM8K and MBPP
+training items gave 203 labelled drafts, 51 of them wrong. The fit is well
+calibrated (held-out ECE 0.024, Brier 0.117). Over 400 random 60/40 splits
+and about 1{,}300 held-out bin tests, one bin broke its bound significantly,
+so the certificate holds out of sample. At this size it costs coverage: on the
+same held-out drafts the fixed rule keeps 78.2\,\% at 10.1\,\% wrong, the
+calibrated rule on expected loss alone keeps 85.8\,\% at 16.6\,\% wrong, and
+with certified bins it keeps 63.6\,\% at 9.5\,\% (risk 0.40), 54.5\,\% at
+9.9\,\% (0.25) and 5.4\,\% at 12.4\,\% (0.15). Bounds from a hundred drafts
+are too wide to beat a rule that uses the samples' agreement, so the fixed
+rule stays in force until the label stream has filled the ledger. The stream
+has since raised the ledger to 1{,}294 labelled drafts (280 wrong). A refit
+on them is as well calibrated (held-out ECE 0.023 over five folds, Brier
+0.115), and of its five equal bins one is certified under the 0.15 bound
+(upper bound 0.106) and two sit just above it (0.157 and 0.161). The fit was
+not promoted: the promotion rule asks for 2{,}900 held-out drafts, and the
+system applies its own rule.
+
+\textbf{Early escalation and the reasoning exit.} In an agreement study,
+\EarlyEscSummary. With the adaptive reasoning exit, \AdaptiveExitSummary. On
+six factual prompts the posterior exit rule gave the same content as the
+two-agreeing-probes rule with slightly more reasoning (382 against 357 tokens
+on average), so the simpler rule is the default.
+
+\subsection{Where does the time go, and what speeds it up?}
+\label{sec:eval:inference}
+Over \StageReplies{} replies with stage timings (Table~\ref{tab:stages}), the
+fast path spends essentially all of its time in the \Sone\ draft and the
+deliberate path in \Stwo\ deliberation; verification and gating are
+negligible. Decode speed is the bottleneck, and it falls several-fold when
+other workloads share the cores.
+
+\begin{table}[t]
+\centering\caption{Latency by stage (share of wall time; llama.cpp backend)}\label{tab:stages}
+\resizebox{\columnwidth}{!}{\StageTable}
+\end{table}
+
+\textbf{The engine.} With identical greedy requests (12 interleaved pairs per
+model) Smiley Core decoded 14.3 tokens/s against 12.6 for llama.cpp on \Sone\
+and 7.4 against 6.6 on \Stwo, faster in 10 and 11 of 12 pairs; answers were
+identical in 12 of 12 and 9 of 12 pairs. Through the whole gateway, on twelve
+prompts in automatic mode with the backend switched before every request,
+both backends checked 9 of 9 checkable answers; the median request took 9.7\,s
+against 17.9\,s and the twelve 131\,s against 303\,s (faster in 10 of 12
+pairs, one-sided sign test $p=0.02$), while the median first token was later
+(1.50\,s against 0.97\,s).
+
+\textbf{Not repeating work.} Table~\ref{tab:speedups} collects the measured
+effect of each mechanism of Section~\ref{sec:inference}.
+
+\begin{table}[t]
 \centering
-\input{../shared/figures/fig_eval.tikz}
-\caption{Evaluation workflow. The harness drives the system and the two
-baselines through the same API and the dashboard shows gate status.}
-\label{fig:eval}
-\end{figure}
+\caption{Mechanisms that pay, with the measurement behind each default.}
+\label{tab:speedups}
+\scriptsize
+\begin{tabular}{@{}p{3.1cm}p{4.9cm}@{}}
+\toprule
+Mechanism & Measured effect \\
+\midrule
+Skip cheap samples when an exact verifier decides & median draft time 13.4\,s to 7.9\,s \\
+Prompt-cache warm-up at start & first token 9.8\,s cold, about 1\,s warm \\
+Agreement samples fused into the draft's batch & time to the gate's decision 23.1\,s to 17.9\,s ($-24\,\%$; faster in 23 of 28 pairs, $p=0.0005$) \\
+$n$ choices in one request & 39.1\,s against 124.5\,s for four requests \\
+Rescue: four \Sone\ samples after a failed check & 3 escalations avoided in 40 paired items; break-even 106\,s against 250--580\,s per escalation \\
+Three decode threads & $+4\,\%$ (\Sone), $+8\,\%$ (\Stwo), 6 of 6 pairs \\
+Prefix store & switching the kind of request: 5.8\,s and 14\,s of prefill to 0.1\,s and 0.2\,s \\
+Exact continuation prefix & escalated requests 182\,s to 133\,s on average (not interleaved; prefill counts are deterministic) \\
+Adaptive reasoning exit & 220\,s to 123\,s at equal accuracy ($n=11$) \\
+Embedder keeps a shared prefix & question embedding 297\,ms to 146\,ms, identical vectors \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\subsection{Hypotheses Scheduled for Validation}
-H1: the calibrated gate achieves at least $70\%$ routing accuracy against the
-oracle at $g\le0.3$ (Phase~2). H2: at matched accuracy the cascade costs at
-most $60\%$ of the slow-only baseline on the Phase-0 suite (Phase~2). H3: per-task
-acceptance rates are adequately fitted by a Beta distribution per domain,
-judged by a goodness-of-fit test (Phase~2). H4: slow-path accuracy is concave
-in the thinking budget on each domain (Phase~0). H5: the draft-blind slow
-path adopts a wrong fast draft in fewer than $5\%$ of trials at $95\%$
-confidence over at least $200$ trials (Phase~2). H6: one round of distillation
-yields a lower-confidence-bound gain above zero on a held-out verifier without
-a per-domain regression beyond one point (Phase~3). H7: Qwen3.5 hybrid
-models decode at no less than $70\%$ of the speed of same-size dense Qwen3
-models on the target CPU (Phase~0, gate for Profile~C).
+\textbf{Several users.} Table~\ref{tab:phase18} gives decode throughput with
+each engine alone on the machine. At two users Smiley Core is $1.40\times$
+ahead; at four llama.cpp is ahead ($1.30\times$). Every user's text from
+Smiley Core was identical to a solo run at every concurrency (4 of 4 at four
+users); llama.cpp's was not (0 of 4). The gateway does not yet use this
+concurrency for $n$-choice requests.
+
+\begin{table}[t]
+\centering
+\caption{Decode throughput of Qwen3-1.7B, all users together (tokens/s).}
+\label{tab:phase18}
+\scriptsize
+\begin{tabular}{lrrr}
+\toprule
+Users & 1 & 2 & 4 \\
+\midrule
+Smiley Core & 14.2 & 20.2 & 24.9 \\
+llama.cpp (slots) & 14.4 & 14.4 & 32.4 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Load.} On the llama.cpp backend the fast path at 1, 2 and 4
+concurrent sessions had a p95 latency of 7.2, 4.9 and 9.0\,s; the ratio of
+the four-session to the single-session p95 ranged from 1.25 to 2.48 across
+runs on the shared host.
+
+\subsection{Does the agent harness verify more, sooner?}
+\label{sec:eval:harness}
+Ten small Python tasks (fixes of a buggy function and functions written from
+an empty workspace, four or five hidden asserts each) were run through the
+gateway once per arm with a budget of six steps
+(Table~\ref{tab:agent}).
+
+\begin{table*}[t]
+\centering
+\caption{Code agent, interleaved live comparisons on the reference machine. Same tasks, model and step budget per arm; arm order rotated per task. Malformed: steps whose reply held no action or a patch that did not apply. Wall times are from a shared host.}
+\label{tab:agent}
+\footnotesize
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+Comparison & Arm & Verified & Calls & Malformed & Decoded tok. & Wall (s) \\
+\midrule
+\Sone, transcript and grammar & context rebuilt each step, free text & 2/10 & 50 & 23/50 & 2{,}793 & 356 \\
+ & append-only, grammar, edits by file length & 4/10 & 41 & 1/41 & 4{,}146 & 504 \\
+ & append-only, grammar, patch always offered & 0/10 & 60 & 16/60 & 10{,}706 & 1{,}468 \\
+\Stwo, same (3 tasks) & context rebuilt each step, free text & 0/3 & 15 & 13/15 & 9{,}907 & 2{,}695 \\
+ & append-only, grammar & 3/3 & 3 & 0/3 & 1{,}818 & 451 \\
+\midrule
+\Sone, breaking repetition & without & 5/10 & 35 & 0/35 & 3{,}926 & 523 \\
+ & with & 7/10 & 27 & 0/27 & 2{,}575 & 305 \\
+\midrule
+\Stwo, reasoning budget (6 tasks) & 512 tokens every step & 6/6 & 6 & 0/6 & 3{,}499 & 560 \\
+ & 256 on the first step, then 512 & 6/6 & 6 & 0/6 & 1{,}961 & 282 \\
+\midrule
+Cascade, \Stwo\ as the run's model & \Stwo\ from the first step & 10/10 & 12 & 0 & 4{,}534 & 1{,}987 \\
+ & four \Sone\ candidates first & 10/10 & 14 & 0 & 5{,}958 & 1{,}467 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The append-only transcript with a per-step grammar verified more tasks on
+both models, and the mechanism is visible in every step: 23 of 50 steps of
+the free-text loop held no action the harness could parse, against 1 of 41
+under the grammar. The difference in verified tasks on \Sone\ rests on two
+discordant tasks (exact McNemar $p=0.5$). Offering a patch at every step was
+the worst arm: most patches applied and still broke the file, so the grammar
+fixes the syntax of a patch, not its sense. A verified \Stwo\ fix of a small
+function takes 33 to 59\,s with the cheap first step, where the free-text
+loop spent single calls of 500 to 1{,}041\,s and verified none. The cascade
+verified the same ten tasks in 26\,\% less wall time (faster in 7 of 10
+pairs, sign test $p=0.17$); six tasks never reached \Stwo. The guards
+(compile check, rollback, stall guard) cost nothing: with them on and off,
+ten tasks on each model verified identically (10/10 on \Stwo; 4/10 and 5/10
+in two rounds on \Sone), with the same number of model calls. They also
+changed no outcome on this task set; they are insurance against failure
+modes seen in practice, such as a run that spent its whole 900\,s cap on
+repeated indentation errors. Pruning old observations before compaction is
+likewise inert here: the model is never shown more than about 930 bytes of
+evidence, and 16 paired runs had identical action sequences.
+
+\textbf{Lean.} The protocol is validated end to end with the real binary, but
+Qwen3-4B-Thinking in 4 bits does not yet write valid Lean~4: for $n+0=n$,
+which \texttt{rfl} proves, it abstained after three attempts (826\,s). Every
+verdict was precise and no wrong proof was accepted; the system abstained
+with a notice.
+
+\subsection{Does the knowledge base find and use the right passage?}
+\label{sec:eval:knowledge}
+\textbf{Answers.} Twenty questions with exact expected phrases were asked over
+this paper's own sources in each mode, arms interleaved per question. On a
+66-passage base with the model-built graph (271 entities, 100 relations, each
+with a verified quote): closed-book 0/20, \texttt{rag} 18/20 (median 20.8\,s),
+\texttt{graph} 17/20 (25.2\,s). On the 847-passage base: closed-book 0/20,
+\texttt{rag} 17/20 ($p=1.5\times10^{-5}$ against closed-book). On an earlier
+fixture base closed-book answered 2/20 against 18/20 for \texttt{rag}. Before
+the graph became a fused arm it had answered 15/20 and lost all three
+discordant pairs to \texttt{rag}, because it reordered passages by entity
+mentions; as an arm it loses one pair and wins none. It no longer costs
+accuracy, adds none on these questions and costs 15\,\% of the time, so the
+automatic mode uses \texttt{rag}. Every miss is classified: two questions
+were not retrieved, one was retrieved but not used.
+
+\textbf{Speed.} Table~\ref{tab:p25time} compares the in-process index with
+searching through the store.
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{Search time, 40 questions interleaved through both paths, 847 passages (load 6 to 8). Under heavier load (24 to 129) the store path took 5.3\,s for a hybrid search at the median.}
+\label{tab:p25time}
+\begin{tabular}{@{}p{3.1cm}rr@{}}
+\toprule
+ & Store & In-process index \\
+\midrule
+Search by words, median (p90) & 177\,ms (221) & 0.086\,ms (0.100) \\
+Hybrid search, median (p90) & 578\,ms (649) & 152\,ms (181) \\
+Hybrid without the embedding call & -- & 0.17\,ms \\
+The same with the PageRank arm & -- & 0.60\,ms \\
+Graph of a base & 17--28\,s/passage (model) & under 1\,ms (rules) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Ranking.} Three question sets over the 847-passage base, each
+accepted phrase checked by script: 60 that quote their passage, 146 reworded
+ones (on average 9\,\% of a question's content words occur in the answering
+passage) and 50 that need two passages (Table~\ref{tab:p25acc}). The two
+paths are equally accurate within what the sets resolve. Fifty-nine settings
+were ranked on these sets; the only change adopted was length normalisation
+$b=0.5$ (the answer first for 53 of 60 quoted questions against 50 at 0.75).
+The weight of 0.1 on the meaning arm was confirmed: with equal weights the
+fused list is worse than words alone. Passages of 1{,}200 characters tie for
+first on recall and are best on rank against 600 and 2{,}400.
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{Where the answering passage ranks, 256 questions. Pooled mean reciprocal rank: 0.379 through the store, 0.388 through the index.}
+\label{tab:p25acc}
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Set & Path & R@1 & R@8 & MRR & both@8 \\
+\midrule
+Quoted (60) & store, hybrid & 0.767 & 1.000 & 0.855 & \\
+ & index, hybrid & 0.817 & 1.000 & 0.882 & \\
+Reworded (146) & store, hybrid & 0.096 & 0.226 & 0.147 & \\
+ & index, hybrid & 0.116 & 0.240 & 0.160 & \\
+ & index, vectors alone & 0.062 & 0.137 & 0.088 & \\
+Two-passage (50) & store, hybrid & 0.300 & 0.800 & 0.485 & 0.62 \\
+ & index, hybrid & 0.260 & 0.830 & 0.460 & 0.68 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{The open problem} is the reworded question: the answering passage is
+first for 12\,\% of such questions and within the first eight for 24\,\%.
+
+\textbf{Typing slips and follow-ups.} Table~\ref{tab:p26} measures the two
+query-side rules of Section~\ref{sec:knowledge} against searching the question
+as typed. For slips, one word of each quoted question was corrupted by a
+seeded swap, deletion or replacement (56 of 60 questions changed). The
+correction repaired 40 words, brought the two questions that had lost their
+passage back into the first eight, and changed no word of the 60 questions as
+written. For follow-ups, 40 pairs were written from facts in the sources: a
+question that names its subject, then one that refers back (``How was that
+fixed?''). Searched alone, a follow-up finds its passage first once in 40;
+read with the previous turn, ten times in 40. The rule fired on 37 of the 40
+follow-ups and on 1 of the 256 self-contained questions of the three ranking
+sets.
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{Query-side rules on the 847-passage base, hybrid search.}
+\label{tab:p26}
+\begin{tabular}{@{}p{4.3cm}rrrr@{}}
+\toprule
+ & R@1 & R@4 & R@8 & MRR \\
+\midrule
+Mistyped (60), as typed & 0.750 & 0.950 & 0.967 & 0.831 \\
+Mistyped (60), corrected & 0.750 & 0.983 & 1.000 & 0.844 \\
+\midrule
+Follow-up (40), alone & 0.025 & 0.125 & 0.225 & 0.073 \\
+Follow-up, with the previous turn by rule & 0.250 & 0.325 & 0.375 & 0.285 \\
+Follow-up, always with the previous turn & 0.275 & 0.350 & 0.400 & 0.310 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Is the answer in its sources?} The support check of
+Section~\ref{sec:kb:chat} was measured on 50 questions with exact expected
+phrases. The quick model answered each twice, from the passages (42 of 50
+right) and with none (0 of 50), and the answers made up without passages
+were checked against the passages the other answer had been given
+(Table~\ref{tab:support}). A made-up answer is flagged 38 times in 44; a
+right answer from passages once in 42; the area under the curve for telling
+the two apart is 0.90. The check does not catch a wrong reading of the right
+passage: of the five wrong answers from passages that make a claim, three
+quote a number that is in a passage and is the wrong one. Two design points
+came from this run. A word that the answer repeats from the question counts
+as found (without it five right answers had a sentence flagged, such as
+``listens on port 8300'' against a passage that writes \texttt{:8300});
+requiring instead that every other word be in a passage flagged 16. And a
+sentence that says the base does not hold the answer is set aside rather
+than counted as an unsupported claim. Sending answers below a supported
+share of 0.5 to the reasoning model would have moved two of the 50, both
+wrong; two answers do not show that the reasoning model would then be right,
+so that rule is off.
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{The support check on 50 questions, quick model, 847-passage base. An answer is flagged when at least one of its sentences is not in the passages.}
+\label{tab:support}
+\begin{tabular}{@{}p{3.7cm}rrr@{}}
+\toprule
+Answers & With a claim & Flagged & Mean share \\
+\midrule
+From passages, right (42) & 42 & 1 & 0.99 \\
+From passages, wrong (8) & 5 & 2 & 0.60 \\
+Made up, no passages (50) & 44 & 38 & 0.21 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Scale and readers.} A synthetic base of 1{,}000 documents and 50{,}000
+passages was timed through the store under load 20 to 130: listing the
+documents 0.28\,s, a search by meaning through the HNSW index 0.37\,s at the
+median (0.93\,s at p95); an exact in-memory scan of the same vectors takes 18
+to 22\,ms. Deleting such a base runs in the background at about 16 passages a
+second. As a check of the readers, this paper was read from its \LaTeX\
+sources and from its PDF: 98.0\,\% of the numbers and 91.6\,\% of the distinct
+words of the former are in the latter; the remainder are macro names that the
+\LaTeX\ reader lets through inside mathematics.
+
+\subsection{Do memory tokens carry knowledge?}
+\label{sec:eval:memory}
+Not at this scale. The module was fine-tuned for one epoch on the 66-passage
+base (234 examples; validation loss 8.77 to 1.46). On the 20 questions:
+closed-book 0/20, \texttt{rag} 18/20, \texttt{hybrid} 17/20, \texttt{memory}
+alone 0/20 with degenerate text. In the training decoder the claim accuracy is
+0.55 with the module and 0.55 without it: the module read no knowledge, as its
+authors predict for a module without pre-training. Training costs 137 to
+272\,s per example here, and the pre-training stages need a GPU. An untrained
+module reads exactly like no module, so the path itself is correct.
+
+A second look at the trained module explains the result. Its forward pass,
+recomputed outside the system and matched to the reference within
+$9\times10^{-7}$, gives \emph{one vector for all sixteen slots and for every
+question}: the cosine between slots is 0.9999999, between the memories of
+different questions 0.999998, and the vector's norm is 63 where a token
+embedding of the decoder has 1.5. The residual branches had drifted to large
+constants and the projection was close to rank one. The module had become a
+fixed prompt for the answer format, which lowers the loss and carries no
+knowledge, and selecting the checkpoint by validation loss had rewarded it.
+Against the reference, the first trainer used three times the learning rate
+at a quarter of the batch, no dropout and a warm-up that started near the
+peak. These are corrected and the collapse is now measured and refused
+(Section~\ref{sec:mem:tokens}); a retrain with the corrected recipe was not
+run, since it costs hours for one small base and its outcome without
+pre-training is uncertain.
+
+\subsection{Does the memory of earlier conversations work?}
+\label{sec:eval:recall}
+A live check of fourteen assertions passes. A fact kept on purpose
+(``Remember that the staging server listens on port 8443'') and a fact stated
+in passing in another conversation were each recalled from a new conversation
+and used in the answer; a question in other words (``which pet does my
+sibling own?'' for ``my sister's dog is called Biscuit'') found its note
+through the meaning arm; an impersonal question and a private request read
+nothing; the conversation that held the fact answered from its own history;
+a forgotten note and the notes of a deleted conversation were not recalled;
+and deleting the conversations left the memory as it had been. When the gate
+opens, the memory step takes 0.13 to 0.58\,s under load 20 to 54, nearly all
+of it one embedding call; when it does not, the step costs nothing. This is a
+check of function, not of recall quality over a long history: no set of real
+multi-session conversations with known answers was available.
+
+\subsection{What did not pay}
+\label{sec:eval:negative}
+Table~\ref{tab:negative} lists what was built or measured and not adopted.
+Each stays available as an option where it could pay on other hardware.
+
+\begin{table*}[t]
+\centering
+\caption{Measured and not adopted.}
+\label{tab:negative}
+\scriptsize
+\begin{tabular}{@{}p{4.2cm}p{7.6cm}p{4.6cm}@{}}
+\toprule
+Idea & Measurement & Why \\
+\midrule
+Speculative decoding with a 0.6B draft model \cite{leviathan2023speculative} & 6.5 against 7.3 tokens/s & the draft model competes for the same cores and bandwidth \\
+EAGLE-3 speculative heads \cite{li2024eagle} & \Sone\ 1.04$\times$ greedy, 0.95$\times$ at production temperature; \Stwo\ 0.99$\times$; about half the drafted tokens accepted & verifying a draft costs real compute on a CPU \\
+n-gram self-speculation & at most 1.12$\times$ (code repair), down to 0.84$\times$ (JSON) & as above \\
+Flash attention, 8-bit cache, micro-batch, polling flags & no consistent gain; per-round ratios swing 0.07$\times$ to 3.8$\times$ with the load & inconclusive on a shared host \\
+1-bit-class weights (LittleBit \cite{littlebit2025}), post-training conversion at 0.98 bits & 0 of 12 exact-answer prompts against 9 for the dense model; decode $+5\,\%$ & quality needs quantisation-aware training on a GPU \\
+Concurrent hedging on \Stwo & 4/8 and 4/7 verified against 4/8 and 3/8 sequential; $+44$ to $+87\,\%$ time on easy items & a batch at repair depth costs 2.2 to 3.4 single attempts (Proposition~\ref{prop:wide}) \\
+A larger \Sone\ (Qwen3.5-2B) & \ProfileCDelta; 3.7 times slower per task & latency rule (within 1.3 times) not met \\
+A judge on the quick model & accepts a quarter of seeded wrong answers & not a soft verifier in the sense of Theorem~\ref{thm:precision} \\
+Lowest-window log-probability as the fixed rule's signal & AUROC 0.581 [0.488, 0.698] on GSM8K drafts & exact to act on (Proposition~\ref{prop:n2}), too weak to use \\
+Certified bins as the deciding rule at $n=203$ & keeps 54.5\,\% at 9.9\,\% wrong against 78.2\,\% at 10.1\,\% for the fixed rule & bounds too wide at this ledger size \\
+A larger embedder (Qwen3-Embedding-4B) & alone, reworded R@1 0.25 to 0.45; in the hybrid, pooled MRR 0.787 against 0.804 for the 0.6B model & four times the embedding time, 2.5 times the storage \\
+Convex score fusion & pooled MRR 0.387 against 0.388 for reciprocal rank & better on quoted, worse on reworded questions \\
+BM25F field weights from 0 to 3 & within one question of flat weights on every set & inert \\
+Feedback terms from the first passages & cost eight quoted questions their first place & drift \\
+PageRank arm in the default search & first eight passages unchanged on every set; reworded R@20 0.329 to at most 0.377 & needs a reranker to use what it finds below rank eight \\
+Model-written query expansion & 8\,s a question; $-0.03$ MRR on quoted questions & cost and mixed effect \\
+Reranker, near-duplicate removal, AND-first search & answer already in the hybrid top four for 19 of 20 and 57 of 70 questions & nothing to gain on these sets \\
+Memory tokens without pre-training & 0/20 alone; 17/20 with passages against 18/20 for passages & Section~\ref{sec:eval:memory} \\
+A difficulty signal from the question alone (nearest labelled questions; prototype banks \cite{semanticrouter2026}) & AUC for a wrong draft over 810 labelled drafts: domain 0.566, banks 0.573, nearest questions 0.615, the draft's own features 0.682, both together 0.690 & the question adds 0.008 to what the draft already says; skipping the draft would touch 12 of 810 requests \\
+Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.77 passages a prompt (quoted), 3.33 to 2.99 (reworded); the answering passage left one prompt & a tenth of a passage saved for an answer lost \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\subsection{Validation}
+\label{sec:eval:validation}
+The workspace has 504 Rust tests, including the ported upstream suites of the
+patch parser and the Lean rules, bit-identity tests of the batched engine and
+parity tests of the memory module; formatting, lints and dependency audits
+are clean. Live sweeps on the final build pass: the API contract, 26 of 26
+security probes (sandbox escape, injection, authentication, limits) with no
+open high-severity finding, 33 of 33 knowledge-security checks, 69 of 69
+end-to-end checks of every endpoint and page, 10 of 10 chat-room checks, 55
+knowledge checks, 14 of 14 checks of the conversation memory and 55 of 55
+checks of the agent harness. Of the nine acceptance tests seven pass; the two
+that fail are latency targets, missed under a load average of 30 to 40 from
+other workloads (the first token of a quick reply after 2.6\,s against a
+target of 2.0\,s, and a verified deliberate answer after 420\,s against
+240\,s), with correct answers in both; all nine have passed on a quiet host.
+The security suite earlier found one high-severity issue, since fixed:
+sandboxed code could signal other processes.

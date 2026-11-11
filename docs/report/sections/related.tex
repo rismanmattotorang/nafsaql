@@ -1,0 +1,89 @@
+\section{Related Work}
+\label{sec:background}
+
+\subsection{Dual-process theory and metareasoning}
+Dual-process accounts distinguish a fast, automatic, associative mode from a
+slow, effortful, rule-based one
+\cite{sloman1996two,stanovich2000individual,kahneman2011thinking}; Evans and
+Stanovich treat the question of \emph{when} the slow mode intervenes as central
+\cite{evans2013dual}. The expected-value-of-control theory models that
+allocation as a cost--benefit decision \cite{shenhav2013evc}, resource-rational
+analysis makes the same move for cognition in general
+\cite{lieder2020resource}, and the metareasoning literature asks how an agent
+should decide which computations to run \cite{russell1991metareasoning}.
+Decision neuroscience adds sequential forms: evidence accumulated to a bound
+\cite{gold2007neural}, optimal as Wald's sequential probability ratio test
+\cite{wald1945sequential,wald1948optimum}, with a bound that collapses under a
+cost of time \cite{frazier2007deadline,drugowitsch2012cost}.
+Theorem~\ref{thm:gate} is the one-step instance of these ideas, and
+Section~\ref{sec:gate:seq} uses the sequential ones.
+
+\subsection{Test-time compute and self-correction}
+Chain-of-thought prompting elicits multi-step reasoning \cite{wei2022cot};
+sampling several chains and voting improves accuracy
+\cite{wang2023selfconsistency}. Coverage grows roughly log-linearly in the
+number of samples, but without an automatic verifier the gain from voting
+plateaus \cite{brown2024monkeys}; trained verifiers recover much of it
+\cite{cobbe2021gsm8k,lightman2024verify}. Allocating compute per prompt by
+difficulty is several times as efficient as uniform best-of-$N$
+\cite{snell2024scaling}. Reinforcement learning induces long reasoning traces
+\cite{deepseek2025r1,guo2025deepseekr1nature,openai2024o1}, budget forcing
+closes them \cite{muennighoff2025s1}, and Qwen3 ships both modes in one model
+with a thinking budget \cite{qwen2025qwen3}. Self-critique helps on some tasks
+\cite{madaan2023selfrefine,shinn2023reflexion} but without external feedback
+does not improve reasoning and can degrade it
+\cite{huang2024selfcorrect,kamoi2024survey}; Theorem~\ref{thm:selfrefine} gives
+the simplest model in which this happens.
+
+\subsection{Deciding when to think, routing and cascades}
+A growing literature trains or prompts models to choose between a direct answer
+and a reasoning trace per query
+\cite{zhang2025adaptthink,fang2025thinkless,he2025selfroute,hou2025thinkprune,yang2025deer,arora2025efficient},
+or stops a trace early on a confidence signal
+\cite{aggarwal2023adaptive,li2024esc,fu2025deepconf}. Routing between a cheap
+and an expensive model on predicted difficulty
+\cite{ding2024hybridllm,ong2025routellm} and cascading on the weak model's
+consistency \cite{yue2024cascades,chen2023frugalgpt} reduce cost at matched
+quality. The classical foundations are Chow's reject option
+\cite{chow1970reject}, selective classification with risk guarantees
+\cite{geifman2017selective} and learning to defer
+\cite{madras2018defer,mozannar2020defer}; calibration of the routing signal is
+the crux \cite{guo2017calibration,kadavath2022know,tian2023calibration}. vLLM
+Semantic Router \cite{semanticrouter2026} is a production decision layer in
+front of many models; Section~\ref{sec:comparison} compares it with our gate.
+
+\subsection{Agent harnesses}
+SWE-agent showed that an edit-time check raises the resolve rate of a coding
+agent \cite{yang2024sweagent}; Agentless that selection by tests beats majority
+voting \cite{xia2024agentless}; observation masking that old tool output can be
+dropped at no loss \cite{lindenbauer2025complexity}. Concise execution feedback
+is what lets models repair code \cite{chen2024selfdebug}, and best-first search
+over verified candidates is competitive with heavier tree search when the
+verifier is exact \cite{xin2025bfsprover}. We draw mechanisms from Open Math
+Harness \cite{openmathharness2026}, the core of OpenAI's Codex CLI
+\cite{openaicodex2026} and DeepSeek Harness \cite{deepseekharness2026}. Small
+models are worse at diff formats than at whole-file rewrites
+\cite{diffxyz2025,aider2024editformats}, and constraining the format of the
+reasoning itself can cost accuracy \cite{tam2024speakfreely}.
+
+\subsection{CPU inference}
+Speculative decoding drafts with a cheap model and verifies in parallel
+\cite{leviathan2023speculative,chen2023speculative}; Medusa and EAGLE replace
+the draft model with extra heads \cite{cai2024medusa,li2024eagle}; model-free
+variants draft from earlier text \cite{oliaro2024suffix}. Batching across
+requests and prefix caching are the basis of modern serving
+\cite{yu2022orca,kwon2023pagedattention,zheng2024sglang}, and hedged requests
+trade compute for tail latency \cite{dean2013tail}. Low-bit formats such as
+LittleBit \cite{littlebit2025} and table-lookup kernels \cite{wei2024tmac}
+change the model rather than the engine. Section~\ref{sec:eval:negative}
+reports which of these pay on four cores.
+
+\subsection{Retrieval, graphs and memory}
+Hybrid retrieval fuses lexical and dense rankings, commonly by reciprocal rank
+\cite{cormack2009rrf}, and indexing a passage with its context improves both
+\cite{anthropic2024contextual}. Graph-based retrieval builds an entity graph
+over passages; OntoSmith \cite{ontosmith2026} governs such a graph with a
+pinned ontology. Memorilla \cite{memorilla2026} compresses a document
+collection into a few vectors that a frozen decoder reads as input tokens.
+Prompt injection through retrieved text is a first-class threat
+\cite{greshake2023injection,perez2022ignore}.
