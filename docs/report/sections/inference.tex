@@ -41,13 +41,19 @@ reasoning span and continuing the turn. The engine's phase split puts 86 to
 to 0.3\,\% and attention 1 to 3\,\% at these context lengths. It runs within
 60 to 95\,\% of the machine's bandwidth.
 
-\textbf{Three threads, not four.} Three decode threads beat four in all six
-interleaved pairs ($+4\,\%$ on \Sone, $+8\,\%$ on \Stwo\ at the median), while
-cold prefill is 16 to 17\,\% slower at three. On a shared host the fourth
-worker is the one the scheduler preempts, and every matrix product waits for
-its slowest worker. Decode dominates a request and most prompts are cache
-hits, so three is the default; it also leaves a core for the sandbox and the
-gateway.
+\textbf{Three threads to write, four to read.} Three decode threads beat four
+in all six interleaved pairs ($+4\,\%$ on \Sone, $+8\,\%$ on \Stwo\ at the
+median): on a shared host the fourth worker is the one the scheduler preempts,
+and every matrix product waits for its slowest worker. Reading a prompt is
+the opposite case. It is bound by arithmetic, not by memory, and scales
+almost linearly with cores (22, 44, 60 and 72 prompt tokens per second on one
+to four threads for \Sone). The engine therefore keeps two worker pools, a
+narrow one for decode steps and a wide one for prompt chunks; an idle pool's
+workers park, so the two never compete, and the weight products do not depend
+on how rows are shared among workers. With four threads for prompts and three
+for tokens, both models read prompts 23\,\% faster with unchanged decode
+speed (Section~\ref{sec:eval:inference}). The same split exists in llama.cpp
+as separate thread counts for batch and generation.
 
 \textbf{A prefix store.} A session with a single cache benefits only when a
 prompt follows a conversation with the same beginning; alternating a chat
