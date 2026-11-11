@@ -609,6 +609,120 @@ paths:
                 type: object
         '403':
           $ref: '#/components/responses/Forbidden'
+  /v1/memory:
+    get:
+      tags:
+      - chat
+      operationId: listMemory
+      summary: What is remembered from earlier conversations, newest first
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+      responses:
+        '200':
+          description: Whether remembering is on (`[recall] enabled`), how many notes are held and the most that are kept,
+            and one page of notes (id, created_at, kind `turn`, `window` or `note`, conversation_id, the first 240
+            characters of the text, access_count).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - chat
+      operationId: addMemoryNote
+      summary: Keep a note a person wrote; it belongs to no conversation and is never removed by the size limit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - text
+              properties:
+                text:
+                  type: string
+                  maxLength: 4000
+      responses:
+        '201':
+          description: The note's id
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    delete:
+      tags:
+      - chat
+      operationId: forgetMemory
+      summary: Forget everything remembered from earlier conversations (the conversations themselves are kept)
+      responses:
+        '200':
+          description: The number of notes removed
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/memory/tidy:
+    post:
+      tags:
+      - chat
+      operationId: tidyMemory
+      summary: Merge notes that say the same thing (same words, same numbers); no model call
+      responses:
+        '200':
+          description: The number of notes merged away and the number held afterwards
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/memory/{memory_id}:
+    delete:
+      tags:
+      - chat
+      operationId: forgetMemoryItem
+      summary: Forget one note
+      parameters:
+      - name: memory_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '204':
+          description: Forgotten
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /v1/conversations:
     get:
       tags:
@@ -3139,7 +3253,9 @@ components:
             carries memory {tokens, documents, prepare_ms, read_ms, mode}, where that mode is the *chat* mode
             (memory or hybrid) that auto resolved to; a row with arms lists the retrieval arms that ran (lexical,
             vector, graph) with arm_notes saying why any did not (FR-K59); a row with note alone says why nothing was
-            used. Each fact carries source, predicate, target, weight, quote (the verified sentence that states it,
+            used; a row with support {claims, supported, share, unsupported[{text, reason}]} says which sentences of
+            the answer the passages hold; a row with recall lists the notes from earlier conversations that were
+            put in the prompt (id, created_at, kind, score, text). Each fact carries source, predicate, target, weight, quote (the verified sentence that states it,
             FR-K55), hop (1 or 2) and, at hop 2, via (FR-K56).'
           items:
             type: object
@@ -3274,6 +3390,7 @@ components:
           - uncertified_bin
           - unknown_escalate
           - unknown_keep
+          - unsupported_by_sources
           description: 'Phase 22: uncertified_bin (FR-R1) escalates a draft whose e1 bin has no certified error bound within max_risk; unknown_* (FR-R2) records the on_unknown policy applied to a draft with no log-probabilities.'
         audit:
           type: boolean

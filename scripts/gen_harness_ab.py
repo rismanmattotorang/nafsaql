@@ -3,17 +3,17 @@
 Reads benchmarks/harness_ab.json (round 1: Phase 10 loop vs Phase 11) and, when present,
 benchmarks/harness_ab_round2.json (round 2: unstick on/off, System 2 reasoning budget) and
 benchmarks/harness_ab_round3.json (round 3: a smaller reasoning budget on the first step only), and writes
-docs/report/sections/harness_ab_macros.tex (\\HAB... / \\HABR... macros, loaded in the preamble so the abstract can
-use them) and docs/report/sections/harness_ab_tables.tex (one table per round).
-Every number in the report's Phase 11 results comes from here.
+benchmarks/gen/harness_ab_macros.tex (\\HAB... / \\HABR... macros) and benchmarks/gen/harness_ab_tables.tex (one
+table per round). The paper states these numbers in its consolidated agent table; this script is how to regenerate
+and check them.
 
     python3 -I scripts/gen_harness_ab.py
 """
 import json, os, statistics
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OUT_MACROS = os.path.join(ROOT, "docs/report/sections/harness_ab_macros.tex")
-OUT_TABLES = os.path.join(ROOT, "docs/report/sections/harness_ab_tables.tex")
+OUT_MACROS = os.path.join(ROOT, "benchmarks/gen/harness_ab_macros.tex")
+OUT_TABLES = os.path.join(ROOT, "benchmarks/gen/harness_ab_tables.tex")
 MODEL_LABEL = {"system1": "System~1 (Qwen3-1.7B)", "system2": "System~2 (Qwen3-4B-Thinking)"}
 MODEL_KEY = {"system1": "One", "system2": "Two"}
 ROUNDS = [
@@ -123,6 +123,7 @@ def main():
         m, t = round_tex(rd)
         macros += m
         tables += t
+    os.makedirs(os.path.dirname(OUT_MACROS), exist_ok=True)
     open(OUT_MACROS, "w").write("\n".join(macros) + "\n")
     open(OUT_TABLES, "w").write("\n".join(tables) + "\n")
     print("wrote", os.path.relpath(OUT_MACROS, ROOT), "and", os.path.relpath(OUT_TABLES, ROOT))

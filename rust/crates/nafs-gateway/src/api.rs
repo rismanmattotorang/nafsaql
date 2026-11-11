@@ -86,7 +86,8 @@ pub fn new_state(
             cfg.knowledge.graph_facts,
             crate::kb::MemoryReader::from_config(&cfg.knowledge),
             cfg.knowledge.auto_order.clone(),
-        );
+        )
+        .with_elbow(cfg.knowledge.rag_elbow_gap);
         knowledge_memory = ck.memory_enabled();
         knowledge_memory_global = ck.memory_global();
         orch.set_knowledge(Arc::new(ck));
@@ -151,6 +152,12 @@ pub fn router(state: AppState) -> Router {
                 .patch(rename_conversation)
                 .delete(delete_conversation),
         )
+        .route(
+            "/v1/memory",
+            get(list_memory).post(add_memory).delete(forget_memory),
+        )
+        .route("/v1/memory/tidy", post(tidy_memory))
+        .route("/v1/memory/{id}", axum::routing::delete(forget_memory_item))
         .route("/v1/decisions/{id}", get(get_decision))
         .route(
             "/v1/rooms",
@@ -640,6 +647,62 @@ async fn delete_conversation(
     s.store.delete_conversation(id)?;
     Ok(StatusCode::NO_CONTENT)
 }
+// ---------------- Phase 26: the memory of earlier conversations ----------------
+#[derive(Deserialize)]
+struct MemoryQ {
+    #[serde(default)]
+    limit: Option<usize>,
+    #[serde(default)]
+    offset: Option<usize>,
+}
+/// What is remembered, newest first, with whether remembering is on.
+async fn list_memory(
+    State(s): State<AppState>,
+    Query(q): Query<MemoryQ>,
+) -> ApiResult<Json<Value>> {
+    let items = s
+        .store
+        .list_episodes(q.limit.unwrap_or(50).clamp(1, 200), q.offset.unwrap_or(0))?;
+    Ok(Json(json!({
+        "enabled": s.cfg.recall.enabled,
+        "count": s.store.episode_count()?,
+        "max": s.cfg.recall.max_episodes,
+        "items": items,
+    })))
+}
+#[derive(Deserialize)]
+struct NoteReq {
+    text: String,
+}
+/// Keep a note a person wrote.
+async fn add_memory(
+    State(s): State<AppState>,
+    Json(b): Json<NoteReq>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    if b.text.chars().count() > 4000 {
+        return Err(NafsError::BadRequest("a note holds at most 4,000 characters".into()).into());
+    }
+    let id = s.store.remember_note(&b.text)?;
+    Ok((StatusCode::CREATED, Json(json!({"id": id}))))
+}
+async fn forget_memory_item(
+    State(s): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> ApiResult<StatusCode> {
+    s.store.forget_episode(id)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+async fn forget_memory(State(s): State<AppState>) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({"forgotten": s.store.forget_all_episodes()?})))
+}
+/// Merge notes that say the same thing.
+async fn tidy_memory(State(s): State<AppState>) -> ApiResult<Json<Value>> {
+    let merged = s.store.consolidate_episodes(chrono::Utc::now())?;
+    Ok(Json(
+        json!({"merged": merged, "count": s.store.episode_count()?}),
+    ))
+}
+
 async fn get_decision(State(s): State<AppState>, Path(id): Path<Uuid>) -> ApiResult<Json<Value>> {
     Ok(Json(json!(s.store.get_decision(id)?)))
 }

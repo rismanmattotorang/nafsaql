@@ -10,7 +10,13 @@
 //! 5. per block: `slots += MHA(LN(slots), docs, docs, mask)`; `slots += FFN(LN(slots))`, FFN = Linear 4E, GELU, Linear;
 //! 6. `M = Linear(LN(slots))` -> [B, K, output_dim].
 //!
-//! Dropout is the identity (inference; training adds it in Phase 6).
+//! Dropout (the reference's 0.1) is applied only when a caller passes a `Dropout` (`forward_train`): on the attention
+//! weights of every attention, on the attended residual, and twice in the FFN (after GELU and after the second
+//! Linear), as `memory.py` does. Without one the forward runs exactly the operations it always ran, so inference and
+//! the parity fixtures are unchanged.
+//!
+//! `collapse_stats` measures whether a module's memory depends on the question at all (Phase 26): the one checkpoint
+//! trained before it existed gave the same vector at every slot for every question.
 
 use candle_core::{DType, Device, IndexOp, Module, Result, Tensor, D};
 use candle_nn::{linear, Init, Linear, VarBuilder};
@@ -84,6 +90,65 @@ impl MemoryConfig {
     }
 }
 
+/// Training-time dropout with its own seeded generator: each call draws a fresh keep-mask (a constant of the graph)
+/// and multiplies by it, scaled by 1 / (1 - p) so the expectation is unchanged. A plain multiply, which Candle
+/// differentiates; the generator is a xorshift, so a run with the same seed drops the same units.
+pub struct Dropout {
+    p: f64,
+    state: std::cell::Cell<u64>,
+}
+
+impl Dropout {
+    /// `p` is the probability of dropping a unit, clamped to [0, 0.95]; 0 makes `apply` the identity.
+    pub fn new(p: f64, seed: u64) -> Dropout {
+        Dropout {
+            p: if p.is_finite() {
+                p.clamp(0.0, 0.95)
+            } else {
+                0.0
+            },
+            // Xorshift has one fixed point, zero.
+            state: std::cell::Cell::new(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).max(1)),
+        }
+    }
+
+    pub fn probability(&self) -> f64 {
+        self.p
+    }
+
+    pub fn apply(&self, x: &Tensor) -> Result<Tensor> {
+        if self.p <= 0.0 {
+            return Ok(x.clone());
+        }
+        let keep = 1.0 - self.p;
+        let scale = (1.0 / keep) as f32;
+        let mut r = self.state.get();
+        let mask: Vec<f32> = (0..x.elem_count())
+            .map(|_| {
+                r ^= r << 13;
+                r ^= r >> 7;
+                r ^= r << 17;
+                // The top 24 bits as a uniform number in [0, 1).
+                if ((r >> 40) as f64) < keep * (1u64 << 24) as f64 {
+                    scale
+                } else {
+                    0.0
+                }
+            })
+            .collect();
+        self.state.set(r);
+        x.mul(&Tensor::from_vec(mask, x.shape(), x.device())?)
+    }
+}
+
+/// `x` itself without dropout (inference: no extra operation), else `x` with units dropped.
+fn dropped(d: Option<&Dropout>, x: Tensor) -> Result<Tensor> {
+    match d {
+        Some(d) => d.apply(&x),
+        None => Ok(x),
+    }
+}
+
 /// `nn.MultiheadAttention(batch_first=True)`: packed `in_proj_weight` [3E, E] and `in_proj_bias`, then `out_proj`.
 struct Mha {
     wq: Tensor,
@@ -141,9 +206,15 @@ impl Mha {
     }
 
     /// `q` [B, Lq, E], `kv` [B, Lk, E]; `mask` [B, Lk] with 1 at padding (keys to ignore).
-    fn forward(&self, q: &Tensor, kv: &Tensor, mask: Option<&Tensor>) -> Result<Tensor> {
+    fn forward(
+        &self,
+        q: &Tensor,
+        kv: &Tensor,
+        mask: Option<&Tensor>,
+        d: Option<&Dropout>,
+    ) -> Result<Tensor> {
         let (kh, vh) = self.keys_values(kv)?;
-        self.attend(q, &kh, &vh, mask)
+        self.attend(q, &kh, &vh, mask, d)
     }
 
     /// Attention of `q` [B, Lq, E] over precomputed keys and values [B, H, Lk, E/H].
@@ -153,6 +224,7 @@ impl Mha {
         kh: &Tensor,
         vh: &Tensor,
         mask: Option<&Tensor>,
+        d: Option<&Dropout>,
     ) -> Result<Tensor> {
         let (b, lq, e) = q.dims3()?;
         let lk = kh.dim(2)?;
@@ -167,7 +239,8 @@ impl Mha {
             scores = scores.broadcast_add(&neg)?;
         }
         // The composed softmax: `softmax_last_dim` is a fused kernel without a backward pass.
-        let attn = candle_nn::ops::softmax(&scores, D::Minus1)?;
+        // Training only: PyTorch's attention drops attention weights (`dropout=` of `nn.MultiheadAttention`).
+        let attn = dropped(d, candle_nn::ops::softmax(&scores, D::Minus1)?)?;
         let ctx = attn
             .matmul(vh)?
             .transpose(1, 2)?
@@ -187,9 +260,13 @@ struct EncoderLayer {
 }
 
 impl EncoderLayer {
-    fn forward(&self, x: &Tensor, mask: Option<&Tensor>) -> Result<Tensor> {
-        let x = self.n1.forward(&(x + self.attn.forward(x, x, mask)?)?)?;
-        let ff = self.l2.forward(&self.l1.forward(&x)?.relu()?)?;
+    fn forward(&self, x: &Tensor, mask: Option<&Tensor>, d: Option<&Dropout>) -> Result<Tensor> {
+        // PyTorch's layer drops in four places: attention weights, the attention output, after the activation, and
+        // the feed-forward output.
+        let a = dropped(d, self.attn.forward(x, x, mask, d)?)?;
+        let x = self.n1.forward(&(x + a)?)?;
+        let ff = dropped(d, self.l1.forward(&x)?.relu()?)?;
+        let ff = dropped(d, self.l2.forward(&ff)?)?;
         self.n2.forward(&(x + ff)?)
     }
 }
@@ -352,13 +429,34 @@ impl MemoryModule {
         self.forward_prepared(&self.prepare(docs, padding)?, question)
     }
 
+    /// The training forward: the same pass with dropout at the reference's sites. Never used to serve.
+    pub fn forward_train(
+        &self,
+        docs: &Tensor,
+        padding: Option<&Tensor>,
+        question: &Tensor,
+        dropout: &Dropout,
+    ) -> Result<Tensor> {
+        let d = (dropout.probability() > 0.0).then_some(dropout);
+        self.read(&self.prepared(docs, padding, d)?, question, d)
+    }
+
     /// The question-independent half of the forward pass: the document encoder, the document norm, and every
     /// block's keys and values. A store computes this once and reuses it for every question (the per-question cost
     /// then grows with K x N, not with N x E^2).
     pub fn prepare(&self, docs: &Tensor, padding: Option<&Tensor>) -> Result<PreparedDocs> {
+        self.prepared(docs, padding, None)
+    }
+
+    fn prepared(
+        &self,
+        docs: &Tensor,
+        padding: Option<&Tensor>,
+        drop: Option<&Dropout>,
+    ) -> Result<PreparedDocs> {
         let mut d = docs.clone();
         for l in &self.encoder {
-            d = l.forward(&d, padding)?;
+            d = l.forward(&d, padding, drop)?;
         }
         let normed = self.doc_norm.forward(&d)?;
         let kv = self
@@ -375,6 +473,10 @@ impl MemoryModule {
 
     /// The question-dependent half: memory tokens [B, K, output_dim] for `question` [B, E] over prepared documents.
     pub fn forward_prepared(&self, p: &PreparedDocs, question: &Tensor) -> Result<Tensor> {
+        self.read(p, question, None)
+    }
+
+    fn read(&self, p: &PreparedDocs, question: &Tensor, d: Option<&Dropout>) -> Result<Tensor> {
         let (b, _, e) = p.docs.dims3()?;
         let q = question.reshape((b, 1, e))?;
         let slots = match &self.memory_queries {
@@ -385,16 +487,20 @@ impl MemoryModule {
         };
         let slots = self
             .query_cond_norm
-            .forward(&(&slots + self.query_cond_attn.forward(&slots, &q, None)?)?)?;
+            .forward(&(&slots + self.query_cond_attn.forward(&slots, &q, None, d)?)?)?;
         let mut s = slots;
         for (blk, (kh, vh)) in self.blocks.iter().zip(&p.kv) {
-            s = (&s
-                + blk
-                    .attn
-                    .attend(&blk.attn_norm.forward(&s)?, kh, vh, p.padding.as_ref())?)?;
-            let f = blk
-                .ffn_out
-                .forward(&blk.ffn_in.forward(&blk.ffn_norm.forward(&s)?)?.gelu_erf()?)?;
+            let attended = dropped(
+                d,
+                blk.attn
+                    .attend(&blk.attn_norm.forward(&s)?, kh, vh, p.padding.as_ref(), d)?,
+            )?;
+            s = (&s + attended)?;
+            let f = dropped(
+                d,
+                blk.ffn_in.forward(&blk.ffn_norm.forward(&s)?)?.gelu_erf()?,
+            )?;
+            let f = dropped(d, blk.ffn_out.forward(&f)?)?;
             s = (s + f)?;
         }
         self.projection.forward(&self.layer_norm.forward(&s)?)
@@ -517,9 +623,303 @@ impl MemoryModule {
     }
 }
 
+/// From this cosine between the memories of different questions upward, a module is taken to say nothing about the
+/// question. The collapsed Phase 20 checkpoint measured 0.999998.
+pub const COLLAPSE_QUESTION_COSINE: f64 = 0.98;
+
+/// Whether a module's memory depends on the question (Phase 26). A module can lower its training loss by handing the
+/// decoder one fixed vector, a soft prompt, whatever was asked: the loss falls and the answers do not improve.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+pub struct CollapseStats {
+    /// Mean pairwise cosine between the K slots of one question, averaged over the questions.
+    pub slot_cosine: f64,
+    /// Mean pairwise cosine between the whole memories (all slots, flattened) of different questions; 0 with fewer
+    /// than two questions.
+    pub question_cosine: f64,
+    /// Mean Euclidean norm of a memory token.
+    pub mean_norm: f64,
+    /// Questions measured.
+    pub questions: usize,
+}
+
+impl CollapseStats {
+    /// The memory is (nearly) the same for every question. Needs two questions to say so.
+    pub fn collapsed(&self) -> bool {
+        self.questions >= 2 && self.question_cosine >= COLLAPSE_QUESTION_COSINE
+    }
+}
+
+/// Mean cosine over all pairs of `rows` (0 for fewer than two). A zero row has cosine 0 with everything.
+fn mean_pairwise_cosine(rows: &[&[f32]]) -> f64 {
+    let n = rows.len();
+    if n < 2 {
+        return 0.0;
+    }
+    let norms: Vec<f64> = rows
+        .iter()
+        .map(|r| r.iter().map(|&x| x as f64 * x as f64).sum::<f64>().sqrt())
+        .collect();
+    let mut sum = 0.0;
+    for i in 0..n {
+        for j in i + 1..n {
+            let dot: f64 = rows[i]
+                .iter()
+                .zip(rows[j])
+                .map(|(&a, &b)| a as f64 * b as f64)
+                .sum();
+            let den = norms[i] * norms[j];
+            if den > 0.0 {
+                sum += dot / den;
+            }
+        }
+    }
+    sum / (n * (n - 1) / 2) as f64
+}
+
+/// The statistics of the memories of several questions: per question, its K token vectors (as `read_rows` returns).
+pub fn collapse_stats(tokens_per_question: &[Vec<Vec<f32>>]) -> CollapseStats {
+    let qs: Vec<&Vec<Vec<f32>>> = tokens_per_question
+        .iter()
+        .filter(|q| !q.is_empty())
+        .collect();
+    if qs.is_empty() {
+        return CollapseStats::default();
+    }
+    let mut slot = 0.0;
+    let (mut norm, mut tokens) = (0.0, 0usize);
+    for q in &qs {
+        let rows: Vec<&[f32]> = q.iter().map(Vec::as_slice).collect();
+        slot += mean_pairwise_cosine(&rows);
+        for r in &rows {
+            norm += r.iter().map(|&x| x as f64 * x as f64).sum::<f64>().sqrt();
+            tokens += 1;
+        }
+    }
+    let flat: Vec<Vec<f32>> = qs.iter().map(|q| q.concat()).collect();
+    let flat_rows: Vec<&[f32]> = flat.iter().map(Vec::as_slice).collect();
+    CollapseStats {
+        slot_cosine: slot / qs.len() as f64,
+        question_cosine: mean_pairwise_cosine(&flat_rows),
+        mean_norm: norm / tokens.max(1) as f64,
+        questions: qs.len(),
+    }
+}
+
+/// What the trainer knew about a checkpoint when it saved it: `metrics.json` beside the weights. A checkpoint saved
+/// before Phase 26 has none.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct CheckpointMetrics {
+    /// The memory was the same for every validation question: the module must not be used to answer.
+    pub collapsed: bool,
+    #[serde(flatten)]
+    pub stats: CollapseStats,
+    /// Mean loss per answer token on the validation examples.
+    #[serde(default)]
+    pub val_loss: Option<f64>,
+    /// Accuracy on the validation claims with the module's memory, and with none (`None`: no claims to measure).
+    #[serde(default)]
+    pub claim_accuracy: Option<f64>,
+    #[serde(default)]
+    pub claim_accuracy_without_memory: Option<f64>,
+    #[serde(default)]
+    pub claims: usize,
+}
+
+impl CheckpointMetrics {
+    pub const FILE: &'static str = "metrics.json";
+
+    /// The metrics saved beside a checkpoint, if any (and readable).
+    pub fn read(dir: &std::path::Path) -> Option<CheckpointMetrics> {
+        serde_json::from_slice(&std::fs::read(dir.join(Self::FILE)).ok()?).ok()
+    }
+
+    /// Written beside its place and renamed over it, like the weights.
+    pub fn write(&self, dir: &std::path::Path) -> std::result::Result<(), String> {
+        let e = |x: std::io::Error| x.to_string();
+        std::fs::create_dir_all(dir).map_err(e)?;
+        let tmp = dir.join("metrics.json.part");
+        std::fs::write(
+            &tmp,
+            serde_json::to_vec_pretty(self).map_err(|x| x.to_string())?,
+        )
+        .map_err(e)?;
+        std::fs::rename(&tmp, dir.join(Self::FILE)).map_err(e)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn module(cfg: MemoryConfig) -> (candle_nn::VarMap, MemoryModule) {
+        let vm = candle_nn::VarMap::new();
+        let m =
+            MemoryModule::new(cfg, VarBuilder::from_varmap(&vm, DType::F32, &Device::Cpu)).unwrap();
+        (vm, m)
+    }
+
+    fn max_abs_diff(a: &Tensor, b: &Tensor) -> f32 {
+        (a - b)
+            .unwrap()
+            .abs()
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .max(0)
+            .unwrap()
+            .to_scalar::<f32>()
+            .unwrap()
+    }
+
+    /// Dropout changes the training forward, is repeatable from its seed, leaves the serving forward alone, and at
+    /// probability 0 the training forward is the serving one bit for bit.
+    #[test]
+    fn dropout_is_training_only_and_seeded() {
+        let cfg = MemoryConfig {
+            num_memories: 4,
+            num_self_attn_layers: 1,
+            ..MemoryConfig::paper(32, 16)
+        };
+        let (_vm, m) = module(cfg);
+        let docs = Tensor::randn(0f32, 0.05, (1, 9, 32), &Device::Cpu).unwrap();
+        let q = Tensor::randn(0f32, 0.05, (1, 32), &Device::Cpu).unwrap();
+        let plain = m.forward(&docs, None, &q).unwrap();
+        let again = m.forward(&docs, None, &q).unwrap();
+        assert_eq!(max_abs_diff(&plain, &again), 0.0);
+        let off = m
+            .forward_train(&docs, None, &q, &Dropout::new(0.0, 7))
+            .unwrap();
+        assert_eq!(max_abs_diff(&plain, &off), 0.0);
+        let a = m
+            .forward_train(&docs, None, &q, &Dropout::new(0.1, 7))
+            .unwrap();
+        let b = m
+            .forward_train(&docs, None, &q, &Dropout::new(0.1, 7))
+            .unwrap();
+        let c = m
+            .forward_train(&docs, None, &q, &Dropout::new(0.1, 8))
+            .unwrap();
+        assert!(max_abs_diff(&plain, &a) > 0.0, "dropout changed nothing");
+        assert_eq!(max_abs_diff(&a, &b), 0.0, "the same seed, another mask");
+        assert!(max_abs_diff(&a, &c) > 0.0, "another seed, the same mask");
+    }
+
+    /// The mask keeps about 1 - p of the units and scales the rest so the mean is unchanged.
+    #[test]
+    fn dropout_keeps_the_expected_share() {
+        let x = Tensor::ones((200, 500), DType::F32, &Device::Cpu).unwrap();
+        let y: Vec<f32> = Dropout::new(0.1, 3)
+            .apply(&x)
+            .unwrap()
+            .flatten_all()
+            .unwrap()
+            .to_vec1()
+            .unwrap();
+        let kept = y.iter().filter(|&&v| v != 0.0).count() as f64 / y.len() as f64;
+        assert!((kept - 0.9).abs() < 0.01, "kept {kept}");
+        let mean = y.iter().map(|&v| v as f64).sum::<f64>() / y.len() as f64;
+        assert!((mean - 1.0).abs() < 0.01, "mean {mean}");
+        assert!(y.iter().all(|&v| v == 0.0 || (v - 1.0 / 0.9).abs() < 1e-6));
+    }
+
+    /// Dropout must not cut the gradient: every parameter still learns through the training forward.
+    #[test]
+    fn every_parameter_gets_a_gradient_through_dropout() {
+        let cfg = MemoryConfig {
+            num_memories: 4,
+            num_self_attn_layers: 1,
+            ..MemoryConfig::paper(32, 16)
+        };
+        let (vm, m) = module(cfg);
+        let docs = Tensor::randn(0f32, 0.05, (1, 9, 32), &Device::Cpu).unwrap();
+        let q = Tensor::randn(0f32, 0.05, (1, 32), &Device::Cpu).unwrap();
+        let out = m
+            .forward_train(&docs, None, &q, &Dropout::new(0.1, 11))
+            .unwrap();
+        let w = Tensor::randn(0f32, 1.0, out.dims(), &Device::Cpu).unwrap();
+        let g = (out * w).unwrap().sum_all().unwrap().backward().unwrap();
+        for (name, v) in vm.data().lock().unwrap().iter() {
+            let t = g.get(v).unwrap_or_else(|| panic!("{name}: no gradient"));
+            let s = t
+                .sqr()
+                .unwrap()
+                .sum_all()
+                .unwrap()
+                .to_scalar::<f32>()
+                .unwrap();
+            assert!(s.is_finite() && s > 0.0, "{name}: gradient norm {s}");
+        }
+    }
+
+    fn random_memory(seed: u64, k: usize, h: usize) -> Vec<Vec<f32>> {
+        let mut r = seed.max(1);
+        (0..k)
+            .map(|_| {
+                (0..h)
+                    .map(|_| {
+                        r ^= r << 13;
+                        r ^= r >> 7;
+                        r ^= r << 17;
+                        ((r >> 40) as f32 / (1u64 << 24) as f32) - 0.5
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn identical_memories_are_collapsed_and_random_ones_are_not() {
+        // The shape of the collapsed checkpoint: one vector at every slot, for every question.
+        let same: Vec<Vec<Vec<f32>>> = (0..5).map(|_| vec![vec![0.5f32; 64]; 16]).collect();
+        let s = collapse_stats(&same);
+        assert!(s.slot_cosine > 0.999999 && s.question_cosine > 0.999999);
+        assert!((s.mean_norm - 4.0).abs() < 1e-6, "norm {}", s.mean_norm);
+        assert_eq!(s.questions, 5);
+        assert!(s.collapsed());
+
+        let random: Vec<Vec<Vec<f32>>> = (1..6).map(|q| random_memory(q * 977, 16, 64)).collect();
+        let r = collapse_stats(&random);
+        assert!(r.slot_cosine.abs() < 0.2, "slot cosine {}", r.slot_cosine);
+        assert!(r.question_cosine.abs() < 0.2, "{}", r.question_cosine);
+        assert!(!r.collapsed());
+
+        // Different slots, but the same ones whatever the question: still nothing about the question.
+        let one = random_memory(5, 16, 64);
+        let fixed = collapse_stats(&[one.clone(), one.clone(), one]);
+        assert!(fixed.slot_cosine.abs() < 0.2 && fixed.collapsed());
+
+        // One question cannot show it either way; nothing measured is not collapsed.
+        assert!(!collapse_stats(&same[..1]).collapsed());
+        assert!(!collapse_stats(&[]).collapsed());
+    }
+
+    #[test]
+    fn checkpoint_metrics_round_trip_and_old_checkpoints_have_none() {
+        let dir =
+            std::env::temp_dir().join(format!("nafs-memorilla-metrics-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(CheckpointMetrics::read(&dir).is_none());
+        let m = CheckpointMetrics {
+            collapsed: true,
+            stats: CollapseStats {
+                slot_cosine: 1.0,
+                question_cosine: 0.999998,
+                mean_norm: 63.0,
+                questions: 40,
+            },
+            val_loss: Some(1.46),
+            claim_accuracy: Some(0.55),
+            claim_accuracy_without_memory: Some(0.55),
+            claims: 20,
+        };
+        m.write(&dir).unwrap();
+        assert_eq!(CheckpointMetrics::read(&dir), Some(m));
+        let raw: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.join("metrics.json")).unwrap()).unwrap();
+        assert_eq!(raw["collapsed"], true);
+        assert!(raw["question_cosine"].as_f64().unwrap() > 0.98);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     /// Every parameter learns: a fused op without a backward pass (Candle's LayerNorm and softmax_last_dim) or a
     /// zero initialisation would leave parameters without a gradient, silently.

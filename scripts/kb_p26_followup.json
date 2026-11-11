@@ -1,0 +1,310 @@
+[
+ [
+  "What is the gate probe that Phase 23 added to collect labelled gate samples?",
+  "How many labelled drafts did it produce, and how many of them were wrong?",
+  [
+   "203 labelled drafts",
+   "51 of them wrong"
+  ]
+ ],
+ [
+  "How well calibrated was the gate fit on held-out drafts in Phase 23 (ECE and Brier score)?",
+  "Then why could it not be promoted?",
+  [
+   "cannot be promoted",
+   "2,900 held-out samples"
+  ]
+ ],
+ [
+  "What does the label stream do while no user request is in flight?",
+  "How long would it take to reach the required floor at that rate?",
+  [
+   "32 hours of idle time"
+  ]
+ ],
+ [
+  "What is the certified per-bin risk (FR-R1) that the gate took from Semantic Router's cascade?",
+  "How much can it certify early on, when there is little data?",
+  [
+   "young ledger certifies little",
+   "bounds its error at 0.21"
+  ]
+ ],
+ [
+  "What policy does the gate apply to a draft without log-probabilities (FR-R2)?",
+  "How was such a draft treated before that change?",
+  [
+   "look like a confident draft"
+  ]
+ ],
+ [
+  "What is the polarity guard on retrieval-memory hits (FR-R4)?",
+  "Can you give an example of what it now prevents?",
+  [
+   "no longer retrieves the stored answer"
+  ]
+ ],
+ [
+  "How does the OMH discovery service keep candidate proofs?",
+  "How is each node in it scored?",
+  [
+   "0.9 complete but rejected",
+   "Lean's verdict alone"
+  ]
+ ],
+ [
+  "Why did a Lean proof request receive the open-question limits before the Phase 12 fix?",
+  "What limits does it get now?",
+  [
+   "up to three attempts"
+  ]
+ ],
+ [
+  "Why did the model's import Mathlib line fail in the Lean verifier?",
+  "What was added to the prompt to deal with that?",
+  [
+   "three-line Lean 4 syntax note",
+   "which library is available"
+  ]
+ ],
+ [
+  "What does the compile check before the verifier (harness.lint) do with a Python file that does not compile?",
+  "How much time does it add to each edit?",
+  [
+   "37 ms per edit",
+   "Python's start-up"
+  ]
+ ],
+ [
+  "Which exact verifiers does the Verifier Hub (nafs-verify) provide?",
+  "And which soft ones?",
+  [
+   "Soft verifiers: rubric judge",
+   "sample consensus. Each"
+  ]
+ ],
+ [
+  "What is the stall guard (harness.stuck_after) of the code agent?",
+  "What defect did the A/B expose in its first version?",
+  [
+   "six times in a row",
+   "file that does not exist"
+  ]
+ ],
+ [
+  "What did the A/B of the Phase 16 harness guards (lint, rollback, stuck_after) show about their cost?",
+  "Did they change any outcome?",
+  [
+   "rollback restored nothing",
+   "neither model produced a file"
+  ]
+ ],
+ [
+  "How does prune-then-compact (FR-H2) cut older observations in the harness transcript?",
+  "Did it ever fire when it was measured?",
+  [
+   "none of 16 runs",
+   "insurance against a long"
+  ]
+ ],
+ [
+  "Why did the code agent's first run on Smiley Core fail at the 900 s deadline?",
+  "How was that fixed?",
+  [
+   "starts at its first file section",
+   "patch finder and the stream cut"
+  ]
+ ],
+ [
+  "When does a run end in DeepSeek Harness (dsh)?",
+  "And when does ours end instead?",
+  [
+   "fourth identical failure",
+   "only when an exact verifier accepts"
+  ]
+ ],
+ [
+  "How fast does Smiley Core decode compared with llama.cpp on System 1 and System 2?",
+  "Is its first token earlier as well?",
+  [
+   "session is reset and the prompt replanned",
+   "later on System 1"
+  ]
+ ],
+ [
+  "Why do three threads beat four for decode on the shared host?",
+  "What does that choice make slower?",
+  [
+   "slower at three"
+  ]
+ ],
+ [
+  "What caused the fourfold decode slowdown of Qwen3-1.7B after the Phase 19 engine merge?",
+  "How was it fixed?",
+  [
+   "Spelling the eight-element arrays out",
+   "restores 96 ns per row"
+  ]
+ ],
+ [
+  "Why does serving several users in one pass over the weights pay on four cores (Phase 18)?",
+  "Up to how many users is that nearly free?",
+  [
+   "roofline ridge sits near seven rows",
+   "another row costs almost no extra time"
+  ]
+ ],
+ [
+  "How long do four separate concurrent requests take with a 703-token prompt, compared with one request with n=4?",
+  "Why is the single-request way so much cheaper?",
+  [
+   "prefills once and forks",
+   "forks the KV cache"
+  ]
+ ],
+ [
+  "What does the in-process knowledge index of Phase 25 hold for each base?",
+  "What happens when one does not fit?",
+  [
+   "keeps the store path"
+  ]
+ ],
+ [
+  "What does a re-read of a document do with the vectors of unchanged passages (FR-K73)?",
+  "How was the embedder then changed to make questions cheaper?",
+  [
+   "every question starts with the same instruction",
+   "keep the cache rows"
+  ]
+ ],
+ [
+  "How much worse does retrieval rank reworded questions than quoted ones?",
+  "What remedies does the literature offer for that?",
+  [
+   "questions written for each passage",
+   "a reranker or a stronger embedder"
+  ]
+ ],
+ [
+  "Why did a question go unanswered although the words search ranked its passage first?",
+  "What rule keeps such a passage now?",
+  [
+   "BM25 score reaches 10.0"
+  ]
+ ],
+ [
+  "What went wrong when a base of 50,000 passages was deleted in one statement?",
+  "How are they removed now?",
+  [
+   "batches of 500",
+   "restart resumes an interrupted deletion"
+  ]
+ ],
+ [
+  "What gaps did the hardening review of the knowledge base (SR-K11 to SR-K13) close?",
+  "And did everything pass when it was tested live afterwards?",
+  [
+   "36 of 36 checks"
+  ]
+ ],
+ [
+  "How does the model-free graph of Phase 25 read terms from the text?",
+  "Which of them are actually kept?",
+  [
+   "named by at least two passages",
+   "at most a fifth of the base"
+  ]
+ ],
+ [
+  "How is Personalized PageRank run over the bipartite graph of passages and terms?",
+  "Why was it left out of the default search?",
+  [
+   "leaves the first eight passages unchanged",
+   "waits for a reranker"
+  ]
+ ],
+ [
+  "What does the quick model return for each passage when it builds the knowledge graph (Phase 20)?",
+  "How are duplicates merged afterwards?",
+  [
+   "Entities are merged by name",
+   "Louvain communities are detected"
+  ]
+ ],
+ [
+  "How long did the model-built graph take per passage before Phase 25?",
+  "How well did it answer questions compared with plain retrieval?",
+  [
+   "two-hop walk answered 15"
+  ]
+ ],
+ [
+  "What is Memorilla and how large is its memory module?",
+  "How is it trained from a base?",
+  [
+   "differentiable Qwen3 decoder"
+  ]
+ ],
+ [
+  "On what was Memorilla trained in Phase 23 and for how many epochs?",
+  "How did it do on the paper questions?",
+  [
+   "alone 0 of 20",
+   "with degenerate text"
+  ]
+ ],
+ [
+  "What was the claim accuracy with and without the Memorilla module in the training decoder?",
+  "What is the next step for it?",
+  [
+   "GPU pre-train the next step",
+   "ten GPU-hours of pre-training"
+  ]
+ ],
+ [
+  "What could happen when a Memorilla run that was still training was activated?",
+  "How is that prevented now?",
+  [
+   "copied out on activation",
+   "saves are atomic"
+  ]
+ ],
+ [
+  "Which three question sets does the Phase 25 evaluation use over the 847-passage base?",
+  "How does the harness around them keep the comparison fast?",
+  [
+   "reads the base once",
+   "ranks every question under every setting"
+  ]
+ ],
+ [
+  "How many tests does the workspace have at the Phase 23 validation?",
+  "And how did the live run on the final build go?",
+  [
+   "knowledge sweep 79 of 79",
+   "end to end 68 of 68"
+  ]
+ ],
+ [
+  "On what kind of host did the Phase 12 end-to-end validation run every automated suite?",
+  "How many defects did it find?",
+  [
+   "three defects in the Phase 10 integration"
+  ]
+ ],
+ [
+  "How did Smiley Core compare with llama.cpp in wall time over the twelve Auto-mode prompts?",
+  "Was that difference statistically significant?",
+  [
+   "one-sided sign test"
+  ]
+ ],
+ [
+  "What does Orchestrated objective reduction claim, and what decoherence times did Tegmark estimate?",
+  "Did any of that change the design?",
+  [
+   "design needed no change",
+   "contribute nothing computable"
+  ]
+ ]
+]

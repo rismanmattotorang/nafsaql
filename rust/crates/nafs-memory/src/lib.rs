@@ -9,6 +9,8 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use uuid::Uuid;
 
+pub mod recall;
+
 fn st(e: impl std::fmt::Display) -> NafsError {
     NafsError::Storage(e.to_string())
 }
@@ -231,6 +233,7 @@ impl Store {
             CREATE INDEX IF NOT EXISTS idx_prefs_fast ON preferences(fast_reply_id);
             CREATE INDEX IF NOT EXISTS idx_prefs_slow ON preferences(slow_reply_id);
         "#).map_err(st)?;
+        conn.execute_batch(recall::SCHEMA).map_err(st)?;
         // Migration: per-conversation training opt-out (SR-004).
         let has_opt: bool = conn
             .prepare(
@@ -669,6 +672,12 @@ impl Store {
                 params![conv_s],
             )
             .map_err(st)? as i64;
+        // What the conversation left in the recall memory (turns and windows) goes with it.
+        tx.execute(
+            "DELETE FROM episodes WHERE conversation_id=?1",
+            params![conv_s],
+        )
+        .map_err(st)?;
         if with_conversation {
             report.messages = tx
                 .query_row(
@@ -1150,56 +1159,18 @@ impl Store {
         if docs.is_empty() {
             return Ok(vec![]);
         }
-        const STOP: [&str; 24] = [
-            "the", "and", "for", "with", "what", "how", "many", "much", "from", "that", "this",
-            "are", "was", "his", "her", "its", "you", "your", "into", "then", "than", "who", "has",
-            "have",
-        ];
-        let toks = |t: &str| -> Vec<String> {
-            t.to_lowercase()
-                .split(|ch: char| !ch.is_alphanumeric())
-                .filter(|w| w.len() > 1 && !STOP.contains(w))
-                .map(String::from)
-                .collect()
-        };
+        // Questions weigh most: each is counted twice.
         let dt: Vec<Vec<String>> = docs
             .iter()
-            .map(|d| toks(&format!("{} {}", d.4, d.4)))
-            .collect(); // questions weigh most
-        let n = dt.len() as f64;
-        let avg = dt.iter().map(|d| d.len()).sum::<usize>() as f64 / n;
-        let mut q: Vec<String> = toks(query);
-        q.sort();
-        q.dedup();
-        let idf = |w: &str| {
-            let df = dt.iter().filter(|d| d.iter().any(|x| x == w)).count() as f64;
-            ((n - df + 0.5) / (df + 0.5) + 1.0).ln()
-        };
-        let (k1, b) = (1.2, 0.75);
-        let idfs: Vec<(String, f64)> = q.iter().map(|w| (w.clone(), idf(w))).collect();
-        // Normalise by the best score reachable with the query terms that occur in the memory at all.
-        let max_score: f64 = idfs
-            .iter()
-            .filter(|(w, _)| dt.iter().any(|d| d.iter().any(|x| x == w)))
-            .map(|(_, i)| i * (k1 + 1.0))
-            .sum::<f64>()
-            .max(1e-9);
-        let mut scored: Vec<(f64, usize)> = dt
-            .iter()
-            .enumerate()
-            .map(|(i, d)| {
-                let len = d.len() as f64;
-                let sc: f64 = idfs
-                    .iter()
-                    .map(|(w, idf)| {
-                        let tf = d.iter().filter(|x| *x == w).count() as f64;
-                        idf * tf * (k1 + 1.0) / (tf + k1 * (1.0 - b + b * len / avg.max(1.0)))
-                    })
-                    .sum();
-                (sc / max_score, i)
-            })
-            .filter(|(sc, _)| *sc > 0.0)
+            .map(|d| recall::tokens(&format!("{} {}", d.4, d.4), &recall::STOP))
             .collect();
+        let mut scored: Vec<(f64, usize)> =
+            recall::bm25_normalised(&dt, &recall::tokens(query, &recall::STOP))
+                .into_iter()
+                .enumerate()
+                .map(|(i, sc)| (sc, i))
+                .filter(|(sc, _)| *sc > 0.0)
+                .collect();
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         Ok(scored
             .into_iter()
@@ -1463,6 +1434,12 @@ impl Store {
             (Utc::now() - chrono::Duration::days(i64::from(days.min(36_500)))).to_rfc3339();
         let mut conn = self.db();
         let c = conn.transaction().map_err(st)?;
+        // The recall memory of a conversation is deleted with it; notes belong to no conversation and stay.
+        c.execute(
+            "DELETE FROM episodes WHERE conversation_id IN (SELECT id FROM conversations WHERE updated_at < ?1 AND room_id IS NULL)",
+            params![cutoff],
+        )
+        .map_err(st)?;
         let n = c
             .execute(
                 "DELETE FROM conversations WHERE updated_at < ?1 AND room_id IS NULL",

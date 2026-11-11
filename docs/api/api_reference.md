@@ -119,6 +119,42 @@ Parameters: `decision_id` (path, required).
 
 Responses: `200`, `404`, `403`.
 
+### `DELETE /v1/memory`
+
+Forget everything remembered from earlier conversations (the conversations themselves are kept)
+
+Responses: `200`, `403`.
+
+### `GET /v1/memory`
+
+What is remembered from earlier conversations, newest first
+
+Parameters: `limit` (query), `offset` (query).
+
+Responses: `200`, `403`.
+
+### `POST /v1/memory`
+
+Keep a note a person wrote; it belongs to no conversation and is never removed by the size limit
+
+Request body: `text`* (* = required).
+
+Responses: `201`, `400`, `403`.
+
+### `POST /v1/memory/tidy`
+
+Merge notes that say the same thing (same words, same numbers); no model call
+
+Responses: `200`, `403`.
+
+### `DELETE /v1/memory/{memory_id}`
+
+Forget one note
+
+Parameters: `memory_id` (path, required).
+
+Responses: `204`, `404`, `403`.
+
 ### `POST /v1/replies/{reply_id}/feedback`
 
 Human rating of a reply (+1 / -1): a soft signal shown in the ledger, never a calibration label

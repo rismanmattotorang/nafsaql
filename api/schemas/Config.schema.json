@@ -216,6 +216,21 @@
         "samples_on_verifiable": {
           "type": "boolean"
         },
+        "max_risk": {
+          "type": "number"
+        },
+        "risk_alpha": {
+          "type": "number"
+        },
+        "on_unknown": {
+          "type": "string"
+        },
+        "reask_overlap": {
+          "type": "number"
+        },
+        "reask_escalates": {
+          "type": "boolean"
+        },
         "samples_when_uncertain": {
           "type": "boolean"
         },
@@ -267,32 +282,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "max_risk": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "risk_alpha": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "on_unknown": {
-          "type": "string",
-          "enum": [
-            "escalate",
-            "keep",
-            "fixed"
-          ]
-        },
-        "reask_overlap": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "reask_escalates": {
-          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -511,6 +500,31 @@
       },
       "additionalProperties": false
     },
+    "labels": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "dataset": {
+          "type": "string"
+        },
+        "poll_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "per_hour": {
+          "type": "integer"
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "cursor_file": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
     "alerts": {
       "type": "object",
       "properties": {
@@ -547,6 +561,33 @@
         },
         "min_score": {
           "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "recall": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "min_score": {
+          "type": "number"
+        },
+        "half_life_days": {
+          "type": "number"
+        },
+        "budget_chars": {
+          "type": "integer"
+        },
+        "vectors": {
+          "type": "boolean"
+        },
+        "max_episodes": {
+          "type": "integer"
         }
       },
       "additionalProperties": false
@@ -592,6 +633,192 @@
         },
         "lean_memory_mb": {
           "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "knowledge": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "password_file": {
+          "type": "string"
+        },
+        "files_dir": {
+          "type": "string"
+        },
+        "max_upload_mb": {
+          "type": "integer"
+        },
+        "max_files_per_request": {
+          "type": "integer"
+        },
+        "max_request_mb": {
+          "type": "integer"
+        },
+        "concurrent_uploads": {
+          "type": "integer"
+        },
+        "max_documents_per_base": {
+          "type": "integer"
+        },
+        "max_chunks_per_document": {
+          "type": "integer"
+        },
+        "max_queued_jobs": {
+          "type": "integer"
+        },
+        "parse_timeout_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "search_timeout_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_concurrent_trainers": {
+          "type": "integer"
+        },
+        "chunk_chars": {
+          "type": "integer"
+        },
+        "chunk_overlap": {
+          "type": "integer"
+        },
+        "search_k": {
+          "type": "integer"
+        },
+        "embed_url": {
+          "type": "string"
+        },
+        "embed_model": {
+          "type": "string"
+        },
+        "embed_dims": {
+          "type": "integer"
+        },
+        "embed_batch": {
+          "type": "integer"
+        },
+        "exact_search_below": {
+          "type": "integer"
+        },
+        "rag_k": {
+          "type": "integer"
+        },
+        "rag_max_chars": {
+          "type": "integer"
+        },
+        "rag_min_similarity": {
+          "type": "number"
+        },
+        "vector_weight": {
+          "type": "number"
+        },
+        "vector_cache_mb": {
+          "type": "integer"
+        },
+        "rag_lexical_rescue": {
+          "type": "number"
+        },
+        "graph_llm_url": {
+          "type": "string"
+        },
+        "graph_model": {
+          "type": "string"
+        },
+        "graph_max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "entity_merge_similarity": {
+          "type": "number"
+        },
+        "graph_facts": {
+          "type": "integer"
+        },
+        "graph_weight": {
+          "type": "number"
+        },
+        "graph_beam": {
+          "type": "integer"
+        },
+        "graph_decay": {
+          "type": "number"
+        },
+        "index_memory_mb": {
+          "type": "integer"
+        },
+        "bm25_weights": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "fusion": {
+          "type": "string"
+        },
+        "fusion_alpha": {
+          "type": "number"
+        },
+        "graph_arm_weight": {
+          "type": "number"
+        },
+        "fuzzy_terms": {
+          "type": "boolean"
+        },
+        "followup_context": {
+          "type": "boolean"
+        },
+        "rag_elbow_gap": {
+          "type": "number"
+        },
+        "support_check": {
+          "type": "boolean"
+        },
+        "support_min_overlap": {
+          "type": "number"
+        },
+        "support_escalate_below": {
+          "type": "number"
+        },
+        "memory_checkpoint": {
+          "type": "string"
+        },
+        "memory_placeholder": {
+          "type": "string"
+        },
+        "memory_trainer": {
+          "type": "string"
+        },
+        "memory_decoder": {
+          "type": "string"
+        },
+        "memory_gguf": {
+          "type": "string"
+        },
+        "hybrid_k": {
+          "type": "integer"
+        },
+        "auto_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -691,214 +918,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "knowledge": {
-      "type": "object",
-      "description": "Knowledge Base (Phase 20, IF-K02): SurrealDB connection, upload limits, passage size",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "url": {
-          "type": "string"
-        },
-        "namespace": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_]+$"
-        },
-        "database": {
-          "type": "string",
-          "pattern": "^[A-Za-z0-9_]+$"
-        },
-        "user": {
-          "type": "string"
-        },
-        "password_file": {
-          "type": "string"
-        },
-        "files_dir": {
-          "type": "string"
-        },
-        "max_upload_mb": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "max_files_per_request": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "chunk_chars": {
-          "type": "integer",
-          "minimum": 200
-        },
-        "chunk_overlap": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "search_k": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "embed_url": {
-          "type": "string"
-        },
-        "embed_model": {
-          "type": "string"
-        },
-        "embed_dims": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "embed_batch": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 256
-        },
-        "exact_search_below": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "rag_k": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 20
-        },
-        "rag_max_chars": {
-          "type": "integer",
-          "minimum": 200
-        },
-        "rag_min_similarity": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "graph_llm_url": {
-          "type": "string"
-        },
-        "graph_model": {
-          "type": "string"
-        },
-        "graph_max_tokens": {
-          "type": "integer",
-          "minimum": 64
-        },
-        "entity_merge_similarity": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "graph_facts": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 50
-        },
-        "memory_checkpoint": {
-          "type": "string"
-        },
-        "memory_placeholder": {
-          "type": "string",
-          "minLength": 1
-        },
-        "memory_trainer": {
-          "type": "string"
-        },
-        "memory_decoder": {
-          "type": "string"
-        },
-        "memory_gguf": {
-          "type": "string"
-        },
-        "hybrid_k": {
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 12
-        },
-        "auto_order": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "enum": [
-              "memory",
-              "hybrid",
-              "graph",
-              "rag"
-            ]
-          },
-          "minItems": 1
-        },
-        "max_request_mb": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "concurrent_uploads": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "max_documents_per_base": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "max_chunks_per_document": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "max_queued_jobs": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "parse_timeout_s": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "max_concurrent_trainers": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "rag_lexical_rescue": {
-          "type": "number",
-          "minimum": 0
-        },
-        "search_timeout_s": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "vector_weight": {
-          "type": "number",
-          "minimum": 0
-        },
-        "vector_cache_mb": {
-          "type": "integer",
-          "minimum": 0
-        }
-      },
-      "additionalProperties": false
-    },
-    "labels": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "dataset": {
-          "type": "string"
-        },
-        "poll_s": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "per_hour": {
-          "type": "integer",
-          "minimum": 1
-        },
-        "seed": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "cursor_file": {
-          "type": "string"
-        }
-      }
     }
   },
   "additionalProperties": false,

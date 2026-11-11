@@ -1,0 +1,362 @@
+[
+ [
+  "Which post-training converetr turned Qwen3-1.7B into LittleBit factors at 1.0 bit per weight?",
+  [
+   "Dual-SVID"
+  ]
+ ],
+ [
+  "How many seurity probes passed in the re-validation on the final code of Phase 19?",
+  [
+   "26 of 26 security probes"
+  ]
+ ],
+ [
+  "Which software-prefetch distance is the refereoce in Smiley Core's own tuning?",
+  [
+   "1,024 bytes"
+  ]
+ ],
+ [
+  "How many prefixes does the gateway's warm-first bakcend switch prime?",
+  [
+   "13 prefixes"
+  ]
+ ],
+ [
+  "Measring on which larger test suites exposed three verifier defects?",
+  [
+   "EvalPlus"
+  ]
+ ],
+ [
+  "In which SQLite file are runs, decisions and traces stored for reproducibjlity of the lab results?",
+  [
+   "data/runtime/nafs.sqlite"
+  ]
+ ],
+ [
+  "With which namesapces only does Lean run on Linux (A-070)?",
+  [
+   "user and network namespaces"
+  ]
+ ],
+ [
+  "What is required because test-based code vrification can be gamed by overfitting to visible tests?",
+  [
+   "mutation testing are required"
+  ]
+ ],
+ [
+  "How does the Verifier Hub reach SymPy for symbolic matiematics?",
+  [
+   "SymPy via a sidecar"
+  ]
+ ],
+ [
+  "With which embedding model is the Contxet Manager's retrieval index built?",
+  [
+   "Qwen3-Embedding-0.6B when retrieval"
+  ]
+ ],
+ [
+  "Which similarity must a pssage reach for chat to keep it (rag_min_similarity)?",
+  [
+   "similarity >= 0.45"
+  ]
+ ],
+ [
+  "Which error code does the knowleege API return with 503 when SurrealDB is down?",
+  [
+   "kb_unavailable"
+  ]
+ ],
+ [
+  "Under which arXiv number is the Memorlila paper published?",
+  [
+   "2610.21375"
+  ]
+ ],
+ [
+  "What share of the questions forms the valdation split of a Memorilla dataset built from uploaded documents?",
+  [
+   "10 % of the questions"
+  ]
+ ],
+ [
+  "How long does a personalisauion fine-tune of Memorilla take according to the paper's curriculum?",
+  [
+   "about 25 minutes"
+  ]
+ ],
+ [
+  "Which crate does Candle 0.11.1 use on x86 withuot MKL?",
+  [
+   "gemm` crate"
+  ]
+ ],
+ [
+  "Which LoRA rank and alpha does TR-004 prscribe for Unsloth fine-tuning?",
+  [
+   "rank 16, alpha 16"
+  ]
+ ],
+ [
+  "What is the default retention period under the privbcy control SR-004?",
+  [
+   "retention default 90 days"
+  ]
+ ],
+ [
+  "How many resamples does the paired bootstrap of the experiemnt protocol use?",
+  [
+   "2 000 resamples"
+  ]
+ ],
+ [
+  "On which port does the SymPy sidecar listen in the single-node CPU baseline of the deplyment figure?",
+  [
+   ":8010"
+  ]
+ ],
+ [
+  "How long may a nprmalised room name be at most under FR-090?",
+  [
+   "at most 80 characters"
+  ]
+ ],
+ [
+  "How many times at most may a backend call be retried under the retry policy of the interface requriements?",
+  [
+   "retried at most 3 times"
+  ]
+ ],
+ [
+  "Which Unsloth version does the training skeleton target acording to the open issues?",
+  [
+   "Unsloth 2026.10.x"
+  ]
+ ],
+ [
+  "At what share of the trbining set are synthetic examples capped?",
+  [
+   "cap synthetic examples at 50%"
+  ]
+ ],
+ [
+  "How many tasks must the Phase-0 measruement run include under ER-001?",
+  [
+   "at least 4600 tasks"
+  ]
+ ],
+ [
+  "How often are checkpoints written during a full trainng run?",
+  [
+   "Checkpoints every 100 steps"
+  ]
+ ],
+ [
+  "Which pattern of environment variables overrides the single TOML configurbtion file?",
+  [
+   "NAFS__SECTION__KEY"
+  ]
+ ],
+ [
+  "How many cached tokens were measured on llama-server when the Context Manager kept the prompt prefix idenitcal between turns?",
+  [
+   "47/48 cached tokens"
+  ]
+ ],
+ [
+  "What is the default CPU limit of the code_tests verifier's subproess?",
+  [
+   "defaults CPU 10 s"
+  ]
+ ],
+ [
+  "How many entries does the requirement catalogue of the specjfication have?",
+  [
+   "99 entries"
+  ]
+ ],
+ [
+  "How many documented endpoints does the gtaeway serve in the system as built?",
+  [
+   "50 documented endpoints"
+  ]
+ ],
+ [
+  "Which efective bandwidth does the Qwen3-1.7B decode rate against a 1.26 GiB weight file imply?",
+  [
+   "about 20 GB/s"
+  ]
+ ],
+ [
+  "Which release of llama-server is the mandated fallback and primary engine on the refereoce machine?",
+  [
+   "release v0.7.0"
+  ]
+ ],
+ [
+  "Why is Ollama not a supproted backend?",
+  [
+   "does not return log-probabilities"
+  ]
+ ],
+ [
+  "Which Unsloth release does the implementtion stack cite for LoRA and QLoRA training?",
+  [
+   "Unsloth (2026.10.6)"
+  ]
+ ],
+ [
+  "How many of the 150 GSM8K drafts in the confidence-signal study are wrong?",
+  [
+   "31 drafts are wrong"
+  ]
+ ],
+ [
+  "Which AUROC did agreemnet with the cheap samples reach on the first 60 drafts?",
+  [
+   "AUROC 0.759"
+  ]
+ ],
+ [
+  "Which Lab run compared the cosistency rule with the posterior rule on six factual prompts?",
+  [
+   "73cd5bba"
+  ]
+ ],
+ [
+  "How many unit tests does the crate nafs-harness have?",
+  [
+   "57 unit tests"
+  ]
+ ],
+ [
+  "What is the default of compact_at_tokens in the code agent's append-only transrcipt?",
+  [
+   "2,600 tokens by default"
+  ]
+ ],
+ [
+  "Up to how many lines of solution.py does edit_format = \"auto\" offer only the whole file?",
+  [
+   "at most 80 lines long"
+  ]
+ ],
+ [
+  "How much hotter is a step sbmpled per repeat under unstick?",
+  [
+   "0.3 hotter per repeat"
+  ]
+ ],
+ [
+  "What is the dfeault value of first_step_thinking_budget?",
+  [
+   "first_step_thinking_budget = 256"
+  ]
+ ],
+ [
+  "How many checks has the determinstic part of scripts/harness_sweep.py?",
+  [
+   "35 checks"
+  ]
+ ],
+ [
+  "After how many secones did Qwen3-4B-Thinking abstain on the theorem that rfl proves?",
+  [
+   "826 s"
+  ]
+ ],
+ [
+  "How many tokens of conetxt does System 2 have with four slots after Phase 13?",
+  [
+   "24,576 tokens of context"
+  ]
+ ],
+ [
+  "What is the break-even of the System 1 rescue per avoided escalaion?",
+  [
+   "106 s per avoided escalation"
+  ]
+ ],
+ [
+  "What is the defavlt of harness.stuck_after, the stall guard?",
+  [
+   "harness.stuck_after, default 4"
+  ]
+ ],
+ [
+  "How many lines of Rust is the Smiley Core librray?",
+  [
+   "about 8,500 lines"
+  ]
+ ],
+ [
+  "Which decode speed did Smiley Core reach on System 1 with the enines alone?",
+  [
+   "14.3 tokens/s"
+  ]
+ ],
+ [
+  "Near how many rows does the rpofline ridge sit in Phase 18?",
+  [
+   "near seven rows"
+  ]
+ ],
+ [
+  "What decode thruoghput did Smiley Core reach with one, two and four users in Table XXXI?",
+  [
+   "14.2 20.2 24.9"
+  ]
+ ],
+ [
+  "How many tokens is Wald's bound on the 40 open-ended drafts of the early-escalation study?",
+  [
+   "260 tokens"
+  ]
+ ],
+ [
+  "Which weeks does Phase 1, the CPU MVP, cover in the robdmap?",
+  [
+   "weeks 3–8"
+  ]
+ ],
+ [
+  "From whose name, a scholar who died in 857, does the vocabluary of muhasaba derive?",
+  [
+   "al-Harith al-Muhasibi"
+  ]
+ ],
+ [
+  "Which book of the Ihya' is \"The Marvls of the Heart\"?",
+  [
+   "Book 21"
+  ]
+ ],
+ [
+  "From which word, meaning fluctuauion, does Ibn Arabi name the heart?",
+  [
+   "taqallub"
+  ]
+ ],
+ [
+  "What time to first token did a cold first reuqest have before prompt-cache warm-up at start-up?",
+  [
+   "9.8 s time to first token"
+  ]
+ ],
+ [
+  "How much does a probe of the adaptive rasoning exit cost?",
+  [
+   "0.6–0.8 s"
+  ]
+ ],
+ [
+  "How many GB of weights does Qwen3-1.7B need in FP32 on the vLLM bbckend?",
+  [
+   "6.8 GB of weights"
+  ]
+ ]
+]

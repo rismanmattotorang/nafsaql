@@ -373,6 +373,9 @@ pub enum GateRule {
     /// FR-R2: a feature the gate needs was missing (no log-probabilities), and `[gate] on_unknown` decided.
     UnknownEscalate,
     UnknownKeep,
+    /// Phase 26: the quick answer from documents states what its passages do not (`[knowledge]
+    /// support_escalate_below`), so the reasoning model answers from the same passages.
+    UnsupportedBySources,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

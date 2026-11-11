@@ -88,6 +88,12 @@ pub trait Knowledge: Send + Sync {
     /// caches), so nothing of it can still be read.
     fn forget(&self, _kb: &str) {}
 
+    /// The meaning vector of a text from the embedding server, when one is running. The memory of earlier
+    /// conversations uses it to find what was said in other words; without it that memory matches words only.
+    fn embed<'a>(&'a self, _text: &'a str) -> BoxFuture<'a, Option<Vec<f32>>> {
+        Box::pin(async { None })
+    }
+
     /// Memorilla (FR-K23): the memory tokens for `query` read from the whole of knowledge base `kb`.
     fn memory<'a>(
         &'a self,
