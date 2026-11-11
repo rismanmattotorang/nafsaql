@@ -179,6 +179,10 @@ pub fn chat_prompt(
 pub struct Engine {
     model: Arc<Model>,
     pool: Pool,
+    /// nafs-aql: a wider pool for reading prompts, when one was asked for (`with_prefill_threads`). Writing a
+    /// token is bound by memory and is fastest a thread short of the cores; reading a prompt is bound by
+    /// arithmetic and scales with every core. An idle pool's workers are parked, so the two do not compete.
+    prefill_pool: Option<Pool>,
     state: State,
     slots: Vec<Slot>,
     max_slots: usize,
@@ -206,6 +210,30 @@ impl Engine {
         kv_prec: KvPrec,
         prefix_cache_bytes: usize,
     ) -> Engine {
+        Engine::with_prefill_threads(
+            model,
+            threads,
+            threads,
+            max_ctx,
+            max_slots,
+            kv_prec,
+            prefix_cache_bytes,
+        )
+    }
+
+    /// `new`, with prompts read by `prefill_threads` workers and tokens written by `threads`. Measured on four
+    /// cores (Qwen3-1.7B, Q4_K_M): a prompt is read at 60 tokens/s by three threads and 72 by four, while
+    /// decode is 4 to 8 % faster with three than with four.
+    pub fn with_prefill_threads(
+        model: Arc<Model>,
+        threads: usize,
+        prefill_threads: usize,
+        max_ctx: usize,
+        max_slots: usize,
+        kv_prec: KvPrec,
+        prefix_cache_bytes: usize,
+    ) -> Engine {
+        let prefill_threads = prefill_threads.max(1);
         let c = model.cfg;
         let max_slots = max_slots.max(1);
         let max_ctx = max_ctx.clamp(32, c.ctx_train);
@@ -217,7 +245,8 @@ impl Engine {
             max_batch,
             max_slots,
             max_ctx,
-            threads,
+            // The per-worker scratch must serve the wider of the two pools.
+            threads.max(prefill_threads),
             model.rope_factors.as_deref(),
         );
         // A LittleBit sidecar's projections need scratch for their intermediates; without it the first one
@@ -227,6 +256,7 @@ impl Engine {
         Engine {
             model,
             pool: Pool::new(threads),
+            prefill_pool: (prefill_threads != threads).then(|| Pool::new(prefill_threads)),
             state,
             slots: Vec::with_capacity(max_slots),
             max_slots,
@@ -447,7 +477,7 @@ impl Engine {
         self.model.forward(
             &mut self.state,
             &mut self.slots[i].kv,
-            &self.pool,
+            self.prefill_pool.as_ref().unwrap_or(&self.pool),
             &chunk,
             start,
             &[],
@@ -659,6 +689,39 @@ mod tests {
         assert!(
             e.decode_rows > e.decode_steps,
             "the users never shared a pass"
+        );
+    }
+
+    /// nafs-aql: a prompt read by a wider pool gives the answer it gives when read by the decode pool. The
+    /// weight products do not depend on how the rows are shared out; attention's partial sums do, in the last
+    /// bits, so this compares the greedy text of a prompt long enough to be read in chunks.
+    #[test]
+    fn a_prompt_read_by_a_wider_pool_gets_the_same_answer() {
+        let Some(m) = model() else {
+            eprintln!("skipped: set SMILEY_CORE_MODEL");
+            return;
+        };
+        let prompt: Vec<u32> = (0..150u32).map(|i| (i * 37) % 1000 + 5).collect();
+        let run = |mut e: Engine| {
+            e.admit(prompt.clone(), cfg(8)).unwrap();
+            let mut text = String::new();
+            while e.active() > 0 {
+                for em in e.step() {
+                    text.push_str(&em.text);
+                }
+            }
+            text
+        };
+        let narrow = run(Engine::new(m.clone(), 3, 256, 1, KvPrec::F16, 0));
+        let wide = Engine::with_prefill_threads(m.clone(), 3, 4, 256, 1, KvPrec::F16, 0);
+        assert_eq!(wide.prefill_pool.as_ref().map(Pool::width), Some(4));
+        assert_eq!(wide.pool.width(), 3);
+        assert_eq!(run(wide), narrow);
+        // The same width for both makes no second pool.
+        assert!(
+            Engine::with_prefill_threads(m, 3, 3, 256, 1, KvPrec::F16, 0)
+                .prefill_pool
+                .is_none()
         );
     }
 

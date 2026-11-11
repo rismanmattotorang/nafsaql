@@ -796,6 +796,9 @@
         "support_escalate_below": {
           "type": "number"
         },
+        "rag_compact_sources": {
+          "type": "boolean"
+        },
         "memory_checkpoint": {
           "type": "string"
         },

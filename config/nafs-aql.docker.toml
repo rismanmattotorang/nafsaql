@@ -225,6 +225,7 @@ rag_elbow_gap = 0.0                    # cut the passages after a drop in simila
 support_check = true                   # say which sentences of an answer from documents are in the passages it was given (no model)
 support_min_overlap = 0.6              # share of a sentence's content words one passage must hold
 support_escalate_below = 0.0           # a quick answer with fewer supported sentences than this share goes to the reasoning model (0 = never)
+rag_compact_sources = false            # true: rag_max_chars is the size of the whole block (headers counted) and a title is written once. A faster profile, not the default: with rag_k = 6 and rag_max_chars = 2400, prompts are 25 % shorter and answers 20-26 % sooner, with 39 of 50 right against 42
 memory_checkpoint = ""                 # Phase 5: Memorilla module trained for System 1 (dir with config.json + weights.safetensors); "" = memory mode off
 memory_placeholder = "<|fim_pad|>"     # the token at the 16 memory positions of the prompt
 memory_trainer = "rust/target/release/memorilla-train"   # Phase 6: cargo build --release -p nafs-memorilla

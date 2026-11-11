@@ -54,6 +54,11 @@ struct Args {
     port: u16,
     #[arg(short = 't', long)]
     threads: Option<usize>,
+    /// Threads that read a prompt (prefill); default: the same as --threads. Reading a prompt scales with every
+    /// core, writing tokens does not, so a machine that decodes best a thread short of its cores can still read
+    /// prompts with all of them. For an embedding server, which only reads, this replaces --threads.
+    #[arg(long = "prefill-threads")]
+    prefill_threads: Option<usize>,
     /// Context length (clamped to the model's training context).
     #[arg(short = 'c', long, default_value_t = 8192)]
     ctx: usize,
@@ -128,7 +133,7 @@ async fn main() {
             a.alias.clone(),
             &a.host,
             a.port,
-            threads,
+            a.prefill_threads.unwrap_or(threads),
             a.embed_max_tokens,
         )
         .await;
@@ -165,9 +170,11 @@ async fn main() {
         smiley_core::kv::KvPrec::F16
     };
     let max_ctx = a.ctx.clamp(32, model.cfg.ctx_train);
-    let engine = Engine::new(
+    let prefill_threads = a.prefill_threads.unwrap_or(threads).max(1);
+    let engine = Engine::with_prefill_threads(
         model.clone(),
         threads,
+        prefill_threads,
         max_ctx,
         a.slots,
         kv_prec,
@@ -211,10 +218,11 @@ async fn main() {
         None => "dense".to_string(),
     };
     tracing::info!(
-        "smiley-core: {} loaded in {:.1} s, {} threads, {}, ctx {}, {} slots ({} MB of cache each), {} weights, think tokens {:?}/{:?}",
+        "smiley-core: {} loaded in {:.1} s, {} threads ({} to read prompts), {}, ctx {}, {} slots ({} MB of cache each), {} weights, think tokens {:?}/{:?}",
         a.model.display(),
         t0.elapsed().as_secs_f64(),
         threads,
+        prefill_threads,
         app.simd,
         max_ctx,
         a.slots,
