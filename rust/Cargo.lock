@@ -2282,6 +2282,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nafs-context"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nafs-core"
 version = "0.1.0"
 dependencies = [
@@ -2340,6 +2350,7 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "nafs-bench",
+ "nafs-context",
  "nafs-core",
  "nafs-eval",
  "nafs-kb",
@@ -2348,6 +2359,7 @@ dependencies = [
  "nafs-types",
  "nafs-verify",
  "nafs-web",
+ "regex",
  "serde",
  "serde_json",
  "tokio",
@@ -2409,6 +2421,7 @@ name = "nafs-memory"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "nafs-context",
  "nafs-types",
  "rusqlite",
  "serde",

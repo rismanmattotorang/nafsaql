@@ -1078,13 +1078,51 @@ impl Base {
         k: usize,
         p: &Params,
     ) -> Vec<Hit> {
+        self.search_in(an, query, qv, mode, k, p, None)
+    }
+
+    /// Phase 29 (scoped search): the same search ranked only among the passages of the documents in `scope`. The
+    /// passages outside are masked before ranking, so both arms rank within the scope (a filter after ranking would
+    /// leave a scoped search with fewer hits than asked for).
+    #[allow(clippy::too_many_arguments)]
+    pub fn search_in(
+        &self,
+        an: &Analyzer,
+        query: &str,
+        qv: Option<&[f32]>,
+        mode: SearchMode,
+        k: usize,
+        p: &Params,
+        scope: Option<&std::collections::HashSet<String>>,
+    ) -> Vec<Hit> {
         let depth = (k * 3).max(20);
-        let lex = (mode != SearchMode::Vector)
+        let mut lex = (mode != SearchMode::Vector)
             .then(|| self.lexical_scores(&self.weighted_terms(an, query, p), &p.bm25));
-        let sim = match mode {
+        let mut sim = match mode {
             SearchMode::Lexical => None,
             _ => qv.and_then(|q| self.similarities_mixed(q, p.piece_mix)),
         };
+        let inside: Option<Vec<bool>> = scope.map(|docs| {
+            let mut m = vec![false; self.n];
+            for (part, &o) in self.parts.iter().zip(&self.offsets) {
+                if docs.contains(&part.doc_id) {
+                    m[o as usize..o as usize + part.len()].fill(true);
+                }
+            }
+            m
+        });
+        if let Some(m) = &inside {
+            for (i, keep) in m.iter().enumerate() {
+                if !keep {
+                    if let Some(l) = lex.as_mut() {
+                        l[i] = 0.0;
+                    }
+                    if let Some(v) = sim.as_mut() {
+                        v[i] = f32::NEG_INFINITY;
+                    }
+                }
+            }
+        }
         let lex_top = lex.as_ref().map(|s| top(s, depth, 0.0)).unwrap_or_default();
         let vec_top = sim
             .as_ref()
@@ -1097,6 +1135,9 @@ impl Base {
         };
         if let (Some(ppr), SearchMode::Hybrid) = (p.ppr, mode) {
             fused = self.with_graph(query, fused, &ppr, depth);
+        }
+        if let Some(m) = &inside {
+            fused.retain(|(g, _)| m[*g as usize]);
         }
         fused
             .into_iter()
@@ -1637,6 +1678,355 @@ impl Index {
     }
 }
 
+// ---------------------------------------------------------------------------------------------- layers (Phase 29)
+
+/// A document's layers (spec `context_fs_spec.md` §3), made from what the index holds with no model call.
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub struct DocLayers {
+    pub doc_id: String,
+    pub title: String,
+    /// L0: at most 300 characters.
+    pub l0: String,
+    /// L1: at most 2,000 characters of Markdown.
+    pub l1: String,
+    /// The most distinctive terms, best first, in their commonest written form.
+    pub terms: Vec<String>,
+    /// (heading path, ord of the first passage under it), in document order.
+    pub sections: Vec<(String, u64)>,
+    pub passages: usize,
+}
+
+const L0_MAX: usize = 300;
+/// Words that name a part of a document, not what it is about.
+const STRUCTURAL: &[&str] = &[
+    "contents",
+    "references",
+    "abstract",
+    "introduction",
+    "conclusion",
+    "conclusions",
+    "appendix",
+    "section",
+    "sections",
+    "chapter",
+    "table",
+    "figure",
+    "results",
+    "discussion",
+    "background",
+    "overview",
+    "summary",
+    "phase",
+    "allowbreak",
+    "textbf",
+    "emph",
+    "cite",
+    "label",
+    "ref",
+    "https",
+    "http",
+    "available",
+    "online",
+    "arxiv",
+    "preprint",
+    "proceedings",
+    "conference",
+    "journal",
+    "vol",
+    "doi",
+];
+
+/// A passage under a references or bibliography heading: its words name other works.
+fn is_references(heading: &str) -> bool {
+    let h = heading
+        .rsplit(" > ")
+        .next()
+        .unwrap_or(heading)
+        .to_lowercase();
+    [
+        "references",
+        "bibliography",
+        "works cited",
+        "literature cited",
+    ]
+    .iter()
+    .any(|r| {
+        h.trim_start_matches(|c: char| !c.is_alphabetic())
+            .starts_with(r)
+    })
+}
+const L1_MAX: usize = 2000;
+
+fn clip(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let cut: String = s.chars().take(max.saturating_sub(3)).collect();
+    // At a sentence or word boundary when one is near.
+    let at = cut
+        .rfind(". ")
+        .filter(|&i| i > max / 2)
+        .map(|i| i + 1)
+        .or_else(|| cut.rfind(' '))
+        .unwrap_or(cut.len());
+    format!("{}...", cut[..at].trim_end())
+}
+
+/// The first paragraph of prose in a passage: not a heading, a table row or a list of numbers.
+fn first_paragraph(text: &str) -> Option<String> {
+    text.split("\n\n")
+        .map(str::trim)
+        .filter(|b| !b.starts_with('#') && !b.starts_with('|') && !b.starts_with("```"))
+        .map(|b| {
+            b.lines()
+                .filter(|l| !l.trim_start().starts_with('#'))
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .find(|b| b.chars().filter(|c| c.is_alphabetic()).count() >= 60)
+}
+
+fn first_sentence(p: &str) -> String {
+    let b = p.as_bytes();
+    for i in 30..b.len().saturating_sub(1) {
+        if matches!(b[i], b'.' | b'!' | b'?') && b[i + 1] == b' ' {
+            return p[..=i].to_string();
+        }
+    }
+    p.to_string()
+}
+
+fn captions(text: &str, out: &mut Vec<String>) {
+    static RE: OnceLock<regex::Regex> = OnceLock::new();
+    let re = RE.get_or_init(|| {
+        regex::Regex::new(r"^(?:Figure|Fig\.|FIGURE|Table|TABLE)\s+[0-9IVX]+[.:](?:\s|$)")
+            .expect("valid regex")
+    });
+    for l in text.lines().map(str::trim) {
+        if out.len() < 6 && re.is_match(l) && !out.iter().any(|c| c == l) {
+            out.push(clip(l, 160));
+        }
+    }
+}
+
+impl Base {
+    /// (document id, title) of every document the index holds.
+    pub fn documents_list(&self) -> Vec<(String, String)> {
+        self.parts
+            .iter()
+            .map(|p| (p.doc_id.clone(), p.title.clone()))
+            .collect()
+    }
+
+    /// Passage `ord` of a document, as a hit.
+    pub fn passage_at(&self, doc: &str, ord: u64) -> Option<Hit> {
+        let (pi, part) = self
+            .parts
+            .iter()
+            .enumerate()
+            .find(|(_, p)| p.doc_id == doc)?;
+        let i = part.rows.iter().position(|r| r.ord == ord)?;
+        Some(self.passage(self.offsets[pi] + i as u32))
+    }
+
+    /// The passages of a document, in order, as hits.
+    pub fn passages_of(&self, doc: &str) -> Vec<Hit> {
+        let Some((pi, part)) = self.parts.iter().enumerate().find(|(_, p)| p.doc_id == doc) else {
+            return Vec::new();
+        };
+        (0..part.len() as u32)
+            .map(|i| self.passage(self.offsets[pi] + i))
+            .collect()
+    }
+
+    /// How many passages hold `term` (a stem as the analyzer makes it).
+    fn df(&self, term: &str) -> usize {
+        self.parts
+            .iter()
+            .map(|p| p.postings.get(term).map_or(0, Vec::len))
+            .sum()
+    }
+
+    /// Terms of `texts` ranked by frequency times inverse passage frequency in this base, shown in their commonest
+    /// written form. Numbers, short terms and terms in more than half of the base's passages are left out.
+    fn distinctive(&self, an: &Analyzer, texts: &[&str], k: usize) -> Vec<String> {
+        let mut tf: HashMap<String, usize> = HashMap::new();
+        let mut surface: HashMap<String, HashMap<String, usize>> = HashMap::new();
+        for t in texts {
+            for w in t.split(|c: char| !(c.is_alphanumeric() || c == '-' || c == '_')) {
+                let w = w.trim_matches('-');
+                let digits = w.chars().filter(char::is_ascii_digit).count();
+                let roman = w.len() <= 6 && w.chars().all(|c| "IVXLC".contains(c));
+                if w.chars().count() < 4
+                    || digits * 2 >= w.len()
+                    || roman
+                    || STRUCTURAL.contains(&w.to_lowercase().as_str())
+                {
+                    continue;
+                }
+                let mut stems = Vec::new();
+                an.terms(w, |s| stems.push(s));
+                // A compound ("Qwen3-1.7B") is its own term beside its parts; the whole is the last one emitted.
+                if let Some(stem) = stems.pop() {
+                    *tf.entry(stem.clone()).or_default() += 1;
+                    *surface
+                        .entry(stem)
+                        .or_default()
+                        .entry(w.to_string())
+                        .or_default() += 1;
+                }
+            }
+        }
+        let n = self.n.max(1) as f64;
+        let mut scored: Vec<(String, f64)> = tf
+            .into_iter()
+            .filter_map(|(t, f)| {
+                let df = self.df(&t);
+                if df == 0 || df as f64 > n / 2.0 || f < 2 {
+                    return None;
+                }
+                let idf = (1.0 + (n - df as f64 + 0.5) / (df as f64 + 0.5)).ln();
+                Some((t, f as f64 * idf))
+            })
+            .collect();
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+        scored
+            .into_iter()
+            .take(k)
+            .filter_map(|(t, _)| {
+                surface.get(&t).and_then(|m| {
+                    m.iter()
+                        .max_by(|a, b| a.1.cmp(b.1).then(b.0.cmp(a.0)))
+                        .map(|(w, _)| w.clone())
+                })
+            })
+            .collect()
+    }
+
+    /// L0 and L1 of a document (spec §3).
+    pub fn doc_layers(&self, an: &Analyzer, doc: &str) -> Option<DocLayers> {
+        let part = self.parts.iter().find(|p| p.doc_id == doc)?;
+        let mut sections: Vec<(String, u64)> = Vec::new();
+        for r in &part.rows {
+            if !r.heading.is_empty() && sections.last().is_none_or(|s| s.0 != r.heading) {
+                if !sections.iter().any(|s| s.0 == r.heading) {
+                    sections.push((r.heading.clone(), r.ord));
+                }
+            }
+        }
+        let texts: Vec<&str> = part
+            .rows
+            .iter()
+            .filter(|r| !is_references(&r.heading))
+            .map(|r| r.text.as_str())
+            .collect();
+        let terms = self.distinctive(an, &texts, 12);
+        let para = part
+            .rows
+            .iter()
+            .find_map(|r| first_paragraph(&r.text))
+            .unwrap_or_default();
+        let mut caps = Vec::new();
+        for r in &part.rows {
+            captions(&r.text, &mut caps);
+        }
+        let title = part.title.clone();
+        // The topics are kept whole; the sentence takes what is left of the 300 characters.
+        let topics = if terms.is_empty() {
+            String::new()
+        } else {
+            format!(
+                " Topics: {}.",
+                terms.iter().take(6).cloned().collect::<Vec<_>>().join(", ")
+            )
+        };
+        let mut l0 = clip(&title, 150);
+        if !para.is_empty() {
+            let room = L0_MAX.saturating_sub(l0.chars().count() + topics.chars().count() + 3);
+            if room >= 40 {
+                l0.push_str(" — ");
+                l0.push_str(&clip(&first_sentence(&para), room));
+            }
+        }
+        l0.push_str(&topics);
+        let mut l1 = format!("# {title}\n\n{}\n", clip(&para, 400));
+        if !sections.is_empty() {
+            l1.push_str("\n## Contents\n\n");
+            for (h, _) in sections.iter().take(24) {
+                let depth = h.matches(" > ").count();
+                let leaf = h.rsplit(" > ").next().unwrap_or(h);
+                l1.push_str(&format!("{}- {leaf}\n", "  ".repeat(depth)));
+            }
+            if sections.len() > 24 {
+                l1.push_str(&format!(
+                    "- ... and {} more sections\n",
+                    sections.len() - 24
+                ));
+            }
+        }
+        if !caps.is_empty() {
+            l1.push_str("\n## Tables and figures\n\n");
+            for c in &caps {
+                l1.push_str(&format!("- {c}\n"));
+            }
+        }
+        if !terms.is_empty() {
+            l1.push_str(&format!("\n## Key terms\n\n{}\n", terms.join(", ")));
+        }
+        Some(DocLayers {
+            doc_id: doc.to_string(),
+            title,
+            l0: clip(&l0, L0_MAX),
+            l1: clip(&l1, L1_MAX),
+            terms,
+            sections,
+            passages: part.len(),
+        })
+    }
+
+    /// L0 and L1 of the whole base (spec §3): one line per document with its L0 (32 evenly spaced documents above
+    /// that), and the base's own distinctive terms.
+    pub fn base_layers(&self, an: &Analyzer, name: &str, description: &str) -> (String, String) {
+        let mut docs: Vec<DocLayers> = self
+            .parts
+            .iter()
+            .filter_map(|p| self.doc_layers(an, &p.doc_id))
+            .collect();
+        docs.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+        let shown: Vec<&DocLayers> = if docs.len() <= 32 {
+            docs.iter().collect()
+        } else {
+            (0..32).map(|i| &docs[i * (docs.len() - 1) / 31]).collect()
+        };
+        let texts: Vec<&str> = self
+            .parts
+            .iter()
+            .flat_map(|p| p.rows.iter().map(|r| r.heading.as_str()))
+            .collect();
+        let terms = self.distinctive(an, &texts, 8);
+        let mut l0 = format!("{name}: {} documents, {} passages", docs.len(), self.n);
+        if !terms.is_empty() {
+            l0.push_str(&format!(". Topics: {}.", terms.join(", ")));
+        }
+        let mut l1 = format!("# {name}\n\n");
+        if !description.trim().is_empty() {
+            l1.push_str(description.trim());
+            l1.push_str("\n\n");
+        }
+        l1.push_str("## Documents\n\n");
+        for d in &shown {
+            l1.push_str(&format!("- {}\n", d.l0));
+        }
+        if docs.len() > shown.len() {
+            l1.push_str(&format!(
+                "- ... {} more documents not shown\n",
+                docs.len() - shown.len()
+            ));
+        }
+        (clip(&l0, L0_MAX), clip(&l1, 4 * L1_MAX))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1690,6 +2080,59 @@ mod tests {
             &an,
         );
         Base::new(vec![Arc::new(a), Arc::new(b)])
+    }
+
+    #[test]
+    fn a_scoped_search_ranks_only_inside_its_documents() {
+        let b = base();
+        let an = Analyzer::default();
+        let p = Params::default();
+        let all = b.search(&an, "SurrealDB passages", None, SearchMode::Lexical, 5, &p);
+        assert!(all.iter().any(|h| h.doc_id == "a") && all.iter().any(|h| h.doc_id == "b"));
+        let scope: std::collections::HashSet<String> = ["b".to_string()].into();
+        let only = b.search_in(
+            &an,
+            "SurrealDB passages",
+            Some(&[0.0, 1.0]),
+            SearchMode::Hybrid,
+            5,
+            &p,
+            Some(&scope),
+        );
+        assert!(
+            !only.is_empty() && only.iter().all(|h| h.doc_id == "b"),
+            "{only:?}"
+        );
+    }
+
+    #[test]
+    fn layers_come_from_headings_text_and_terms() {
+        let b = base();
+        let an = Analyzer::default();
+        let l = b.doc_layers(&an, "a").unwrap();
+        assert_eq!(
+            l.sections.iter().map(|s| s.0.as_str()).collect::<Vec<_>>(),
+            ["Store", "Store > Index", "Chunks"]
+        );
+        assert!(
+            l.l1.contains("## Contents") && l.l1.contains("  - Index"),
+            "{}",
+            l.l1
+        );
+        assert!(
+            l.l0.starts_with("Storage notes") && l.l0.chars().count() <= 300,
+            "{}",
+            l.l0
+        );
+        assert_eq!(l.passages, 3);
+        let (l0, l1) = b.base_layers(&an, "Notes", "Two documents");
+        assert!(l0.starts_with("Notes: 2 documents, 5 passages"), "{l0}");
+        assert!(
+            l1.contains("Models") && l1.contains("Storage notes"),
+            "{l1}"
+        );
+        assert_eq!(b.passage_at("a", 1).unwrap().heading, "Store > Index");
+        assert_eq!(b.passages_of("b").len(), 2);
     }
 
     #[test]

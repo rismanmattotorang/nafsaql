@@ -19,6 +19,7 @@ nafs-web = { path = "../nafs-web" }
 nafs-eval = { path = "../nafs-eval" }
 nafs-bench = { path = "../nafs-bench" }
 nafs-kb = { path = "../nafs-kb" }
+nafs-context = { path = "../nafs-context" }
 nafs-memorilla = { path = "../nafs-memorilla" }
 libc = { workspace = true }
 tokio = { workspace = true }
@@ -33,6 +34,7 @@ metrics-exporter-prometheus = { workspace = true }
 clap = { workspace = true }
 anyhow = { workspace = true }
 uuid = { workspace = true }
+regex = { workspace = true }
 chrono = { workspace = true }
 futures = { workspace = true }
 tokio-stream = { workspace = true }
