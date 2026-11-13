@@ -453,9 +453,9 @@ pub fn latency_breakdown(rows: &[StageRow]) -> Value {
         queues.sort_by(|a, b| a.partial_cmp(b).unwrap());
         prefill.sort_by(|a, b| a.partial_cmp(b).unwrap());
         engine.push(json!({"stage": stage, "calls": sts.len(),
-            "prefill_tok_s": (pms > 0.0).then(|| pn / pms * 1000.0),
-            "decode_tok_s": (dms > 0.0).then(|| dn / dms * 1000.0),
-            "cache_reuse": (pn + cn > 0.0).then(|| cn / (pn + cn)),
+            "prefill_tok_s": (pms > 0.0).then_some(pn / pms * 1000.0),
+            "decode_tok_s": (dms > 0.0).then_some(dn / dms * 1000.0),
+            "cache_reuse": (pn + cn > 0.0).then_some(cn / (pn + cn)),
             "prefill_p50_ms": qs(&prefill, 0.5),
             "queue_p95_ms": qs(&queues, 0.95)}));
     }

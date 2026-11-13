@@ -369,7 +369,7 @@ pub fn plain_numeric(s: &str) -> Option<f64> {
     });
     let c = frac.captures(&x)?;
     let (a, b): (f64, f64) = (c[1].parse().ok()?, c[2].parse().ok()?);
-    (b != 0.0).then(|| a / b)
+    (b != 0.0).then_some(a / b)
 }
 
 async fn symbolic_equal(a: &str, b: &str, python: &str, limits: &SandboxLimits) -> Option<bool> {
