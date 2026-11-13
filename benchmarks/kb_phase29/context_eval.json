@@ -1,0 +1,95 @@
+{
+  "documents": 9,
+  "kb": "pir9ftsm6eja267j4fg0",
+  "para": {
+    "assembly": {
+      "4 whole passages": {
+        "answer_in_prompt": 0.22535211267605634,
+        "chars": 2828.112676056338,
+        "sources": 4.0
+      },
+      "assembler, 2,400 chars": {
+        "answer_in_prompt": 0.1619718309859155,
+        "chars": 2334.154929577465,
+        "sources": 8.880281690140846
+      },
+      "assembler, 3,600 chars": {
+        "answer_in_prompt": 0.23943661971830985,
+        "chars": 3528.06338028169,
+        "sources": 9.732394366197184
+      },
+      "assembler, 4,800 chars": {
+        "answer_in_prompt": 0.2535211267605634,
+        "chars": 4683.598591549296,
+        "sources": 9.838028169014084
+      }
+    },
+    "n": 142,
+    "oracle": {
+      "MRR": 0.267,
+      "R@1": 0.197,
+      "R@4": 0.303,
+      "n": 142
+    },
+    "planned": {
+      "MRR": 0.192,
+      "R@1": 0.148,
+      "R@4": 0.218,
+      "n": 142
+    },
+    "planner_fired": 5,
+    "planner_right": 1,
+    "whole": {
+      "MRR": 0.194,
+      "R@1": 0.148,
+      "R@4": 0.225,
+      "n": 142
+    }
+  },
+  "passages": 723,
+  "quoted": {
+    "assembly": {
+      "4 whole passages": {
+        "answer_in_prompt": 0.9642857142857143,
+        "chars": 2758.875,
+        "sources": 4.0
+      },
+      "assembler, 2,400 chars": {
+        "answer_in_prompt": 0.8571428571428571,
+        "chars": 2332.8035714285716,
+        "sources": 8.625
+      },
+      "assembler, 3,600 chars": {
+        "answer_in_prompt": 0.9464285714285714,
+        "chars": 3539.8035714285716,
+        "sources": 9.714285714285714
+      },
+      "assembler, 4,800 chars": {
+        "answer_in_prompt": 0.9642857142857143,
+        "chars": 4673.535714285715,
+        "sources": 9.821428571428571
+      }
+    },
+    "n": 56,
+    "oracle": {
+      "MRR": 0.903,
+      "R@1": 0.821,
+      "R@4": 1.0,
+      "n": 56
+    },
+    "planned": {
+      "MRR": 0.841,
+      "R@1": 0.75,
+      "R@4": 0.946,
+      "n": 56
+    },
+    "planner_fired": 6,
+    "planner_right": 4,
+    "whole": {
+      "MRR": 0.87,
+      "R@1": 0.786,
+      "R@4": 0.964,
+      "n": 56
+    }
+  }
+}

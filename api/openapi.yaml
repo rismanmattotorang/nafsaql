@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Nafs-Aql Gateway API
-  version: 1.5.1
+  version: 1.6.0
   summary: Dual-process (System 1 / System 2) chat gateway with verifier-gated deliberation
   description: 'External API of the Nafs-Aql Rust gateway (crate `nafs-gateway`). Every reply exposes the
 
@@ -40,6 +40,8 @@ security:
 - bearerAuth: []
 tags:
 - name: chat
+- name: files
+  description: "The context filesystem: documents, memories, skills and saved chats under nafs:// addresses"
 - name: knowledge
 - name: rooms
 - name: bench
@@ -721,6 +723,444 @@ paths:
           description: Forgotten
         '404':
           $ref: '#/components/responses/NotFound'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/ls:
+    get:
+      tags:
+      - files
+      operationId: fsList
+      summary: "Children of a folder in the context filesystem, each with its one-line summary (L0)"
+      parameters:
+      - name: uri
+        in: query
+        required: false
+        description: "A nafs:// URI (default nafs://)"
+        schema:
+          type: string
+      - name: layers
+        in: query
+        required: false
+        description: "0 leaves the summaries out"
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/tree:
+    get:
+      tags:
+      - files
+      operationId: fsTree
+      summary: "A folder's subtree with summaries"
+      parameters:
+      - name: uri
+        in: query
+        required: false
+        description: "A nafs:// URI (default nafs://)"
+        schema:
+          type: string
+      - name: depth
+        in: query
+        required: false
+        description: "1 to 4 (default 2)"
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/read:
+    get:
+      tags:
+      - files
+      operationId: fsRead
+      summary: "Read an item at a level: 0 summary, 1 overview, 2 full"
+      parameters:
+      - name: uri
+        in: query
+        required: false
+        description: "A nafs:// URI (default nafs://)"
+        schema:
+          type: string
+      - name: level
+        in: query
+        required: false
+        description: "0, 1 or 2 (default 2)"
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/stat:
+    get:
+      tags:
+      - files
+      operationId: fsStat
+      summary: "An item's kind, layer sizes and parent"
+      parameters:
+      - name: uri
+        in: query
+        required: false
+        description: "A nafs:// URI (default nafs://)"
+        schema:
+          type: string
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/glob:
+    get:
+      tags:
+      - files
+      operationId: fsGlob
+      summary: "URIs matching a pattern (* within a segment, ** across)"
+      parameters:
+      - name: pattern
+        in: query
+        required: true
+        description: "for example nafs://memory/**"
+        schema:
+          type: string
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/grep:
+    post:
+      tags:
+      - files
+      operationId: fsGrep
+      summary: "Lines matching a literal or regular expression within a scope"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pattern]
+              properties:
+                pattern:
+                  type: string
+                scope:
+                  type: string
+                regex:
+                  type: boolean
+                limit:
+                  type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/find:
+    post:
+      tags:
+      - files
+      operationId: fsFind
+      summary: "Run a question within a scope (a base, a document, a memory kind, skills); no model call"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                scope:
+                  type: string
+                k:
+                  type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/search:
+    post:
+      tags:
+      - files
+      operationId: fsSearch
+      summary: "A planned search: the scopes are chosen by rule from the question and the conversation"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                conversation:
+                  type: string
+                k:
+                  type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/assemble:
+    post:
+      tags:
+      - files
+      operationId: fsAssemble
+      summary: "A budgeted context block: every hit at its summary first, the best in full"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                scope:
+                  type: string
+                chars:
+                  type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/write:
+    put:
+      tags:
+      - files
+      operationId: fsWrite
+      summary: "Write a memory file or a skill"
+      parameters:
+      - name: uri
+        in: query
+        required: true
+        description: "nafs://memory/<kind>/<key> or nafs://skills/<name>"
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/fs/rm:
+    delete:
+      tags:
+      - files
+      operationId: fsRemove
+      summary: "Remove a memory file, a skill or a saved session"
+      parameters:
+      - name: uri
+        in: query
+        required: true
+        description: "the item to remove"
+        schema:
+          type: string
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/sessions/{conversation_id}/commit:
+    post:
+      tags:
+      - files
+      operationId: commitSession
+      summary: "Save a conversation as a file and keep what it said about the person as memory files"
+      parameters:
+      - name: conversation_id
+        in: path
+        required: true
+        description: "the conversation"
+        schema:
+          type: string
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/memory/diff:
+    get:
+      tags:
+      - files
+      operationId: memoryDiff
+      summary: "Every change to the memory files, newest first"
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        description: "at most 1000"
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/memory/diff/{change_id}/undo:
+    post:
+      tags:
+      - files
+      operationId: undoMemoryChange
+      summary: "Put a memory file back as it was before one change"
+      parameters:
+      - name: change_id
+        in: path
+        required: true
+        description: "the change"
+        schema:
+          type: string
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/compile:
+    post:
+      tags:
+      - files
+      operationId: compile
+      summary: "Render a knowledge base as a wiki, a graph or a report (Markdown files), with no model call"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from, to]
+              properties:
+                from:
+                  type: string
+                to:
+                  type: string
+      responses:
+        '200':
+          description: "The result"
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '403':
           $ref: '#/components/responses/Forbidden'
   /v1/conversations:

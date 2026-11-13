@@ -201,7 +201,7 @@ const api = {
   fail(status, data) { const said = data && typeof data === 'object' && typeof data.message === 'string' ? data.message : '';
     const e = new Error(said); e.status = status; e.data = data; e.detail = said || (typeof data === 'string' ? data.slice(0, 200) : ''); e.message = humanError(e);
     if (status === 401) toast('This service needs an access key: add it in Settings.', { kind: 'error' }); return e; },
-  get(p) { return this.req('GET', p); }, post(p, b) { return this.req('POST', p, b ?? {}); }, patch(p, b) { return this.req('PATCH', p, b); }, del(p) { return this.req('DELETE', p); },
+  get(p) { return this.req('GET', p); }, post(p, b) { return this.req('POST', p, b ?? {}); }, patch(p, b) { return this.req('PATCH', p, b); }, put(p, b) { return this.req('PUT', p, b); }, del(p) { return this.req('DELETE', p); },
   // POST + Server-Sent Events reader (EventSource cannot POST).
   async stream(path, body, onEvent, signal) {
     const r = await fetch(path, { method: 'POST', headers: this.headers(), body: JSON.stringify(body), signal });
@@ -336,6 +336,7 @@ const chart = {
   },
 };
 
+
 // ============================== shell, router, status ==============================
 const routes = {};
 let cleanup = null;
@@ -467,6 +468,142 @@ async function route() {
   if (alive()) cleanup = c; else if (c) { try { c(); } catch {} }
 }
 window.addEventListener('hashchange', route);
+
+// ============================== Files (Phase 29): one place for documents, memories, skills and sessions ==============================
+// Everything the assistant knows has an address (nafs://...). A folder shows each item's one-line summary; an item
+// opens at its summary, its overview or in full. Memories and skills can be written here, every change to the
+// memory is listed and can be undone, a chat can be saved as a file, and a knowledge base can be compiled.
+const FS_LEVELS = [[0, 'Summary'], [1, 'Overview'], [2, 'Full']];
+const fsQ = (u) => encodeURIComponent(u);
+const FS_NAMES = { kb: 'Knowledge', memory: 'Memory', skills: 'Skills', sessions: 'Sessions', profile: 'Profile', preferences: 'Preferences', entities: 'People and things', events: 'Events', notes: 'Notes' };
+routes.files = { title: 'Files', sub: 'documents, memories, skills and sessions in one place', async render(view, alive) {
+  const S = { uri: store.get('fsUri', 'nafs://'), level: 1, sel: null, listing: null, titles: {} };
+  view.innerHTML = `<div class="page kb fs">
+    <div class="fs-find card"><div class="card-b row" style="gap:8px;flex-wrap:wrap">
+      <input id="fsQ" type="search" placeholder="Search here, for example: how fast is the quick model" aria-label="Search in this folder" style="flex:1;min-width:220px">
+      <div class="seg" id="fsHow"><button type="button" data-h="find" class="on" title="Search this folder only">This folder</button><button type="button" data-h="search" title="The assistant chooses where to look">Everywhere</button></div>
+      <button class="btn" type="button" id="fsGo">Search</button></div></div>
+    <div class="kb-grid">
+      <aside class="card kb-side" aria-label="Folder"><div class="card-h"><nav class="fs-crumbs" id="fsCrumbs" aria-label="Path"></nav><span id="fsNew"></span></div>
+        <div id="fsList" class="kb-list fs-list" role="list"><div class="empty small">Loading…</div></div></aside>
+      <section id="fsMain" class="kb-main"></section>
+    </div></div>`;
+  const list = $('#fsList', view), main = $('#fsMain', view);
+  const label = (u, name) => FS_NAMES[name] || S.titles[u] || name;
+  function crumbs() {
+    const rest = S.uri.replace(/^nafs:\/\//, '').split('/').filter(Boolean);
+    const parts = [['nafs://', 'All']]; let acc = 'nafs://';
+    rest.forEach((p, i) => { acc += (i ? '/' : '') + p; parts.push([acc, label(acc, decodeURIComponent(p))]); });
+    $('#fsCrumbs', view).innerHTML = parts.map(([u, l], i) => i === parts.length - 1 ? `<b>${esc(l)}</b>` : `<a href="#" data-u="${esc(u)}">${esc(l)}</a>`).join('<span class="faint"> / </span>');
+    $$('#fsCrumbs [data-u]', view).forEach(a => a.onclick = (e) => { e.preventDefault(); open(a.dataset.u); });
+    const space = rest[0];
+    const nw = $('#fsNew', view);
+    nw.innerHTML = space === 'memory' ? `<button class="btn sm" type="button" id="fsAdd">${icon.plus}New</button>` : space === 'skills' ? `<button class="btn sm" type="button" id="fsAdd">${icon.plus}New skill</button>` : '';
+    if ($('#fsAdd', view)) $('#fsAdd', view).onclick = () => editor(null, space === 'skills' ? 'skill' : (rest[1] || 'notes'));
+  }
+  async function open(u) {
+    S.uri = u; store.set('fsUri', u); S.sel = null; crumbs();
+    list.innerHTML = '<div class="empty small"><span class="spin"></span> Loading…</div>';
+    let d; try { d = await api.get(`/v1/fs/ls?uri=${fsQ(u)}`); } catch (e) { list.innerHTML = `<div class="notice bad">${icon.alert}<span>${esc(humanError(e))}</span></div>`; return; }
+    if (!alive()) return;
+    S.listing = d;
+    d.items.forEach(it => { if (it.title) S.titles[it.uri] = it.title; });
+    crumbs();
+    list.innerHTML = d.items.length ? d.items.map(it => `<div class="kb-item fs-item" role="listitem"><button type="button" data-u="${esc(it.uri)}" data-dir="${it.dir ? 1 : 0}">
+        <span class="fs-ic">${it.dir ? '▸' : '·'}</span><span class="fs-n">${esc(label(it.uri, it.title || it.name))}</span>${it.l0 ? `<small class="fs-l0">${esc(it.l0)}</small>` : ''}</button></div>`).join('')
+      : `<div class="empty small">${emptyText(u)}</div>`;
+    $$('#fsList [data-u]', view).forEach(b => b.onclick = () => b.dataset.dir === '1' ? open(b.dataset.u) : show(b.dataset.u));
+    await show(u);
+  }
+  const emptyText = (u) => u.startsWith('nafs://memory') ? 'Nothing here yet. Tell the assistant “remember that …”, save a chat as a file, or add one with New.'
+    : u.startsWith('nafs://skills') ? 'No skills yet. A skill is a set of instructions for a task, written in Markdown; add one with New skill.'
+    : u.startsWith('nafs://sessions') ? 'No chats saved as files yet. Save one below.' : 'Empty.';
+  async function show(u, level = S.level) {
+    S.sel = u; S.level = level;
+    $$('#fsList [data-u]', view).forEach(b => b.classList.toggle('on', b.dataset.u === u));
+    main.innerHTML = '<div class="card"><div class="card-b"><span class="spin"></span> Reading…</div></div>';
+    let r; try { r = await api.get(`/v1/fs/read?uri=${fsQ(u)}&level=${level}`); } catch (e) { main.innerHTML = `<div class="notice bad">${icon.alert}<span>${esc(humanError(e))}</span></div>`; return; }
+    if (!alive() || S.sel !== u) return;
+    if (r.meta?.title && !S.titles[u]) { S.titles[u] = r.meta.title; if (u === S.uri) crumbs(); }
+    const editable = r.kind === 'memory' || r.kind === 'skill';
+    const removable = editable || r.kind === 'session';
+    const title = r.meta?.title || label(u, u.split('/').pop());
+    main.innerHTML = `<div class="card"><div class="card-h"><h3>${esc(title)}</h3><div class="row" style="gap:6px">
+        <div class="seg" id="fsLv">${FS_LEVELS.map(([v, l]) => `<button type="button" data-l="${v}" class="${v === level ? 'on' : ''}">${l}</button>`).join('')}</div>
+        ${editable ? '<button class="btn sm ghost" type="button" id="fsEdit">Edit</button>' : ''}${removable ? '<button class="btn sm ghost" type="button" id="fsRm">Delete</button>' : ''}</div></div>
+      <div class="card-b"><p class="tiny faint fs-uri"><code>${esc(r.uri)}</code></p><div class="fs-body">${level === 2 && r.kind === 'document' ? md(r.content.replace(/<!--[^>]*-->/g, '')) : md(r.content)}</div></div></div>
+      <div id="fsExtra"></div>`;
+    $$('#fsLv button', main).forEach(b => b.onclick = () => show(u, +b.dataset.l));
+    if ($('#fsEdit', main)) $('#fsEdit', main).onclick = guard(async () => { const full = await api.get(`/v1/fs/read?uri=${fsQ(u)}&level=2`); editor(u, r.kind === 'skill' ? 'skill' : u.split('/')[3], full.content); }, 'This file could not be opened for editing.');
+    if ($('#fsRm', main)) $('#fsRm', main).onclick = guard(async () => {
+      if (!await confirmDialog({ title: 'Delete this file?', body: `<p>${esc(title)} is removed.${r.kind === 'memory' ? ' The change is listed under Memory and can be undone there.' : ''}</p>`, ok: 'Delete' })) return;
+      await api.del(`/v1/fs/rm?uri=${fsQ(u)}`); toast('Deleted'); open(S.uri === u ? u.replace(/\/[^/]*$/, '') : S.uri); }, 'The file could not be deleted.');
+    extras(u, r);
+  }
+  // What a folder offers beyond reading: memory changes, saving chats as files, compiling a knowledge base.
+  async function extras(u, r) {
+    const box = $('#fsExtra', main); if (!box) return;
+    if (u === 'nafs://memory') {
+      const d = await api.get('/v1/memory/diff?limit=30');
+      box.innerHTML = `<div class="card"><div class="card-h"><h3>Recent changes</h3><span class="hint">Every change to your memory, and why. Undo puts a file back as it was.</span></div><div class="card-b">${
+        d.diff.length ? `<ul class="fs-diff">${d.diff.map(x => `<li><span class="tag ${x.op}">${esc({ add: 'Added', update: 'Changed', delete: 'Deleted', skip: 'Skipped' }[x.op] || x.op)}</span> <a href="#" data-u="${esc(x.uri)}">${esc(x.title || x.uri)}</a> <span class="tiny faint">${esc(x.reason)} · ${ago(x.at)}</span>${x.undone ? ' <span class="tiny faint">(undone)</span>' : x.op !== 'skip' ? ` <button class="linkbtn" type="button" data-undo="${esc(x.id)}">Undo</button>` : ''}</li>`).join('')}</ul>` : '<p class="small muted">No changes yet.</p>'}</div></div>`;
+      $$('[data-u]', box).forEach(a => a.onclick = (e) => { e.preventDefault(); open(a.dataset.u.replace(/\/[^/]*$/, '')).then(() => show(a.dataset.u)); });
+      $$('[data-undo]', box).forEach(b => b.onclick = guard(async () => { await api.post(`/v1/memory/diff/${b.dataset.undo}/undo`); toast('Undone'); open(u); }, 'This change could not be undone.'));
+    } else if (u === 'nafs://sessions') {
+      const convs = (await api.get('/v1/conversations')).slice(0, 12);
+      box.innerHTML = `<div class="card"><div class="card-h"><h3>Save a chat as a file</h3><span class="hint">The chat is written out in full, and what you said about yourself is kept as memory files you can read and edit.</span></div><div class="card-b">${
+        convs.length ? `<ul class="fs-diff">${convs.map(c => `<li>${esc(c.title)} <span class="tiny faint">${plural(c.messages, 'message')} · ${ago(c.updated_at)}</span> <button class="linkbtn" type="button" data-c="${esc(c.conversation_id)}">Save as file</button></li>`).join('')}</ul>` : '<p class="small muted">No chats yet.</p>'}</div></div>`;
+      $$('[data-c]', box).forEach(b => b.onclick = guard(async () => { const x = await api.post(`/v1/sessions/${b.dataset.c}/commit`);
+        const learned = x.diff.filter(d => d.op !== 'skip').length; toast(learned ? `Saved; ${plural(learned, 'memory file')} added or changed` : 'Saved; nothing new to remember'); open(u); }, 'The chat could not be saved.'));
+    } else if (r.kind === 'base') {
+      box.innerHTML = `<div class="card"><div class="card-h"><h3>Compile</h3><span class="hint">Turn this knowledge base into linked Markdown pages, with no model: a wiki, a map of its terms, or one report.</span></div>
+        <div class="card-b row" style="gap:8px;flex-wrap:wrap"><button class="btn sm" type="button" data-to="wiki">Wiki</button><button class="btn sm ghost" type="button" data-to="graph">Graph</button><button class="btn sm ghost" type="button" data-to="report">Report</button><span id="fsCompiled" class="small muted"></span></div></div>`;
+      $$('[data-to]', box).forEach(b => b.onclick = guard(async () => {
+        const c = await api.post('/v1/compile', { from: u, to: b.dataset.to });
+        const all = c.files.map(f => `<!-- ${f.path} -->\n${f.content}`).join('\n\n');
+        const blob = new Blob([all], { type: 'text/markdown' }); const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = `${(r.meta?.title || 'knowledge').replace(/[^\w-]+/g, '-')}-${b.dataset.to}.md`; a.click(); URL.revokeObjectURL(a.href);
+        $('#fsCompiled', box).textContent = `${plural(c.files.length, 'page')} compiled and downloaded.`; }, 'The base could not be compiled.'));
+    }
+  }
+  function editor(u, kind, content = '') {
+    const isSkill = kind === 'skill';
+    const kinds = ['profile', 'preferences', 'entities', 'events', 'notes'];
+    modal(`<h3 style="margin-top:0">${u ? 'Edit' : isSkill ? 'New skill' : 'New memory'}</h3>
+      ${u ? `<p class="tiny faint"><code>${esc(u)}</code></p>` : isSkill
+        ? `<label class="f"><span>Name</span><input id="fsName" type="text" maxlength="64" placeholder="for example: release-notes"><span class="hint">Lower-case letters, digits and dashes.</span></label>`
+        : `<div class="row" style="gap:8px"><label class="f" style="flex:1"><span>Kind</span><select id="fsKind">${kinds.map(k => `<option value="${k}" ${k === kind ? 'selected' : ''}>${esc(FS_NAMES[k])}</option>`).join('')}</select></label><label class="f" style="flex:2"><span>Title</span><input id="fsName" type="text" maxlength="80" placeholder="for example: Answer language"></label></div>`}
+      <label class="f"><span>${isSkill ? 'Instructions (Markdown; front matter optional)' : 'What to remember'}</span><textarea id="fsText" rows="12" style="width:100%;font-family:var(--mono);font-size:12.5px">${esc(content || (isSkill ? '---\nname: \ndescription: \ntags: []\n---\n1. ' : ''))}</textarea></label>
+      <div class="row" style="gap:8px;margin-top:8px"><button class="btn" type="button" id="fsSave">Save</button></div><div class="rerr" id="fsErr" role="alert"></div>`);
+    $('#fsSave').onclick = async () => {
+      let target = u;
+      const slug = (t) => t.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 64);
+      if (!target) { const name = slug($('#fsName').value || ''); if (!name) { $('#fsErr').textContent = 'Give it a name.'; return; }
+        target = isSkill ? `nafs://skills/${name}` : `nafs://memory/${$('#fsKind').value}/${name}`; }
+      let text = $('#fsText').value;
+      if (!u && !isSkill && $('#fsName').value.trim() && !/^---/.test(text)) text = `# ${$('#fsName').value.trim()}\n${text}`;
+      if (isSkill && !u) text = text.replace(/^name:\s*$/m, `name: ${target.split('/').pop()}`);
+      try { await api.put(`/v1/fs/write?uri=${fsQ(target)}`, { content: text }); $('#modal').close(); toast('Saved');
+        const dir = target.replace(/\/[^/]*$/, ''); await open(dir); show(target); }
+      catch (e) { $('#fsErr').textContent = humanError(e); }
+    };
+  }
+  async function search() {
+    const q = $('#fsQ', view).value.trim(); if (!q) return;
+    const how = $('#fsHow .on', view).dataset.h;
+    main.innerHTML = '<div class="card"><div class="card-b"><span class="spin"></span> Searching…</div></div>';
+    let r; try { r = how === 'find' ? await api.post('/v1/fs/find', { query: q, scope: S.uri, k: 10 }) : await api.post('/v1/fs/search', { query: q, k: 10 }); }
+    catch (e) { main.innerHTML = `<div class="notice bad">${icon.alert}<span>${esc(humanError(e))}</span></div>`; return; }
+    const where = how === 'find' ? `in ${esc(S.uri)}` : `where the assistant chose to look: ${(r.plan || []).map(p => `<code>${esc(p.scope)}</code>`).join(', ') || 'nowhere'}`;
+    main.innerHTML = `<div class="card"><div class="card-h"><h3>${plural(r.hits.length, 'result')}</h3><span class="hint">${where} · ${r.ms} ms</span></div><div class="card-b">${
+      r.hits.length ? `<ol class="fs-hits">${r.hits.map(x => `<li><a href="#" data-u="${esc(x.uri)}">${esc(x.title || x.uri)}</a> <span class="tag">${esc({ passage: 'Passage', document: 'Document', memory: 'Memory', skill: 'Skill' }[x.category] || x.category)}</span><div class="small muted">${esc(x.l0)}</div></li>`).join('')}</ol>` : '<p class="small muted">Nothing found.</p>'}</div></div>`;
+    $$('[data-u]', main).forEach(a => a.onclick = (e) => { e.preventDefault(); const t = a.dataset.u; const dir = t.includes('#') ? t.replace(/#.*$/, '') : t.replace(/\/[^/]*$/, ''); open(dir).then(() => show(t, 2)); });
+  }
+  $('#fsGo', view).onclick = search; $('#fsQ', view).onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); search(); } };
+  $$('#fsHow button', view).forEach(b => b.onclick = () => $$('#fsHow button', view).forEach(x => x.classList.toggle('on', x === b)));
+  await open(S.uri);
+} };
+
 
 // ============================== chat: one assistant turn ==============================
 const STATE_NAMES = Object.fromEntries(Object.entries(STATIONS).map(([k, v]) => [k, v.en]));

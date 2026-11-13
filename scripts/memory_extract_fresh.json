@@ -1,0 +1,22 @@
+[
+ ["I prefer metric units in every answer.", ["preferences"]],
+ ["From now on use British spelling.", ["preferences"]],
+ ["Always include the source file when you quote code.", ["preferences"]],
+ ["I'd rather you ask before running long jobs.", ["preferences"]],
+ ["My dog is called Mochi.", ["entities"]],
+ ["Our office manager is Rina.", ["entities"]],
+ ["I live near Kemang.", ["entities"]],
+ ["I study at ITB.", ["entities"]],
+ ["Remember that invoices go out on the 25th.", ["notes"]],
+ ["Note: the test server restarts at midnight.", ["notes"]],
+ ["Last month we hired two engineers.", ["events"]],
+ ["We released 0.2.0 on 2026-12-01.", ["events"]],
+ ["Call me Pak Adnan in formal emails.", ["profile"]],
+ ["I'm Dewi.", ["profile"]],
+ ["Why do you always answer so slowly?", []],
+ ["Never again will I trust that benchmark.", []],
+ ["I'm not sure about the second step.", []],
+ ["My concern is the latency.", []],
+ ["Remember how the gate worked before Phase 7?", []],
+ ["Our results are in the appendix.", []]
+]

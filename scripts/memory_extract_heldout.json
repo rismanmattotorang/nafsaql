@@ -1,0 +1,22 @@
+[
+ ["I'd rather get the code first and the explanation after.", ["preferences"]],
+ ["From now on, answer in English.", ["preferences"]],
+ ["Please always cite the page number.", ["preferences"]],
+ ["Never use bullet points with me.", ["preferences"]],
+ ["I work at Paracorp as a data engineer.", ["entities"]],
+ ["I live in Depok.", ["entities"]],
+ ["My wife's name is Sari.", ["entities"]],
+ ["Our CTO is Andi.", ["entities"]],
+ ["Don't forget that the VPN expires every 90 days.", ["notes"]],
+ ["For future reference, the build machine is mac-mini-2.", ["notes"]],
+ ["Yesterday we migrated the database to SurrealDB 3.3.5.", ["events"]],
+ ["Last week I passed the AWS exam.", ["events"]],
+ ["I'm Ris, by the way.", ["profile"]],
+ ["You can call me Pak Ris.", ["profile"]],
+ ["What would you call me?", []],
+ ["Never mind, it works now.", []],
+ ["I'd rather not say.", []],
+ ["Remember when we talked about BM25?", []],
+ ["My bad, I meant the 1.7B model.", []],
+ ["Always the same error: connection refused.", []]
+]

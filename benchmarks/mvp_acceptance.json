@@ -1,62 +1,62 @@
 {
   "base": "http://127.0.0.1:8080",
-  "at": "2026-11-13T07:11:29+0700",
+  "at": "2026-11-13T09:43:05+0700",
   "results": [
     {
       "id": "MVP-A1",
       "name": "Fast reply",
       "pass": true,
-      "detail": "mode=fast assurance=unverified ttft=248ms rule=fixed",
-      "seconds": 2.8
+      "detail": "mode=fast assurance=unverified ttft=151ms rule=fixed",
+      "seconds": 1.7
     },
     {
       "id": "MVP-A2",
       "name": "Verified code + forced escalation",
       "pass": true,
       "detail": "verified=verified via fast; impossible test -> rule=forced_failed_verification escalate=True final=verified",
-      "seconds": 73.4
+      "seconds": 53.5
     },
     {
       "id": "MVP-A3",
       "name": "Slow path within budget",
       "pass": true,
-      "detail": "mode=slow reasoning=987/1024 wall=155s assurance=verified",
-      "seconds": 155.2
+      "detail": "mode=slow reasoning=987/1024 wall=182s assurance=verified",
+      "seconds": 182.3
     },
     {
       "id": "MVP-A4",
       "name": "Abstention with notice",
       "pass": true,
       "detail": "assurance=abstained state=X notice=yes answer_nonempty=True",
-      "seconds": 189.9
+      "seconds": 255.6
     },
     {
       "id": "MVP-A5",
       "name": "Bounded loop (Lemma 1)",
       "pass": true,
       "detail": "model_calls=4 <= 1 + k + N(R+1) = 10 (k=2, rescue=4, N=1, R=2)",
-      "seconds": 57.7
+      "seconds": 70.9
     },
     {
       "id": "MVP-A6",
       "name": "SSE event order",
       "pass": true,
       "detail": "order: start phase token decision done",
-      "seconds": 0.4
+      "seconds": 0.5
     },
     {
       "id": "MVP-A7",
       "name": "Rooms over WebSocket",
       "pass": true,
       "detail": "bob saw alice's message=True, saw streamed answer=True, members=2",
-      "seconds": 1.9
+      "seconds": 1.8
     },
     {
       "id": "MVP-A8",
       "name": "Records and schemas",
       "pass": true,
       "detail": "decision retrievable=True, conversation messages=2, schemas: CONTRACT TESTS PASSED",
-      "seconds": 1.0
+      "seconds": 3.1
     },
     {
       "id": "MVP-A9",

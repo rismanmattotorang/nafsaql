@@ -1,6 +1,6 @@
 {
-  "when": "2026-11-13T07:03:23",
-  "seconds": 928,
+  "when": "2026-11-13T09:33:32",
+  "seconds": 807,
   "passed": 53,
   "total": 53,
   "checks": [
@@ -232,7 +232,7 @@
     {
       "name": "model: on a 1-slot backend a failed draft escalates without the rescue",
       "pass": true,
-      "detail": "7s verdicts=[False] escalate=True backend=smiley"
+      "detail": "14s verdicts=[False] escalate=True backend=smiley"
     },
     {
       "name": "model: rescue 0 escalates the failed draft at once",
@@ -242,17 +242,17 @@
     {
       "name": "model: easy theorem: a Lean task gets the maths caps and the Lean verifier",
       "pass": true,
-      "detail": "abstained domain=math calls=4 552s"
+      "detail": "abstained domain=math calls=4 542s"
     },
     {
       "name": "model: easy theorem: verified, or abstained with a notice (never an unchecked proof)",
       "pass": true,
-      "detail": "abstained domain=math calls=4 552s"
+      "detail": "abstained domain=math calls=4 542s"
     },
     {
       "name": "model: code agent fixes a function and the verifier accepts",
       "pass": true,
-      "detail": "verified calls=2 actions=['run', 'write'] 172s"
+      "detail": "verified calls=2 actions=['run', 'write'] 91s"
     },
     {
       "name": "model: the agent's step records are complete",
@@ -267,7 +267,7 @@
     {
       "name": "model: a verified code chat on System 2 records its candidate tree",
       "pass": true,
-      "detail": "verified ['candidate 1 (whole) fresh from the task; score 1.00'] 174s"
+      "detail": "verified ['candidate 1 (whole) fresh from the task; score 1.00'] 142s"
     }
   ]
 }

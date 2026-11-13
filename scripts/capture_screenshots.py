@@ -183,6 +183,34 @@ def main():
             tab.wait_for("document.querySelectorAll('.kb-sources').length > 0", 240)
             time.sleep(2)
             tab.shot("knowledge_chat")
+        # Phase 29: the Files page, at a document's overview, at the memory with its change log, and a search the
+        # assistant planned. --kb <id> names the base to open; --doc <id> the document in it.
+        doc = args[args.index("--doc") + 1] if "--doc" in args else ""
+        def files_at(uri):
+            go("chat")
+            tab.js(f"localStorage.setItem('nafs.fsUri', JSON.stringify({json.dumps(uri)}))")
+            go("files")
+            tab.wait_for("document.querySelectorAll('#fsList [data-u]').length > 0 && !document.querySelector('#fsMain .spin')", 40)
+            time.sleep(1.5)
+        if want("files") and kb and doc:
+            files_at(f"nafs://kb/{kb}")
+            tab.js(f"""(() => {{ const b = document.querySelector('#fsList [data-u="nafs://kb/{kb}/{doc}"]'); b && b.click(); return !!b; }})()""")
+            time.sleep(1.5)
+            tab.wait_for("!!document.querySelector('#fsMain .fs-body h1, #fsMain .fs-body h2')", 30)
+            time.sleep(1)
+            tab.shot("files")
+        if want("files_memory"):
+            files_at("nafs://memory")
+            tab.wait_for("!!document.querySelector('#fsExtra .card')", 30)
+            time.sleep(1)
+            tab.shot("files_memory")
+        if want("files_search"):
+            files_at("nafs://")
+            tab.js("""(() => { document.getElementById('fsQ').value = 'How should I write the release notes, and in which language?';
+              document.querySelector('#fsHow [data-h="search"]').click(); document.getElementById('fsGo').click(); return true; })()""")
+            tab.wait_for("!!document.querySelector('#fsMain .fs-hits, #fsMain .card-h h3') && !document.querySelector('#fsMain .spin')", 60)
+            time.sleep(1.5)
+            tab.shot("files_search")
         if want("rooms"):
             # A throw-away room with three people and two real answers, photographed, then deleted.
             ws_base = base.replace("http", "ws", 1)

@@ -32,3 +32,4 @@ text-splitter = { version = "0.33.1", features = ["markdown"] }
 
 [dev-dependencies]
 nafs-core = { path = "../nafs-core" }
+nafs-context = { path = "../nafs-context" }

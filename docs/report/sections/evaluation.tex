@@ -329,6 +329,18 @@ Two-passage (44) & converter & 0.284 & 0.830 & 0.474 \\
 \end{tabular}
 \end{table}
 
+\textbf{One context filesystem.} On the same base, confining the search to
+the document that holds the answer would lift reworded questions (MRR 0.194
+to 0.267; quoted 0.870 to 0.903), but a rule that guessed the document from
+its distinctive terms fired on 11 of 198 questions, chose the right one 5
+times and lowered MRR (quoted 0.841), so a planned search narrows only to a
+document named by its exact title and scoping is otherwise the person's or
+an agent's choice. A summaries-first context block with quotas, as in
+OpenViking, put the answer in the prompt less often at the same size
+(quoted 0.857 against 0.964 for four whole passages of 2{,}759 characters)
+and more often only with 25 to 70\,\% more text, which costs prompt reading
+on four cores; the chat prompt keeps whole passages.
+
 \textbf{The open problem} is still the reworded question: the answering
 passage is first for 16\,\% of such questions and within the first eight for
 24\,\%.
@@ -488,6 +500,8 @@ A difficulty signal from the question alone (nearest labelled questions; prototy
 Sentences of six passages packed into a block of 2{,}400 characters, headers counted, in place of four whole passages & prompts 25\,\% shorter and answers 20 to 26\,\% sooner (42 of 50 pairs); 39 of 50 right against 42 ($p=0.38$) & the answers lost took a number from the wrong excerpt; kept as an option \\
 Cache-blocking the prompt's weight products; a smaller prompt chunk & within $\pm3\,\%$ once the benchmark was warmed up & reading a prompt is bound by the kernel's arithmetic, not by the caches \\
 A meaning weight of 0.3 or 0.5 with sentence windows & reworded MRR 0.201 to 0.216 and 0.228; quoted 0.922 to 0.867 and 0.857 & the quoted questions pay for it \\
+Summaries-first context block with quotas \cite{openviking2026} & answer in prompt 0.857 against 0.964 at the same size (quoted) & needs 25 to 70\,\% more text to gain \\
+Scoping a search to a document guessed from its terms & fired on 11 of 198 questions, right 5 times; quoted MRR 0.870 to 0.841 & a correct scope helps, a guessed one does not \\
 Sentence windows counted in full ($m=1$) & reworded MRR 0.182 against 0.201 at $m=0.5$ & a short window outranks the passage that answers \\
 Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.77 passages a prompt (quoted), 3.33 to 2.99 (reworded); the answering passage left one prompt & a tenth of a passage saved for an answer lost \\
 \bottomrule
@@ -496,16 +510,16 @@ Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.7
 
 \subsection{Validation}
 \label{sec:eval:validation}
-The workspace has 513 Rust tests, including the ported upstream suites of the
+The workspace has 533 Rust tests, including the ported upstream suites of the
 patch parser and the Lean rules, bit-identity tests of the batched engine and
 parity tests of the memory module; formatting, lints and dependency audits
 are clean. Live sweeps on the final build pass: the API contract, 26 of 26
 security probes (sandbox escape, injection, authentication, limits) with no
-open high-severity finding, 33 of 33 knowledge-security checks, 69 of 69
+open high-severity finding, 33 of 33 knowledge-security checks, 74 of 74
 end-to-end checks of every endpoint and page, 10 of 10 chat-room checks, 55
 knowledge checks, 14 of 14 checks of the conversation memory, 53 of 53 checks
 of the agent harness and all nine acceptance tests (the first token of a
-quick reply after 0.25\,s; a verified deliberate answer after 155\,s against
+quick reply after 0.15\,s; a verified deliberate answer after 182\,s against
 a target of 240\,s). The acceptance latencies depend on what else the machine
 is doing: an earlier sweep the same day, under a load average of 30 to 40
 from other workloads, missed both targets (2.6\,s and 420\,s) with correct
