@@ -8,6 +8,7 @@ pub mod dataset;
 pub mod embed;
 pub mod graph;
 pub mod index;
+pub mod layout;
 pub mod parse;
 pub mod store;
 pub mod vcache;
@@ -614,11 +615,13 @@ impl Kb {
         // Vectors are about to be written for this base: a copy made before is stale from here on.
         self.vcache.drop_kb(kb);
         if todo.is_empty() {
-            return self
+            let n = self
                 .store
                 .finish_vectors(kb, doc, &e.cfg.model, e.cfg.dims)
                 .await
-                .map_err(|x| x.to_string());
+                .map_err(|x| x.to_string())?;
+            self.embed_pieces(kb, doc, title).await;
+            return Ok(n);
         }
         self.store
             .set_status(doc, "embedding", None)
@@ -668,7 +671,69 @@ impl Kb {
             ms = t0.elapsed().as_millis() as u64,
             "knowledge passages embedded"
         );
+        self.embed_pieces(kb, doc, title).await;
         Ok(n)
+    }
+
+    /// Phase 28 (`[knowledge] piece_chars`): give each embedded passage of a document vectors for its sentence
+    /// windows, so a question about one sentence can find the passage that holds it. A failure leaves the passage
+    /// searchable by its own vector; the windows are made again on the next reindex.
+    async fn embed_pieces(&self, kb: &str, doc: &str, title: &str) {
+        let (Some(e), target) = (&self.embedder, self.cfg.index.piece_chars) else {
+            return;
+        };
+        if target == 0 {
+            return;
+        }
+        let Ok(todo) = self.store.chunks_without_pieces(doc).await else {
+            return;
+        };
+        let t0 = Instant::now();
+        let mut made = 0usize;
+        for batch in todo.chunks(e.cfg.batch.max(1)) {
+            let windows: Vec<Vec<String>> = batch
+                .iter()
+                .map(|c| {
+                    chunk::pieces(&c.text, target)
+                        .into_iter()
+                        .map(|p| embed::passage_text(title, &c.heading, &c.context, &p))
+                        .collect()
+                })
+                .collect();
+            let flat: Vec<String> = windows.iter().flatten().cloned().collect();
+            let mut vecs = if flat.is_empty() {
+                Vec::new()
+            } else {
+                match e.embed(&flat, None).await {
+                    Ok(v) => v,
+                    Err(err) => {
+                        tracing::warn!(doc, %err, "sentence windows not embedded");
+                        return;
+                    }
+                }
+            }
+            .into_iter();
+            let rows: Vec<(String, Vec<Vec<f32>>)> = batch
+                .iter()
+                .zip(&windows)
+                .map(|(c, w)| (c.id.clone(), vecs.by_ref().take(w.len()).collect()))
+                .collect();
+            made += flat.len();
+            if self.store.set_pieces(&rows).await.is_err() {
+                return;
+            }
+        }
+        if !todo.is_empty() {
+            self.index
+                .refresh_doc(&self.store, kb, doc, e.cfg.dims)
+                .await;
+            tracing::info!(
+                doc,
+                windows = made,
+                ms = t0.elapsed().as_millis() as u64,
+                "sentence windows embedded"
+            );
+        }
     }
 
     /// Queue every ready document (of one knowledge base, or all) whose passages are not all embedded.
@@ -695,7 +760,16 @@ impl Kb {
                 self.foreign.lock().expect("embedder identity").remove(base);
             }
         }
-        let docs = self.store.documents_missing_vectors(kb).await?;
+        let mut docs = self.store.documents_missing_vectors(kb).await?;
+        // Phase 28: with sentence windows on, a base's ready documents are visited too; the pass embeds only the
+        // windows that are missing, so a base indexed before the setting was turned on gets them.
+        if let (Some(base), true) = (kb, self.cfg.index.piece_chars > 0) {
+            for d in self.store.list_documents(base).await? {
+                if d.status == "ready" && !docs.iter().any(|x| x.id == d.id) {
+                    docs.push(d);
+                }
+            }
+        }
         for d in &docs {
             self.enqueue(&d.kb, &d.id, JobKind::Vectors);
         }

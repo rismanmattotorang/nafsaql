@@ -1,5 +1,5 @@
 {
- "measured_at": "2026-11-11T14:42:45Z",
+ "measured_at": "2026-11-12T23:46:24Z",
  "base": "http://127.0.0.1:8080",
  "passed": 69,
  "failed": 0,
@@ -12,7 +12,7 @@
   {
    "check": "GET /metrics",
    "pass": true,
-   "detail": "200 text/plain 4829 B"
+   "detail": "200 text/plain 2287 B"
   },
   {
    "check": "GET /openapi.json",
@@ -42,12 +42,12 @@
   {
    "check": "GET /v1/conversations",
    "pass": true,
-   "detail": "200 application/json 19598 B"
+   "detail": "200 application/json 19964 B"
   },
   {
    "check": "GET /v1/drift",
    "pass": true,
-   "detail": "200 application/json 13175 B"
+   "detail": "200 application/json 13471 B"
   },
   {
    "check": "GET /v1/eval/datasets",
@@ -77,7 +77,7 @@
   {
    "check": "GET /v1/gates",
    "pass": true,
-   "detail": "200 application/json 4331 B"
+   "detail": "200 application/json 4330 B"
   },
   {
    "check": "GET /v1/harness",
@@ -87,12 +87,12 @@
   {
    "check": "GET /v1/kb",
    "pass": true,
-   "detail": "200 application/json 549 B"
+   "detail": "200 application/json 1263 B"
   },
   {
    "check": "GET /v1/kb/status",
    "pass": true,
-   "detail": "200 application/json 632 B"
+   "detail": "200 application/json 633 B"
   },
   {
    "check": "GET /v1/lab/insights",
@@ -107,7 +107,7 @@
   {
    "check": "GET /v1/perf/stages",
    "pass": true,
-   "detail": "200 application/json 2281 B"
+   "detail": "200 application/json 484 B"
   },
   {
    "check": "GET /v1/preferences",
@@ -127,12 +127,12 @@
   {
    "check": "GET /v1/system",
    "pass": true,
-   "detail": "200 application/json 7181 B"
+   "detail": "200 application/json 7180 B"
   },
   {
    "check": "GET /v1/system/activity",
    "pass": true,
-   "detail": "200 application/json 35743 B"
+   "detail": "200 application/json 35695 B"
   },
   {
    "check": "GET /v1/tazkiya",
@@ -157,7 +157,7 @@
   {
    "check": "chat: verified math reply",
    "pass": true,
-   "detail": "fast verified 3.1s"
+   "detail": "fast verified 1.4s"
   },
   {
    "check": "chat: stage timings recorded (NFR-030)",
@@ -167,7 +167,7 @@
   {
    "check": "chat: unverified math stages add up to the wall time",
    "pass": true,
-   "detail": "counted 5268 ms of 16004 ms; 0 sample_after stage(s)"
+   "detail": "counted 3287 ms of 10153 ms; 0 sample_after stage(s)"
   },
   {
    "check": "rooms: create normalises the name (201)",
@@ -227,7 +227,7 @@
   {
    "check": "perf: latency breakdown (P7-T01)",
    "pass": true,
-   "detail": "479 replies"
+   "detail": "5 replies"
   },
   {
    "check": "system: switching to a stopped backend is refused",

@@ -131,6 +131,11 @@ pub struct KnowledgeCfg {
     pub graph_arm_weight: f64,
     /// Phase 26: a question word the base does not hold is replaced by the nearest word it does hold (a typing slip).
     pub fuzzy_terms: bool,
+    /// Phase 28: target size (characters) of the sentence windows of a passage that get vectors of their own
+    /// (semtools' small search unit); 0 = none. Costs about one more embedding pass per document.
+    pub piece_chars: usize,
+    /// Phase 28: how much a passage's best sentence window counts in its meaning score (0 to 1).
+    pub piece_mix: f32,
     /// Phase 26, chat: among the passages that pass the relevance filter, those after the largest drop in meaning
     /// similarity are left out when that drop is at least this large (0 = keep all `rag_k`).
     pub rag_elbow_gap: f64,
@@ -213,6 +218,10 @@ impl Default for KnowledgeCfg {
             fusion_alpha: 0.2,
             graph_arm_weight: 0.0,
             fuzzy_terms: true,
+            // Measured (Phase 28, 242 questions): quoted MRR 0.870 to 0.922, reworded 0.194 to 0.201, two-passage
+            // 0.570 to 0.571, no set worse.
+            piece_chars: 240,
+            piece_mix: 0.5,
             rag_elbow_gap: 0.0,
             followup_context: true,
             support_check: true,

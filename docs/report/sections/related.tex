@@ -81,7 +81,12 @@ reports which of these pay on four cores.
 \subsection{Retrieval, graphs and memory}
 Hybrid retrieval fuses lexical and dense rankings, commonly by reciprocal rank
 \cite{cormack2009rrf}, and indexing a passage with its context improves both
-\cite{anthropic2024contextual}. Graph-based retrieval builds an entity graph
+\cite{anthropic2024contextual}. Layout analysis decides what a passage is in
+the first place: LiteParse \cite{liteparse2026} reads PDF pages by recursive
+XY-cut over positioned glyphs, with headings, tables and running headers found
+by geometry and no model, and semtools \cite{semtools2026} searches with
+static embeddings of single lines and returns a window around each hit.
+Graph-based retrieval builds an entity graph
 over passages; OntoSmith \cite{ontosmith2026} governs such a graph with a
 pinned ontology. Memorilla \cite{memorilla2026} compresses a document
 collection into a few vectors that a frozen decoder reads as input tokens.

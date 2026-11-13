@@ -41,7 +41,14 @@ pub fn chunk(doc: &Parsed, opts: ChunkOpts) -> Vec<Chunk> {
         .with_overlap(overlap)
         .expect("overlap is below the minimum");
     let splitter = MarkdownSplitter::new(cfg);
-    let headings = heading_index(&doc.text);
+    let mut headings = heading_index(&doc.text);
+    // The document's own title as its first heading is already the passage's title: repeating it in every heading
+    // path only costs tokens in the vectors' text and in the prompt's source headers.
+    if let (Some(t), Some(first)) = (&doc.title, headings.first()) {
+        if first.1 == 1 && first.2 == *t && !headings[1..].iter().any(|h| h.1 == 1) {
+            headings.remove(0);
+        }
+    }
     splitter
         .chunk_indices(&doc.text)
         .filter(|(_, t)| t.chars().any(char::is_alphanumeric))
@@ -54,6 +61,83 @@ pub fn chunk(doc: &Parsed, opts: ChunkOpts) -> Vec<Chunk> {
             text: text.to_string(),
         })
         .collect()
+}
+
+/// Phase 28 (semtools' small search unit): the sentence windows of a passage that get vectors of their own. A
+/// passage's vector averages everything it says, so a question about one of its sentences, put in other words, can
+/// sit far from it; a window of two or three sentences is matched instead and scores the passage it belongs to.
+/// Sentences are packed in order to about `target` characters (never across a table row or a list item); a passage
+/// that makes a single window gets none, its own vector already is that window.
+pub fn pieces(text: &str, target: usize) -> Vec<String> {
+    // (text, is a table row): rows and sentences do not share a window.
+    let mut units: Vec<(String, bool)> = Vec::new();
+    for block in text.split("\n\n") {
+        let block = block.trim();
+        if block.is_empty() {
+            continue;
+        }
+        // Table rows and list items stay whole; a separator row carries no words.
+        if block.lines().all(|l| l.trim_start().starts_with('|')) {
+            units.extend(
+                block
+                    .lines()
+                    .filter(|l| l.chars().any(char::is_alphanumeric))
+                    .map(|l| (l.to_string(), true)),
+            );
+            continue;
+        }
+        let flat = block.split_whitespace().collect::<Vec<_>>().join(" ");
+        let mut start = 0;
+        let b = flat.as_bytes();
+        for i in 1..b.len().saturating_sub(1) {
+            // A sentence ends at . ! ? followed by a space and a capital, a digit or an opening mark.
+            if matches!(b[i], b'.' | b'!' | b'?')
+                && b[i + 1] == b' '
+                && flat[i + 2..]
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_uppercase() || c.is_ascii_digit() || "([\"'".contains(c))
+                && i + 1 - start >= 20
+            {
+                units.push((flat[start..=i].to_string(), false));
+                start = i + 2;
+            }
+        }
+        if start < flat.len() {
+            units.push((flat[start..].to_string(), false));
+        }
+    }
+    let mut out: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut cur_rows = false;
+    for (u, row) in units {
+        if !cur.is_empty() && (cur.len() + u.len() + 1 > target * 3 / 2 || row != cur_rows) {
+            out.push(std::mem::take(&mut cur));
+        }
+        if !cur.is_empty() {
+            cur.push(' ');
+        }
+        cur.push_str(&u);
+        cur_rows = row;
+        if cur.len() >= target {
+            out.push(std::mem::take(&mut cur));
+        }
+    }
+    if !cur.is_empty() {
+        // A short tail joins the window before it.
+        match out.last_mut() {
+            Some(last) if cur.len() < target / 3 => {
+                last.push(' ');
+                last.push_str(&cur);
+            }
+            _ => out.push(cur),
+        }
+    }
+    out.retain(|p| p.chars().filter(|c| c.is_alphanumeric()).count() >= 12);
+    if out.len() < 2 {
+        return Vec::new();
+    }
+    out
 }
 
 /// Every Markdown heading in the text: (byte offset, level, title).
@@ -177,6 +261,23 @@ mod tests {
         );
         assert_eq!(c.first().unwrap().page, Some(1));
         assert_eq!(c.last().unwrap().page, Some(2));
+    }
+
+    #[test]
+    fn pieces_pack_sentences_and_keep_rows_whole() {
+        let para = "The gate reads the draft. It escalates when the error is likely. The verifier decides alone. \
+                    A reask counts as evidence. Budgets are fixed per request. The ledger keeps every outcome.";
+        let text = format!("{para}\n\n| Model | Size |\n| --- | --- |\n| Qwen3-1.7B | 1.26 GiB |");
+        let p = pieces(&text, 120);
+        assert!(p.len() >= 3, "{p:?}");
+        assert!(p.iter().all(|x| !x.contains("outcome. |")), "{p:?}");
+        assert!(p.iter().all(|x| x.len() <= 180), "{p:?}");
+        assert!(
+            p.iter().any(|x| x.contains("| Qwen3-1.7B | 1.26 GiB |")),
+            "{p:?}"
+        );
+        assert!(!p.iter().any(|x| x.contains("---")), "{p:?}");
+        assert!(pieces("One short sentence only.", 120).is_empty());
     }
 
     #[test]

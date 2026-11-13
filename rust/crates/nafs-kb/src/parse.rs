@@ -236,7 +236,62 @@ fn first_heading(md: &str) -> Option<String> {
 
 // ---------------------------------------------------------------- PDF
 
+/// How a PDF page becomes text (Phase 28).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PdfLayout {
+    /// Our layout pass over the positioned spans (`crate::layout`): columns, headings, running lines, table rows.
+    #[default]
+    Spans,
+    /// `pdf_oxide`'s own Markdown converter (the reader before Phase 28), kept for comparison.
+    Converter,
+}
+
+impl PdfLayout {
+    /// `NAFS_KB_PDF_LAYOUT=converter` selects the earlier reader (for comparisons); anything else the layout pass.
+    pub fn from_env() -> PdfLayout {
+        match std::env::var("NAFS_KB_PDF_LAYOUT").as_deref() {
+            Ok("converter") => PdfLayout::Converter,
+            _ => PdfLayout::Spans,
+        }
+    }
+}
+
+fn pdf_spans(doc: &pdf_oxide::PdfDocument, i: usize) -> Option<crate::layout::Page> {
+    let (x0, y0, x1, y1) = doc.get_page_media_box(i).ok()?;
+    let spans = doc.extract_spans(i).ok()?;
+    let spans = spans
+        .into_iter()
+        .map(|s| {
+            let name = s.font_name.to_ascii_lowercase();
+            let bold = s.font_weight.is_bold()
+                || ["bold", "black", "heavy", "semibold", "demi", "-medi"]
+                    .iter()
+                    .any(|k| name.contains(k));
+            let italic = s.is_italic || name.contains("ital") || name.contains("oblique");
+            crate::layout::Span {
+                x0: s.bbox.x - x0,
+                x1: s.bbox.x + s.bbox.width - x0,
+                y0: s.bbox.y - y0,
+                y1: s.bbox.y + s.bbox.height - y0,
+                size: s.font_size,
+                bold,
+                italic,
+                text: s.text,
+            }
+        })
+        .collect();
+    Some(crate::layout::Page {
+        width: (x1 - x0).abs(),
+        height: (y1 - y0).abs(),
+        spans,
+    })
+}
+
 fn parse_pdf(bytes: &[u8]) -> Result<Parsed, String> {
+    parse_pdf_with(bytes, PdfLayout::from_env())
+}
+
+pub fn parse_pdf_with(bytes: &[u8], layout: PdfLayout) -> Result<Parsed, String> {
     let doc = pdf_oxide::PdfDocument::from_bytes(bytes.to_vec())
         .map_err(|e| format!("the PDF could not be read: {e}"))?;
     let n = doc
@@ -247,12 +302,38 @@ fn parse_pdf(bytes: &[u8]) -> Result<Parsed, String> {
         ..Default::default()
     };
     // One unreadable page must not lose the document: fall back to plain text, then to nothing.
-    let pages: Vec<String> = (0..n)
-        .map(|i| {
-            doc.to_markdown(i, &opts)
-                .or_else(|_| doc.extract_text(i))
-                .unwrap_or_default()
-        })
+    let converter = |i: usize| {
+        doc.to_markdown(i, &opts)
+            .or_else(|_| doc.extract_text(i))
+            .unwrap_or_default()
+    };
+    let pages: Vec<String> = match layout {
+        PdfLayout::Converter => (0..n).map(converter).collect(),
+        PdfLayout::Spans => {
+            let spans: Vec<Option<crate::layout::Page>> =
+                (0..n).map(|i| pdf_spans(&doc, i)).collect();
+            let read: Vec<crate::layout::Page> = spans
+                .iter()
+                .map(|p| p.clone().unwrap_or_default())
+                .collect();
+            // A layout rule that fails on an odd page must not lose the document: the converter reads it instead.
+            match std::panic::catch_unwind(|| crate::layout::markdown(read)) {
+                Ok(md) => md
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, md)| if spans[i].is_none() { converter(i) } else { md })
+                    .collect(),
+                Err(_) => {
+                    tracing::warn!(
+                        "the PDF layout pass failed; using the converter for this document"
+                    );
+                    (0..n).map(converter).collect()
+                }
+            }
+        }
+    };
+    let pages: Vec<String> = pages
+        .into_iter()
         .map(|p| tidy_pdf_markdown(&clean(&p)))
         .collect();
     let pages = drop_running_lines(pages);
@@ -1258,6 +1339,40 @@ The fast path (\Sone) drafts; \Gw\ routes to the \kb{} and \Sone\ answers. \Stwo
         );
         assert_eq!(p.page_at(0), Some(1));
         assert_eq!(p.page_at(p.page_starts[2]), Some(3));
+    }
+
+    #[test]
+    fn two_column_paper_reads_in_column_order_with_its_sections() {
+        // The project's own IEEE two-column paper (in version control): the layout pass must keep sentences whole
+        // across the columns' lines and mark the numbered sections as headings.
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../../docs/report/nafs_aql_report.pdf"
+        );
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let p = parse_pdf_with(&bytes, PdfLayout::Spans).unwrap();
+        assert!(
+            p.text.contains("## I. INTRODUCTION"),
+            "{}",
+            &p.text[..2000.min(p.text.len())]
+        );
+        assert!(p.text.contains("## II. RELATED WORK"));
+        assert!(p
+            .title
+            .as_deref()
+            .is_some_and(|t| t.starts_with("Nafs-Aql: A Verifier-Gated")));
+        // A sentence that wraps over several lines of the left column, read whole.
+        assert!(
+            p.text
+                .contains("there is a fast, automatic mode and a slow, effortful one"),
+            "{}",
+            &p.text[..3000.min(p.text.len())]
+        );
+        let converter = parse_pdf_with(&bytes, PdfLayout::Converter).unwrap();
+        let headings = |t: &str| t.lines().filter(|l| l.starts_with('#')).count();
+        assert!(headings(&p.text) > 3 * headings(&converter.text).max(1));
     }
 
     #[test]

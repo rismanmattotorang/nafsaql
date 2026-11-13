@@ -103,6 +103,9 @@ pub struct Params {
     /// Phase 26: a question word the base does not hold is replaced by the nearest word it does hold (one edit away,
     /// two for a long word), so a typing slip does not cost the passage.
     pub fuzzy: bool,
+    /// Phase 28: how much a passage's best sentence window counts in its meaning score (0 = the passage's own
+    /// vector only; see `Base::similarities_mixed`).
+    pub piece_mix: f32,
 }
 
 impl Default for Params {
@@ -113,6 +116,7 @@ impl Default for Params {
             prf: None,
             ppr: None,
             fuzzy: true,
+            piece_mix: 0.5,
         }
     }
 }
@@ -150,6 +154,8 @@ pub struct IndexConfig {
     /// The most memory (MB) the indexes of all bases may use; 0 turns the index off (every search uses the store).
     pub memory_mb: u64,
     pub params: Params,
+    /// Phase 28: target size (characters) of the sentence windows that get vectors of their own; 0 = none.
+    pub piece_chars: usize,
 }
 
 impl Default for IndexConfig {
@@ -157,6 +163,7 @@ impl Default for IndexConfig {
         IndexConfig {
             memory_mb: 512,
             params: Params::default(),
+            piece_chars: 0,
         }
     }
 }
@@ -431,6 +438,8 @@ pub struct Row {
     pub context: String,
     pub text: String,
     pub embedding: Option<Vec<f32>>,
+    /// Phase 28: vectors of the passage's sentence windows (`crate::chunk::pieces`), empty when it has none.
+    pub pieces: Vec<Vec<f32>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -453,6 +462,9 @@ pub struct Part {
     /// One row per passage, unit length; zeros where the passage has no vector yet.
     vecs: Vec<f32>,
     has_vec: Vec<bool>,
+    /// Sentence-window vectors, unit length, one row each, and the passage (position in the document) each belongs to.
+    pvecs: Vec<f32>,
+    powner: Vec<u32>,
     cands: Vec<Vec<Cand>>,
     bytes: usize,
 }
@@ -472,6 +484,7 @@ impl Part {
         let mut len_sum = [0u64; FIELDS];
         let mut vecs = vec![0f32; n * dims];
         let mut has_vec = vec![false; n];
+        let (mut pvecs, mut powner) = (Vec::new(), Vec::new());
         let mut cands = Vec::with_capacity(n);
         let mut bytes = 0usize;
         // The title is the same for every passage of the document: analysed once.
@@ -514,13 +527,21 @@ impl Part {
                     has_vec[i] = true;
                 }
             }
+            for mut v in std::mem::take(&mut r.pieces) {
+                if v.len() == dims && dims > 0 {
+                    normalise(&mut v);
+                    pvecs.extend_from_slice(&v);
+                    powner.push(i as u32);
+                }
+            }
             let mut c = Vec::new();
             candidates(&r.heading, true, &mut c);
             candidates(&r.text, false, &mut c);
             bytes += r.text.len() + r.heading.len() + r.context.len() + r.id.len() + c.len() * 48;
             cands.push(c);
         }
-        bytes += postings.keys().map(|k| k.len() + 48).sum::<usize>() + vecs.len() * 4;
+        bytes +=
+            postings.keys().map(|k| k.len() + 48).sum::<usize>() + vecs.len() * 4 + pvecs.len() * 4;
         Part {
             doc_id: doc_id.to_string(),
             title: title.to_string(),
@@ -531,6 +552,8 @@ impl Part {
             dims,
             vecs,
             has_vec,
+            pvecs,
+            powner,
             cands,
             bytes,
         }
@@ -857,6 +880,11 @@ impl Base {
         }
     }
 
+    /// Passage `g` as a hit with no scores (its text, heading, document and page).
+    pub fn passage(&self, g: u32) -> Hit {
+        self.hit(g, 0.0, None, None, 0)
+    }
+
     /// The BM25F score of every passage for weighted terms (0 where no term matches).
     pub fn lexical_scores(&self, terms: &[(String, f32)], p: &Bm25) -> Vec<f32> {
         let mut score = vec![0f32; self.n];
@@ -912,6 +940,34 @@ impl Base {
                     f32::NEG_INFINITY
                 });
             }
+        }
+        Some(out)
+    }
+
+    /// Phase 28: the meaning score of every passage with its sentence windows counted: `(1 - mix) * own +
+    /// mix * max(own, best window)`. With `mix = 0`, or no windows, the passage's own similarity.
+    pub fn similarities_mixed(&self, q: &[f32], mix: f32) -> Option<Vec<f32>> {
+        let mut out = self.similarities(q)?;
+        if mix <= 0.0 || self.parts.iter().all(|p| p.powner.is_empty()) {
+            return Some(out);
+        }
+        let mut q = q.to_vec();
+        normalise(&mut q);
+        let mut at = 0;
+        for part in &self.parts {
+            let mut best = vec![f32::NEG_INFINITY; part.rows.len()];
+            for (k, &owner) in part.powner.iter().enumerate() {
+                let s = dot(&part.pvecs[k * part.dims..(k + 1) * part.dims], &q);
+                let b = &mut best[owner as usize];
+                *b = b.max(s);
+            }
+            for (i, b) in best.into_iter().enumerate() {
+                let own = &mut out[at + i];
+                if own.is_finite() && b.is_finite() {
+                    *own = (1.0 - mix) * *own + mix * own.max(b);
+                }
+            }
+            at += part.rows.len();
         }
         Some(out)
     }
@@ -1027,7 +1083,7 @@ impl Base {
             .then(|| self.lexical_scores(&self.weighted_terms(an, query, p), &p.bm25));
         let sim = match mode {
             SearchMode::Lexical => None,
-            _ => qv.and_then(|q| self.similarities(q)),
+            _ => qv.and_then(|q| self.similarities_mixed(q, p.piece_mix)),
         };
         let lex_top = lex.as_ref().map(|s| top(s, depth, 0.0)).unwrap_or_default();
         let vec_top = sim
@@ -1594,6 +1650,7 @@ mod tests {
             context: String::new(),
             text: text.into(),
             embedding: v,
+            pieces: Vec::new(),
         }
     }
 
@@ -1633,6 +1690,46 @@ mod tests {
             &an,
         );
         Base::new(vec![Arc::new(a), Arc::new(b)])
+    }
+
+    #[test]
+    fn a_passage_is_scored_by_its_best_sentence_window_when_mixed() {
+        let an = Analyzer::default();
+        let mut far = row(
+            "p0",
+            0,
+            "",
+            "Long passage about many things.",
+            Some(vec![1.0, 0.0]),
+        );
+        // One of its windows says exactly what the question asks.
+        far.pieces = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        let near = row(
+            "p1",
+            1,
+            "",
+            "A passage somewhat close to the question.",
+            Some(vec![0.6, 0.8]),
+        );
+        let base = Base::new(vec![Arc::new(Part::build(
+            "d",
+            "Doc",
+            vec![far, near],
+            2,
+            &an,
+        ))]);
+        let q = [0.0, 1.0];
+        let own = base.similarities_mixed(&q, 0.0).unwrap();
+        assert!(own[1] > own[0]);
+        let mixed = base.similarities_mixed(&q, 1.0).unwrap();
+        assert!(
+            (mixed[0] - 1.0).abs() < 1e-6 && mixed[0] > mixed[1],
+            "{mixed:?}"
+        );
+        let half = base.similarities_mixed(&q, 0.5).unwrap();
+        assert!((half[0] - 0.5).abs() < 1e-6, "{half:?}");
+        // A passage without windows keeps its own score.
+        assert!((mixed[1] - own[1]).abs() < 1e-6);
     }
 
     #[test]

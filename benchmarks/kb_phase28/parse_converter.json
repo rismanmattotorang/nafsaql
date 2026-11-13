@@ -1,0 +1,59 @@
+{
+  "mean": {
+    "headings": 0.2056338028169014,
+    "junk": 0.506711367360184,
+    "order": 0.6920215800671354
+  },
+  "rows": [
+    {
+      "heading_lines": 1,
+      "headings": 0.028169014084507043,
+      "junk": 0.31266728913787734,
+      "ms": 2632.361887,
+      "order": 0.7814025900502442,
+      "pages": 23,
+      "pdf": "docs/report/nafs_aql_report.pdf",
+      "titles": 71
+    },
+    {
+      "heading_lines": 2,
+      "headings": 0.0,
+      "junk": 0.6650998824911869,
+      "ms": 2379.562575,
+      "order": 0.7125,
+      "pages": 29,
+      "pdf": "docs/spec/nafs_aql_spec.pdf",
+      "titles": 60
+    },
+    {
+      "heading_lines": 9,
+      "headings": 0.0,
+      "junk": 0.49364837398373984,
+      "ms": 759.091595,
+      "order": 0.6443582282573553,
+      "pages": 15,
+      "pdf": "docs/roadmap/nafs_aql_roadmap.pdf",
+      "titles": 22
+    },
+    {
+      "heading_lines": 2,
+      "headings": 0.0,
+      "junk": 0.3544910179640719,
+      "ms": 158.367377,
+      "order": 0.7973372781065089,
+      "pages": 4,
+      "pdf": "docs/publication/nafs_aql_lab_results.pdf",
+      "titles": 11
+    },
+    {
+      "heading_lines": 12,
+      "headings": 1.0,
+      "junk": 0.7076502732240437,
+      "ms": 1269.4726190000001,
+      "order": 0.5245098039215687,
+      "pages": 40,
+      "pdf": "docs/slides/nafs_aql_slides.pdf",
+      "titles": 9
+    }
+  ]
+}
