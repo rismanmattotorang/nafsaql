@@ -1,4 +1,4 @@
-# Nafs-Aql API reference (v1.5.1)
+# Nafs-Aql API reference (v1.6.0)
 
 Generated from `api/openapi.yaml` by `scripts/gen_api_reference.py`; do not edit by hand.
 
@@ -236,6 +236,130 @@ Resume an interrupted or cancelled evaluation run, keeping completed items (runs
 Parameters: `run_id` (path, required).
 
 Responses: `202`, `400`, `404`, `403`.
+
+## files
+
+### `POST /v1/compile`
+
+Render a knowledge base as a wiki, a graph or a report (Markdown files), with no model call
+
+Request body: `from`*, `to`* (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/fs/assemble`
+
+A budgeted context block: every hit at its summary first, the best in full
+
+Request body: `query`*, `scope`, `chars` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/fs/find`
+
+Run a question within a scope (a base, a document, a memory kind, skills); no model call
+
+Request body: `query`*, `scope`, `k` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `GET /v1/fs/glob`
+
+URIs matching a pattern (* within a segment, ** across)
+
+Parameters: `pattern` (query, required).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/fs/grep`
+
+Lines matching a literal or regular expression within a scope
+
+Request body: `pattern`*, `scope`, `regex`, `limit` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `GET /v1/fs/ls`
+
+Children of a folder in the context filesystem, each with its one-line summary (L0)
+
+Parameters: `uri` (query), `layers` (query).
+
+Responses: `200`, `400`, `403`.
+
+### `GET /v1/fs/read`
+
+Read an item at a level: 0 summary, 1 overview, 2 full
+
+Parameters: `uri` (query), `level` (query).
+
+Responses: `200`, `400`, `403`.
+
+### `DELETE /v1/fs/rm`
+
+Remove a memory file, a skill or a saved session
+
+Parameters: `uri` (query, required).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/fs/search`
+
+A planned search: the scopes are chosen by rule from the question and the conversation
+
+Request body: `query`*, `conversation`, `k` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `GET /v1/fs/stat`
+
+An item's kind, layer sizes and parent
+
+Parameters: `uri` (query).
+
+Responses: `200`, `400`, `403`.
+
+### `GET /v1/fs/tree`
+
+A folder's subtree with summaries
+
+Parameters: `uri` (query), `depth` (query).
+
+Responses: `200`, `400`, `403`.
+
+### `PUT /v1/fs/write`
+
+Write a memory file or a skill
+
+Parameters: `uri` (query, required).
+
+Request body: `content`* (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `GET /v1/memory/diff`
+
+Every change to the memory files, newest first
+
+Parameters: `limit` (query).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/memory/diff/{change_id}/undo`
+
+Put a memory file back as it was before one change
+
+Parameters: `change_id` (path, required).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/sessions/{conversation_id}/commit`
+
+Save a conversation as a file and keep what it said about the person as memory files
+
+Parameters: `conversation_id` (path, required).
+
+Responses: `200`, `400`, `403`.
 
 ## gate
 

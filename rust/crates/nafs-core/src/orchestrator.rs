@@ -1096,7 +1096,38 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         // A message that asked for something to be kept is the note itself; its turn is not stored a second time.
         let mut noted = false;
         if personal && memory.is_none() {
+            // Phase 29: the person's memory files (profile and preferences always; matching entities, events and
+            // notes when the recall gate opens), so a stated preference applies to every later answer.
+            let ask = nafs_memory::recall::should_recall(
+                &user.content,
+                source_texts.iter().any(|t| !t.is_empty()),
+            );
+            match self.store.memory_context(
+                ask.then_some(user.content.as_str()),
+                cfg.recall.budget_chars,
+            ) {
+                Ok(Some((block, uris))) => {
+                    system.push_str("\n\n");
+                    system.push_str(&delimit(
+                        "remembered",
+                        &block,
+                        cfg.recall.budget_chars + 400,
+                    ));
+                    sources.push(json!({"memory_files": uris}));
+                }
+                Ok(None) => {}
+                Err(e) => tracing::warn!(error = %e, "the memory files could not be read"),
+            }
             if let Some(note) = nafs_memory::recall::note_request(&user.content) {
+                // The note is also a memory file (with its diff row), so it can be read and edited as a file.
+                for c in nafs_context::memory::extract(&user.content) {
+                    if let Err(e) = self
+                        .store
+                        .remember_candidate(&c, conv.map(|c| c.to_string()).as_deref())
+                    {
+                        tracing::warn!(error = %e, "the memory file could not be written");
+                    }
+                }
                 match self.store.remember_note(note) {
                     Ok(_) => {
                         noted = true;

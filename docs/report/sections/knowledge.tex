@@ -129,6 +129,37 @@ override was the decisive change (Section~\ref{sec:eval:knowledge}).
 Extraction costs 17 to 28\,s per passage on this machine, so this layer is
 opt-in; the rule-built graph is always there.
 
+\subsection{One context filesystem}
+\label{sec:kb:fs}
+Documents, memory files, skills and saved chats share one namespace
+(Fig.~\ref{fig:files}): \texttt{nafs://kb/\{base\}/\{doc\}\#p\{n\}} names a
+passage, \texttt{nafs://memory/preferences/\{topic\}} a memory file,
+\texttt{nafs://skills/\{name\}} a skill. The names are a view over the
+stores that hold the items, not a copy. Folders can be listed, read, globbed
+and searched with a regular expression, and every item has three levels, as
+in OpenViking \cite{openviking2026}: a one-line summary, an overview and
+the full text. Here the levels need no model: a document's overview is its
+first paragraph, its heading tree, its table and figure captions and its
+most distinctive terms (term frequency times inverse passage frequency, with
+reference lists and structural words left out), its summary the title, the
+first sentence and six terms, and a base's overview its documents'
+summaries. OpenViking writes each summary with a model call per file and per
+folder, which on four cores would take hours for a base of this size. A
+search can be confined to a base, a document, a kind of memory or the
+skills; the passages outside are masked inside the index before ranking, so
+both arms rank within the scope. A knowledge base can be compiled into a
+wiki, a term graph whose relations cite passage addresses, or a report,
+with no model call.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.48\textwidth]{../shared/screenshots/files.png}\hfill
+\includegraphics[width=0.48\textwidth]{../shared/screenshots/files_memory.png}
+\caption{The Files page: a document at its overview, made with no model
+(left); memory files with the log of every change and its undo (right).}
+\label{fig:files}
+\end{figure*}
+
 \subsection{Answering}
 \label{sec:kb:chat}
 Chat has the modes \texttt{rag} (numbered passages), \texttt{graph},

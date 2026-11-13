@@ -676,3 +676,20 @@ details.fold-card>summary h3::before{content:"▸ ";color:var(--faint)}details.f
   .kb-gbar{flex-wrap:wrap}
 }
 .kb-gsrc{margin:2px 0 6px}
+
+/* Files (Phase 29) */
+.fs .fs-find{margin-bottom:14px}
+.fs-crumbs{font-size:13px;display:flex;flex-wrap:wrap;gap:2px;align-items:center;min-width:0}
+.fs-crumbs a{color:var(--accent);text-decoration:none}
+.fs-list .fs-item button{display:grid;grid-template-columns:14px 1fr;gap:2px 6px;text-align:left;width:100%;background:none;border:0;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--text)}
+.fs-list .fs-item button:hover,.fs-list .fs-item button.on{background:var(--surface-2)}
+.fs-ic{color:var(--faint);grid-row:span 2}
+.fs-n{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.fs-l0{grid-column:2;color:var(--muted);font-size:11.5px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.fs-uri code{font-size:11px;word-break:break-all}
+.fs-body{font-size:13.5px;line-height:1.55;max-height:65vh;overflow:auto}
+.fs-diff,.fs-hits{margin:0;padding-left:18px;display:grid;gap:8px;font-size:13px}
+.fs-diff{list-style:none;padding-left:0}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);color:var(--muted)}
+.tag.add{background:var(--ok-bg);color:var(--ok);border-color:transparent}.tag.update{background:var(--fast-bg);color:var(--fast);border-color:transparent}
+.tag.delete{background:var(--bad-bg);color:var(--bad);border-color:transparent}

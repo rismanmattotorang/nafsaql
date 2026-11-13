@@ -69,6 +69,25 @@ Open **Knowledge** in the left bar to give the assistant documents of your own. 
 - **Typing slips** in a question ("converetr") are matched to the nearest word your documents contain.
 - **Memory** modes (experimental, *Advanced* only) use a module trained on the base's documents; they appear once a module has been trained and activated from the *Memory* card. A module that gives the same memory whatever is asked is recognised and not used; the answer then comes from passages and says why.
 
+
+## Files
+
+**Files** shows everything the assistant knows in one tree, each item with a one-line summary: your knowledge bases and
+their documents and passages, your memory, your skills and the chats you saved as files. Every item has an address
+such as `nafs://memory/preferences/answer-language`.
+
+- **Summary, Overview, Full**: an item opens at its overview (for a document: its first paragraph, its sections, its
+  tables and figures and its key terms); *Summary* is one line, *Full* is the whole text.
+- **Search here** searches only the folder you are in (a knowledge base, one document, your memory); *Everywhere* lets
+  the assistant choose where to look.
+- **Memory** holds files you can read, edit, add (*New*) and delete: who you are, how you like things done, people and
+  things in your life, events, and notes. Your profile and preferences are used in every chat. *Recent changes* lists
+  every change and why, and *Undo* puts a file back.
+- **Sessions → Save as file** writes a chat out in full and keeps what you said about yourself ("call me …", "I prefer
+  …", "my manager is …", "remember that …") as memory files.
+- **Skills** are instructions for tasks, written in Markdown; the assistant finds one by its description.
+- A knowledge base can be **compiled** into a wiki, a map of its terms or one report, downloaded as Markdown.
+
 ## What it remembers
 
 The assistant keeps a short note of each finished turn of your saved chats, so that something you told it in one chat can be found in another. Nothing is sent anywhere; the notes are in the same local database as your chats.

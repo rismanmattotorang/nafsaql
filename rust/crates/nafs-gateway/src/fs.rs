@@ -163,11 +163,18 @@ async fn children(s: &AppState, u: &Uri, layers: bool) -> ApiResult<Vec<Value>> 
                 .iter()
                 .map(|h| {
                     let l0 = layers.then(|| passage_l0(&h.heading, &h.text));
+                    let leaf = h.heading.rsplit(" > ").next().unwrap_or("").trim();
+                    let title = match (leaf.is_empty(), h.page) {
+                        (true, Some(p)) => format!("Passage {} (page {p})", h.ord + 1),
+                        (true, None) => format!("Passage {}", h.ord + 1),
+                        (false, Some(p)) => format!("{leaf} (page {p})"),
+                        (false, None) => leaf.to_string(),
+                    };
                     entry(
                         &Uri::passage(base, doc, h.ord),
                         false,
                         l0,
-                        json!({"heading": h.heading, "page": h.page}),
+                        json!({"heading": h.heading, "page": h.page, "title": title}),
                     )
                 })
                 .collect())
@@ -245,7 +252,7 @@ fn kind_l0(kind: &str, n: usize) -> String {
         "events" => "what happened and when",
         _ => "things you asked to be remembered",
     };
-    format!("{kind}: {what} ({n} files)")
+    format!("{kind}: {what} ({n} file{})", if n == 1 { "" } else { "s" })
 }
 
 fn passage_l0(heading: &str, text: &str) -> String {
@@ -367,6 +374,7 @@ async fn layers_of(s: &AppState, u: &Uri) -> ApiResult<Layers> {
             } else {
                 u.path[0].clone()
             };
+            let title = title[..1].to_uppercase() + &title[1..];
             let l1 = format!("# {title}\n\n{}", listing(&items));
             Ok(Layers {
                 l0: if u.path.is_empty() {
@@ -950,29 +958,16 @@ async fn plan(
                 scopes.push((Uri::kb(&b.id), "the whole base"));
                 continue;
             };
-            // A document named by its title, or by a distinctive term no other document of the base has.
-            let layers: Vec<_> = ix
+            // A document named by its title. A rule that also took a document's distinctive terms as naming it
+            // fired on 11 of 198 questions and picked the right document 5 times; scoped and fused with the whole
+            // base it lowered MRR (quoted 0.870 to 0.841), so only an exact title scopes (benchmarks/kb_phase29).
+            let named = ix
                 .documents_list()
-                .iter()
-                .filter_map(|(d, _)| ix.doc_layers(kb.analyzer(), d))
-                .collect();
-            let mut named = None;
-            for l in &layers {
-                let title = l.title.to_lowercase();
-                let title_hit = title.len() >= 6 && lower.contains(&title);
-                let own_term = l.terms.iter().take(3).find(|t| {
-                    let t = t.to_lowercase();
-                    t.len() >= 5
-                        && words.contains(t.as_str())
-                        && !layers.iter().any(|o| {
-                            o.doc_id != l.doc_id && o.terms.iter().any(|x| x.to_lowercase() == t)
-                        })
-                });
-                if title_hit || own_term.is_some() {
-                    named = Some(l.doc_id.clone());
-                    break;
-                }
-            }
+                .into_iter()
+                .find(|(_, title)| {
+                    title.chars().count() >= 8 && lower.contains(&title.to_lowercase())
+                })
+                .map(|(d, _)| d);
             if let Some(d) = named {
                 scopes.push((Uri::doc(&b.id, &d), "the question names this document"));
             }
@@ -1078,12 +1073,18 @@ async fn assemble_route(
 
 // ------------------------------------------------------------------------------------------------- writing
 
+#[derive(Deserialize)]
+struct WriteReq {
+    content: String,
+}
+
 async fn write(
     State(s): State<AppState>,
     Query(q): Query<UriQ>,
-    body: String,
+    Json(w): Json<WriteReq>,
 ) -> ApiResult<Json<Value>> {
     let u = parse_uri(q.uri.as_deref())?;
+    let body = w.content;
     match (u.space, u.path.as_slice()) {
         (Some(Space::Memory), [kind, key]) => {
             if nafs_context::uri::slug(key) != *key {

@@ -72,8 +72,8 @@ passages before ranking, so words and meaning both rank only inside it.
 **find** runs the query as given within the scope and returns hits with their URI, level and score; document L0/L1
 are searched beside passages (a document whose overview matches is returned as `level: 1`).
 
-**search** plans first, by rule: (1) a question that names a document or base by its title (or a distinctive term
-that only one document holds) is scoped to it, (2) a question that leans on the previous turn is joined to it (the
+**search** plans first, by rule: (1) a question that contains a document's exact title is scoped to it (a rule from
+distinctive terms was measured and lowered MRR; §9), (2) a question that leans on the previous turn is joined to it (the
 Phase 26 follow-up rule), (3) a personal question (first-person words, "my", "I prefer") adds the memory space, (4) a
 question that asks how to do a task adds the skills space. It then runs `find` per scope and merges by reciprocal
 rank. A model planner is not called by default.
@@ -132,9 +132,17 @@ prompt may carry the L0 of at most two skills whose description matches the ques
 
 The output is returned as a list of `{path, content}` and can be downloaded as a ZIP; nothing is written to disk.
 
+**Assembly.** `/v1/fs/assemble` returns the budgeted block; the chat prompt keeps four whole passages, because at the
+same size the assembler put the answer in the prompt less often (§9).
+
 ## 9. Measures
 
 Each mechanism is compared with what it replaces, on the existing question sets and the 50-question answer set:
 scoped `find` against the whole base on questions about one document; the assembler against four whole passages
 (answers right, prompt tokens, time to answer, interleaved); rule extraction on a set of written conversations
 (precision and recall of the memory writes); layers' use in ranking (document-level questions).
+
+Results (`benchmarks/kb_phase29/README.md`): the answering document as scope lifts reworded MRR 0.194 to 0.267, a rule
+guessing it from distinctive terms lowers it; the assembler loses answers at equal size (quoted 0.857 against 0.964)
+and gains only with 25 to 70 % more text; rule extraction finds 13 of 14 memories with 1 false on messages written
+after the rules were final.

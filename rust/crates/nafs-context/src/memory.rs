@@ -65,11 +65,20 @@ impl MemoryFile {
             ));
         }
         let (front, body) = split_front_matter(text);
+        // A first line "# Title" is the title, not part of what is remembered.
+        let (heading, body) = match body.trim_start().strip_prefix("# ") {
+            Some(rest) => {
+                let (h, b) = rest.split_once('\n').unwrap_or((rest, ""));
+                (Some(h.trim().to_string()), b)
+            }
+            None => (None, body),
+        };
         let title = front
             .iter()
             .find(|(k, _)| k == "title")
             .map(|(_, v)| v.clone())
             .filter(|t| !t.is_empty())
+            .or(heading)
             .unwrap_or_else(|| title_from(body));
         let sources = front
             .iter()
@@ -281,17 +290,27 @@ fn rules() -> &'static [Rule] {
             kind,
         };
         vec![
-            // "Remember that the deployment key rotates monthly." -> a note.
-            r(r"(?i)^(?:please\s+)?(?:remember|note|keep in mind)(?:\s+that)?[:,]?\s+(?P<x>.{6,400})$", "notes"),
-            // "Call me Ris." / "My name is Ris." -> profile.
-            r(r"(?i)^(?:please\s+)?call me\s+(?P<name>[\p{L}][\p{L} .'-]{0,40})$", "profile"),
+            // "Remember that the deploy key rotates monthly." / "Don't forget that ..." / "For future reference, ..."
+            // -> a note. "Remember when / how / what ..." recalls the past; it is not a note.
+            r(r"(?i)^(?:please\s+)?(?:remember|note|keep in mind|don'?t forget|do not forget|for future reference|fyi)(?:\s+that)?[:,]?\s+(?P<x>.{6,400})$", "notes"),
+            // "Call me Ris." / "You can call me Pak Ris." / "My name is Ris." / "I'm Ris, by the way." -> profile.
+            r(r"(?i)^(?:please\s+|you can\s+)?call me\s+(?P<name>[\p{L}][\p{L} .'-]{0,40})$", "profile"),
             r(r"(?i)^my name is\s+(?P<name>[\p{L}][\p{L} .'-]{0,40})$", "profile"),
-            // "I prefer answers in Indonesian." / "I like short replies." / "I don't like emoji." -> preferences.
-            r(r"(?i)^i\s+(?P<verb>prefer|like|love|want|don'?t like|do not like|dislike|hate|always want|never want)\s+(?P<x>.{3,300})$", "preferences"),
-            // "My office is in Jakarta." / "My manager is Dewi." -> entities (filed under the thing named).
-            r(r"(?i)^my\s+(?P<thing>[\p{L}][\p{L} -]{1,40}?)\s+(?:is|are|was)\s+(?P<x>.{2,300})$", "entities"),
-            // "I moved to Bandung on 2026-10-01." / "We launched the beta on 3 November 2026." -> events.
+            r(r"^(?:I'?m|I am)\s+(?P<name>\p{Lu}[\p{L}'-]{1,20}(?:\s+\p{Lu}[\p{L}'-]{1,20})?)(?:,?\s+by the way)?$", "profile"),
+            // "I prefer ..." / "I'd rather get the code first" / "From now on, answer in English." / "Please always
+            // cite the page." / "Never use bullet points." -> preferences. An instruction needs a verb of doing after
+            // always / never / from now on, so "Never mind" and "Always the same error" are not preferences.
+            r(r"(?i)^i\s*(?P<verb>prefer|like|love|want|don'?t like|do not like|dislike|hate|always want|never want|'d rather| would rather|would rather)\s+(?P<x>.{3,300})$", "preferences"),
+            r(r"(?i)^(?:please\s+)?(?P<verb>from now on|always|never|don'?t ever|do not ever)[,]?\s+(?:please\s+)?(?P<x>(?:answer|use|reply|write|cite|give|show|include|put|explain|start|keep|call|send|format|respond|add|avoid|mention|speak|say|ask|list|sort)\b.{2,300})$", "preferences"),
+            // "My manager is Dewi." / "My wife's name is Sari." / "Our CTO is Andi." / "I work at Paracorp" /
+            // "I live in Depok." -> entities (filed under the thing named).
+            r(r"(?i)^my\s+(?P<thing>[\p{L}][\p{L} -]{1,40}?)'s name is\s+(?P<x>.{2,100})$", "entities"),
+            r(r"(?i)^(?:my|our)\s+(?P<thing>[\p{L}][\p{L} -]{1,40}?)\s+(?:is|are|was)\s+(?P<x>.{2,300})$", "entities"),
+            r(r"(?i)^i\s+(?P<thing>work|live|study)\s+(?P<x>(?:at|in|for|as|with)\b.{2,300})$", "entities"),
+            // "I moved to Bandung on 2026-10-01." / "We launched the beta on 3 November 2026." / "Yesterday we migrated
+            // the database." / "Last week I passed the exam." -> events.
             r(r"(?i)^(?:i|we)\s+(?P<x>(?:moved|started|joined|left|launched|released|shipped|married|graduated|finished|began|met)\b.{2,300})$", "events"),
+            r(r"(?i)^(?:yesterday|today|this morning|earlier today|last (?:week|month|year|night)|on \d{4}-\d{2}-\d{2}|in (?:january|february|march|april|may|june|july|august|september|october|november|december)(?: \d{4})?),?\s+(?:i|we)\s+(?P<x>\p{L}+ed\b.{2,300})$", "events"),
         ]
     })
 }
@@ -377,6 +396,13 @@ pub fn extract(user_message: &str) -> Vec<Candidate> {
             let cand = match rule.kind {
                 "notes" => {
                     let x = c["x"].trim();
+                    // "Remember when we ..." recalls the past; it is not a note.
+                    let first = x.split_whitespace().next().unwrap_or("").to_lowercase();
+                    if ["when", "how", "what", "if", "where", "who", "why"]
+                        .contains(&first.as_str())
+                    {
+                        break;
+                    }
                     Candidate {
                         kind: "notes".into(),
                         title: x.split_whitespace().take(6).collect::<Vec<_>>().join(" "),
@@ -391,7 +417,26 @@ pub fn extract(user_message: &str) -> Vec<Candidate> {
                     date: None,
                 },
                 "preferences" => {
-                    let verb = c["verb"].to_lowercase();
+                    // "I'd rather not say" declines; it states no preference.
+                    if c["x"].trim().to_lowercase().starts_with("not") {
+                        break;
+                    }
+                    let verb = c["verb"]
+                        .to_lowercase()
+                        .replace("'d rather", "would rather");
+                    let verb = if [
+                        "from now on",
+                        "always",
+                        "never",
+                        "don't ever",
+                        "do not ever",
+                    ]
+                    .contains(&verb.as_str())
+                    {
+                        format!("want you to {verb}")
+                    } else {
+                        verb
+                    };
                     let x = c["x"].trim().trim_end_matches('.');
                     // The topic is what the preference is about: its first content words.
                     let topic: Vec<&str> = x
@@ -411,6 +456,34 @@ pub fn extract(user_message: &str) -> Vec<Candidate> {
                 }
                 "entities" => {
                     let thing = c["thing"].trim().to_lowercase();
+                    let lead = s.split_whitespace().next().unwrap_or("").to_lowercase();
+                    if ["work", "live", "study"].contains(&thing.as_str()) && lead == "i" {
+                        let x = c["x"].trim().trim_end_matches('.');
+                        let what = match thing.as_str() {
+                            "work" => "where I work",
+                            "live" => "where I live",
+                            _ => "where I study",
+                        };
+                        let cand = Candidate {
+                            kind: "entities".into(),
+                            title: sentence_case(what),
+                            body: format!("I {thing} {x}."),
+                            date: None,
+                        };
+                        if !out
+                            .iter()
+                            .any(|o| o.kind == cand.kind && o.key() == cand.key())
+                        {
+                            out.push(cand);
+                        }
+                        break;
+                    }
+                    let owner = if lead == "our" { "our" } else { "my" };
+                    let is = if s.to_lowercase().contains("'s name is") {
+                        "'s name is"
+                    } else {
+                        " is"
+                    };
                     // "my question is ..." and the like are not things.
                     if [
                         "question", "point", "guess", "problem", "idea", "answer", "concern",
@@ -422,8 +495,12 @@ pub fn extract(user_message: &str) -> Vec<Candidate> {
                     }
                     Candidate {
                         kind: "entities".into(),
-                        title: sentence_case(&format!("my {thing}")),
-                        body: format!("My {thing} is {}.", c["x"].trim().trim_end_matches('.')),
+                        title: sentence_case(&format!("{owner} {thing}")),
+                        body: format!(
+                            "{} {thing}{is} {}.",
+                            sentence_case(owner),
+                            c["x"].trim().trim_end_matches('.')
+                        ),
                         date: None,
                     }
                 }

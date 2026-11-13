@@ -55,6 +55,25 @@ that uses the access counts, and the person's view of every note are added
 here; a model-written rewrite of the query is left out. A live check is in
 Section~\ref{sec:eval:recall}.
 
+\subsection{Memories as files}
+\label{sec:mem:files}
+What a person says about themselves is also kept as files they can read,
+edit and delete, one per thing remembered and keyed by what it is about: a
+profile, preferences (keyed by topic), people and things, dated events, and
+notes. A repeated fact updates its file instead of adding a near-copy: a
+profile field takes its new value, a preference is replaced by the newer
+statement, an entity gathers new lines, an event is never merged. Every
+write is logged with what the file held before and after and why, and any
+change can be undone. Saving a chat writes its transcript as a file and
+draws memories from the person's messages by rule (``call me'', ``I
+prefer'', ``my \ldots{} is'', ``remember that'', dated events); the rules
+were widened once against a held-out set and then found 13 of 14 memories
+with one false on messages written afterwards. The profile and the
+preferences go into every personal conversation, so a stated preference
+applies to every later answer; the other kinds join when the recall gate
+opens. The design follows OpenViking's sessions and memory files
+\cite{openviking2026}, with rules where it calls a model.
+
 \subsection{The audit ledger as self-knowledge}
 \label{sec:mem:ledger}
 The ledger is the system's memory of its own performance: gate decisions,

@@ -15,6 +15,7 @@ nafs-types = { path = "../nafs-types" }
 nafs-verify = { path = "../nafs-verify" }
 nafs-harness = { path = "../nafs-harness" }
 nafs-memory = { path = "../nafs-memory" }
+nafs-context = { path = "../nafs-context" }
 rust-stemmers = "1.2.0"
 tokio = { workspace = true }
 reqwest = { workspace = true }
