@@ -136,7 +136,8 @@ async fn upload_search_and_delete_round_trip() {
     assert_eq!(total as usize, chunks.len());
     assert!(chunks.windows(2).all(|w| w[0].ord < w[1].ord));
     assert!(
-        chunks.iter().any(|c| c.heading == "Memory > Refinement"),
+        // The document's title ("Memory", its H1) is not repeated at the head of the path (Phase 28).
+        chunks.iter().any(|c| c.heading == "Refinement"),
         "{chunks:?}"
     );
 
@@ -177,7 +178,9 @@ async fn upload_search_and_delete_round_trip() {
     assert_eq!(rc.title, "MEMORILLA: LATENT MEMORY");
     let (cc, _) = store.list_chunks(&base.id, &dc.id, 0, 10).await.unwrap();
     assert_eq!(cc[0].text, colon);
-    assert_eq!(cc[0].heading, "MEMORILLA: LATENT MEMORY");
+    // The heading is the document's own title, which the path leaves out (Phase 28); the title above carries the
+    // colon string through the store.
+    assert_eq!(cc[0].heading, "");
     let hits = store
         .search_lexical(&base.id, "Caption: Model gate", 3)
         .await

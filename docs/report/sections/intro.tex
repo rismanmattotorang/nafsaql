@@ -47,8 +47,10 @@ that tries the quick model first (Section~\ref{sec:harness}).
 one pass over the weights with output identical to a solo run, and a measured
 account of which forms of parallelism pay on four cores
 (Section~\ref{sec:inference}).
-\item A knowledge base that searches documents by words and meaning from an
-in-process index, builds a graph of a document set without a model call,
+\item A knowledge base that reads PDF pages by their layout (columns,
+headings, tables, running headers) with no model, searches documents by words
+and meaning from an in-process index, scores each passage by its best
+sentence window as well as its whole text, builds a graph of a document set without a model call,
 answers with numbered sources and says which sentences of an answer its
 sources hold; and two memories that need no model, one of verified answers
 and one of earlier conversations (Sections~\ref{sec:knowledge}

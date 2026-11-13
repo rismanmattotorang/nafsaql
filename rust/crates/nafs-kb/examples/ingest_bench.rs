@@ -45,6 +45,9 @@ fn main() {
                 "chunks": c.len(), "median_ms": (times[1] * 10.0).round() / 10.0,
                 "ms_per_page": p.pages.map(|n| (times[1] / n.max(1) as f64 * 100.0).round() / 100.0),
                 "title": p.title,
+                "headings": p.text.lines().filter(|l| l.starts_with('#')).count(),
+                "chunks_without_heading": c.iter().filter(|x| x.heading.is_empty()).count(),
+                "table_rows": p.text.lines().filter(|l| l.starts_with("| ")).count(),
             }),
             Err(e) => {
                 serde_json::json!({ "file": name, "kind": kind.as_str(), "error": e, "median_ms": times[1] })

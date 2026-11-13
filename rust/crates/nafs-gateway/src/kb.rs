@@ -77,6 +77,7 @@ fn index_config(k: &nafs_core::config::KnowledgeCfg) -> nafs_kb::IndexConfig {
     use nafs_kb::index::{Bm25, Fusion, Params, Ppr};
     nafs_kb::IndexConfig {
         memory_mb: k.index_memory_mb,
+        piece_chars: k.piece_chars,
         params: Params {
             bm25: Bm25 {
                 weights: k.bm25_weights,
@@ -93,6 +94,7 @@ fn index_config(k: &nafs_core::config::KnowledgeCfg) -> nafs_kb::IndexConfig {
             },
             prf: None,
             fuzzy: k.fuzzy_terms,
+            piece_mix: k.piece_mix,
             ppr: (k.graph_arm_weight > 0.0).then(|| Ppr {
                 weight: k.graph_arm_weight,
                 ..Ppr::default()

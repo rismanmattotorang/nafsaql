@@ -241,6 +241,8 @@ fusion = "rrf"                         # FR-K70: "rrf" (by rank, the meaning wei
 fusion_alpha = 0.2
 graph_arm_weight = 0.0                 # FR-K72: the walk over the passage-and-term graph as a third arm (0 = off)
 fuzzy_terms = true                     # a mistyped question word is replaced by the nearest word the base holds (one edit; two for long words)
+piece_chars = 240                      # sentence windows of a passage that get vectors of their own (characters; 0 = off); about one more embedding pass per document
+piece_mix = 0.5                        # how much a passage's best sentence window counts in its meaning score (0 to 1)
 followup_context = true                # a question that leans on the previous turn ("and how fast is it?") is searched together with it
 rag_elbow_gap = 0.0                    # cut the passages after a drop in similarity of at least this (0 = off; measured: saves 0.1 passage, loses an answer)
 support_check = true                   # say which sentences of an answer from documents are in the passages it was given (no model)

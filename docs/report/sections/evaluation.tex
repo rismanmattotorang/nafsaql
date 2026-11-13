@@ -288,8 +288,50 @@ Two-passage (50) & store, hybrid & 0.300 & 0.800 & 0.485 & 0.62 \\
 \end{tabular}
 \end{table}
 
-\textbf{The open problem} is the reworded question: the answering passage is
-first for 12\,\% of such questions and within the first eight for 24\,\%.
+\textbf{Reading and windows.} The same nine files were stored twice through
+the upload path, once read by the PDF converter used before and once by the
+layout pass, and the windows were then added to the second base.
+Table~\ref{tab:p28} scores only the questions whose accepted phrase occurs in
+both bases (56, 142 and 44), because the phrases were written against the
+earlier reading. Against the \LaTeX\ sources of five of the project's own
+documents, the layout pass marks 166 of 173 section titles as headings
+against 11, holds 73.5\,\% of the sources' five-word runs in order against
+69.2\,\%, and adds fewer runs found nowhere in the source (47.0\,\% against
+50.7\,\%). On 25 papers it finds 833 headings against 195, leaves 19 passages
+without a heading path against 32, and reads a page in 15.5\,ms against
+24.0. Better passages helped most where the question shares few words with
+the answer: a reworded question finds its passage first half as often again,
+and a two-passage question a third as often again. The windows then lifted
+quoted questions most (first place 0.786 to 0.875), the meaning arm alone
+most of all (quoted MRR 0.465 to 0.611), and made no set worse; they cost
+about one more embedding pass per document (1{,}402 windows for 723
+passages). Weighting the meaning arm more than 0.1 again helped reworded
+questions and cost quoted ones, so the weight is unchanged.
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{Where the answering passage ranks with the service's hybrid search, the same nine files read two ways, questions answerable in both bases.}
+\label{tab:p28}
+\begin{tabular}{@{}llrrr@{}}
+\toprule
+Set & Base & R@1 & R@8 & MRR \\
+\midrule
+Quoted (56) & converter, 847 passages & 0.768 & 1.000 & 0.860 \\
+ & layout, 723 passages & 0.786 & 0.982 & 0.870 \\
+ & layout + windows & 0.875 & 0.982 & 0.922 \\
+Reworded (142) & converter & 0.099 & 0.232 & 0.152 \\
+ & layout & 0.148 & 0.246 & 0.194 \\
+ & layout + windows & 0.162 & 0.239 & 0.201 \\
+Two-passage (44) & converter & 0.284 & 0.830 & 0.474 \\
+ & layout & 0.375 & 0.909 & 0.570 \\
+ & layout + windows & 0.386 & 0.920 & 0.571 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{The open problem} is still the reworded question: the answering
+passage is first for 16\,\% of such questions and within the first eight for
+24\,\%.
 
 \textbf{Typing slips and follow-ups.} Table~\ref{tab:p26} measures the two
 query-side rules of Section~\ref{sec:knowledge} against searching the question
@@ -445,6 +487,8 @@ Memory tokens without pre-training & 0/20 alone; 17/20 with passages against 18/
 A difficulty signal from the question alone (nearest labelled questions; prototype banks \cite{semanticrouter2026}) & AUC for a wrong draft over 810 labelled drafts: domain 0.566, banks 0.573, nearest questions 0.615, the draft's own features 0.682, both together 0.690 & the question adds 0.008 to what the draft already says; skipping the draft would touch 12 of 810 requests \\
 Sentences of six passages packed into a block of 2{,}400 characters, headers counted, in place of four whole passages & prompts 25\,\% shorter and answers 20 to 26\,\% sooner (42 of 50 pairs); 39 of 50 right against 42 ($p=0.38$) & the answers lost took a number from the wrong excerpt; kept as an option \\
 Cache-blocking the prompt's weight products; a smaller prompt chunk & within $\pm3\,\%$ once the benchmark was warmed up & reading a prompt is bound by the kernel's arithmetic, not by the caches \\
+A meaning weight of 0.3 or 0.5 with sentence windows & reworded MRR 0.201 to 0.216 and 0.228; quoted 0.922 to 0.867 and 0.857 & the quoted questions pay for it \\
+Sentence windows counted in full ($m=1$) & reworded MRR 0.182 against 0.201 at $m=0.5$ & a short window outranks the passage that answers \\
 Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.77 passages a prompt (quoted), 3.33 to 2.99 (reworded); the answering passage left one prompt & a tenth of a passage saved for an answer lost \\
 \bottomrule
 \end{tabular}
@@ -452,7 +496,7 @@ Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.7
 
 \subsection{Validation}
 \label{sec:eval:validation}
-The workspace has 507 Rust tests, including the ported upstream suites of the
+The workspace has 513 Rust tests, including the ported upstream suites of the
 patch parser and the Lean rules, bit-identity tests of the batched engine and
 parity tests of the memory module; formatting, lints and dependency audits
 are clean. Live sweeps on the final build pass: the API contract, 26 of 26
@@ -461,7 +505,7 @@ open high-severity finding, 33 of 33 knowledge-security checks, 69 of 69
 end-to-end checks of every endpoint and page, 10 of 10 chat-room checks, 55
 knowledge checks, 14 of 14 checks of the conversation memory, 53 of 53 checks
 of the agent harness and all nine acceptance tests (the first token of a
-quick reply after 0.15\,s; a verified deliberate answer after 198\,s against
+quick reply after 0.25\,s; a verified deliberate answer after 155\,s against
 a target of 240\,s). The acceptance latencies depend on what else the machine
 is doing: an earlier sweep the same day, under a load average of 30 to 40
 from other workloads, missed both targets (2.6\,s and 420\,s) with correct

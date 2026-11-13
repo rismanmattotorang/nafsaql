@@ -74,6 +74,8 @@ DEFINE FIELD IF NOT EXISTS heading   ON chunk TYPE string DEFAULT "";
 DEFINE FIELD IF NOT EXISTS page      ON chunk TYPE option<int>;
 DEFINE FIELD IF NOT EXISTS chars     ON chunk TYPE int;
 DEFINE FIELD IF NOT EXISTS embedding ON chunk TYPE option<array<float>>;
+-- Phase 28: vectors of the passage's sentence windows; NONE until made, [] when the passage has none.
+DEFINE FIELD IF NOT EXISTS pieces ON chunk TYPE option<array<array<float>>>;
 DEFINE INDEX IF NOT EXISTS chunk_kb   ON chunk FIELDS kb;
 DEFINE INDEX IF NOT EXISTS chunk_doc  ON chunk FIELDS doc;
 -- FR-K51 (contextual BM25): the words are searched over the same text the passage is embedded as - its document
@@ -852,6 +854,47 @@ impl Store {
     }
 
     /// Store passage vectors (one request per call; the caller batches).
+    /// Phase 28: passages that have a vector and no sentence-window vectors yet, in order.
+    pub async fn chunks_without_pieces(
+        &self,
+        doc: &str,
+    ) -> Result<Vec<ChunkForEmbedding>, KbError> {
+        let r = self
+            .query(
+                "SELECT record::id(id) AS id, heading, context, text, ord FROM chunk \
+                 WHERE doc = type::record('document', $doc) AND embedding != NONE AND pieces = NONE ORDER BY ord ASC;",
+                json!({ "doc": doc }),
+            )
+            .await?;
+        let rows: Vec<Value> = rows(r.into_iter().next())?;
+        Ok(rows
+            .into_iter()
+            .map(|v| {
+                let s = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                ChunkForEmbedding {
+                    id: s("id"),
+                    heading: s("heading"),
+                    context: s("context"),
+                    text: s("text"),
+                }
+            })
+            .collect())
+    }
+
+    /// Phase 28: store the sentence-window vectors of passages (an empty list marks a passage that has none).
+    pub async fn set_pieces(&self, rows: &[(String, Vec<Vec<f32>>)]) -> Result<(), KbError> {
+        let rows: Vec<Value> = rows
+            .iter()
+            .map(|(id, v)| json!({ "id": id, "v": v }))
+            .collect();
+        self.query(
+            "FOR $r IN $rows { UPDATE type::record('chunk', $r.id) SET pieces = $r.v; };",
+            json!({ "rows": rows }),
+        )
+        .await?;
+        Ok(())
+    }
+
     pub async fn set_vectors(&self, rows: &[(String, Vec<f32>)]) -> Result<(), KbError> {
         let rows: Vec<Value> = rows
             .iter()
@@ -1014,7 +1057,8 @@ impl Store {
         kb: &str,
         doc: Option<&str>,
     ) -> Result<Vec<(String, crate::index::Row)>, KbError> {
-        let fields = "record::id(id) AS id, record::id(doc) AS doc, ord, heading, page, context, text, embedding";
+        let fields =
+            "record::id(id) AS id, record::id(doc) AS doc, ord, heading, page, context, text, embedding, pieces";
         let r = match doc {
             Some(d) => {
                 self.query(
@@ -1053,6 +1097,17 @@ impl Store {
                     embedding: row["embedding"]
                         .as_array()
                         .map(|e| e.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect()),
+                    pieces: row["pieces"]
+                        .as_array()
+                        .map(|ps| {
+                            ps.iter()
+                                .filter_map(Value::as_array)
+                                .map(|e| {
+                                    e.iter().map(|x| x.as_f64().unwrap_or(0.0) as f32).collect()
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                 },
             ));
         }
@@ -1280,7 +1335,7 @@ impl Store {
             .query(
                 "LET $k = type::record('kb', $kb); \
                  LET $n = (SELECT VALUE count() FROM chunk WHERE kb = $k AND embedding != NONE GROUP ALL)[0] ?? 0; \
-                 UPDATE chunk SET embedding = NONE WHERE kb = $k; \
+                 UPDATE chunk SET embedding = NONE, pieces = NONE WHERE kb = $k; \
                  UPDATE document SET n_embedded = 0 WHERE kb = $k; \
                  UPDATE $k SET embedder = NONE; \
                  RETURN $n;",

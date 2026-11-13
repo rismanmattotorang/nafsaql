@@ -17,8 +17,24 @@ the graph read from them (right).}
 \label{sec:kb:ingest}
 Readers written in Rust handle PDF, Word, PowerPoint, \LaTeX, HTML, Markdown
 and plain text. A heading-aware chunker cuts passages of 1{,}200 characters
-with 150 of overlap, each carrying its heading path and page; 25 papers (421
-pages) parse and chunk in 32 to 70\,ms per page. SurrealDB is the source of
+with 150 of overlap, each carrying its heading path and page.
+
+\textbf{Reading a PDF page.} A PDF holds positioned runs of text, not
+paragraphs. A layout pass, our Rust rewrite of LiteParse's rules
+\cite{liteparse2026} over the reader's runs (box, size, weight, style), turns
+them into Markdown in reading order. Columns are found by recursive XY-cut: a
+gutter is a valley in the character density of a region's narrow lines, and
+the lines that cross it (a title, an abstract, a wide caption) are cut off
+first as bands, so the columns are read one after the other. A region whose
+rows split into three or more aligned cells is a table and is not cut into
+columns; its rows are written as Markdown rows, so a row stays one line.
+Running headers and page numbers are removed by position and repetition;
+paragraphs are rejoined across line-end hyphens, column breaks and footnotes;
+headings come from sizes above the body size, from numbering (``I.'',
+``A.'', ``2.5'') in bold, italic or capitals, and from short bold blocks.
+Table-of-contents entries are not headings. If the pass fails on a document,
+the reader's own converter reads it. On 25 papers (421 pages) parsing and
+chunking take 15.5\,ms a page. SurrealDB is the source of
 truth for documents, passages, vectors and graphs. Passages are embedded by
 Qwen3-Embedding-0.6B, served by the same engine with a pooling head; a
 re-read keeps the vector of every passage whose embedded text did not change,
@@ -64,6 +80,15 @@ records the embedding model that wrote its first vector; if another model is
 running, the base is searched by its words and says so, until its meaning
 index is rebuilt, because vectors of two models are not comparable even at
 the same width.
+
+\textbf{Sentence windows.} A passage's vector averages everything the passage
+says, so a question about one of its sentences can sit far from it. Each
+passage is therefore also cut into windows of about 240 characters (whole
+sentences; table rows and list items kept whole), each embedded with the
+passage's title and heading path. A passage's meaning score is the mean of
+its own similarity and the larger of that and its best window's, an idea taken
+from semtools' line-level search \cite{semtools2026} but kept at the level of
+the passage, which is what the prompt receives.
 
 \textbf{Fusion.} The two rankings are fused by reciprocal rank
 \cite{cormack2009rrf} ($k=60$) with the meaning arm weighted 0.1. A passage
