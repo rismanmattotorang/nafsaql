@@ -1908,10 +1908,9 @@ impl Base {
         let part = self.parts.iter().find(|p| p.doc_id == doc)?;
         let mut sections: Vec<(String, u64)> = Vec::new();
         for r in &part.rows {
-            if !r.heading.is_empty() && sections.last().is_none_or(|s| s.0 != r.heading) {
-                if !sections.iter().any(|s| s.0 == r.heading) {
-                    sections.push((r.heading.clone(), r.ord));
-                }
+            // The first passage under each heading path, once.
+            if !r.heading.is_empty() && !sections.iter().any(|s| s.0 == r.heading) {
+                sections.push((r.heading.clone(), r.ord));
             }
         }
         let texts: Vec<&str> = part
@@ -1992,7 +1991,7 @@ impl Base {
             .iter()
             .filter_map(|p| self.doc_layers(an, &p.doc_id))
             .collect();
-        docs.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+        docs.sort_by_key(|d| d.title.to_lowercase());
         let shown: Vec<&DocLayers> = if docs.len() <= 32 {
             docs.iter().collect()
         } else {
