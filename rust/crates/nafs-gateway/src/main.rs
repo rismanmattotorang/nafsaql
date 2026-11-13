@@ -1,5 +1,6 @@
 //! nafs-gateway: the Rust Gateway (IF-001..IF-004, IF-009, NFR-011, NFR-021, NFR-022).
 mod api;
+mod fs;
 mod gates;
 mod kb;
 mod memory_runs;

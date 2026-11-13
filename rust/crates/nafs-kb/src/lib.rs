@@ -1045,7 +1045,7 @@ impl Kb {
                 let mut params = self.cfg.index.params;
                 params.ppr = Some(params.ppr.unwrap_or_default());
                 let r = self
-                    .search_indexed(kb, ix, query, k, SearchMode::Hybrid, params)
+                    .search_indexed(kb, ix, query, k, SearchMode::Hybrid, params, None)
                     .await;
                 return Ok((Vec::new(), r));
             }
@@ -1339,6 +1339,32 @@ impl Kb {
         })
     }
 
+    /// Phase 29 (`find`): a hybrid search of one base, ranked only among the documents in `docs` when given. Needs the
+    /// in-process index (a base too large for it is searched whole by the store, and `docs` cannot be honoured).
+    pub async fn find_scoped(
+        &self,
+        kb: &str,
+        query: &str,
+        k: usize,
+        docs: Option<std::collections::HashSet<String>>,
+    ) -> Result<SearchResult, KbError> {
+        self.ready().await?;
+        match self.index.get(&self.store, kb, self.dims()).await? {
+            index::Lookup::Ready(base) => Ok(self
+                .search_indexed(kb, base, query, k, SearchMode::Hybrid, self.cfg.index.params, docs)
+                .await),
+            _ if docs.is_some() => Err(KbError::Unavailable(
+                "this base is too large for the in-process index, so it cannot be searched by document".into(),
+            )),
+            _ => self.search(kb, query, k, SearchMode::Hybrid).await,
+        }
+    }
+
+    /// The analyzer the index uses (for layers).
+    pub fn analyzer(&self) -> &index::Analyzer {
+        &self.index.analyzer
+    }
+
     /// (bases, passages, bytes) the in-process indexes hold.
     pub fn index_stats(&self) -> (usize, usize, usize) {
         self.index.stats()
@@ -1356,6 +1382,7 @@ impl Kb {
     }
 
     /// A search answered from the in-process index: no round trip to the store, and the question is embedded once.
+    #[allow(clippy::too_many_arguments)]
     async fn search_indexed(
         &self,
         kb: &str,
@@ -1364,6 +1391,7 @@ impl Kb {
         k: usize,
         mode: SearchMode,
         params: index::Params,
+        scope: Option<std::collections::HashSet<String>>,
     ) -> SearchResult {
         let t0 = Instant::now();
         let (mut fallback, mut embed_ms) = (None, 0);
@@ -1398,7 +1426,17 @@ impl Kb {
         let index = self.index.clone();
         let query = query.to_string();
         let large = base.passages() > 20_000;
-        let run = move || base.search(&index.analyzer, &query, qv.as_deref(), used, k, &params);
+        let run = move || {
+            base.search_in(
+                &index.analyzer,
+                &query,
+                qv.as_deref(),
+                used,
+                k,
+                &params,
+                scope.as_ref(),
+            )
+        };
         // Scoring a small base takes well under a millisecond; a large one goes off the async threads.
         let results = if large {
             tokio::task::spawn_blocking(run).await.unwrap_or_default()
@@ -1432,7 +1470,7 @@ impl Kb {
             if let index::Lookup::Ready(base) = self.index.get(&self.store, kb, self.dims()).await?
             {
                 let mut r = self
-                    .search_indexed(kb, base, query, k, mode, self.cfg.index.params)
+                    .search_indexed(kb, base, query, k, mode, self.cfg.index.params, None)
                     .await;
                 r.took_ms = t0.elapsed().as_millis() as u64;
                 return Ok(r);

@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use uuid::Uuid;
 
+pub mod files;
 pub mod recall;
 
 fn st(e: impl std::fmt::Display) -> NafsError {
@@ -234,6 +235,7 @@ impl Store {
             CREATE INDEX IF NOT EXISTS idx_prefs_slow ON preferences(slow_reply_id);
         "#).map_err(st)?;
         conn.execute_batch(recall::SCHEMA).map_err(st)?;
+        conn.execute_batch(files::SCHEMA).map_err(st)?;
         // Migration: per-conversation training opt-out (SR-004).
         let has_opt: bool = conn
             .prepare(

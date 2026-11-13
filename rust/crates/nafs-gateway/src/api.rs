@@ -219,6 +219,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/system", get(system))
         .route("/v1/system/backend", post(set_backend))
         .route("/v1/system/activity", get(activity))
+        .merge(crate::fs::routes())
         .layer(middleware::from_fn_with_state(state.clone(), auth));
     Router::new()
         .route("/", get(|s: State<AppState>| serve_asset(s, "index.html")))
