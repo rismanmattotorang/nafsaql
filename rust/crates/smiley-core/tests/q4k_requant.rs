@@ -29,7 +29,7 @@ fn requantising_llama_cpp_q4_k_blocks_reproduces_their_bytes() {
         dequant_row(Format::Q4_K, row, &mut x);
         let mut q = Vec::new();
         quantize_row_q4_k(&x, &mut q);
-        for (a, b) in row.chunks_exact(144).zip(q.chunks_exact(144)) {
+        for (a, b) in row.as_chunks::<144>().0.iter().zip(q.as_chunks::<144>().0) {
             total += 1;
             if a == b {
                 same += 1;

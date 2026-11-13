@@ -85,8 +85,7 @@ impl Transcript {
         }
         let mut saved = 0;
         // Indices 1..n-2: after the task message, before the newest (assistant, user) exchange.
-        for i in 1..n.saturating_sub(2) {
-            let (role, content) = &self.messages[i];
+        for (role, content) in &mut self.messages[1..n.saturating_sub(2)] {
             if role != "user" || content.len() <= over || content.contains("…pruned…") {
                 continue;
             }
@@ -99,7 +98,7 @@ impl Transcript {
                 &content[tail_start..]
             );
             saved += content.len().saturating_sub(cut.len());
-            self.messages[i].1 = cut;
+            *content = cut;
         }
         if saved > 0 {
             self.pruned_bytes += saved;

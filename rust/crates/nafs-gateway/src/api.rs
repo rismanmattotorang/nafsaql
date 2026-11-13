@@ -996,7 +996,7 @@ fn evaluate_alerts(s: &AppState) -> NafsResult<Value> {
         rule(
             "error_rate",
             "share of failed requests",
-            (n_out > 0).then(|| n_err as f64 / n_out as f64),
+            (n_out > 0).then_some(n_err as f64 / n_out as f64),
             n_out,
             n_out > 0 && n_err as f64 / n_out as f64 > a.error_rate,
             format!("> {:.0}%", a.error_rate * 100.0),
@@ -1867,24 +1867,6 @@ pub fn spawn_background(s: AppState) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::{host_only, percent_decode};
-    #[test]
-    fn token_query_is_percent_decoded() {
-        assert_eq!(percent_decode("ab%2Bcd%2F%3D"), "ab+cd/=");
-        assert_eq!(percent_decode("plain"), "plain");
-        assert_eq!(percent_decode("bad%zz"), "bad%zz");
-    }
-    #[test]
-    fn host_parsing() {
-        assert_eq!(host_only("127.0.0.1:8080"), "127.0.0.1");
-        assert_eq!(host_only("LOCALHOST"), "localhost");
-        assert_eq!(host_only("[::1]:8080"), "[::1]");
-        assert_eq!(host_only("evil.example:8080"), "evil.example");
-    }
-}
-
 // ---------------- The label stream (Phase 23) ----------------
 
 /// What the label worker has done since the gateway started (reported by `GET /v1/gate/labels`).
@@ -2048,4 +2030,22 @@ async fn get_labels(State(s): State<AppState>) -> ApiResult<Json<Value>> {
         "calibration": { "version": cal.version, "n": cal.n, "ece": cal.ece, "risk_bins": cal.risk_bins },
         "recalibrate_every_h": s.cfg.gate.recalibrate_every_h,
     })))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{host_only, percent_decode};
+    #[test]
+    fn token_query_is_percent_decoded() {
+        assert_eq!(percent_decode("ab%2Bcd%2F%3D"), "ab+cd/=");
+        assert_eq!(percent_decode("plain"), "plain");
+        assert_eq!(percent_decode("bad%zz"), "bad%zz");
+    }
+    #[test]
+    fn host_parsing() {
+        assert_eq!(host_only("127.0.0.1:8080"), "127.0.0.1");
+        assert_eq!(host_only("LOCALHOST"), "localhost");
+        assert_eq!(host_only("[::1]:8080"), "[::1]");
+        assert_eq!(host_only("evil.example:8080"), "evil.example");
+    }
 }

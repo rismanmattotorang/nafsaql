@@ -2737,7 +2737,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         };
         let rate = |agg: &GenOutput| -> Option<f64> {
             (agg.wall_ms > 0 && agg.completion_tokens > 0)
-                .then(|| agg.completion_tokens as f64 / agg.wall_ms as f64)
+                .then_some(agg.completion_tokens as f64 / agg.wall_ms as f64)
         };
         let left_ms = || -> Option<u64> {
             deadline.map(|dl| dl.saturating_duration_since(Instant::now()).as_millis() as u64)

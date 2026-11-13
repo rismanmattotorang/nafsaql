@@ -574,7 +574,7 @@ pub fn report(
         let k_correct = scored.iter().filter(|r| r.correct == Some(true)).count() as u64;
         let ci = (!scored.is_empty()).then(|| clopper_pearson(k_correct, scored.len() as u64));
         systems.insert(sys.clone(), json!({"n": rs.len(), "n_scored": scored.len(), "accuracy": acc, "accuracy_ci95": ci.map(|(a, b)| [a, b]), "selective_accuracy": sel,
-            "coverage": (!scored.is_empty()).then(|| answered.len() as f64 / scored.len() as f64),
+            "coverage": (!scored.is_empty()).then_some(answered.len() as f64 / scored.len() as f64),
             // Escalation from the gate's decision, so degraded escalations count (review L3).
             "escalation_rate": (!ok.is_empty()).then(|| ok.iter().filter(|r| r.escalated).count() as f64 / ok.len() as f64),
             "mean_wall_ms": mean(&walls), "p50_wall_ms": quantile(&mut walls.clone(), 0.5), "p95_wall_ms": quantile(&mut walls, 0.95),
