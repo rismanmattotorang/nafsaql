@@ -30,6 +30,12 @@ Nafs-Aql answers in two ways. A quick model answers at once. A thorough model th
 - **Next** suggests a follow-up: *Think harder* (or *Quick answer*), *Explain step by step*, or *Check this answer*.
 - **👍 / 👎** records your rating. Ratings help reviewers; they never change the answers directly.
 
+## Tables, formulas, diagrams and code
+
+Answers are drawn the way you would read them. A table can be copied (button above it) and pastes into a spreadsheet. A formula such as $x^2$ is typeset. A diagram (flowchart, sequence or pie) has a **Source** button to see its text and **Save SVG**. Code has a **Copy** button, and long code folds with **Show all lines**. While an answer is still being written, a half-finished formula or diagram shows as plain text and turns into the picture when it is complete.
+
+In **Knowledge**, the graph shows what your documents name: bigger circles are mentioned more, a colour is a group. Point at a circle to light up what it connects to, click it to read the sentences that say so, double-click to open what is around it, drag to move it, scroll to zoom, and use the arrows button for full screen.
+
 ## Comparing answers
 
 Turn on *Show Insights pages and technical details* in **Settings** (the *Advanced* section) to add:

@@ -2,6 +2,7 @@
 //! Assets are embedded in the gateway binary; set NAFS_WEB_DIR to serve them from disk while editing.
 pub const INDEX_HTML: &str = include_str!("../assets/index.html");
 pub const APP_JS: &str = include_str!("../assets/app.js");
+pub const RENDER_JS: &str = include_str!("../assets/render.js");
 pub const APP_CSS: &str = include_str!("../assets/app.css");
 pub const FAVICON_SVG: &str = include_str!("../assets/favicon.svg");
 
@@ -21,6 +22,7 @@ pub fn asset(name: &str, dir: Option<&str>) -> Option<(String, &'static str)> {
     let s = match name {
         "index.html" => INDEX_HTML,
         "app.js" => APP_JS,
+        "render.js" => RENDER_JS,
         "app.css" => APP_CSS,
         "favicon.svg" => FAVICON_SVG,
         _ => return None,
@@ -67,7 +69,11 @@ mod tests {
     #[test]
     fn ui_copy_has_no_internal_references() {
         let mut found = vec![];
-        for (file, text) in [("app.js", APP_JS), ("index.html", INDEX_HTML)] {
+        for (file, text) in [
+            ("app.js", APP_JS),
+            ("render.js", RENDER_JS),
+            ("index.html", INDEX_HTML),
+        ] {
             for (n, line) in text.lines().enumerate() {
                 // Comments may cite requirements; a line marked `copy-lint: allow` holds a pattern, not copy.
                 if line.trim_start().starts_with("//") || line.contains("copy-lint: allow") {

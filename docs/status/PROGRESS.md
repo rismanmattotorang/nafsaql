@@ -179,3 +179,7 @@ Decision 003: condition 1 (>= 10 items, no loss, median ratio < 0.7) is met; con
 ## Open questions
 
 - The host is never idle by the prompt's rule (load1 < 1.5 for five minutes): Chrome and the Claude app alone keep load1 at 2 to 4. Results are labelled SHARED MACHINE with the load average; the idle-host command is in `HUMAN-NEEDED.md`.
+
+## Phase 31 (2026-11-14): answers drawn as people read them, and a graph that reads as a map
+
+`render.js` (tables, maths as MathML, a Mermaid subset as SVG, highlighted code, callouts; 142 tests in `scripts/render_test.mjs`), a redesigned knowledge graph (hover, choose, double-click, drag, zoom, full screen, legend), new screenshots `rich_answer` and `knowledge_graph`. Decision 024. Not done: command palette, scroll-to-latest button, simpler welcome screen.
