@@ -108,6 +108,9 @@ The gate escalates only when the error it expects to save is worth the waiting t
 <td width="50%"><img src="docs/shared/screenshots/settings_speed.png" alt="Settings, Speed"><br><sub><b>Ready when you need it.</b> The careful model reads the conversation while you read the answer.</sub></td>
 </tr>
 <tr>
+<td colspan="2"><img src="docs/shared/screenshots/rich_answer.png" alt="An answer with a table, a callout, a flowchart and formulas" width="100%"><br><sub><b>Answers drawn as you read them.</b> Tables, formulas, diagrams and code are rendered, with copy buttons; unfinished ones stay plain text until they close.</sub></td>
+</tr>
+<tr>
 <td colspan="2"><img src="docs/shared/screenshots/knowledge_graph.png" alt="The map of a set of documents" width="100%"><br><sub><b>A map of your documents.</b> Drawn from the text the moment a file is read; a deeper pass adds relations, each with the sentence that states it.</sub></td>
 </tr>
 </table>
@@ -131,6 +134,7 @@ Current state: [docs/roadmap/STATUS.md](docs/roadmap/STATUS.md).
 | [User guide](docs/user_guide.md) | the app, rooms, the lab, your documents |
 | [Paper](docs/report/nafs_aql_report.pdf) | the formal model and its proofs, the architecture, every measurement |
 | [Features and measured results](docs/features_and_results.md) | everything built, with evidence, and how it compares |
+| [Answer rendering](docs/decisions/024-rich-answers-and-graph-phase31.md) | tables, maths, diagrams and code, and the knowledge graph |
 | [Context filesystem](docs/spec/context_fs_spec.md) · [ShadowPrefill](docs/spec/shadow_prefill_spec.md) | one place for documents, memory, skills and chats; keeping the careful model warm |
 | [Serving](docs/serving_and_operations.md) · [Runbook](docs/operations/operator_runbook.md) · [API](docs/api/api_reference.md) | running it |
 | [All documents](docs/index.md) | specifications, research notes, decisions |

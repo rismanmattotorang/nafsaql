@@ -109,6 +109,46 @@ model's draft, so the gate kept it and the reply is labelled \emph{Checked}.}
 \label{fig:ui-chat}
 \end{figure*}
 
+\subsection{Drawing an answer}
+\label{sec:render}
+Answers are drawn by one dependency-free module (\texttt{render.js}) that maps
+the model's Markdown to safe HTML; it has no build step and runs under Node, so
+it is tested without a browser (142 checks, including every prefix of a rich
+answer, which must render without error while the answer streams). Tables keep
+their alignment, right-align numeric columns, and can be copied as
+tab-separated text. Code is highlighted by a small tokenizer and long blocks
+collapse. LaTeX becomes MathML Core, which current browsers draw natively
+(fractions, roots, sums and integrals with limits, matrices, cases, aligned
+blocks); a dollar amount such as ``\$5 and \$6'' is not read as a formula. A
+Mermaid subset (flowcharts with seven node shapes, subgraphs and edge labels;
+sequence diagrams; pie charts) is laid out in layers, with long edges routed
+through the layers they cross, and drawn as inline SVG that can show its source
+or be saved. Anything outside the subset, or that does not parse, stays a code
+block. All model text is escaped and nothing but a checked colour reaches a
+style, so the page policy (\texttt{script-src 'self'}) is unchanged. KaTeX and
+Mermaid were not vendored: both are downloads, and the subset covers what the
+model writes in practice (Fig.~\ref{fig:ui-rich}). The knowledge graph
+(Fig.~\ref{fig:ui-graph}) is a force layout with collision and communities, node
+size by mentions and colour by group; hovering lights a thing's neighbourhood,
+choosing it shows the sentences that state each relation, and a double tap opens
+what is around it.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../shared/screenshots/rich_answer.png}
+\caption{A fixed sample answer drawn by the renderer: a table, a callout, a
+flowchart and formulas (the code and sequence diagram follow below the fold).}
+\label{fig:ui-rich}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../shared/screenshots/knowledge_graph.png}
+\caption{The knowledge graph of the technical paper: 2,683 things and 1,096
+relations, the 40 most mentioned shown, coloured by group.}
+\label{fig:ui-graph}
+\end{figure}
+
 \subsection{Model profiles}
 \label{sec:models}
 The reference profile uses two dense Qwen3 checkpoints \cite{qwen2025qwen3},

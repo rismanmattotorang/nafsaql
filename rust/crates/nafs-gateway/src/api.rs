@@ -228,6 +228,10 @@ pub fn router(state: AppState) -> Router {
             get(|s: State<AppState>| serve_asset(s, "app.js")),
         )
         .route(
+            "/render.js",
+            get(|s: State<AppState>| serve_asset(s, "render.js")),
+        )
+        .route(
             "/app.css",
             get(|s: State<AppState>| serve_asset(s, "app.css")),
         )

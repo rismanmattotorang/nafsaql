@@ -1,4 +1,5 @@
 // Nafs-Aql web UI. Vanilla ES module, no build step. Served by nafs-gateway.
+import { markdown } from './render.js';
 // Sections: core utilities, markdown, charts, chat, rooms, knowledge, performance, evaluation, system.
 
 // ============================== core ==============================
@@ -222,55 +223,16 @@ const api = {
 
 // ============================== markdown (safe subset) ==============================
 // Make common LaTeX from the models readable without a math renderer.
-function prettyMath(t) {
-  const sym = { times: '×', cdot: '·', div: '÷', le: '≤', leq: '≤', ge: '≥', geq: '≥', neq: '≠', ne: '≠', approx: '≈', pm: '±', infty: '∞', to: '→', rightarrow: '→', Rightarrow: '⇒', implies: '⇒', quad: ' ', qquad: '  ', ldots: '…', dots: '…', pi: 'π', alpha: 'α', beta: 'β', theta: 'θ', lambda: 'λ', sqrt: '√', degree: '°', circ: '°', '%': '%', '$': '$' }; // copy-lint: allow
-  let x = t;
-  for (let i = 0; i < 3; i++) x = x.replace(/\\(?:d|t)?frac\{([^{}]*)\}\{([^{}]*)\}/g, '($1)/($2)');
-  x = x.replace(/\\boxed\{([^{}]*)\}/g, '**$1**').replace(/\\(?:text|mathrm|mathbf|textbf|operatorname)\{([^{}]*)\}/g, '$1').replace(/\\sqrt\{([^{}]*)\}/g, '√($1)');
-  x = x.replace(/\\left|\\right/g, '').replace(/\\[,;:! ]/g, ' ').replace(/\\([a-zA-Z]+|[%$])/g, (m, w) => sym[w] ?? m);
-  x = x.replace(/\^\{([^{}]*)\}/g, '^$1').replace(/\\\(|\\\)/g, '');
-  return x;
-}
-
-function md(src, cites = null) {
-  if (!src) return '';
-  const blocks = []; let s = String(src).replace(/\r/g, '');
-  // Display math ($$...$$ or \[...\]) renders as a centred formula line; inline $...$ as code.
-  s = s.replace(/```([\w+-]*)\n?([\s\S]*?)(```|$)/g, (_, lang, code) => { blocks.push({ lang, code }); return `\u0000${blocks.length - 1}\u0000`; });
-  s = prettyMath(s); // after code blocks are set aside, so code is never rewritten
-  s = s.replace(/\$\$\s*([\s\S]*?)\s*\$\$/g, (_, m) => `\u0001${m.trim().replace(/\n/g, ' ')}\u0001`).replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, (_, m) => `\u0001${m.trim().replace(/\n/g, ' ')}\u0001`);
-  const inline = (t) => esc(t)
-    .replace(/\u0001([^\u0001]*)\u0001/g, '<div class="math">$1</div>')
-    .replace(/(^|[^\w$])\$([^$\n]{1,80}?)\$(?![\w$])/g, '$1<code class="m">$2</code>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-    .replace(/(<code[^>]*>[\s\S]*?<\/code>)|\[(\d{1,2}(?:\s*[,;]\s*\d{1,2})*)\]/g, (m, code, ns) => code || !cites ? m : ns.split(/\s*[,;]\s*/).map(n => cites.has(+n) ? `<button type="button" class="cite" data-cite="${+n}" aria-haspopup="dialog" aria-expanded="false" aria-label="Source ${+n}: show the passage">${+n}</button>` : `[${+n}]`).join(''));
-  const out = []; const lines = s.split('\n'); let list = null; let para = [];
-  const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join('\n')).replace(/\n/g, '<br>')}</p>`); para = []; } };
-  const flushList = () => { if (list) { out.push(`<${list.t}${list.t === 'ol' && list.start > 1 ? ` start="${list.start}"` : ''}>${list.items.map(i => `<li>${inline(i)}</li>`).join('')}</${list.t}>`); list = null; } };
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const cb = line.match(/^\u0000(\d+)\u0000$/);
-    if (cb) { flushPara(); flushList(); const b = blocks[+cb[1]]; out.push(`<pre><span class="lang">${esc(b.lang)}</span><button class="copy" type="button">copy</button><code>${esc(b.code.replace(/\n$/, ''))}</code></pre>`); continue; }
-    const dm = line.trim().match(/^\u0001([^\u0001]*)\u0001$/); if (dm) { flushPara(); flushList(); out.push(`<div class="math">${esc(dm[1])}</div>`); continue; }
-    const hm = line.match(/^(#{1,4})\s+(.*)$/); if (hm) { flushPara(); flushList(); out.push(`<h${hm[1].length + 1}>${inline(hm[2])}</h${hm[1].length + 1}>`); continue; }
-    if (/^\s*\|.*\|\s*$/.test(line) && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1] || '')) {
-      flushPara(); flushList(); const row = (l) => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
-      const head = row(line); i += 1; const body = []; while (i + 1 < lines.length && /^\s*\|.*\|\s*$/.test(lines[i + 1])) { body.push(row(lines[++i])); }
-      out.push(`<table><thead><tr>${head.map(c => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`); continue;
-    }
-    const ul = line.match(/^\s*[-*+]\s+(.*)$/), ol = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
-    // A numbered list split by blank lines continues its numbering (models often separate items).
-    if (ul || ol) { flushPara(); const t = ul ? 'ul' : 'ol'; if (!list || list.t !== t) { flushList(); list = { t, items: [], start: ol ? +ol[1] : 1 }; } list.items.push(ul ? ul[1] : ol[2]); continue; }
-    if (!line.trim()) { flushPara(); const nx = lines.slice(i + 1).find(l => l.trim()); const same = nx && list && (list.t === 'ol' ? /^\s*\d+[.)]\s+/.test(nx) : /^\s*[-*+]\s+/.test(nx)); if (!same) flushList(); continue; }
-    if (list && /^\s{2,}\S/.test(line)) { list.items[list.items.length - 1] += ' ' + line.trim(); continue; }
-    flushList(); para.push(line);
-  }
-  flushPara(); flushList();
-  return out.join('');
-}
+// The renderer is its own module (render.js): Markdown, tables, code, maths as MathML, Mermaid as SVG.
+const md = (src, cites = null) => markdown(src, cites);
+// Controls inside rendered answers: expand a long code block, show a diagram's source, save a diagram.
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  if (b.dataset.act === 'expand') { const pre = b.closest('pre'); pre.classList.remove('long'); b.remove(); }
+  else if (b.dataset.act === 'source') { const fig = b.closest('figure'); const src = $('.fig-source', fig); src.hidden = !src.hidden; b.textContent = src.hidden ? 'Source' : 'Hide source'; b.setAttribute('aria-pressed', String(!src.hidden)); }
+  else if (b.dataset.act === 'svg') { const svg = $('svg', b.closest('figure')); if (!svg) return; const xml = new XMLSerializer().serializeToString(svg).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' })); a.download = 'diagram.svg'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+  else if (b.dataset.act === 'table') { const t = b.closest('.tablewrap'); const rows = $$('tr', t).map(r => $$('th,td', r).map(c => c.textContent.replace(/\s+/g, ' ').trim())); const tsv = rows.map(r => r.join('\t')).join('\n'); copyText(tsv).then(ok => { b.textContent = ok ? 'Copied' : 'Press Ctrl/Cmd+C'; setTimeout(() => (b.textContent = 'Copy table'), 1500); }); }
+});
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('pre .copy'); if (!b) return;
   const ok = await copyText(b.parentElement.querySelector('code').textContent);
@@ -1654,7 +1616,7 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
 
   // ---- knowledge graph: build, browse, one entity's relations with the passages behind them ----
   const GCOL = ['var(--accent)', 'var(--slow)', 'var(--warn)', 'var(--ok)', 'var(--bad)', 'var(--focus)', 'var(--muted)'];
-  const GW = 760, GH = 400; // the drawing's own size; the view box zooms and pans over it
+  const GW = 980, GH = 560; // the drawing's own size; the view box zooms and pans over it
   // `light` refreshes the numbers above the drawing only (while the graph is being built), so the drawing, the
   // zoom, the chosen thing and anything typed stay as they are.
   async function loadGraph(center = S.gcenter, light = false) {
@@ -1680,9 +1642,9 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     if (full) {
       const typed = $('#kbEnt', body)?.value || '', focused = document.activeElement?.id === 'kbEnt';
       body.innerHTML = nodes.length ? `<div class="row kb-gtools"><input type="search" id="kbEnt" placeholder="Find a thing by name" aria-label="Find a thing in the graph">${S.gcenter ? '<button class="btn sm ghost" type="button" id="kbGAll">Show the most mentioned</button>' : ''}</div><div id="kbEntList" class="kb-entlist"></div>
-        <div class="row kb-gbar"><span class="small muted" id="kbGCount" role="status"></span><span class="sp"></span><span class="kb-zoom" role="group" aria-label="Zoom the graph"><button type="button" class="btn sm ghost" data-z="out" aria-label="Zoom out">−</button><button type="button" class="btn sm ghost" data-z="in" aria-label="Zoom in">+</button><button type="button" class="btn sm ghost" data-z="fit">Fit</button></span></div>
-        <div class="kb-gwrap"><div class="kb-gcol"><svg id="kbSvg" class="kb-svg" role="group" aria-label="Knowledge graph: things and their relations"></svg>
-          <div class="kb-legend" id="kbLegend"></div><div class="tiny faint">Scroll to zoom, drag to move. A bigger circle is mentioned in more passages; a colour marks a group of closely related things.</div></div>
+        <div class="row kb-gbar"><span class="small muted" id="kbGCount" role="status"></span><span class="sp"></span><span class="kb-zoom" role="group" aria-label="Zoom the graph"><button type="button" class="btn sm ghost" data-z="out" aria-label="Zoom out">−</button><button type="button" class="btn sm ghost" data-z="in" aria-label="Zoom in">+</button><button type="button" class="btn sm ghost" data-z="fit">Fit</button><button type="button" class="btn sm ghost" data-z="full" aria-label="Full screen" aria-pressed="false">⤢</button></span></div>
+        <div class="kb-gwrap"><div class="kb-gcol"><div class="kb-stage"><svg id="kbSvg" class="kb-svg" role="group" aria-label="Knowledge graph: things and their relations"></svg><div id="kbTip" class="kb-tip" role="tooltip" hidden></div></div>
+          <div class="kb-legend" id="kbLegend"></div><div class="tiny faint">Hover a thing to light up what it connects to; click it to read what the documents say; double-click to open what is around it; drag to move it. Scroll to zoom. A bigger circle is mentioned in more passages; a colour marks a group of closely related things.</div></div>
           <aside id="kbEntity" class="kb-entity" aria-live="polite"><div class="tiny faint">Choose a thing in the graph to see what the documents say about it.</div></aside></div>`
         : `<div class="empty small">${st.entities ? 'Nothing to show.' : 'No graph yet. Build it to see the people, systems, methods and ideas your documents name, and how they connect.'}</div>`;
       const all = $('#kbGAll', body); if (all) all.onclick = () => { S.gsel = null; loadGraph(null); };
@@ -1697,53 +1659,94 @@ routes.knowledge = { title: 'Knowledge', sub: 'your documents, ready for questio
     clearTimeout(S.gtimer); S.gtimer = null;
     if (p.building) S.gtimer = setTimeout(function again() { S.gtimer = null; if (S.dead) return; if (document.hidden) { S.gtimer = setTimeout(again, 4000); return; } loadGraph(S.gcenter, true); }, 4000);
   }
-  // A small force layout (springs on edges, repulsion between nodes). A thing keeps the place it was first given:
-  // choosing one, or opening its neighbourhood, moves nothing that is already on screen.
+  // The graph drawing (Phase 31). A small force layout with clusters: springs on edges, repulsion and collision between
+  // circles, and a pull of each thing towards the centre of its group. A thing keeps the place it was first given:
+  // choosing one, or opening its neighbourhood, moves nothing that is already on screen. Hovering or choosing a thing
+  // lights its neighbourhood and fades the rest; things can be dragged; labels are placed so they do not overlap.
   function drawGraph(svg, allNodes, edges, total) {
     // The overview keeps connected things only (isolated ones crowd the edges and say nothing about relations).
     const linked = new Set(edges.flatMap(e => [e.source, e.target]));
-    const nodes = S.gcenter || !edges.length ? allNodes : allNodes.filter(n => linked.has(n.id)).slice(0, 36);
+    const nodes = S.gcenter || !edges.length ? allNodes : allNodes.filter(n => linked.has(n.id)).slice(0, 48);
     const W = GW, H = GH; const idx = new Map(nodes.map((n, i) => [n.id, i])); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-    const P = nodes.map((n) => { const c = S.gpos.get(n.id); return c ? { x: c.x, y: c.y, vx: 0, vy: 0, pin: true } : { x: W / 2 + (rnd() - 0.5) * W * 0.6, y: H / 2 + (rnd() - 0.5) * H * 0.6, vx: 0, vy: 0, pin: false }; });
-    const E = edges.map(e => [idx.get(e.source), idx.get(e.target), e]).filter(e => e[0] != null && e[1] != null);
+    const maxM = Math.max(1, ...nodes.map(n => +n.mentions || 1)); const rad = (n) => 5 + 11 * Math.sqrt((+n.mentions || 1) / maxM);
+    const grp = (n) => (Number.isInteger(n.community) ? n.community : -1), cls = (n) => `c${(grp(n) < 0 ? 7 : grp(n)) % 8}`;
+    const P = nodes.map((n) => { const c = S.gpos.get(n.id); return c ? { x: c.x, y: c.y, vx: 0, vy: 0, pin: true, r: rad(n) } : { x: W / 2 + (rnd() - 0.5) * W * 0.7, y: H / 2 + (rnd() - 0.5) * H * 0.7, vx: 0, vy: 0, pin: false, r: rad(n) }; });
+    const E = edges.map(e => [idx.get(e.source), idx.get(e.target), e]).filter(e => e[0] != null && e[1] != null && e[0] !== e[1]);
     const ci = S.gcenter ? idx.get(S.gcenter) : -1; const fresh = P.filter(p => !p.pin).length;
-    for (let it = 0; it < (fresh ? (fresh === P.length ? 300 : 160) : 0); it++) {
-      const K = (W * H) / Math.max(8, nodes.length) / 6;
-      for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) { const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = dx * dx + dy * dy + 0.01, f = K / d2; P[i].vx += dx * f / Math.sqrt(d2); P[i].vy += dy * f / Math.sqrt(d2); P[j].vx -= dx * f / Math.sqrt(d2); P[j].vy -= dy * f / Math.sqrt(d2); }
-      for (const [a, b] of E) { const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - 90) * 0.02; P[a].vx += dx / d * f; P[a].vy += dy / d * f; P[b].vx -= dx / d * f; P[b].vy -= dy / d * f; }
-      for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.pin) { p.vx = p.vy = 0; continue; } p.vx += (W / 2 - p.x) * 0.004; p.vy += (H / 2 - p.y) * 0.004; if (i === ci) { p.vx += (W / 2 - p.x) * 0.1; p.vy += (H / 2 - p.y) * 0.1; }
-        p.x = Math.min(W - 30, Math.max(30, p.x + Math.max(-12, Math.min(12, p.vx)))); p.y = Math.min(H - 16, Math.max(16, p.y + Math.max(-12, Math.min(12, p.vy)))); p.vx *= 0.6; p.vy *= 0.6; }
+    const gid = nodes.map(grp);
+    for (let it = 0; it < (fresh ? (fresh === P.length ? 420 : 200) : 0); it++) {
+      const K = (W * H) / Math.max(8, nodes.length) / 5; const cool = 1 - it / 480;
+      const cen = new Map(); P.forEach((p, i) => { const g = gid[i]; if (g < 0) return; const c = cen.get(g) || { x: 0, y: 0, n: 0 }; c.x += p.x; c.y += p.y; c.n++; cen.set(g, c); });
+      for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) { const dx = P[i].x - P[j].x, dy = P[i].y - P[j].y, d2 = dx * dx + dy * dy + 0.01, d = Math.sqrt(d2), f = K / d2; const ux = dx / d, uy = dy / d;
+        P[i].vx += ux * f; P[i].vy += uy * f; P[j].vx -= ux * f; P[j].vy -= uy * f;
+        const min = P[i].r + P[j].r + 16; if (d < min) { const push = (min - d) * 0.5; P[i].vx += ux * push; P[i].vy += uy * push; P[j].vx -= ux * push; P[j].vy -= uy * push; } }
+      for (const [a, b, e] of E) { const dx = P[b].x - P[a].x, dy = P[b].y - P[a].y, d = Math.sqrt(dx * dx + dy * dy) || 1, f = (d - (95 - Math.min(30, (+e.weight || 1) * 6))) * 0.02; P[a].vx += dx / d * f; P[a].vy += dy / d * f; P[b].vx -= dx / d * f; P[b].vy -= dy / d * f; }
+      for (let i = 0; i < P.length; i++) { const p = P[i]; if (p.pin) { p.vx = p.vy = 0; continue; }
+        p.vx += (W / 2 - p.x) * 0.0035; p.vy += (H / 2 - p.y) * 0.0035;
+        const c = gid[i] >= 0 ? cen.get(gid[i]) : null; if (c && c.n > 1) { p.vx += (c.x / c.n - p.x) * 0.012; p.vy += (c.y / c.n - p.y) * 0.012; }
+        if (i === ci) { p.vx += (W / 2 - p.x) * 0.1; p.vy += (H / 2 - p.y) * 0.1; }
+        const lim = 12 * Math.max(0.2, cool);
+        p.x = Math.min(W - 40, Math.max(40, p.x + Math.max(-lim, Math.min(lim, p.vx)))); p.y = Math.min(H - 24, Math.max(24, p.y + Math.max(-lim, Math.min(lim, p.vy)))); p.vx *= 0.6; p.vy *= 0.6; }
     }
     nodes.forEach((n, i) => S.gpos.set(n.id, { x: P[i].x, y: P[i].y }));
-    const maxM = Math.max(1, ...nodes.map(n => +n.mentions || 1)); const f1 = (v) => (+v).toFixed(1);
-    // Labels for the most mentioned and the chosen thing; the rest show their name on hover.
-    const labelled = new Set([...nodes].sort((a, b) => (b.mentions || 0) - (a.mentions || 0)).slice(0, 14).map(n => n.id)); if (S.gcenter) labelled.add(S.gcenter); if (S.gsel) labelled.add(S.gsel);
-    const grp = (n) => (Number.isInteger(n.community) ? n.community : -1), col = (n) => GCOL[(grp(n) < 0 ? 6 : grp(n)) % GCOL.length];
-    svg.innerHTML = E.map(([a, b, e]) => `<line x1="${f1(P[a].x)}" y1="${f1(P[a].y)}" x2="${f1(P[b].x)}" y2="${f1(P[b].y)}" class="kb-edge" data-a="${a}" data-b="${b}" stroke-width="${Math.min(4, 0.8 + (+e.weight || 1) * 0.6)}"><title>${esc(nodes[a].name)} ${esc(e.predicate)} ${esc(nodes[b].name)}</title></line>`).join('')
-      + nodes.map((n, i) => { const r = 4 + 9 * Math.sqrt((+n.mentions || 1) / maxM); return `<g class="kb-node" data-id="${esc(n.id)}" data-i="${i}" tabindex="0" role="button" aria-label="${esc(n.name)}, ${esc(n.type)}, mentioned in ${plural(+n.mentions || 0, 'passage')}"><circle cx="${f1(P[i].x)}" cy="${f1(P[i].y)}" r="${f1(r)}" fill="${col(n)}"/>${labelled.has(n.id) ? `<text x="${f1(P[i].x + r + 3)}" y="${f1(P[i].y + 4)}">${esc(n.name.length > 26 ? n.name.slice(0, 25) + '…' : n.name)}</text>` : ''}<title>${esc(n.name)} (${esc(n.type)}, mentioned in ${plural(+n.mentions || 0, 'passage')})</title></g>`; }).join('');
+    const f1 = (v) => (+v).toFixed(1);
+    // Labels: most mentioned first, kept only where they do not run into one already placed. The chosen thing always has one.
+    const charW = 6.2; const placed = []; const labelled = new Set(); const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    const order = [...nodes.keys()].sort((a, b) => (+nodes[b].mentions || 0) - (+nodes[a].mentions || 0));
+    for (const i of order) { const n = nodes[i], r = P[i].r; const w = Math.min(160, n.name.length * charW) + 4, box = { x: P[i].x + r + 3, y: P[i].y - 8, w, h: 16 };
+      const must = n.id === S.gcenter || n.id === S.gsel; const crowd = placed.some(q => hit(q, box)) || nodes.some((m, j) => j !== i && hit({ x: P[j].x - P[j].r, y: P[j].y - P[j].r, w: P[j].r * 2, h: P[j].r * 2 }, box));
+      if ((must || !crowd) && (labelled.size < 26 || must)) { labelled.add(n.id); placed.push(box); } }
+    const trunc = (t) => (t.length > 26 ? t.slice(0, 25) + '…' : t);
+    const arc = (a, b, k) => { const x1 = P[a].x, y1 = P[a].y, x2 = P[b].x, y2 = P[b].y, dx = x2 - x1, dy = y2 - y1, d = Math.hypot(dx, dy) || 1, o = Math.min(26, d * 0.12) * (k % 2 ? 1 : -1); return `M${f1(x1)} ${f1(y1)} Q${f1((x1 + x2) / 2 - dy / d * o)} ${f1((y1 + y2) / 2 + dx / d * o)} ${f1(x2)} ${f1(y2)}`; };
+    const adj = nodes.map(() => new Set()); E.forEach(([a, b]) => { adj[a].add(b); adj[b].add(a); });
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.innerHTML = `<defs><pattern id="kbDots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="1.5" r="1" class="kb-dot"/></pattern><radialGradient id="kbGlow" cx="50%" cy="45%" r="70%"><stop offset="0" class="kb-glow0"/><stop offset="1" class="kb-glow1"/></radialGradient></defs>
+      <rect x="-4000" y="-4000" width="9000" height="9000" fill="url(#kbGlow)" class="kb-bg"/><rect x="-4000" y="-4000" width="9000" height="9000" fill="url(#kbDots)" class="kb-bg"/>
+      <g class="kb-edges">${E.map(([a, b, e], k) => `<path d="${arc(a, b, k)}" class="kb-edge" data-a="${a}" data-b="${b}" style="stroke-width:${f1(Math.min(3.2, 0.9 + (+e.weight || 1) * 0.45))}"><title>${esc(nodes[a].name)} ${esc(e.predicate)} ${esc(nodes[b].name)}</title></path>`).join('')}</g>
+      <g class="kb-nodes">${nodes.map((n, i) => `<g class="kb-node ${cls(n)}" data-id="${esc(n.id)}" data-i="${i}" transform="translate(${f1(P[i].x)} ${f1(P[i].y)})" tabindex="0" role="button" aria-label="${esc(n.name)}, ${esc(n.type)}, mentioned in ${plural(+n.mentions || 0, 'passage')}"><circle class="kb-halo" r="${f1(P[i].r + 6)}"/><circle class="kb-dotc" r="${f1(P[i].r)}"/><text class="${labelled.has(n.id) ? 'show' : 'lz'}" x="${f1(P[i].r + 5)}" y="4">${esc(trunc(n.name))}</text></g>`).join('')}</g>`;
     const cnt = $('#kbGCount', main); if (cnt) cnt.textContent = `Showing ${nodes.length} of ${fmtCount(total)} things${S.gcenter ? ': the chosen one and what is around it' : nodes.length < total ? ': the most mentioned that have relations' : ''}`;
-    // Marks: the chosen thing, and (from the legend) one group with the rest dimmed.
-    const mark = () => { $$('.kb-node', svg).forEach(g => { const n = nodes[+g.dataset.i]; g.classList.toggle('on', n.id === (S.gsel || S.gcenter)); g.classList.toggle('dim', S.gdim != null && grp(n) !== S.gdim); });
-      $$('.kb-edge', svg).forEach(l => l.classList.toggle('dim', S.gdim != null && (grp(nodes[+l.dataset.a]) !== S.gdim || grp(nodes[+l.dataset.b]) !== S.gdim)));
-      $$('#kbLegend [data-g]', main).forEach(c => c.setAttribute('aria-pressed', String(S.gdim === +c.dataset.g))); };
+    const tip = $('#kbTip', main); const edgeEls = $$('.kb-edge', svg), nodeEls = $$('.kb-node', svg);
+    // Lighting: a thing (hovered, else chosen) and its neighbours stay bright, the rest fade; one group can be isolated from the legend.
+    const light = (i) => { const focus = i != null ? i : (idx.get(S.gsel || S.gcenter) ?? null);
+      nodeEls.forEach((g, k) => { const n = nodes[k]; const on = focus != null && (k === focus || adj[focus].has(k)); g.classList.toggle('on', n.id === (S.gsel || S.gcenter)); g.classList.toggle('hl', on && k !== focus); g.classList.toggle('focus', k === focus && i != null);
+        g.classList.toggle('fade', (focus != null && !on) || (S.gdim != null && grp(n) !== S.gdim)); });
+      edgeEls.forEach((l) => { const a = +l.dataset.a, b = +l.dataset.b; const mine = focus != null && (a === focus || b === focus); l.classList.toggle('hl', mine); l.classList.toggle('fade', (focus != null && !mine) || (S.gdim != null && (grp(nodes[a]) !== S.gdim || grp(nodes[b]) !== S.gdim))); }); };
+    const mark = () => { light(null); $$('#kbLegend [data-g]', main).forEach(c => c.setAttribute('aria-pressed', String(S.gdim === +c.dataset.g))); };
     // Legend: one chip per group on screen, named after its most mentioned member; a chip shows that group alone.
     const groups = new Map(); for (const n of nodes) { const k = grp(n); const x = groups.get(k) || { k, n: 0, top: n }; x.n++; if ((+n.mentions || 0) > (+x.top.mentions || 0)) x.top = n; groups.set(k, x); }
     const lg = $('#kbLegend', main); if (lg) { const gs = [...groups.values()].sort((a, b) => b.n - a.n); if (S.gdim != null && !groups.has(S.gdim)) S.gdim = null;
-      lg.innerHTML = gs.length > 1 ? `<span class="tiny faint">Groups:</span>` + gs.slice(0, 8).map(x => `<button type="button" class="rchip kb-lg" data-g="${x.k}" aria-pressed="false" title="Show only this group"><i style="background:${col(x.top)}"></i>${x.k < 0 ? 'No group' : esc(x.top.name.length > 22 ? x.top.name.slice(0, 21) + '…' : x.top.name)} <span class="faint">${x.n}</span></button>`).join('') + (gs.length > 8 ? `<span class="tiny faint">and ${gs.length - 8} more</span>` : '') : '';
+      lg.innerHTML = gs.length > 1 ? `<span class="tiny faint">Groups</span>` + gs.slice(0, 8).map(x => `<button type="button" class="rchip kb-lg" data-g="${x.k}" aria-pressed="false" title="Show only this group"><i class="${cls(x.top)}"></i>${x.k < 0 ? 'No group' : esc(x.top.name.length > 22 ? x.top.name.slice(0, 21) + '…' : x.top.name)} <span class="faint">${x.n}</span></button>`).join('') + (gs.length > 8 ? `<span class="tiny faint">+${gs.length - 8} more</span>` : '') : '';
       $$('[data-g]', lg).forEach(c => c.onclick = () => { S.gdim = S.gdim === +c.dataset.g ? null : +c.dataset.g; mark(); }); }
     mark();
     // View: wheel zooms about the pointer, dragging the background pans, the buttons do the same for keyboards.
-    const v = S.gview || (S.gview = { x: 0, y: 0, w: W, h: H }); const apply = () => svg.setAttribute('viewBox', `${f1(v.x)} ${f1(v.y)} ${f1(v.w)} ${f1(v.h)}`); apply();
+    const v = S.gview || (S.gview = { x: 0, y: 0, w: W, h: H }); const apply = () => { svg.setAttribute('viewBox', `${f1(v.x)} ${f1(v.y)} ${f1(v.w)} ${f1(v.h)}`); svg.classList.toggle('zoomed', v.w < W * 0.72); }; apply();
     const zoom = (k, cx = v.x + v.w / 2, cy = v.y + v.h / 2) => { const nw = Math.min(W * 2.5, Math.max(W / 8, v.w * k)), q = nw / v.w; v.x = cx - (cx - v.x) * q; v.y = cy - (cy - v.y) * q; v.w = nw; v.h *= q; apply(); };
     const at = (e) => { const m = svg.getScreenCTM(); return m ? new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse()) : { x: v.x + v.w / 2, y: v.y + v.h / 2 }; };
     svg.onwheel = (e) => { e.preventDefault(); const pt = at(e); zoom(e.deltaY < 0 ? 0.85 : 1 / 0.85, pt.x, pt.y); };
-    let drag = null;
-    svg.onpointerdown = (e) => { if (e.button !== 0 || e.target.closest('.kb-node')) return; const m = svg.getScreenCTM(); drag = { cx: e.clientX, cy: e.clientY, x: v.x, y: v.y, s: m ? m.a : 1 }; svg.setPointerCapture?.(e.pointerId); svg.classList.add('grab'); };
-    svg.onpointermove = (e) => { if (!drag) return; v.x = drag.x - (e.clientX - drag.cx) / drag.s; v.y = drag.y - (e.clientY - drag.cy) / drag.s; apply(); };
-    svg.onpointerup = svg.onpointercancel = () => { drag = null; svg.classList.remove('grab'); };
-    $$('.kb-zoom [data-z]', main).forEach(b => b.onclick = () => { if (b.dataset.z === 'fit') { v.x = 0; v.y = 0; v.w = W; v.h = H; apply(); } else zoom(b.dataset.z === 'in' ? 0.75 : 1 / 0.75); });
-    // Choosing a thing shows what the documents say about it and leaves the drawing as it is.
-    $$('.kb-node', svg).forEach(g => { const go = () => { S.gsel = g.dataset.id; mark(); showEntity(g.dataset.id, nodes[+g.dataset.i]); }; g.onclick = go; g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }; });
+    let drag = null, mv = null;
+    svg.onpointerdown = (e) => { const ng = e.target.closest('.kb-node'); if (e.button !== 0) return;
+      if (ng) { const i = +ng.dataset.i; const pt = at(e); mv = { i, ox: P[i].x - pt.x, oy: P[i].y - pt.y, moved: false, x0: e.clientX, y0: e.clientY, el: ng }; svg.setPointerCapture?.(e.pointerId); return; }
+      const m = svg.getScreenCTM(); drag = { cx: e.clientX, cy: e.clientY, x: v.x, y: v.y, s: m ? m.a : 1 }; svg.setPointerCapture?.(e.pointerId); svg.classList.add('grab'); };
+    svg.onpointermove = (e) => {
+      if (mv) { if (!mv.moved && Math.hypot(e.clientX - mv.x0, e.clientY - mv.y0) < 4) return; mv.moved = true; const pt = at(e); const p = P[mv.i]; p.x = pt.x + mv.ox; p.y = pt.y + mv.oy; S.gpos.set(nodes[mv.i].id, { x: p.x, y: p.y });
+        mv.el.setAttribute('transform', `translate(${f1(p.x)} ${f1(p.y)})`); edgeEls.forEach((l) => { const a = +l.dataset.a, b = +l.dataset.b; if (a === mv.i || b === mv.i) l.setAttribute('d', arc(a, b, edgeEls.indexOf(l))); }); if (tip) tip.hidden = true; return; }
+      if (!drag) return; v.x = drag.x - (e.clientX - drag.cx) / drag.s; v.y = drag.y - (e.clientY - drag.cy) / drag.s; apply(); };
+    let lastTap = { el: null, t: 0 };
+    svg.onpointerup = svg.onpointercancel = (e) => { const m = mv; if (m && m.moved) { m.el.dataset.dragged = '1'; setTimeout(() => delete m.el.dataset.dragged, 0); }
+      // Pointer capture sends the click to the svg, so a tap on a thing is handled here: one tap chooses it, two open what is around it.
+      else if (m && e.type === 'pointerup') { const now = Date.now(); if (lastTap.el === m.el && now - lastTap.t < 400) { lastTap = { el: null, t: 0 }; m.el.ondblclick(); } else { lastTap = { el: m.el, t: now }; m.el.onclick(); } }
+      mv = null; drag = null; svg.classList.remove('grab'); };
+    const card = $('#kbGraphCard', main); const full = () => { const on = !card.classList.contains('kb-full'); card.classList.toggle('kb-full', on); document.documentElement.classList.toggle('kb-noscroll', on); const b = $('[data-z="full"]', main); if (b) { b.setAttribute('aria-pressed', String(on)); b.setAttribute('aria-label', on ? 'Leave full screen' : 'Full screen'); b.innerHTML = on ? icon.x : '⤢'; } };
+    S.gescape = (e) => { if (e.key === 'Escape' && card?.classList.contains('kb-full')) { e.preventDefault(); full(); } }; document.removeEventListener('keydown', S.gescapeOld); document.addEventListener('keydown', S.gescape); S.gescapeOld = S.gescape;
+    $$('.kb-zoom [data-z]', main).forEach(b => b.onclick = () => { const z = b.dataset.z; if (z === 'fit') { v.x = 0; v.y = 0; v.w = W; v.h = H; apply(); } else if (z === 'full') full(); else zoom(z === 'in' ? 0.75 : 1 / 0.75); });
+    // Hovering names a thing and lights its neighbourhood; choosing shows what the documents say; a double click opens what is around it.
+    nodeEls.forEach(g => { const i = +g.dataset.i;
+      const go = () => { if (g.dataset.dragged) return; S.gsel = g.dataset.id; mark(); showEntity(g.dataset.id, nodes[i]); };
+      g.ondblclick = () => { S.gsel = g.dataset.id; loadGraph(g.dataset.id); }; g.onclick = go; g.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
+      const showTip = (e) => { if (!tip || mv) return; const n = nodes[i]; const r = svg.getBoundingClientRect(), pr = tip.parentElement.getBoundingClientRect(); tip.innerHTML = `<b>${esc(n.name)}</b><span>${esc(n.type || 'thing')} · ${plural(+n.mentions || 0, 'passage')}${adj[i].size ? ` · ${plural(adj[i].size, 'relation')} here` : ''}</span>`; tip.hidden = false;
+        const x = (e.clientX ?? (r.left + r.width / 2)) - pr.left + 14, y = (e.clientY ?? (r.top + r.height / 2)) - pr.top + 14; tip.style.left = `${Math.min(x, pr.width - tip.offsetWidth - 8)}px`; tip.style.top = `${Math.min(y, pr.height - tip.offsetHeight - 8)}px`; };
+      g.onpointerenter = (e) => { light(i); showTip(e); }; g.onpointermove = (e) => { if (!mv) showTip(e); }; g.onpointerleave = () => { light(null); if (tip) tip.hidden = true; };
+      g.onfocus = () => { light(i); showTip({}); }; g.onblur = () => { light(null); if (tip) tip.hidden = true; }; });
   }
   async function showEntity(id, node) {
     const box = $('#kbEntity', main); if (!box) return;

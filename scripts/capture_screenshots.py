@@ -122,6 +122,16 @@ def main():
             tab.wait_for("document.querySelectorAll('[data-a=\"inspect\"]').length > 0", 20)
             time.sleep(1.5)
             tab.shot("chat")
+        # Phase 31: how a rich answer is drawn (table, formula, diagram, code). The text is a fixed sample run through the
+        # real renderer inside the real message markup; nothing is sent to a model.
+        if want("rich"):
+            sample = open(os.path.join(ROOT, "scripts", "rich_sample.md")).read()
+            go("chat")
+            tab.wait_for("!!document.getElementById('inner')", 30)
+            tab.js("""(async () => { const { markdown } = await import('/render.js?v=' + Date.now()); const md = %s;
+              document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
+            time.sleep(1.5)
+            tab.shot("rich_answer", 1700)
         if want("lab"):
             go("eval")
             tab.wait_for("!!document.querySelector('table.policy-map')", 30)
