@@ -211,6 +211,15 @@ def main():
             tab.wait_for("!!document.querySelector('#fsMain .fs-hits, #fsMain .card-h h3') && !document.querySelector('#fsMain .spin')", 60)
             time.sleep(1.5)
             tab.shot("files_search")
+        # Phase 30: Settings, at the Speed section (ShadowPrefill and the stable prompt beginning).
+        if want("settings_speed"):
+            go("chat")
+            tab.js("document.getElementById('settingsBtn').click(); true")
+            tab.wait_for("!!document.getElementById('stShadow')", 20)
+            tab.js("document.getElementById('stShadow').closest('section').scrollIntoView({block: 'start'}); true")
+            time.sleep(1)
+            tab.shot("settings_speed")
+            tab.js("document.getElementById('modal').close(); true")
         if want("rooms"):
             # A throw-away room with three people and two real answers, photographed, then deleted.
             ws_base = base.replace("http", "ws", 1)

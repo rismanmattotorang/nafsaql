@@ -162,6 +162,38 @@ concurrent sessions had a p95 latency of 7.2, 4.9 and 9.0\,s; the ratio of
 the four-session to the single-session p95 ranged from 1.25 to 2.48 across
 runs on the shared host.
 
+\textbf{Switching to the reasoning model in a conversation.}
+Table~\ref{tab:shadow} measures the switch at the model servers: three quick
+turns answered by \Sone, then \Stwo's time to read the conversation (a
+one-token request), three rounds of four interleaved arms with 20\,s of
+reading between turns. The shadow alone does not help, because the old layout
+changed the system prompt with every question; the stable layout alone does
+not either, because \Stwo\ has read nothing. Together they cut the time to
+\Stwo's first token from 36.6 to 2.0\,s (1.5 to 2.3\,s in every round). The
+stable layout also lets \Sone\ reuse its own conversation, reading about half
+as many tokens on later turns. It costs no answers: on 50 questions answered
+from documents, 42 were right with either layout, with two discordant pairs
+each way. A shadow running during the draft instead made the draft 75\,\%
+slower (19.0 to 33.3\,s) to save 46\,s on an escalated 925-token prompt; real
+chats escalate about one question in four, below the 31\,\% at which it would
+pay.
+
+\begin{table}[t]
+\centering\scriptsize
+\caption{The switch to the reasoning model after three quick turns: medians of three rounds.}
+\label{tab:shadow}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Layout, shadow & \Stwo\ first token & Read at switch & \Sone\ reads per turn \\
+\midrule
+old, none & 36.6\,s & 493 & 292 \\
+old, between turns & 28.0\,s & 466 & 268 \\
+stable, none & 41.3\,s & 502 & 193 \\
+stable, between turns & 2.0\,s & 34 & 207 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Does the agent harness verify more, sooner?}
 \label{sec:eval:harness}
 Ten small Python tasks (fixes of a buggy function and functions written from
@@ -500,6 +532,7 @@ A difficulty signal from the question alone (nearest labelled questions; prototy
 Sentences of six passages packed into a block of 2{,}400 characters, headers counted, in place of four whole passages & prompts 25\,\% shorter and answers 20 to 26\,\% sooner (42 of 50 pairs); 39 of 50 right against 42 ($p=0.38$) & the answers lost took a number from the wrong excerpt; kept as an option \\
 Cache-blocking the prompt's weight products; a smaller prompt chunk & within $\pm3\,\%$ once the benchmark was warmed up & reading a prompt is bound by the kernel's arithmetic, not by the caches \\
 A meaning weight of 0.3 or 0.5 with sentence windows & reworded MRR 0.201 to 0.216 and 0.228; quoted 0.922 to 0.867 and 0.857 & the quoted questions pay for it \\
+A shadow of the reasoning model during the draft \cite{qiu2026shadowprefill} & draft 19.0 to 33.3\,s; escalated first token 46 to 0.2\,s & pays only above 31\,\% escalation; real chats escalate about 25\,\% \\
 Summaries-first context block with quotas \cite{openviking2026} & answer in prompt 0.857 against 0.964 at the same size (quoted) & needs 25 to 70\,\% more text to gain \\
 Scoping a search to a document guessed from its terms & fired on 11 of 198 questions, right 5 times; quoted MRR 0.870 to 0.841 & a correct scope helps, a guessed one does not \\
 Sentence windows counted in full ($m=1$) & reworded MRR 0.182 against 0.201 at $m=0.5$ & a short window outranks the passage that answers \\
@@ -510,7 +543,7 @@ Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.7
 
 \subsection{Validation}
 \label{sec:eval:validation}
-The workspace has 533 Rust tests, including the ported upstream suites of the
+The workspace has 539 Rust tests, including the ported upstream suites of the
 patch parser and the Lean rules, bit-identity tests of the batched engine and
 parity tests of the memory module; formatting, lints and dependency audits
 are clean. Live sweeps on the final build pass: the API contract, 26 of 26
@@ -519,7 +552,7 @@ open high-severity finding, 33 of 33 knowledge-security checks, 74 of 74
 end-to-end checks of every endpoint and page, 10 of 10 chat-room checks, 55
 knowledge checks, 14 of 14 checks of the conversation memory, 53 of 53 checks
 of the agent harness and all nine acceptance tests (the first token of a
-quick reply after 0.15\,s; a verified deliberate answer after 182\,s against
+quick reply after 0.14\,s; a verified deliberate answer after 53\,s against
 a target of 240\,s). The acceptance latencies depend on what else the machine
 is doing: an earlier sweep the same day, under a load average of 30 to 40
 from other workloads, missed both targets (2.6\,s and 420\,s) with correct

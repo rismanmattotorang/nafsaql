@@ -779,6 +779,10 @@ pub struct Base {
     len_sum: [u64; FIELDS],
     bytes: usize,
     graph: OnceLock<FastGraph>,
+    /// Phase 29: passages per term over the whole base, and every document's layers, made once per version of the
+    /// base (a base is immutable; a change builds a new one), not on every listing or search.
+    df_map: OnceLock<HashMap<Box<str>, u32>>,
+    layer_cache: OnceLock<HashMap<String, DocLayers>>,
 }
 
 impl Base {
@@ -805,6 +809,8 @@ impl Base {
             len_sum,
             bytes,
             graph: OnceLock::new(),
+            df_map: OnceLock::new(),
+            layer_cache: OnceLock::new(),
         }
     }
 
@@ -1841,10 +1847,33 @@ impl Base {
 
     /// How many passages hold `term` (a stem as the analyzer makes it).
     fn df(&self, term: &str) -> usize {
-        self.parts
-            .iter()
-            .map(|p| p.postings.get(term).map_or(0, Vec::len))
-            .sum()
+        let map = self.df_map.get_or_init(|| {
+            let mut m: HashMap<Box<str>, u32> = HashMap::new();
+            for p in &self.parts {
+                for (t, list) in &p.postings {
+                    *m.entry(t.clone()).or_default() += list.len() as u32;
+                }
+            }
+            m
+        });
+        map.get(term).copied().unwrap_or(0) as usize
+    }
+
+    /// L0 and L1 of a document (spec §3), from the base's cache.
+    pub fn doc_layers(&self, an: &Analyzer, doc: &str) -> Option<DocLayers> {
+        self.all_layers(an).get(doc).cloned()
+    }
+
+    fn all_layers(&self, an: &Analyzer) -> &HashMap<String, DocLayers> {
+        self.layer_cache.get_or_init(|| {
+            self.parts
+                .iter()
+                .filter_map(|p| {
+                    self.compute_doc_layers(an, &p.doc_id)
+                        .map(|l| (p.doc_id.clone(), l))
+                })
+                .collect()
+        })
     }
 
     /// Terms of `texts` ranked by frequency times inverse passage frequency in this base, shown in their commonest
@@ -1904,7 +1933,7 @@ impl Base {
     }
 
     /// L0 and L1 of a document (spec §3).
-    pub fn doc_layers(&self, an: &Analyzer, doc: &str) -> Option<DocLayers> {
+    fn compute_doc_layers(&self, an: &Analyzer, doc: &str) -> Option<DocLayers> {
         let part = self.parts.iter().find(|p| p.doc_id == doc)?;
         let mut sections: Vec<(String, u64)> = Vec::new();
         for r in &part.rows {
@@ -1986,16 +2015,12 @@ impl Base {
     /// L0 and L1 of the whole base (spec §3): one line per document with its L0 (32 evenly spaced documents above
     /// that), and the base's own distinctive terms.
     pub fn base_layers(&self, an: &Analyzer, name: &str, description: &str) -> (String, String) {
-        let mut docs: Vec<DocLayers> = self
-            .parts
-            .iter()
-            .filter_map(|p| self.doc_layers(an, &p.doc_id))
-            .collect();
+        let mut docs: Vec<&DocLayers> = self.all_layers(an).values().collect();
         docs.sort_by_key(|d| d.title.to_lowercase());
         let shown: Vec<&DocLayers> = if docs.len() <= 32 {
-            docs.iter().collect()
+            docs.clone()
         } else {
-            (0..32).map(|i| &docs[i * (docs.len() - 1) / 31]).collect()
+            (0..32).map(|i| docs[i * (docs.len() - 1) / 31]).collect()
         };
         let texts: Vec<&str> = self
             .parts

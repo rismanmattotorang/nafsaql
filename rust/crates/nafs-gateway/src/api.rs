@@ -1814,6 +1814,29 @@ pub fn spawn_background(s: AppState) {
             }
         });
     }
+    // Phase 29: save quiet chats as files (transcript and memories), when `[context] commit_idle_minutes` is set.
+    if s.cfg.context.commit_idle_minutes > 0 {
+        let s2 = s.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(60)).await;
+                let quiet = s2
+                    .store
+                    .conversations_to_commit(s2.cfg.context.commit_idle_minutes, 20)
+                    .unwrap_or_default();
+                for c in quiet {
+                    match s2.store.commit_session(c, &[]) {
+                        Ok(r) => {
+                            tracing::info!(conversation = %c, writes = r.diff.len(), "chat saved as a file")
+                        }
+                        Err(e) => {
+                            tracing::debug!(conversation = %c, error = %e, "chat not saved as a file")
+                        }
+                    }
+                }
+            }
+        });
+    }
     if s.cfg.labels.enabled {
         let s2 = s.clone();
         tokio::spawn(async move { label_worker(s2).await });

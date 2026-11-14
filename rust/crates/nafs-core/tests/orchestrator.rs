@@ -794,10 +794,15 @@ async fn retrieval_reuses_verified_answers_as_delimited_data() {
         "provenance is reported on the reply"
     );
     let calls = mock.calls.lock().unwrap();
-    let sys = calls.last().unwrap()["messages"][0]["content"]
-        .as_str()
+    // The whole prompt: with the stable layout (Phase 30) the retrieved answers sit before the question, not in the
+    // system prompt.
+    let sys = calls.last().unwrap()["messages"]
+        .as_array()
         .unwrap()
-        .to_string();
+        .iter()
+        .filter_map(|m| m["content"].as_str())
+        .collect::<Vec<_>>()
+        .join("\n");
     assert!(sys.contains("<retrieved>") && sys.contains("source: reply"));
     // Every opened block is closed exactly once: the planted closing tag was neutralised (SR-001).
     assert_eq!(

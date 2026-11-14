@@ -168,6 +168,29 @@ prefix; the prefix must repeat the generated text exactly, or every reasoning
 token is prefilled again (5 tokens and 0.2\,s when exact, against 108 tokens
 and 2.2\,s at a budget of 200 when one newline differed).
 
+\textbf{Keeping the other model warm.} Within one question the switch costs
+little, but a conversation is another matter: \Stwo\ has never read the turns
+\Sone\ answered, so after three quick turns it reads about 500 tokens of
+conversation at some 20 tokens a second before its first token (25.8 to
+51.9\,s). ShadowPrefill \cite{qiu2026shadowprefill} keeps the model a session
+may switch to warm by having it read the session's context in capacity that
+would otherwise go unused. The engine has a \emph{shadow} request class for
+it: a shadow only reads its prompt into the cache, at the lowest priority
+(its chunks run only when no real prompt waits), is never decoded, is
+stopped when its caller goes, keeps to a duty cap when it is the only work,
+and is taken over by a real request that shares its beginning, which
+restores what the shadow read and never waits for it. On one CPU the unused
+capacity is the time a person spends reading an answer: after each reply,
+once nothing has run for 1.5\,s, the model that did not answer reads the
+conversation including that reply, and the next request stops it. This pays
+only if the next prompt begins with the last one, which the prompt layout did
+not ensure: the domain instruction, retrieved answers, passages and notes
+were in the system prompt and changed with every question. The system prompt
+now holds only the assistant's own text, and what changes with the question
+goes before it. A shadow beside the draft, as in the paper's
+SLO-slack harvest, is built but off: the two models share the cores, and it
+made every draft 75\,\% slower.
+
 \subsection{Alternative backends}
 \texttt{llama-server} keeps four things the default engine's server does not
 expose: decoding grammars, $n$-choice requests, a raw continuation endpoint

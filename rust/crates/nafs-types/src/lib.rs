@@ -209,6 +209,13 @@ pub struct ChatRequest {
     /// FR-082: use (true) or skip (false) the adaptive reasoning exit; default from config.
     #[serde(default)]
     pub adaptive_exit: Option<bool>,
+    /// ShadowPrefill (Phase 30): "off", "between" (warm the other model after the reply), "arrival" (warm the
+    /// reasoning model while the quick one drafts) or "both"; default from `[shadow]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shadow: Option<String>,
+    /// Phase 30: keep what changes with each question out of the system prompt; default from `[shadow]`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stable_prefix: Option<bool>,
     /// Gate-calibration probe: with `force_mode = fast`, still draw the k agreement samples, so the draft's gate
     /// features are recorded with no System 2 call behind them. Used by the evaluation system `fast_probe`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

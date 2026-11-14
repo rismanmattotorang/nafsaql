@@ -172,6 +172,17 @@ enabled = false
 top_k = 2
 min_score = 0.35
 
+[context]                              # Phase 29: one context filesystem (nafs://) for documents, memory files, skills and saved chats
+skills_in_chat = true                  # a question that asks how to do a task carries the saved skill that matches it
+commit_idle_minutes = 0                # save a chat as a file (transcript and memories) once quiet this many minutes (0 = only on request)
+
+[shadow]                               # Phase 30: ShadowPrefill - the model a conversation may switch to reads it in unused time (Smiley Core only)
+between_turns = true                   # after a reply, while nothing else runs, the model that did not answer reads the conversation
+idle_delay_ms = 1500                   # wait this long after a reply, with nothing in flight, before starting
+at_arrival = false                     # while the quick model drafts, the reasoning model reads the same prompt (both share the cores)
+arrival_duty = 0.25                    # share of time an arrival shadow may compute (0.05 to 1)
+stable_prefix = true                   # keep what changes with each question out of the system prompt, so each turn's prompt begins with the last
+
 [recall]                               # memory of earlier conversations: notes of finished turns, read back when a question says "my", "last time", "you said"
 enabled = true
 limit = 3                              # most notes in one prompt

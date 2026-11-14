@@ -179,11 +179,14 @@ impl Uri {
         })?;
         let mut path = Vec::new();
         for p in parts {
-            if p.is_empty() || p == "." || p == ".." {
-                return Err(UriError(format!("bad path segment in \"{s}\"")));
-            }
             let d = decode_segment(p)?;
-            if d.contains('/') || d.chars().any(char::is_control) {
+            // Checked after decoding, so `%2E%2E` is refused as `..` is.
+            if d.is_empty()
+                || d == "."
+                || d == ".."
+                || d.contains('/')
+                || d.chars().any(char::is_control)
+            {
                 return Err(UriError(format!("bad path segment in \"{s}\"")));
             }
             path.push(d);
@@ -294,13 +297,22 @@ impl fmt::Display for Uri {
 
 /// A glob over URIs: `*` matches within one segment, `**` across segments.
 pub fn glob_match(pattern: &str, uri: &str) -> bool {
-    fn rec(p: &[&str], u: &[&str]) -> bool {
-        match (p.first(), u.first()) {
-            (None, None) => true,
-            (Some(&"**"), _) => rec(&p[1..], u) || (!u.is_empty() && rec(p, &u[1..])),
-            (Some(ps), Some(us)) => seg(ps, us) && rec(&p[1..], &u[1..]),
-            _ => false,
+    // Segment-level matching by dynamic programming: `m[i][j]` says whether the first `i` pattern segments match
+    // the first `j` URI segments. Linear in their product, whatever the number of `**` (a recursive match is
+    // exponential in it).
+    fn matches(p: &[&str], u: &[&str]) -> bool {
+        let mut m = vec![vec![false; u.len() + 1]; p.len() + 1];
+        m[0][0] = true;
+        for i in 1..=p.len() {
+            for j in 0..=u.len() {
+                m[i][j] = if p[i - 1] == "**" {
+                    m[i - 1][j] || (j > 0 && m[i][j - 1])
+                } else {
+                    j > 0 && m[i - 1][j - 1] && seg(p[i - 1], u[j - 1])
+                };
+            }
         }
+        m[p.len()][u.len()]
     }
     fn seg(p: &str, s: &str) -> bool {
         // `*` within a segment: split on it and match the pieces in order.
@@ -334,9 +346,16 @@ pub fn glob_match(pattern: &str, uri: &str) -> bool {
             .collect()
     };
     let (p, u) = (strip(pattern), strip(uri));
-    let p: Vec<&str> = p.iter().map(String::as_str).collect();
+    let mut ps: Vec<&str> = p.iter().map(String::as_str).collect();
+    // Consecutive `**` match what one does.
+    ps.dedup_by(|a, b| *a == "**" && *b == "**");
     let u: Vec<&str> = u.iter().map(String::as_str).collect();
-    rec(&p, &u)
+    matches(&ps, &u)
+}
+
+/// A pattern `glob_match` accepts from a caller: at most 256 bytes and 4 `**`.
+pub fn glob_ok(pattern: &str) -> bool {
+    pattern.len() <= 256 && pattern.matches("**").count() <= 4
 }
 
 /// A file-name-safe key from free text: lower-case ASCII letters and digits joined by `-`, at most 64 characters.
@@ -355,7 +374,11 @@ pub fn slug(text: &str) -> String {
             c => c,
         };
         if c.is_ascii_alphanumeric() {
+            // A dash and the next character must both fit in the 64.
             if dash && !out.is_empty() {
+                if out.len() + 2 > 64 {
+                    break;
+                }
                 out.push('-');
             }
             dash = false;
@@ -457,6 +480,13 @@ mod tests {
         ));
         assert!(glob_match("nafs://kb/*/*", "nafs://kb/b/d"));
         assert!(!glob_match("nafs://skills/*", "nafs://kb/b"));
+        // Many `**` are matched in linear time (a recursive match took exponential time).
+        let hostile = format!("nafs://{}zz", "**/".repeat(200));
+        let t = std::time::Instant::now();
+        assert!(!glob_match(&hostile, "nafs://kb/a/b/c/d/e"));
+        assert!(t.elapsed().as_millis() < 500);
+        assert!(!glob_ok(&hostile) && glob_ok("nafs://memory/**"));
+        assert!(Uri::parse("nafs://kb/%2E%2E").is_err() && Uri::parse("nafs://kb/%2e").is_err());
     }
 
     #[test]
@@ -465,5 +495,7 @@ mod tests {
         assert_eq!(slug("Café Ünïon"), "cafe-union");
         assert_eq!(slug("!!!"), "item");
         assert!(slug(&"word ".repeat(40)).len() <= 64);
+        let edge = format!("{} b", "a".repeat(63));
+        assert!(slug(&edge).len() <= 64 && !slug(&edge).ends_with('-'));
     }
 }

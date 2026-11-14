@@ -34,6 +34,12 @@ pub struct Config {
     /// Memory of earlier conversations (Phase 26).
     #[serde(default)]
     pub recall: RecallCfg,
+    /// ShadowPrefill (Phase 30): keep the other model of the pair warm.
+    #[serde(default)]
+    pub shadow: ShadowCfg,
+    /// The context filesystem (Phase 29): skills in chat, saving quiet chats as files.
+    #[serde(default)]
+    pub context: ContextCfg,
     /// Math and code harness (FR-090..FR-093): the code agent endpoint.
     #[serde(default)]
     pub harness: HarnessCfg,
@@ -511,6 +517,55 @@ impl Default for RecallCfg {
             budget_chars: 1500,
             vectors: true,
             max_episodes: 5000,
+        }
+    }
+}
+
+/// The context filesystem (Phase 29, `docs/spec/context_fs_spec.md`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ContextCfg {
+    /// A question that asks how to do a task carries the saved skill that matches it.
+    pub skills_in_chat: bool,
+    /// Save a chat as a file (transcript and memories) once it has been quiet this many minutes (0 = only on request).
+    pub commit_idle_minutes: u64,
+}
+impl Default for ContextCfg {
+    fn default() -> Self {
+        Self {
+            skills_in_chat: true,
+            commit_idle_minutes: 0,
+        }
+    }
+}
+
+/// ShadowPrefill (Phase 30, after Qiu et al. 2026): the model a conversation may switch to reads the conversation in
+/// time that would otherwise go unused, so a switch reads only what is new. Smiley Core servers only.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ShadowCfg {
+    /// After a reply, while nothing else runs, the model that did not answer reads the conversation so far.
+    pub between_turns: bool,
+    /// Wait this long after a reply, with no request in flight, before starting.
+    pub idle_delay_ms: u64,
+    /// While the quick model drafts, the reasoning model reads the same prompt (both share the cores).
+    pub at_arrival: bool,
+    /// Share of time an arrival shadow may compute (0.05 to 1).
+    pub arrival_duty: f32,
+    /// Keep what changes with each question (the domain instruction, retrieved passages, notes) out of the system
+    /// prompt and put it before the question, so every turn's prompt begins with the previous turn's.
+    pub stable_prefix: bool,
+}
+impl Default for ShadowCfg {
+    fn default() -> Self {
+        // Measured (Phase 30): stable layout + between-turns shadow cut the switch to the reasoning model from 36.6 s to
+        // 2.0 s with the same right answers (42/50 both layouts); a shadow during the draft slowed every draft by 75 %.
+        Self {
+            between_turns: true,
+            idle_delay_ms: 1500,
+            at_arrival: false,
+            arrival_duty: 0.25,
+            stable_prefix: true,
         }
     }
 }

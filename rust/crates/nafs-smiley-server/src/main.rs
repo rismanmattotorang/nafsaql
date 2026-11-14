@@ -75,6 +75,10 @@ struct Args {
     /// earlier one (not only the last) is not prefilled again; 0 = off. Not used with a DSpark drafter.
     #[arg(long = "prefix-cache-mb", default_value_t = 768)]
     prefix_cache_mb: usize,
+    /// ShadowPrefill (Phase 30): while real requests are decoding, read one chunk of a shadow request every N steps
+    /// (0 = shadows are read only when nothing else is being served).
+    #[arg(long = "shadow-every", default_value_t = 0)]
+    shadow_every: usize,
     /// Users served at once, each in one row of the same weight pass. Above the machine's roofline ridge
     /// (about seven rows here) another row adds no throughput and every user waits longer for its own tokens.
     #[arg(long, default_value_t = smiley_core::serve::DEFAULT_MAX_SLOTS)]
@@ -171,7 +175,7 @@ async fn main() {
     };
     let max_ctx = a.ctx.clamp(32, model.cfg.ctx_train);
     let prefill_threads = a.prefill_threads.unwrap_or(threads).max(1);
-    let engine = Engine::with_prefill_threads(
+    let mut engine = Engine::with_prefill_threads(
         model.clone(),
         threads,
         prefill_threads,
@@ -180,6 +184,7 @@ async fn main() {
         kv_prec,
         a.prefix_cache_mb << 20,
     );
+    engine.shadow_every = a.shadow_every;
     let cache_mb = engine.cache_bytes_per_slot() >> 20;
     let (jobs, rx) = std::sync::mpsc::channel::<EngineMsg>();
     let shared = Arc::new(EngineShared::default());
@@ -295,6 +300,14 @@ struct Plan {
     /// Memorilla's memory tokens (Phase 20): vectors for the placeholder token's positions in the prompt, in order.
     memory: Option<std::sync::Arc<Vec<Vec<f32>>>>,
     placeholder: String,
+    // nafs-aql (ShadowPrefill, Phase 30): `"shadow": true` (or `{"duty": 0.25}`) only reads the prompt into the cache,
+    // at the lowest priority, for a request that may come later. A shadow may end with an assistant message: then
+    // the conversation so far is read (the beginning of the next turn), with no new user turn.
+    shadow: bool,
+    /// Share of wall time a shadow may compute while it is the only work (1 = as fast as it can).
+    duty: f32,
+    /// The messages end with the assistant's turn (shadow only).
+    open_end: bool,
 }
 
 /// `memory_embeds: {"vectors": [[f32; d_model]; K], "placeholder"?: "<|fim_pad|>"}`: K vectors for the K places
@@ -401,7 +414,11 @@ fn plan(b: &Value) -> Result<Plan, String> {
             _ => {}
         }
     }
-    let Some(user) = pending_user else {
+    let shadow_v = &b["shadow"];
+    let shadow = shadow_v.as_bool().unwrap_or(false) || shadow_v.is_object();
+    let duty = shadow_v["duty"].as_f64().unwrap_or(1.0).clamp(0.05, 1.0) as f32;
+    let open_end = shadow && pending_user.is_none() && !pairs.is_empty();
+    let Some(user) = pending_user.or_else(|| open_end.then(String::new)) else {
         return Err("the last message must be from the user".into());
     };
     let kw = &b["chat_template_kwargs"];
@@ -425,7 +442,10 @@ fn plan(b: &Value) -> Result<Plan, String> {
             .or_else(|| b["reasoning_budget_tokens"].as_u64())
             .map(|v| v as usize),
         logprobs: b["logprobs"].as_bool().unwrap_or(false),
-        stream: b["stream"].as_bool().unwrap_or(false),
+        stream: b["stream"].as_bool().unwrap_or(false) && !shadow,
+        shadow,
+        duty,
+        open_end,
     })
 }
 
@@ -478,6 +498,8 @@ struct Job {
     /// Memory vectors by prompt position (Memorilla, Phase 20).
     inputs: Vec<(usize, Vec<f32>)>,
     out: tokio::sync::mpsc::UnboundedSender<Emission>,
+    /// ShadowPrefill: the share of time a shadow may compute when it is the only work.
+    duty: f32,
 }
 
 enum EngineMsg {
@@ -495,6 +517,8 @@ fn engine_thread(
     shared: Arc<EngineShared>,
 ) {
     let mut routes: HashMap<SlotId, tokio::sync::mpsc::UnboundedSender<Emission>> = HashMap::new();
+    // ShadowPrefill: the duty of each shadow slot.
+    let mut duties: HashMap<SlotId, f32> = HashMap::new();
     let mut waiting: VecDeque<Job> = VecDeque::new();
     let take = |msg,
                 waiting: &mut VecDeque<Job>,
@@ -520,9 +544,13 @@ fn engine_thread(
             if j.out.is_closed() {
                 continue;
             }
+            let (shadow, duty) = (j.cfg.shadow, j.duty);
             match engine.admit_with_inputs(j.prompt, j.cfg, j.inputs) {
                 Ok(id) => {
                     routes.insert(id, j.out);
+                    if shadow {
+                        duties.insert(id, duty);
+                    }
                 }
                 Err((_, why)) => {
                     let _ = j.out.send(Emission {
@@ -546,6 +574,22 @@ fn engine_thread(
             }
             continue;
         }
+        // A caller that has gone while its prompt is still being read (no token has been sent to notice it by):
+        // stop reading. Cancelling keeps what was read, as for any cancelled request.
+        let gone: Vec<SlotId> = routes
+            .iter()
+            .filter(|(_, tx)| tx.is_closed())
+            .map(|(id, _)| *id)
+            .collect();
+        for id in gone {
+            engine.cancel(id);
+            routes.remove(&id);
+            duties.remove(&id);
+        }
+        duties.retain(|id, _| routes.contains_key(id));
+        let only_shadows = engine.real_active() == 0 && engine.shadow_active() > 0;
+        let duty = duties.values().copied().fold(1.0f32, f32::min);
+        let t_step = Instant::now();
         for em in engine.step() {
             let done = em.finish.is_some();
             let slot = em.slot;
@@ -561,6 +605,14 @@ fn engine_thread(
                 routes.remove(&slot);
             }
         }
+        // A shadow alone keeps to its duty: it rests in proportion to the time it computed, and a request that
+        // arrives meanwhile wakes the engine at once.
+        if only_shadows && duty < 1.0 {
+            let rest = t_step.elapsed().mul_f32((1.0 - duty) / duty);
+            if let Ok(m) = rx.recv_timeout(rest) {
+                take(m, &mut waiting, &mut engine, &mut routes);
+            }
+        }
         shared.steps.store(engine.decode_steps, Ordering::SeqCst);
         shared.rows.store(engine.decode_rows, Ordering::SeqCst);
         let (entries, bytes, hits, saved) = engine.prefix_stats();
@@ -574,6 +626,11 @@ fn engine_thread(
         *shared.prefix_full.lock().unwrap_or_else(|e| e.into_inner()) =
             (entries, bytes, hits, saved);
         *shared.phases.lock().unwrap_or_else(|e| e.into_inner()) = engine.phases_ms();
+        *shared.shadow.lock().unwrap_or_else(|e| e.into_inner()) = (
+            engine.shadow_done,
+            engine.shadow_taken,
+            engine.shadow_positions,
+        );
     }
 }
 
@@ -587,6 +644,8 @@ struct EngineShared {
     prefix: AtomicU64,
     prefix_full: Mutex<(usize, usize, u64, u64)>,
     phases: Mutex<[f64; 6]>,
+    /// ShadowPrefill: shadows read to the end, shadows a real request took over, positions shadows read.
+    shadow: Mutex<(u64, u64, u64)>,
 }
 
 impl EngineShared {
@@ -607,14 +666,27 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
     // At most two passes: the turn as asked, then the same turn continued with the reasoning closed.
     for pass in 0..2 {
         let thinking = p.thinking && pass == 0;
-        let prompt_text = smiley_core::serve::chat_prompt(
-            app.template,
-            p.system.as_deref().or(app.default_system),
-            &p.pairs,
-            &p.user,
-            thinking || prefix.is_some(),
-            prefix.as_deref(),
-        );
+        let prompt_text = if p.open_end {
+            // The conversation so far, as the next turn's prompt will begin.
+            let mut t = app.template.system_block(
+                p.system.as_deref().or(app.default_system),
+                &smiley_core::template::today_llama3(),
+            );
+            for (u, a) in &p.pairs {
+                t.push_str(&app.template.user_turn(u));
+                t.push_str(&app.template.assistant_turn(a));
+            }
+            t
+        } else {
+            smiley_core::serve::chat_prompt(
+                app.template,
+                p.system.as_deref().or(app.default_system),
+                &p.pairs,
+                &p.user,
+                thinking || prefix.is_some(),
+                prefix.as_deref(),
+            )
+        };
         let prompt = app.model.tk.encode(&prompt_text);
         let inputs = match &p.memory {
             Some(v) => match memory_inputs(&prompt, app.model.tk.id_of(&p.placeholder), v) {
@@ -644,6 +716,7 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
             max_tokens: budget_left.max(1),
             stop: app.stop.clone(),
             logprobs: p.logprobs,
+            shadow: p.shadow,
         };
         if app
             .jobs
@@ -652,6 +725,7 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
                 cfg,
                 inputs,
                 out: etx,
+                duty: p.duty,
             })))
             .is_err()
         {
@@ -746,6 +820,7 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
         run.predicted_ms = run.decode_ms;
     }
     let wall_ms = t0.elapsed().as_secs_f64() * 1e3;
+    let shadow = *app.engine.shadow.lock().unwrap_or_else(|e| e.into_inner());
     let _ = tx.send(Msg::Done {
         finish,
         usage: json!({"prompt_tokens": run.prompt_n + run.cache_n, "completion_tokens": predicted_n, "total_tokens": run.prompt_n + run.cache_n + predicted_n}),
@@ -756,7 +831,8 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
                 "concurrency": {"slots": app.max_slots, "active": app.engine.active.load(Ordering::SeqCst), "waiting": app.engine.waiting.load(Ordering::SeqCst),
                     "decode_steps": steps, "decode_rows": rows,
                     "rows_per_step": if steps > 0 { rows as f64 / steps as f64 } else { 0.0 }},
-                "prefix_store": {"entries": entries, "mb": bytes >> 20, "restores": hits, "positions_saved": saved}}}),
+                "prefix_store": {"entries": entries, "mb": bytes >> 20, "restores": hits, "positions_saved": saved},
+                "shadow": {"done": shadow.0, "taken_over": shadow.1, "positions": shadow.2}}}),
     });
 }
 

@@ -236,6 +236,7 @@ impl Store {
         "#).map_err(st)?;
         conn.execute_batch(recall::SCHEMA).map_err(st)?;
         conn.execute_batch(files::SCHEMA).map_err(st)?;
+        files::migrate(&conn)?;
         // Migration: per-conversation training opt-out (SR-004).
         let has_opt: bool = conn
             .prepare(

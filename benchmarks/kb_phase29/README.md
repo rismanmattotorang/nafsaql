@@ -38,3 +38,8 @@ found, 1 false (precision and recall 0.929).
 preference, entity), each in the change log; undo restored a file; a stated preference ("answer in Indonesian") applied
 to the next answer; `find` scoped to one document answered in 0 ms once the question was embedded; the rule planner put
 a skill, a memory file and passages in one result list.
+
+**Phase 30 correction (code review).** The preference rule took any "I want / like / love ..." as a preference ("I want a
+Python script that parses CSV" became a permanent preference). It now needs a word about answers (style, language,
+length, format) and never takes a task request; "I want the report by Monday" was relabelled as no memory in
+`scripts/memory_extract_set.json`. Written set 24 of 24 found, held-out 14 of 14, fresh set unchanged (13 of 14, 1 false).
