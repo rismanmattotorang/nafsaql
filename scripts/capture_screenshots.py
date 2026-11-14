@@ -132,6 +132,19 @@ def main():
               document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
             time.sleep(1.5)
             tab.shot("rich_answer", 1700)
+        # Phase 32: charts drawn with Nivo from a fixed sample (scripts/chart_sample.md), light and dark.
+        for want_name, dark in (("charts", False), ("charts_dark", True)):
+            if not want(want_name): continue
+            if dark: tab.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-color-scheme", "value": "dark"}])
+            sample = open(os.path.join(ROOT, "scripts", "chart_sample.md")).read()
+            go("chat")
+            tab.wait_for("!!document.getElementById('inner')", 30)
+            tab.js("""(async () => { const { markdown } = await import('/render.js?v=' + Date.now()); const md = %s;
+              document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
+            tab.wait_for("document.querySelectorAll('figure.nvchart .chart-mount svg').length >= 9", 30)
+            time.sleep(3.5)
+            tab.shot("charts_dark" if dark else "charts", 3400)
+            if dark: tab.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-color-scheme", "value": "light"}])
         if want("welcome"):
             go("chat")
             tab.wait_for("!!document.getElementById('newConv')", 30)

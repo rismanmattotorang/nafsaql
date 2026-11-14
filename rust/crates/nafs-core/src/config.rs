@@ -653,6 +653,9 @@ pub struct AssistantCfg {
     pub system_prompt: String,
     #[serde(default = "d_profile")]
     pub profile: String,
+    /// Tell the model how to write a chart or a diagram when the question asks for one (see `visual`).
+    #[serde(default = "d_true")]
+    pub visual_hints: bool,
 }
 fn d_profile() -> String {
     "A".into()

@@ -183,3 +183,7 @@ Decision 003: condition 1 (>= 10 items, no loss, median ratio < 0.7) is met; con
 ## Phase 31 (2026-11-14): answers drawn as people read them, and a graph that reads as a map
 
 `render.js` (tables, maths as MathML, a Mermaid subset as SVG, highlighted code, callouts; 142 tests in `scripts/render_test.mjs`), a redesigned knowledge graph (hover, choose, double-click, drag, zoom, full screen, legend), new screenshots `rich_answer` and `knowledge_graph`. Decision 024. Also: command palette (Ctrl/Cmd+K), Latest button, shorter welcome screen.
+
+## Phase 32-33 (2026-11-14): saved diagrams, Nivo charts, and asking the models for them
+
+Phase 32 (`3bcc02c`): saved SVG now carries its styles, Save PNG, state diagrams, Expand, Copy LaTeX. Phase 33: real Nivo 0.99 vendored (`nivo.js`, built by `tools/nivo-bundle`), a `chart` JSON block with eleven kinds, a Save CSV/SVG/PNG bar, a lenient reader for small models (fence, brackets, shapes), `visual.rs` (one instruction with an example of the kind asked for; `assistant.visual_hints`), a sweep of the quick model (`scripts/visual_sweep.py`: nothing added 0/22 drawn; adopted wording 21/22 drawn and 16/22 exactly right). Decision 025; 197 renderer checks.

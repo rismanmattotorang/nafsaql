@@ -19,3 +19,6 @@ Third-party components keep their own licences:
 - Open Math Harness (openmathmodel/open-math-harness): Apache-2.0. The Lean textual rules and verify protocol,
   the discovery scoring protocol and the candidate-tree policy are derived from it in rust/crates/nafs-harness
   (see its NOTICE).
+- Nivo (@nivo/*, Raphael Benitte): MIT, bundled with React (MIT) and d3 modules (ISC / BSD-3-Clause) into
+  rust/crates/nafs-web/assets/nivo.js by tools/nivo-bundle (pinned in its package-lock.json). Loaded by the chat page
+  only when an answer contains a chart.

@@ -1,0 +1,741 @@
+{
+ "model": "fast",
+ "load_at_end": [
+  9.06884765625,
+  15.89208984375,
+  17.1025390625
+ ],
+ "rows": [
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. I am built on open Qwen models and am designed to provide accurate and concise responses.\n\n```chart\n{\"type\":\"bar\",\"title\":\"Sales\",\"indexBy\":\"label\",\"keys\":[\"value\"],\"data\":[{\"label\":\"Jan\",\"value\":120},{\"label\":\"Feb\",\"value\":150},{\"label\":\"Mar\",\"value\":90},{\"label\":\"Apr\",\"value\":200}]}\n```",
+   "completion_tokens": 107,
+   "prompt_tokens": 246,
+   "secs": 14.3,
+   "score": {
+    "id": "barE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. I will generate the chart as requested.\n\n```chart\n{\"type\":\"line\",\"title\":\"Temperature\",\"series\":[{\"id\":\"Celsius\",\"data\":[{\"x\":\"6am\",\"y\":12},{\"x\":\"9am\",\"y\":16},{\"x\":\"12pm\",\"y\":21},{\"x\":\"3pm\",\"y\":24},{\"x\":\"6pm\",\"y\":19}]}]}\n```",
+   "completion_tokens": 108,
+   "prompt_tokens": 259,
+   "secs": 13.7,
+   "score": {
+    "id": "lineE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, say you are Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design. Be accurate and concise. If you are unsure, say so.\n\n```chart\n{\"type\":\"pie\",\"title\":\"Share\",\"data\":[{\"label\":\"Chrome\",\"value\":65},{\"label\":\"Safari\",\"value\":20},{\"label\":\"Firefox\",\"value\":8},{\"label\":\"Edge\",\"value\":7}]}\n```",
+   "completion_tokens": 121,
+   "prompt_tokens": 231,
+   "secs": 13.5,
+   "score": {
+    "id": "pieE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "donut",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     40,
+     25,
+     15,
+     20
+    ],
+    "labels": [
+     "rent",
+     "food",
+     "travel",
+     "savings"
+    ]
+   },
+   "answer": "I will create a donut chart with the given budget data.\n\n```chart\n{\"type\":\"donut\",\"title\":\"Budget\",\"data\":[{\"label\":\"Rent\",\"value\":40},{\"label\":\"Food\",\"value\":25},{\"label\":\"Travel\",\"value\":15},{\"label\":\"Savings\",\"value\":20}]}\n```",
+   "completion_tokens": 67,
+   "prompt_tokens": 234,
+   "secs": 9.4,
+   "score": {
+    "id": "donutE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "grouped",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     100,
+     70,
+     140,
+     90,
+     160,
+     110
+    ],
+    "labels": [
+     "q1",
+     "q2",
+     "q3",
+     "revenue",
+     "cost"
+    ]
+   },
+   "answer": "I am Nafs-Aql, built on open Qwen models. I will generate the chart.\n\n```chart\n{\"type\":\"bar\",\"title\":\"Revenue and Cost by Quarter\",\"indexBy\":\"label\",\"keys\":[\"revenue\",\"cost\"],\"data\":[{\"label\":\"Jan\",\"revenue\":100,\"cost\":70},{\"label\":\"Feb\",\"revenue\":140,\"cost\":90},{\"label\":\"Mar\",\"revenue\":160,\"cost\":110}]}\n```",
+   "completion_tokens": 101,
+   "prompt_tokens": 263,
+   "secs": 10.5,
+   "score": {
+    "id": "groupedE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 0.4,
+    "ok": false,
+    "note": "labels missing"
+   }
+  },
+  {
+   "id": "radar",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "radar",
+    "numbers": [
+     8,
+     6,
+     9,
+     5,
+     6,
+     9,
+     7,
+     8
+    ],
+    "labels": [
+     "battery",
+     "camera",
+     "speed",
+     "price",
+     "phone a",
+     "phone b"
+    ]
+   },
+   "answer": "I will create a radar chart for the two phones based on the given data.\n\n```chart\n{\"type\":\"radar\",\"title\":\"Phones\",\"indexBy\":\"metric\",\"keys\":[\"A\",\"B\"],\"data\":[{\"metric\":\"Speed\",\"A\":9,\"B\":7},{\"metric\":\"Price\",\"A\":5,\"B\":8},{\"metric\":\"Battery\",\"A\":8,\"B\":6},{\"metric\":\"Camera\",\"A\":6,\"B\":9}]}\n```",
+   "completion_tokens": 92,
+   "prompt_tokens": 266,
+   "secs": 12.4,
+   "score": {
+    "id": "radarE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 0.6666666666666666,
+    "ok": false,
+    "note": "labels missing"
+   }
+  },
+  {
+   "id": "scatter",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "scatter",
+    "numbers": [
+     150,
+     50,
+     160,
+     58,
+     170,
+     66,
+     180,
+     77,
+     190,
+     88
+    ],
+    "labels": []
+   },
+   "answer": "I will create a scatter plot with the given data points.\n\n```chart\n{\"type\":\"scatter\",\"title\":\"Height and weight\",\"series\":[{\"id\":\"People\",\"data\":[{\"x\":150,\"y\":50},{\"x\":160,\"y\":58},{\"x\":170,\"y\":66},{\"x\":180,\"y\":77},{\"x\":190,\"y\":88}]}]}\n```",
+   "completion_tokens": 92,
+   "prompt_tokens": 271,
+   "secs": 12.2,
+   "score": {
+    "id": "scatterE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 0,
+    "ok": false,
+    "note": "labels missing"
+   }
+  },
+  {
+   "id": "treemap",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "treemap",
+    "numbers": [
+     40,
+     90,
+     30,
+     10
+    ],
+    "labels": [
+     "photos",
+     "videos",
+     "apps",
+     "docs"
+    ]
+   },
+   "answer": "I will create a treemap chart with the specified data.\n\n```chart\n{\"type\":\"treemap\",\"title\":\"Storage\",\"data\":{\"name\":\"all\",\"children\":[{\"name\":\"Photos\",\"value\":40},{\"name\":\"Videos\",\"value\":90},{\"name\":\"Apps\",\"value\":30},{\"name\":\"Docs\",\"value\":10}]}}\n```",
+   "completion_tokens": 71,
+   "prompt_tokens": 243,
+   "secs": 9.3,
+   "score": {
+    "id": "treemapE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "funnel",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "funnel",
+    "numbers": [
+     1000,
+     300,
+     120,
+     40
+    ],
+    "labels": [
+     "visits",
+     "signups",
+     "trials",
+     "paid"
+    ]
+   },
+   "answer": "I will create a funnel chart with the given data.  \n```chart\n{\"type\":\"funnel\",\"title\":\"Signups\",\"data\":[{\"id\":\"visits\",\"label\":\"Visits\",\"value\":1000},{\"id\":\"paid\",\"label\":\"Paid\",\"value\":40}]}\n```",
+   "completion_tokens": 60,
+   "prompt_tokens": 252,
+   "secs": 8.5,
+   "score": {
+    "id": "funnelE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 0.5,
+    "labels": 0.5,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "I will create a Sankey chart with the specified data.\n\n```chart\n{\"type\":\"sankey\",\"title\":\"Energy\",\"nodes\":[{\"id\":\"Coal\"},{\"id\":\"Power\"},{\"id\":\"Electricity\"},{\"id\":\"Homes\"},{\"id\":\"Industry\"}],\"links\":[{\"source\":\"Coal\",\"target\":\"Electricity\",\"value\":30},{\"source\":\"Gas\",\"target\":\"Electricity\",\"value\":40},{\"source\":\"Electricity\",\"target\":\"Homes\",\"value\":50},{\"source\":\"Electricity\",\"target\":\"Industry\",\"value\":20}]}\n```",
+   "completion_tokens": 111,
+   "prompt_tokens": 247,
+   "secs": 13.2,
+   "score": {
+    "id": "sankeyE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 0.75,
+    "labels": 0.8,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "heatmap",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "heatmap",
+    "numbers": [
+     5,
+     8,
+     7,
+     3,
+     9,
+     6
+    ],
+    "labels": [
+     "mon",
+     "tue",
+     "wed"
+    ]
+   },
+   "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. I will generate the requested chart.\n\n```chart\n{\"type\":\"heatmap\",\"title\":\"Sales\",\"data\":[{\"id\":\"Store A\",\"data\":[{\"x\":\"Mon\",\"y\":5},{\"x\":\"Tue\",\"y\":7},{\"x\":\"Wed\",\"y\":9}]}],\"keys\":[\"Store A\",\"Store B\"],\"values\":[5,8,7,3,9,6]}\n```",
+   "completion_tokens": 102,
+   "prompt_tokens": 253,
+   "secs": 12.5,
+   "score": {
+    "id": "heatmapE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 0.5,
+    "labels": 1,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "stacked",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     60,
+     40,
+     55,
+     45
+    ],
+    "labels": [
+     "paris",
+     "rome",
+     "yes",
+     "no"
+    ]
+   },
+   "answer": "I will create a horizontal stacked bar chart of votes by city with the given data.\n\n```chart\n{\"type\":\"bar\",\"title\":\"Votes\",\"indexBy\":\"city\",\"keys\":[\"yes\",\"no\"],\"data\":[{\"city\":\"Paris\",\"yes\":60,\"no\":40},{\"city\":\"Rome\",\"yes\":55,\"no\":45}]}\n```",
+   "completion_tokens": 73,
+   "prompt_tokens": 246,
+   "secs": 7.3,
+   "score": {
+    "id": "stackedE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "I will draw a flowchart for making tea as described.\n\n```mermaid\nflowchart TD\n  A[Start] --> B[Boil water]\n  B --> C[Add tea bag]\n  C --> D[Steep for 3 minutes]\n  D --> E[Check strength]\n  E -->|yes| F[Steep more]\n  E -->|no| G[Serve]\n  B -->|no| A\n```",
+   "completion_tokens": 92,
+   "prompt_tokens": 239,
+   "secs": 12.2,
+   "score": {
+    "id": "teaE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "login",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "password",
+     "lock",
+     "login"
+    ]
+   },
+   "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, say you are Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design.\n\n```mermaid\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[First step]\n  C --> D[Second step]\n  D --> E[Done]\n  B -->|no| A\n```",
+   "completion_tokens": 111,
+   "prompt_tokens": 223,
+   "secs": 10.9,
+   "score": {
+    "id": "loginE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0,
+    "ok": false,
+    "note": "words missing"
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "I will draw a sequence diagram of a browser requesting a web page from a server, which queries a database.\n\n```mermaid\nsequenceDiagram\n  participant C as Customer\n  participant S as Server\n  participant D as Database\n  C->>S: request\n  S-->>D: query\n  D-->>S: reply\n  S-->>C: reply\n```",
+   "completion_tokens": 80,
+   "prompt_tokens": 201,
+   "secs": 9.1,
+   "score": {
+    "id": "webE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0.6666666666666666,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, say you are Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design.\n\n```mermaid\nstateDiagram-v2\n  [*] --> Idle\n  Idle --> Busy: start\n  Busy --> Idle: stop\n  Busy --> [*]\n```",
+   "completion_tokens": 92,
+   "prompt_tokens": 195,
+   "secs": 10.4,
+   "score": {
+    "id": "trafficE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0,
+    "ok": false,
+    "note": "words missing"
+   }
+  },
+  {
+   "id": "mpie",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "pie",
+    "min": 4,
+    "words": [
+     "work",
+     "sleep",
+     "leisure",
+     "commute"
+    ]
+   },
+   "answer": "I am Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, say you are Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design.\n\n```mermaid\npie title Time\n  \"Work\" : 8\n  \"Sleep\" : 8\n  \"Leisure\" : 4\n  \"Commute\" : 2\n```",
+   "completion_tokens": 100,
+   "prompt_tokens": 200,
+   "secs": 10.7,
+   "score": {
+    "id": "mpieE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "I will draw a CI pipeline diagram with the specified steps.\n\n```mermaid\nflowchart TD\n  A[Commit] --> B[Build]\n  B --> C[Test]\n  C --> D[Deploy to Staging]\n  D --> E[Approval]\n  E --> F[Deploy to Production]\n```",
+   "completion_tokens": 63,
+   "prompt_tokens": 223,
+   "secs": 6.6,
+   "score": {
+    "id": "ciE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pipeline",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "ingest",
+     "clean",
+     "train",
+     "evaluate",
+     "publish"
+    ]
+   },
+   "answer": "I will draw a left-to-right flowchart of a data pipeline: ingest, clean, train, evaluate, publish.\n\n```mermaid\nflowchart TD\n  A[Ingest] --> B[Clean]\n  B --> C[Train]\n  C --> D[Evaluate]\n  D --> E[Publish]\n```",
+   "completion_tokens": 65,
+   "prompt_tokens": 221,
+   "secs": 6.6,
+   "score": {
+    "id": "pipelineE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "atm",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "customer",
+     "atm",
+     "bank"
+    ]
+   },
+   "answer": "I will create a sequence diagram showing an ATM withdrawal process between the customer, the ATM, and the bank.\n\n```mermaid\nsequenceDiagram\n  participant C as Customer\n  participant A as ATM\n  participant B as Bank\n  C->>A: request withdrawal\n  A-->>C: confirm receipt\n  C->>B: authorize withdrawal\n  B-->>C: confirm authorization\n  C-->>A: confirm withdrawal\n  A-->>C: complete withdrawal\n  C-->>A: success message\n  A-->>C: withdrawal completed\n```",
+   "completion_tokens": 120,
+   "prompt_tokens": 200,
+   "secs": 11.2,
+   "score": {
+    "id": "atmE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "sub",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "web",
+     "mobile",
+     "api",
+     "database"
+    ]
+   },
+   "answer": "I will create a flowchart with two groups: frontend (web, mobile) and backend (api, database).\n\n```mermaid\nflowchart TD\n  A[Start] --> B[Group: Frontend]\n  B --> C[Web]\n  C --> D[Mobile]\n  B --> E[Group: Backend]\n  E --> F[API]\n  E --> G[Database]\n  D --> H[Second Step]\n  F --> I[Third Step]\n  G --> J[Fourth Step]\n  H --> K[Done]\n  I --> L[Done]\n  J --> M[Done]\n  K --> N[End]\n  L --> N\n  M --> N\n```",
+   "completion_tokens": 144,
+   "prompt_tokens": 224,
+   "secs": 10.7,
+   "score": {
+    "id": "subE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "water",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "evaporat",
+     "cloud",
+     "rain"
+    ]
+   },
+   "answer": "I will create a simple flowchart diagram of the water cycle.\n\n```mermaid\nflowchart TD\n  A[Start] --> B[Evaporation]\n  B --> C[Condensation]\n  C --> D[Precipitation]\n  D --> E[Collection]\n  A -->|no| B\n```",
+   "completion_tokens": 65,
+   "prompt_tokens": 207,
+   "secs": 5.6,
+   "score": {
+    "id": "waterE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0.3333333333333333,
+    "ok": false,
+    "note": "words missing"
+   }
+  }
+ ]
+}

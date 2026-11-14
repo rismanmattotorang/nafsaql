@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Tests of the answer renderer (rust/crates/nafs-web/assets/render.js): Markdown, tables, code, maths, Mermaid, streaming
 // and hostile input. No dependencies: `node scripts/render_test.mjs`.
-import { markdown, mathml, mermaid, highlight, esc } from '../rust/crates/nafs-web/assets/render.js';
+import { markdown, mathml, mermaid, chartSpec, highlight, esc } from '../rust/crates/nafs-web/assets/render.js';
 
 let pass = 0, fail = 0;
 const t = (name, ok, detail = '') => { if (ok) pass++; else { fail++; console.log(`FAIL ${name} ${detail}`); } };
@@ -83,6 +83,54 @@ has('diagram figure', markdown('```mermaid\ngraph TD\n A --> B\n```'), '<figure 
 const st = mermaid('stateDiagram-v2\n  [*] --> Idle\n  Idle --> Running : start\n  Running --> Idle : stop\n  state Running {\n    [*] --> Warm\n    Warm --> Hot\n  }\n  Running --> [*]\n  Idle : waiting for work');
 t('state diagram draws', !!st && st.includes('State diagram') && st.includes('Idle') && st.includes('Warm') && st.includes('start'), String(st).slice(0, 200));
 t('empty state diagram falls back', mermaid('stateDiagram-v2') === null);
+
+// ---- charts (Nivo): spec checking and the figure
+const cs = (o) => chartSpec(typeof o === 'string' ? o : JSON.stringify(o));
+t('bar: rows, keys and index are found', (() => { const r = cs({ type: 'bar', data: [{ q: 'Q1', a: 3, b: 4 }, { q: 'Q2', a: 5, b: 6 }] }); return r.type === 'bar' && r.indexBy === 'q' && r.keys.join() === 'a,b' && r.data[1].b === 6; })());
+t('bar: a plain map becomes rows', (() => { const r = cs({ type: 'column', data: { A: 1, B: 2 } }); return r.type === 'bar' && r.data.length === 2 && r.keys[0] === 'value'; })());
+t('bar: numbers in strings are read', cs({ type: 'bar', data: [{ n: 'x', v: '1,200' }] }).data[0].v === 1200);
+t('bar: horizontal and stacked', (() => { const r = cs({ type: 'bar', layout: 'horizontal', stacked: true, data: [{ n: 'x', v: 1 }] }); return r.horizontal && r.stacked; })());
+t('Chart.js shape is understood', (() => { const r = cs({ type: 'line', data: { labels: ['a', 'b'], datasets: [{ label: 's', data: [1, 2] }] } }); return r.type === 'line' && r.series[0].id === 's' && r.series[0].data[1].y === 2; })());
+t('labels + values arrays', cs({ type: 'pie', labels: ['a', 'b'], data: [3, 4] }).data.length === 2);
+t('pie: donut by name or flag', cs({ type: 'donut', data: [{ label: 'a', value: 1 }] }).donut === true && cs({ type: 'pie', data: [{ label: 'a', value: 1 }] }).donut === false && cs({ type: 'pie', donut: true, data: [{ label: 'a', value: 1 }] }).donut === true);
+t('pie: duplicate names stay distinct', (() => { const r = cs({ type: 'pie', data: [{ label: 'a', value: 1 }, { label: 'a', value: 2 }] }); return new Set(r.data.map((d) => d.id)).size === 2; })());
+t('line: flat rows become series', (() => { const r = cs({ type: 'line', data: [{ m: 'Jan', a: 1, b: 2 }, { m: 'Feb', a: 3, b: 4 }] }); return r.series.length === 2 && r.series[0].data[0].x === 'Jan'; })());
+t('line: mixed x are made all text', (() => { const r = cs({ type: 'line', series: [{ id: 'a', data: [{ x: 1, y: 1 }, { x: 'two', y: 2 }] }] }); return r.series[0].data.every((p) => typeof p.x === 'string'); })());
+t('scatter needs numbers', cs({ type: 'scatter', series: [{ id: 'a', data: [{ x: 'a', y: 1 }] }] }).error && !cs({ type: 'scatter', series: [{ id: 'a', data: [{ x: 1, y: 1 }] }] }).error);
+t('heatmap and radial bar series', !cs({ type: 'heatmap', data: [{ id: 'r', data: [{ x: 'a', y: 1 }] }] }).error && !cs({ type: 'radialbar', data: [{ id: 'r', data: [{ x: 'a', y: 1 }] }] }).error);
+t('radar keys', cs({ type: 'radar', indexBy: 'm', keys: ['A'], data: [{ m: 'x', A: 1 }] }).keys[0] === 'A');
+t('treemap tree', (() => { const r = cs({ type: 'treemap', data: { name: 'r', children: [{ name: 'a', value: 2 }, { name: 'b', children: [{ name: 'c', value: 1 }] }] } }); return r.root.children.length === 2; })());
+t('treemap without values is refused', !!cs({ type: 'treemap', data: { name: 'r', children: [{ name: 'a' }] } }).error);
+t('sankey: links to unknown nodes are dropped', (() => { const r = cs({ type: 'sankey', nodes: ['a', 'b'], links: [{ source: 'a', target: 'b', value: 3 }, { source: 'a', target: 'z', value: 1 }, { source: 'a', target: 'a', value: 1 }] }); return r.links.length === 1; })());
+t('funnel', cs({ type: 'funnel', data: [{ id: 'a', label: 'A', value: 10 }, { id: 'b', value: 5 }] }).data.length === 2);
+t('aliases and unknown types', cs({ type: 'Bar Chart', data: [{ n: 'x', v: 1 }] }).type === 'bar' && !!cs({ type: 'gantt', data: [] }).error);
+t('colour scheme is checked', cs({ type: 'bar', colors: 'set2', data: [{ n: 'x', v: 1 }] }).scheme === 'set2' && cs({ type: 'bar', colors: 'url(javascript:1)', data: [{ n: 'x', v: 1 }] }).scheme === undefined);
+t('JSON a bracket short is closed', cs('{"type":"scatter","series":[{"id":"a","data":[{"x":1,"y":2}]}}').series[0].data.length === 1 && !cs('{"type":"pie","data":[{"label":"a","value":1}]').error);
+t('bad JSON, empty, huge', !!cs('{nope').error && !!cs({ type: 'bar', data: [] }).error && !!cs({ type: 'bar', data: Array.from({ length: 500 }, (_, i) => ({ n: i, v: i })) }).error);
+t('NaN and Infinity never reach the chart', cs({ type: 'bar', data: [{ n: 'x', v: 'Infinity' }, { n: 'y', v: 1 }] }).data[0].v === 0);
+h = markdown('```chart\n{"type":"bar","title":"T <b>","data":[{"n":"a","v":1}]}\n```');
+has('chart figure', h, '<figure class="diagram nvchart"', 'data-kind="chart"', 'data-act="png"', 'data-act="svg"', 'data-act="csv"', 'data-act="full"', 'class="chart-data"', '<th>n</th>', '<td>a</td>');
+lacks('chart title is escaped', h, 'T <b>'); has('chart title text', h, 'T &lt;b&gt;');
+t('an unknown chart stays code', markdown('```chart\n{"type":"gantt","data":[1]}\n```').includes('<pre class="code">'));
+t('an unclosed chart stays code', markdown('```chart\n{"type":"bar","data":[{"n":"a","v":1}]}').includes('<pre class="code">'));
+t('every prefix of a chart answer renders', (() => { const full = 'Here:\n\n```chart\n{"type":"pie","data":[{"label":"a","value":1}]}\n```\n\nDone.'; for (let i = 0; i <= full.length; i++) markdown(full.slice(0, i)); return true; })());
+
+// ---- leniency toward small models: a chart or diagram is drawn even if the fence is wrong or missing
+const kindOf = (x) => { const o = markdown(x); return o.includes('nvchart') ? 'chart' : o.includes('data-kind="diagram"') ? 'diagram' : 'text'; };
+const PIE = '{"type":"pie","data":[{"label":"a","value":1}]}';
+t('chart in a json fence', kindOf('```json\n' + PIE + '\n```') === 'chart');
+t('chart in an untagged fence', kindOf('```\n' + PIE + '\n```') === 'chart');
+t('chart with no fence at the end of the text', kindOf('Here you go:\n\n' + PIE) === 'chart');
+t('chart as the whole answer, spread over lines', kindOf('{\n"type":"pie",\n"data":[{"label":"a","value":1}]\n}') === 'chart');
+t('a half-written bare chart stays text', kindOf('{"type":"pie","data":[{"label":"a"') === 'text');
+t('json that is not a chart stays code', kindOf('```json\n{"type":"person","name":"x"}\n```') === 'text' && kindOf('```json\n{"a":1}\n```') === 'text');
+t('mermaid in an untagged fence', kindOf('```\nflowchart LR\nA[x] --> B[y]\n```') === 'diagram');
+t('mermaid in a python fence under a comment', kindOf('```python\n# a flowchart\nflowchart TD\n A[x] --> B[y]\n```') === 'diagram');
+t('mermaid with no fence', kindOf('Sure.\n\nsequenceDiagram\nA->>B: hi\nB-->>A: ok') === 'diagram');
+t('real python is not read as mermaid', kindOf('```python\nimport math\nprint(math.pi)\n```') === 'text');
+t('sankey from a list of links', cs({ type: 'sankey', data: [{ source: 'a', target: 'b', amount: 3 }] }).links[0].value === 3);
+t('bar: index that is not in the rows falls back to the text column', cs({ type: 'bar', indexBy: 'city', keys: ['yes'], data: [{ label: 'P', yes: 1 }] }).indexBy === 'label');
+t('radar: keys that are not columns fall back to the numbers', cs({ type: 'radar', indexBy: 'm', keys: ['Battery'], data: [{ m: 'Battery', A: 8, B: 6 }] }).keys.join() === 'A,B');
 
 // ---- citations and safety
 const cited = markdown('Memory is 768 MB [1] and fast [2, 3] but [9] is not a source.', new Set([1, 2, 3]));

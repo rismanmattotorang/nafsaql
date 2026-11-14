@@ -1,0 +1,2203 @@
+{
+ "model": "fast",
+ "load_at_end": [
+  14.78662109375,
+  12.8271484375,
+  13.7666015625
+ ],
+ "rows": [
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "I can create a bar chart of the monthly sales data you provided. Here's a concise summary:\n\n- **January**: 120\n- **February**: 150\n- **March**: 90\n- **April**: 200\n\nIf you'd like me to generate the actual bar chart, I can do that as well.",
+   "completion_tokens": 74,
+   "prompt_tokens": 128,
+   "secs": 5.5,
+   "score": {
+    "id": "barA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Sales\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"label\": \"Jan\", \"value\": 120},\n    {\"label\": \"Feb\", \"value\": 150},\n    {\"label\": \"Mar\", \"value\": 90},\n    {\"label\": \"Apr\", \"value\": 200}\n  ]\n}\n```",
+   "completion_tokens": 101,
+   "prompt_tokens": 529,
+   "secs": 16.0,
+   "score": {
+    "id": "barB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Monthly Sales\",\n  \"indexBy\": \"month\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"month\": \"Jan\", \"value\": 120},\n    {\"month\": \"Feb\", \"value\": 150},\n    {\"month\": \"Mar\", \"value\": 90},\n    {\"month\": \"Apr\", \"value\": 200}\n  ]\n}\n```",
+   "completion_tokens": 102,
+   "prompt_tokens": 277,
+   "secs": 9.1,
+   "score": {
+    "id": "barC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "I can plot a line chart of temperature by hour based on the provided data. Here's a summary of the data:\n\n- 6am: 12\u00b0C  \n- 9am: 16\u00b0C  \n- 12pm: 21\u00b0C  \n- 3pm: 24\u00b0C  \n- 6pm: 19\u00b0C  \n\nTo plot this as a line chart, I would:\n1. Create a time axis (e.g., 6am, 9am, 12pm, 3pm, 6pm).\n2. Plot the corresponding temperatures on the y-axis.\n3. Connect the points with lines to show the trend.\n\nLet me know if you'd like the chart visualized or if you need further assistance!",
+   "completion_tokens": 158,
+   "prompt_tokens": 142,
+   "secs": 10.2,
+   "score": {
+    "id": "lineA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"line\",\n  \"series\": [\n    {\n      \"id\": \"Units\",\n      \"data\": [\n        {\"x\": \"Jan\", \"y\": 120},\n        {\"x\": \"Feb\", \"y\": 150}\n      ]\n    }\n  ]\n}\n```",
+   "completion_tokens": 68,
+   "prompt_tokens": 543,
+   "secs": 5.3,
+   "score": {
+    "id": "lineB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"line\",\n  \"title\": \"Temperature by Hour\",\n  \"indexBy\": \"x\",\n  \"keys\": [\"y\"],\n  \"data\": [\n    {\"x\": \"6am\", \"y\": 12},\n    {\"x\": \"9am\", \"y\": 16},\n    {\"x\": \"12pm\", \"y\": 21},\n    {\"x\": \"3pm\", \"y\": 24},\n    {\"x\": \"6pm\", \"y\": 19}\n  ]\n}\n```",
+   "completion_tokens": 120,
+   "prompt_tokens": 291,
+   "secs": 7.8,
+   "score": {
+    "id": "lineC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "I cannot generate a pie chart directly. However, I can describe it concisely:\n\n- Chrome: 65%\n- Safari: 20%\n- Firefox: 8%\n- Edge: 7%\n\nLet me know if you'd like a visual representation or further details!",
+   "completion_tokens": 58,
+   "prompt_tokens": 123,
+   "secs": 3.9,
+   "score": {
+    "id": "pieA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"pie\",\n  \"data\": [\n    {\n      \"label\": \"Chrome\",\n      \"value\": 65\n    },\n    {\n      \"label\": \"Safari\",\n      \"value\": 20\n    },\n    {\n      \"label\": \"Firefox\",\n      \"value\": 8\n    },\n    {\n      \"label\": \"Edge\",\n      \"value\": 7\n    }\n  ]\n}\n```",
+   "completion_tokens": 95,
+   "prompt_tokens": 524,
+   "secs": 6.3,
+   "score": {
+    "id": "pieB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"pie\",\n  \"title\": \"Browser Share\",\n  \"data\": [\n    {\"label\": \"Chrome\", \"value\": 65},\n    {\"label\": \"Safari\", \"value\": 20},\n    {\"label\": \"Firefox\", \"value\": 8},\n    {\"label\": \"Edge\", \"value\": 7}\n  ]\n}\n```",
+   "completion_tokens": 83,
+   "prompt_tokens": 272,
+   "secs": 5.6,
+   "score": {
+    "id": "pieC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "donut",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     40,
+     25,
+     15,
+     20
+    ],
+    "labels": [
+     "rent",
+     "food",
+     "travel",
+     "savings"
+    ]
+   },
+   "answer": "I can help you create a donut chart, but I cannot directly draw it here. However, I can describe it for you. A donut chart is a circular chart that divides the circle into sections, each representing a portion of the total. Here's a description of the donut chart for your budget:\n\n- The total budget is 40 + 25 + 15 + 20 = 100.\n- Rent takes up 40/100 = 40% of the chart.\n- Food takes up 25/100 = 25%.\n- Travel takes up 15/100 = 15%.\n- Savings takes up 20/100 = 20%.\n\nThe chart would have four sections: Rent (40%), Food (25%), Travel (15%), and Savings (20%), all adding up to 100%. The sections would be arranged in the order of the given values. Let me know if you'd like a visual representation or further details!",
+   "completion_tokens": 223,
+   "prompt_tokens": 126,
+   "secs": 13.4,
+   "score": {
+    "id": "donutA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "donut",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     40,
+     25,
+     15,
+     20
+    ],
+    "labels": [
+     "rent",
+     "food",
+     "travel",
+     "savings"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"pie\",\n  \"data\": [\n    {\n      \"label\": \"Rent\",\n      \"value\": 40\n    },\n    {\n      \"label\": \"Food\",\n      \"value\": 25\n    },\n    {\n      \"label\": \"Travel\",\n      \"value\": 15\n    },\n    {\n      \"label\": \"Savings\",\n      \"value\": 20\n    }\n  ]\n}\n```",
+   "completion_tokens": 97,
+   "prompt_tokens": 527,
+   "secs": 6.8,
+   "score": {
+    "id": "donutB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "donut",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     40,
+     25,
+     15,
+     20
+    ],
+    "labels": [
+     "rent",
+     "food",
+     "travel",
+     "savings"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"donut\",\n  \"title\": \"Budget\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"label\": \"Rent\", \"value\": 40},\n    {\"label\": \"Food\", \"value\": 25},\n    {\"label\": \"Travel\", \"value\": 15},\n    {\"label\": \"Savings\", \"value\": 20}\n  ]\n}\n```",
+   "completion_tokens": 100,
+   "prompt_tokens": 275,
+   "secs": 7.0,
+   "score": {
+    "id": "donutC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "grouped",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     100,
+     70,
+     140,
+     90,
+     160,
+     110
+    ],
+    "labels": [
+     "q1",
+     "q2",
+     "q3",
+     "revenue",
+     "cost"
+    ]
+   },
+   "answer": "I can create a bar chart comparing revenue and cost by quarter based on the data provided. Here's a concise summary:\n\n- **Q1**: Revenue = 100, Cost = 70  \n- **Q2**: Revenue = 140, Cost = 90  \n- **Q3**: Revenue = 160, Cost = 110  \n\nA bar chart would visually show the differences between revenue and cost in each quarter. Let me know if you'd like the chart itself or further analysis.",
+   "completion_tokens": 109,
+   "prompt_tokens": 145,
+   "secs": 7.5,
+   "score": {
+    "id": "groupedA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "grouped",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     100,
+     70,
+     140,
+     90,
+     160,
+     110
+    ],
+    "labels": [
+     "q1",
+     "q2",
+     "q3",
+     "revenue",
+     "cost"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Revenue and Cost by Quarter\",\n  \"indexBy\": \"quarter\",\n  \"keys\": [\"revenue\", \"cost\"],\n  \"data\": [\n    {\"quarter\": \"Q1\", \"revenue\": 100, \"cost\": 70},\n    {\"quarter\": \"Q2\", \"revenue\": 140, \"cost\": 90},\n    {\"quarter\": \"Q3\", \"revenue\": 160, \"cost\": 110}\n  ]\n}\n```",
+   "completion_tokens": 123,
+   "prompt_tokens": 546,
+   "secs": 9.1,
+   "score": {
+    "id": "groupedB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "grouped",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     100,
+     70,
+     140,
+     90,
+     160,
+     110
+    ],
+    "labels": [
+     "q1",
+     "q2",
+     "q3",
+     "revenue",
+     "cost"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Revenue and Cost by Quarter\",\n  \"indexBy\": \"quarter\",\n  \"keys\": [\"revenue\", \"cost\"],\n  \"data\": [\n    {\"quarter\": \"Q1\", \"revenue\": 100, \"cost\": 70},\n    {\"quarter\": \"Q2\", \"revenue\": 140, \"cost\": 90},\n    {\"quarter\": \"Q3\", \"revenue\": 160, \"cost\": 110}\n  ]\n}\n```",
+   "completion_tokens": 123,
+   "prompt_tokens": 294,
+   "secs": 7.8,
+   "score": {
+    "id": "groupedC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "radar",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "radar",
+    "numbers": [
+     8,
+     6,
+     9,
+     5,
+     6,
+     9,
+     7,
+     8
+    ],
+    "labels": [
+     "battery",
+     "camera",
+     "speed",
+     "price",
+     "phone a",
+     "phone b"
+    ]
+   },
+   "answer": "I can create a radar chart for the two phones based on the provided data. Here's a concise explanation:\n\n- **Phone A**: Battery (8), Camera (6), Speed (9), Price (5)  \n- **Phone B**: Battery (6), Camera (9), Speed (7), Price (8)\n\nA radar chart would visually compare these four attributes for both phones. Let me know if you'd like the actual chart plotted.",
+   "completion_tokens": 90,
+   "prompt_tokens": 141,
+   "secs": 5.4,
+   "score": {
+    "id": "radarA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "radar",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "radar",
+    "numbers": [
+     8,
+     6,
+     9,
+     5,
+     6,
+     9,
+     7,
+     8
+    ],
+    "labels": [
+     "battery",
+     "camera",
+     "speed",
+     "price",
+     "phone a",
+     "phone b"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"radar\",\n  \"indexBy\": \"metric\",\n  \"keys\": [\"Battery\", \"Camera\", \"Speed\", \"Price\"],\n  \"data\": [\n    {\n      \"metric\": \"Battery\",\n      \"A\": 8,\n      \"B\": 6\n    },\n    {\n      \"metric\": \"Camera\",\n      \"A\": 6,\n      \"B\": 9\n    },\n    {\n      \"metric\": \"Speed\",\n      \"A\": 9,\n      \"B\": 7\n    },\n    {\n      \"metric\": \"Price\",\n      \"A\": 5,\n      \"B\": 8\n    }\n  ]\n}\n```",
+   "completion_tokens": 145,
+   "prompt_tokens": 542,
+   "secs": 9.7,
+   "score": {
+    "id": "radarB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 0,
+    "labels": 0.6666666666666666,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "radar",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "radar",
+    "numbers": [
+     8,
+     6,
+     9,
+     5,
+     6,
+     9,
+     7,
+     8
+    ],
+    "labels": [
+     "battery",
+     "camera",
+     "speed",
+     "price",
+     "phone a",
+     "phone b"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"radar\",\n  \"title\": \"Phone Performance\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"battery\", \"camera\", \"speed\", \"price\"],\n  \"data\": [\n    {\n      \"label\": \"Phone A\",\n      \"battery\": 8,\n      \"camera\": 6,\n      \"speed\": 9,\n      \"price\": 5\n    },\n    {\n      \"label\": \"Phone B\",\n      \"battery\": 6,\n      \"camera\": 9,\n      \"speed\": 7,\n      \"price\": 8\n    }\n  ]\n}\n```",
+   "completion_tokens": 133,
+   "prompt_tokens": 290,
+   "secs": 8.1,
+   "score": {
+    "id": "radarC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "scatter",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "scatter",
+    "numbers": [
+     150,
+     50,
+     160,
+     58,
+     170,
+     66,
+     180,
+     77,
+     190,
+     88
+    ],
+    "labels": []
+   },
+   "answer": "I'll create a scatter plot of height against weight based on the given data points:\n\n1. (150, 50)\n2. (160, 58)\n3. (170, 66)\n4. (180, 77)\n5. (190, 88)\n\nTo create the scatter plot:\n- Plot the x-axis as height (in cm) and the y-axis as weight (in kg).\n- Place a point at each data point.\n- The trend appears to be positive, with height increasing and weight increasing proportionally.\n\nIf you'd like, I can also provide a description of the plot or explain the relationship between height and weight.",
+   "completion_tokens": 148,
+   "prompt_tokens": 151,
+   "secs": 8.8,
+   "score": {
+    "id": "scatterA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "scatter",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "scatter",
+    "numbers": [
+     150,
+     50,
+     160,
+     58,
+     170,
+     66,
+     180,
+     77,
+     190,
+     88
+    ],
+    "labels": []
+   },
+   "answer": "```json\n{\n  \"type\": \"scatter\",\n  \"series\": [\n    {\n      \"id\": \"Points\",\n      \"data\": [\n        {\"x\": 150, \"y\": 50},\n        {\"x\": 160, \"y\": 58},\n        {\"x\": 170, \"y\": 66},\n        {\"x\": 180, \"y\": 77},\n        {\"x\": 190, \"y\": 88}\n      ]\n    }\n  ]\n}\n```",
+   "completion_tokens": 118,
+   "prompt_tokens": 552,
+   "secs": 7.6,
+   "score": {
+    "id": "scatterB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 0,
+    "ok": false,
+    "note": "labels missing"
+   }
+  },
+  {
+   "id": "scatter",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "scatter",
+    "numbers": [
+     150,
+     50,
+     160,
+     58,
+     170,
+     66,
+     180,
+     77,
+     190,
+     88
+    ],
+    "labels": []
+   },
+   "answer": "```json\n{\n  \"type\": \"scatter\",\n  \"title\": \"Height vs. Weight\",\n  \"indexBy\": \"x\",\n  \"keys\": [\"y\"],\n  \"data\": [\n    {\"x\": \"Jan\", \"y\": 120},\n    {\"x\": \"Feb\", \"y\": 130},\n    {\"x\": \"Mar\", \"y\": 140},\n    {\"x\": \"Apr\", \"y\": 150},\n    {\"x\": \"May\", \"y\": 160}\n  ]\n}\n```",
+   "completion_tokens": 120,
+   "prompt_tokens": 300,
+   "secs": 8.3,
+   "score": {
+    "id": "scatterC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "json that is not a chart spec"
+   }
+  },
+  {
+   "id": "treemap",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "treemap",
+    "numbers": [
+     40,
+     90,
+     30,
+     10
+    ],
+    "labels": [
+     "photos",
+     "videos",
+     "apps",
+     "docs"
+    ]
+   },
+   "answer": "I can help you visualize a treemap based on the given data. Here's a concise representation:\n\n- **Photos**: 40 GB (larger portion)\n- **Videos**: 90 GB (larger portion)\n- **Apps**: 30 GB\n- **Docs**: 10 GB\n\nThe treemap would typically show the largest item (Photos) as the primary section, with Videos as the next largest, followed by Apps and Docs. The exact layout depends on the specific treemap tool or visualization method used. Let me know if you'd like a specific tool or format!",
+   "completion_tokens": 122,
+   "prompt_tokens": 129,
+   "secs": 14.2,
+   "score": {
+    "id": "treemapA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "treemap",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "treemap",
+    "numbers": [
+     40,
+     90,
+     30,
+     10
+    ],
+    "labels": [
+     "photos",
+     "videos",
+     "apps",
+     "docs"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"treemap\",\n  \"data\": {\n    \"name\": \"all\",\n    \"children\": [\n      {\n        \"name\": \"Photos\",\n        \"value\": 40\n      },\n      {\n        \"name\": \"Videos\",\n        \"value\": 90\n      },\n      {\n        \"name\": \"Apps\",\n        \"value\": 30\n      },\n      {\n        \"name\": \"Docs\",\n        \"value\": 10\n      }\n    ]\n  }\n}\n```",
+   "completion_tokens": 111,
+   "prompt_tokens": 530,
+   "secs": 12.9,
+   "score": {
+    "id": "treemapB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "treemap",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "treemap",
+    "numbers": [
+     40,
+     90,
+     30,
+     10
+    ],
+    "labels": [
+     "photos",
+     "videos",
+     "apps",
+     "docs"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"treemap\",\n  \"title\": \"Storage Use\",\n  \"data\": [\n    {\n      \"label\": \"Photos\",\n      \"value\": 40\n    },\n    {\n      \"label\": \"Videos\",\n      \"value\": 90\n    },\n    {\n      \"label\": \"Apps\",\n      \"value\": 30\n    },\n    {\n      \"label\": \"Docs\",\n      \"value\": 10\n    }\n  ]\n}\n```",
+   "completion_tokens": 105,
+   "prompt_tokens": 278,
+   "secs": 13.2,
+   "score": {
+    "id": "treemapC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "funnel",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "funnel",
+    "numbers": [
+     1000,
+     300,
+     120,
+     40
+    ],
+    "labels": [
+     "visits",
+     "signups",
+     "trials",
+     "paid"
+    ]
+   },
+   "answer": "I can create a funnel chart for the given data. Here's a simple representation:\n\n```\nVisits: 1000\nSignups: 300 (30% of Visits)\nTrials: 120 (12% of Signups)\nPaid: 40 (3.33% of Signups)\n```\n\nThis funnel chart shows the progression of users through different stages, with the largest group (visits) at the top and the smallest (paid) at the bottom. Let me know if you'd like a visual representation or further details!",
+   "completion_tokens": 122,
+   "prompt_tokens": 131,
+   "secs": 12.7,
+   "score": {
+    "id": "funnelA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "funnel",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "funnel",
+    "numbers": [
+     1000,
+     300,
+     120,
+     40
+    ],
+    "labels": [
+     "visits",
+     "signups",
+     "trials",
+     "paid"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"funnel\",\n  \"data\": [\n    {\n      \"id\": \"visits\",\n      \"label\": \"Visits\",\n      \"value\": 1000\n    },\n    {\n      \"id\": \"signups\",\n      \"label\": \"Signups\",\n      \"value\": 300\n    },\n    {\n      \"id\": \"trials\",\n      \"label\": \"Trials\",\n      \"value\": 120\n    },\n    {\n      \"id\": \"paid\",\n      \"label\": \"Paid\",\n      \"value\": 40\n    }\n  ]\n}\n```",
+   "completion_tokens": 135,
+   "prompt_tokens": 532,
+   "secs": 12.6,
+   "score": {
+    "id": "funnelB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "funnel",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "funnel",
+    "numbers": [
+     1000,
+     300,
+     120,
+     40
+    ],
+    "labels": [
+     "visits",
+     "signups",
+     "trials",
+     "paid"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"funnel\",\n  \"title\": \"Signups\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"label\": \"Visits\", \"value\": 1000},\n    {\"label\": \"Signups\", \"value\": 300},\n    {\"label\": \"Trials\", \"value\": 120},\n    {\"label\": \"Paid\", \"value\": 40}\n  ]\n}\n```",
+   "completion_tokens": 107,
+   "prompt_tokens": 280,
+   "secs": 7.4,
+   "score": {
+    "id": "funnelC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "I can create a Sankey chart based on the given data. Here's a concise representation:\n\n- **Coal (30)** \u2192 **Electricity**\n- **Gas (40)** \u2192 **Electricity**\n- **Electricity (50)** \u2192 **Homes**\n- **Electricity (20)** \u2192 **Industry**\n\nThis shows the flow of energy from coal and gas to electricity, and then from electricity to homes and industry. Let me know if you'd like a visual or further details!",
+   "completion_tokens": 103,
+   "prompt_tokens": 133,
+   "secs": 8.5,
+   "score": {
+    "id": "sankeyA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"sankey\",\n  \"nodes\": [\n    {\"id\": \"Coal\"},\n    {\"id\": \"Electricity\"},\n    {\"id\": \"Gas\"}\n  ],\n  \"links\": [\n    {\"source\": \"Coal\", \"target\": \"Electricity\", \"value\": 30},\n    {\"source\": \"Gas\", \"target\": \"Electricity\", \"value\": 40},\n    {\"source\": \"Electricity\", \"target\": \"Homes\", \"value\": 50},\n    {\"source\": \"Electricity\", \"target\": \"Industry\", \"value\": 20}\n  ]\n}\n```",
+   "completion_tokens": 135,
+   "prompt_tokens": 534,
+   "secs": 8.5,
+   "score": {
+    "id": "sankeyB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 0.5,
+    "labels": 0.6,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"sankey\",\n  \"title\": \"Energy Flow\",\n  \"data\": [\n    {\n      \"source\": \"Coal\",\n      \"target\": \"Electricity\",\n      \"amount\": 30\n    },\n    {\n      \"source\": \"Gas\",\n      \"target\": \"Electricity\",\n      \"amount\": 40\n    },\n    {\n      \"source\": \"Electricity\",\n      \"target\": \"Homes\",\n      \"amount\": 50\n    },\n    {\n      \"source\": \"Electricity\",\n      \"target\": \"Industry\",\n      \"amount\": 20\n    }\n  ]\n}\n```",
+   "completion_tokens": 138,
+   "prompt_tokens": 282,
+   "secs": 9.0,
+   "score": {
+    "id": "sankeyC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "json that is not a chart spec"
+   }
+  },
+  {
+   "id": "heatmap",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "heatmap",
+    "numbers": [
+     5,
+     8,
+     7,
+     3,
+     9,
+     6
+    ],
+    "labels": [
+     "mon",
+     "tue",
+     "wed"
+    ]
+   },
+   "answer": "I can create a heatmap of the sales data you provided. Here's a summary of the sales by day and store:\n\n- **Monday**:\n  - Store A: 5\n  - Store B: 8\n\n- **Tuesday**:\n  - Store A: 7\n  - Store B: 3\n\n- **Wednesday**:\n  - Store A: 9\n  - Store B: 6\n\nTo create a heatmap, I can visualize the data using a matrix or a bar chart, where rows represent days and columns represent stores. Let me generate the heatmap for you.",
+   "completion_tokens": 122,
+   "prompt_tokens": 140,
+   "secs": 8.4,
+   "score": {
+    "id": "heatmapA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "heatmap",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "heatmap",
+    "numbers": [
+     5,
+     8,
+     7,
+     3,
+     9,
+     6
+    ],
+    "labels": [
+     "mon",
+     "tue",
+     "wed"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"heatmap\",\n  \"data\": [\n    {\n      \"id\": \"Store A\",\n      \"data\": [\n        {\"x\": \"Mon\", \"y\": 5},\n        {\"x\": \"Tue\", \"y\": 7},\n        {\"x\": \"Wed\", \"y\": 9}\n      ]\n    },\n    {\n      \"id\": \"Store B\",\n      \"data\": [\n        {\"x\": \"Mon\", \"y\": 8},\n        {\"x\": \"Tue\", \"y\": 3},\n        {\"x\": \"Wed\", \"y\": 6}\n      ]\n    }\n  ]\n}\n```",
+   "completion_tokens": 136,
+   "prompt_tokens": 541,
+   "secs": 10.1,
+   "score": {
+    "id": "heatmapB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "heatmap",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "heatmap",
+    "numbers": [
+     5,
+     8,
+     7,
+     3,
+     9,
+     6
+    ],
+    "labels": [
+     "mon",
+     "tue",
+     "wed"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"heatmap\",\n  \"title\": \"Sales by Day and Store\",\n  \"data\": [\n    {\"x\": \"Mon\", \"y\": {\"store A\": 5, \"store B\": 8}},\n    {\"x\": \"Tue\", \"y\": {\"store A\": 7, \"store B\": 3}},\n    {\"x\": \"Wed\", \"y\": {\"store A\": 9, \"store B\": 6}}\n  ]\n}\n```",
+   "completion_tokens": 103,
+   "prompt_tokens": 289,
+   "secs": 12.3,
+   "score": {
+    "id": "heatmapC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "json that is not a chart spec"
+   }
+  },
+  {
+   "id": "stacked",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     60,
+     40,
+     55,
+     45
+    ],
+    "labels": [
+     "paris",
+     "rome",
+     "yes",
+     "no"
+    ]
+   },
+   "answer": "I can create a horizontal stacked bar chart of the votes by city. Here's a description of the chart:\n\n- The x-axis represents the cities (Paris and Rome).\n- The y-axis represents the vote counts (yes and no).\n- Each bar represents a city, with the \"yes\" and \"no\" votes stacked vertically.\n- Paris has 60 yes and 40 no, so the bar for Paris will have 60 units for \"yes\" and 40 units for \"no\".\n- Rome has 55 yes and 45 no, so the bar for Rome will have 55 units for \"yes\" and 45 units for \"no\".\n\nThis chart visually shows the distribution of votes for each city. Let me know if you'd like the actual chart generated.",
+   "completion_tokens": 165,
+   "prompt_tokens": 128,
+   "secs": 17.4,
+   "score": {
+    "id": "stackedA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "stacked",
+   "kind": "chart",
+   "variant": "B",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     60,
+     40,
+     55,
+     45
+    ],
+    "labels": [
+     "paris",
+     "rome",
+     "yes",
+     "no"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Votes\",\n  \"indexBy\": \"city\",\n  \"keys\": [\"yes\", \"no\"],\n  \"data\": [\n    {\n      \"label\": \"Paris\",\n      \"yes\": 60,\n      \"no\": 40\n    },\n    {\n      \"label\": \"Rome\",\n      \"yes\": 55,\n      \"no\": 45\n    }\n  ]\n}\n```",
+   "completion_tokens": 100,
+   "prompt_tokens": 529,
+   "secs": 11.7,
+   "score": {
+    "id": "stackedB",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 0.5,
+    "ok": false,
+    "note": "labels missing"
+   }
+  },
+  {
+   "id": "stacked",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     60,
+     40,
+     55,
+     45
+    ],
+    "labels": [
+     "paris",
+     "rome",
+     "yes",
+     "no"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Votes by City\",\n  \"indexBy\": \"city\",\n  \"keys\": [\"yes\", \"no\"],\n  \"data\": [\n    {\"city\": \"Paris\", \"yes\": 60, \"no\": 40},\n    {\"city\": \"Rome\", \"yes\": 55, \"no\": 45}\n  ]\n}\n```",
+   "completion_tokens": 90,
+   "prompt_tokens": 277,
+   "secs": 8.1,
+   "score": {
+    "id": "stackedC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "1. Start with boiling water.  \n2. Add a tea bag to the water.  \n3. Let the tea steep for 3 minutes.  \n4. Check if the tea is strong enough.  \n5. If not, steep for an additional minute.  \n6. If yes, serve the tea.  \n\nAnswer: 6",
+   "completion_tokens": 68,
+   "prompt_tokens": 152,
+   "secs": 5.7,
+   "score": {
+    "id": "teaA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "no diagram"
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "```python\n# The following is a Mermaid flowchart for the tea-making process.\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Boil water]\n  B -->|no| A\n  C --> D[Add tea bag]\n  D --> E[Steep for 3 minutes]\n  E --> F{Is it strong enough?}\n  F -->|yes| G[Steep more]\n  F -->|no| E\n  G --> H[Serve]\n```\n\n**Explanation:**  \n1. The flowchart starts with \"Start\" and asks if the water is ready.  \n2. If ready, it proceeds to boil water.  \n3. Then adds a tea bag and steeps for 3 minutes.  \n4. If the tea is too strong, it steeps more.  \n5. Finally, it serves the tea.",
+   "completion_tokens": 189,
+   "prompt_tokens": 330,
+   "secs": 16.6,
+   "score": {
+    "id": "teaB",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B[Boil water]\n  B --> C[Add tea bag]\n  C --> D[Steep for 3 minutes]\n  D --> E[Check strength]\n  E -->|yes| F[Steep more]\n  E -->|no| G[Serve]\n```\n\nExplanation: This flowchart represents the steps to make tea: boil water, add a tea bag, steep for 3 minutes, check if it's strong enough, and then either steep more or serve.",
+   "completion_tokens": 114,
+   "prompt_tokens": 249,
+   "secs": 8.4,
+   "score": {
+    "id": "teaC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "login",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "password",
+     "lock",
+     "login"
+    ]
+   },
+   "answer": "I can create a flowchart for the login process with the specified requirements. Here's a concise description:\n\n1. **Start**  \n2. **User enters username**  \n3. **User enters password**  \n4. **Check if password is correct**  \n   - If **correct**:  \n     - Show \"Login successful\"  \n     - **End**  \n   - If **incorrect**:  \n     - Increment failure count  \n     - **Check if failure count >= 3**  \n     - If **yes**:  \n       - Show \"Account locked\"  \n       - **End**  \n     - Else:  \n       - Show \"Incorrect password\"  \n       - **Loop back** to step 3  \n\nLet me know if you'd like a visual representation or further details!",
+   "completion_tokens": 158,
+   "prompt_tokens": 121,
+   "secs": 9.4,
+   "score": {
+    "id": "loginA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "no diagram"
+   }
+  },
+  {
+   "id": "login",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "password",
+     "lock",
+     "login"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| A\n  A --> D[Check Password]\n  D -->|correct| E[Success]\n  D -->|incorrect| F[Locked]\n  F --> G[End]\n```\n\nExplanation: This flowchart represents a login process with a decision for a correct password. If the password is correct, the user is granted access; if not, the account is locked after three failed attempts. The diagram includes a decision in braces and shows the state transitions for the login process.",
+   "completion_tokens": 132,
+   "prompt_tokens": 314,
+   "secs": 8.5,
+   "score": {
+    "id": "loginB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0.6666666666666666,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "login",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "password",
+     "lock",
+     "login"
+    ]
+   },
+   "answer": "```python\n# This is a simple flowchart for a login process with a decision for a correct password and a locked account after 3 failures.\n# The diagram uses the flowchart TD format.\n\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| D[Lock]\n  D --> E[End]\n  C --> F{Password Correct?}\n  F -->|yes| G[Success]\n  F -->|no| H[Fail]\n  H --> I[End]\n```\n\nExplanation:\n- The flowchart starts at \"Start\" and asks if the user is ready.\n- If \"Ready?\" is yes, it proceeds to \"Go\".\n- If \"Ready?\" is no, it goes to \"Lock\".\n- If the password is correct, it proceeds to \"Success\"; if not, it goes to \"Fail\" and ends.\n- The diagram shows the decision for a correct password and a locked account after 3 failures.",
+   "completion_tokens": 211,
+   "prompt_tokens": 233,
+   "secs": 13.2,
+   "score": {
+    "id": "loginC",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "I can help you draw a sequence diagram for the described scenario. Here's a concise representation:\n\n1. **Browser** sends a **GET request** to the **Web Server**.\n2. **Web Server** forwards the request to the **Database Server**.\n3. **Database Server** queries the **Database**.\n4. **Database** returns the requested data.\n5. **Web Server** receives the data and returns it to the **Browser**.\n\nThis sequence illustrates the flow of a browser requesting a web page, with the server querying a database as part of the process. Let me know if you'd like a visual representation or further details!",
+   "completion_tokens": 132,
+   "prompt_tokens": 117,
+   "secs": 8.6,
+   "score": {
+    "id": "webA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "no diagram"
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| A\nsubgraph Browser\n  B --> S: request\n  S --> B: reply\nend\nsubgraph Server\n  S --> D: query database\n  D --> S: reply\nend\nsubgraph Database\n  D --> D: data\nend\n```\n\nThe diagram shows a browser requesting a web page from a server, which then queries a database. The sequence illustrates the flow of requests and responses between the browser, server, and database.",
+   "completion_tokens": 130,
+   "prompt_tokens": 310,
+   "secs": 8.5,
+   "score": {
+    "id": "webB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": false,
+    "size": false,
+    "words": 1,
+    "ok": false,
+    "note": "kind flowchart td"
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nsequenceDiagram\n    participant Browser in\n    participant Server in\n    participant DB in\n    Browser->>Server: request web page\n    Server->>DB: query database\n    DB->>Server: return data\n    Server->>Browser: send web page\n```\n\nExplanation: This sequence diagram shows a browser requesting a web page from a server, which then queries a database to retrieve data, and sends the web page back to the browser.",
+   "completion_tokens": 97,
+   "prompt_tokens": 229,
+   "secs": 6.3,
+   "score": {
+    "id": "webC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "I can help you draw a state diagram for a traffic light with green, yellow, and red. The state diagram would represent the transitions between these states.\n\nHere's a simple state diagram:\n\n```\nRed\n|\nv\nYellow\n|\nv\nGreen\n```\n\nThis diagram shows the sequence of states in which the traffic light cycles: first red, then yellow, and finally green. The transitions are as follows:\n\n- From Red to Yellow\n- From Yellow to Green\n- From Green to Red (to complete the cycle)\n\nLet me know if you'd like a more detailed version or a visual representation.",
+   "completion_tokens": 123,
+   "prompt_tokens": 112,
+   "secs": 7.5,
+   "score": {
+    "id": "trafficA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "I will draw a state diagram for a traffic light with green, yellow, and red states.\n\n```mermaid\nstateDiagram\n    [*] --> Idle\n    Idle --> Green: 8 seconds\n    Green --> Yellow: 2 seconds\n    Yellow --> Red: 2 seconds\n    Red --> Green: 8 seconds\n```\n\nThe diagram shows the traffic light cycling through green, yellow, and red states, with each state lasting for a set duration. The `[*]` represents the initial state, and the arrows show the transitions between states.",
+   "completion_tokens": 114,
+   "prompt_tokens": 305,
+   "secs": 7.6,
+   "score": {
+    "id": "trafficB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "```mermaid\nstateDiagram\n    [Start] --> G: Green\n    G --> Y: Yellow\n    Y --> R: Red\n    R --> G: Cycle\n```\n\nExplanation: This state diagram represents the cycle of a traffic light, with states for Green, Yellow, and Red. The diagram shows the transitions between these states in a cycle.",
+   "completion_tokens": 74,
+   "prompt_tokens": 224,
+   "secs": 4.8,
+   "score": {
+    "id": "trafficC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "mpie",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "pie",
+    "min": 4,
+    "words": [
+     "work",
+     "sleep",
+     "leisure",
+     "commute"
+    ]
+   },
+   "answer": "I can create a Mermaid pie chart for you. Here's the breakdown:\n\n- Work: 8\n- Sleep: 8\n- Leisure: 4\n- Commute: 2\n\nLet me draw it for you.",
+   "completion_tokens": 48,
+   "prompt_tokens": 127,
+   "secs": 3.7,
+   "score": {
+    "id": "mpieA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "no diagram"
+   }
+  },
+  {
+   "id": "mpie",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "pie",
+    "min": 4,
+    "words": [
+     "work",
+     "sleep",
+     "leisure",
+     "commute"
+    ]
+   },
+   "answer": "```mermaid\npie Time\nWork: 8\nSleep: 8\nLeisure: 4\nCommute: 2\n```\n\nThe pie chart shows that 8 hours are spent on work, 8 on sleep, 4 on leisure, and 2 on commute.",
+   "completion_tokens": 60,
+   "prompt_tokens": 320,
+   "secs": 4.2,
+   "score": {
+    "id": "mpieB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "mpie",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "pie",
+    "min": 4,
+    "words": [
+     "work",
+     "sleep",
+     "leisure",
+     "commute"
+    ]
+   },
+   "answer": "Short sentence: A pie chart shows the distribution of time spent in different activities of a day.\n\n```mermaid\npie\nWork: 8\nSleep: 8\nLeisure: 4\nCommute: 2\n```",
+   "completion_tokens": 48,
+   "prompt_tokens": 239,
+   "secs": 3.7,
+   "score": {
+    "id": "mpieC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "I can help you visualize a CI pipeline diagram. Here's a concise representation:\n\n```\nCommit \u2192 Build \u2192 Test \u2192 Deploy to Staging \u2192 Approval \u2192 Deploy to Production\n```\n\nThis represents the standard CI pipeline workflow. Let me know if you'd like a more detailed diagram or explanation!",
+   "completion_tokens": 59,
+   "prompt_tokens": 121,
+   "secs": 4.3,
+   "score": {
+    "id": "ciA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B[Commit]\n  B --> C[Build]\n  C --> D[Test]\n  D --> E[Deploy to Staging]\n  E --> F[Approval]\n  F --> G[Deploy to Production]\n```\n\nExplanation: This diagram shows a CI pipeline with stages: commit, build, test, deploy to staging, approval, and deploy to production. Each stage is represented by a node with a short letter id and text in brackets. The flowchart uses the `flowchart TD` syntax with a subgraph for clarity.",
+   "completion_tokens": 122,
+   "prompt_tokens": 314,
+   "secs": 7.6,
+   "score": {
+    "id": "ciB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "Short sentence: A CI pipeline consists of stages for commit, build, test, deploy to staging, approval, and deploy to production.\n\n```mermaid\nsequenceDiagram\n    participant User\n    participant Git\n    participant Build\n    participant Test\n    participant Staging\n    participant Prod\n    \n    User->>Git: Commit\n    Git->>Build: Build\n    Build->>Test: Test\n    Test->>Staging: Deploy to Staging\n    Staging->>Prod: Approval\n    Prod->>User: Deploy to Production\n```",
+   "completion_tokens": 115,
+   "prompt_tokens": 233,
+   "secs": 7.5,
+   "score": {
+    "id": "ciC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": false,
+    "size": true,
+    "words": 1,
+    "ok": false,
+    "note": "kind sequencediagram"
+   }
+  },
+  {
+   "id": "pipeline",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "ingest",
+     "clean",
+     "train",
+     "evaluate",
+     "publish"
+    ]
+   },
+   "answer": "I can create a left-to-right flowchart for a data pipeline as follows:\n\n1. **Ingest** \u2013 Collect and load data from various sources.\n2. **Clean** \u2013 Preprocess and transform data to make it consistent and usable.\n3. **Train** \u2013 Use the cleaned data to train a machine learning model.\n4. **Evaluate** \u2013 Assess the model's performance using a validation set.\n5. **Publish** \u2013 Deploy the model for use in production.\n\nThis flowchart represents the logical sequence of steps in a typical data pipeline. Let me know if you need a visual representation or further details!",
+   "completion_tokens": 124,
+   "prompt_tokens": 119,
+   "secs": 7.7,
+   "score": {
+    "id": "pipelineA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "no diagram"
+   }
+  },
+  {
+   "id": "pipeline",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "ingest",
+     "clean",
+     "train",
+     "evaluate",
+     "publish"
+    ]
+   },
+   "answer": "```mermaid\nflowchart LR\n  A[Ingest] --> B[Clean]\n  B --> C[Train]\n  C --> D[Evaluate]\n  D --> E[Publish]\n```\n\nExplanation: This flowchart represents a left-to-right data pipeline with nodes for Ingest, Clean, Train, Evaluate, and Publish. Each node is labeled with a short letter id and its text in brackets, and the flow is from left to right.",
+   "completion_tokens": 93,
+   "prompt_tokens": 312,
+   "secs": 6.2,
+   "score": {
+    "id": "pipelineB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pipeline",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "ingest",
+     "clean",
+     "train",
+     "evaluate",
+     "publish"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TL\n  A[Ingest] --> B[Clean]\n  B --> C[Train]\n  C --> D[Evaluate]\n  D --> E[Publish]\n```\n\nExplanation: This flowchart represents a left-to-right data pipeline with the steps: Ingest, Clean, Train, Evaluate, and Publish. Each step is represented by a node with an arrow pointing to the next step.",
+   "completion_tokens": 86,
+   "prompt_tokens": 231,
+   "secs": 5.6,
+   "score": {
+    "id": "pipelineC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "atm",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "customer",
+     "atm",
+     "bank"
+    ]
+   },
+   "answer": "I cannot create diagrams directly, but I can describe the process of an ATM withdrawal in a simplified manner:\n\n1. **Customer** inserts cash into the ATM.\n2. **ATM** processes the withdrawal request and checks if the cash is valid.\n3. **ATM** dispenses the cash to the customer.\n4. **Customer** presents the cash to the bank for verification.\n5. **Bank** verifies the customer's identity and confirms the withdrawal.\n6. **Bank** sends a confirmation to the ATM.\n\nThis is a simplified representation. For a detailed diagram, you would need to use a tool like Microsoft PowerPoint or a diagramming software. Let me know if you'd like a textual description of the steps.",
+   "completion_tokens": 146,
+   "prompt_tokens": 116,
+   "secs": 8.6,
+   "score": {
+    "id": "atmA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "no diagram"
+   }
+  },
+  {
+   "id": "atm",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "customer",
+     "atm",
+     "bank"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Customer] --> B[ATM] --> C[Bank]\n  B --> D[Bank]\n  A --> B\n  D --> B\n  B --> C\n  C --> B\n  B --> A\n```\n\nThe diagram shows a customer initiating an ATM withdrawal, with the ATM sending a request to the bank, and the bank processing the withdrawal. The customer is represented by A, the ATM by B, and the bank by C.\n\n```mermaid\nsubgraph ATM and Bank\n  A[Customer] --> B[ATM] --> C[Bank]\n  B --> D[Bank]\n  D --> B\n  B --> C\n  C --> B\n  B --> A\nend\n```\n\nThe diagram illustrates the flow of a withdrawal request from the customer to the ATM, then to the bank, with the bank processing the request.",
+   "completion_tokens": 188,
+   "prompt_tokens": 309,
+   "secs": 11.9,
+   "score": {
+    "id": "atmB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": false,
+    "size": false,
+    "words": 1,
+    "ok": false,
+    "note": "kind flowchart td"
+   }
+  },
+  {
+   "id": "atm",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "customer",
+     "atm",
+     "bank"
+    ]
+   },
+   "answer": "Short sentence: A diagram shows an ATM withdrawal process with customer, ATM, and bank interacting.\n\n```mermaid\nflowchart TD\n  A[Customer] --> B[ATM] --> C[Bank]\n  B --> D[ATM Processor]\n  D --> E[Bank Processor]\n  A --> B\n  B --> D\n  D --> E\n  E --> C\n  C --> A\n```",
+   "completion_tokens": 86,
+   "prompt_tokens": 228,
+   "secs": 5.5,
+   "score": {
+    "id": "atmC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": false,
+    "size": false,
+    "words": 1,
+    "ok": false,
+    "note": "kind flowchart td"
+   }
+  },
+  {
+   "id": "sub",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "web",
+     "mobile",
+     "api",
+     "database"
+    ]
+   },
+   "answer": "I can create a flowchart with the specified groups. Here's a concise description:\n\n1. **Frontend Group**  \n   - Web (e.g., React, Angular)  \n   - Mobile (e.g., Flutter, React Native)  \n\n2. **Backend Group**  \n   - API (e.g., Node.js, Python Flask)  \n   - Database (e.g., PostgreSQL, MongoDB)  \n\nLet me know if you'd like a visual representation or further details!",
+   "completion_tokens": 97,
+   "prompt_tokens": 122,
+   "secs": 6.2,
+   "score": {
+    "id": "subA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "no diagram"
+   }
+  },
+  {
+   "id": "sub",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "web",
+     "mobile",
+     "api",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nsubgraph Frontend\n  A[Web]\n  B[Mobile]\nend\n\nsubgraph Backend\n  C[API]\n  D[Database]\nend\n\nflowchart TD\n  A --> B\n  A --> C\n  B --> D\n  C --> D\n  A --> C\n  B --> D\n  C --> D\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C\n  D --> A\n  D --> B\n  D --> C",
+   "completion_tokens": 900,
+   "prompt_tokens": 315,
+   "secs": 58.6,
+   "score": {
+    "id": "subB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "sub",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "web",
+     "mobile",
+     "api",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B[Frontend Group]\n  B --> C[Web]\n  B --> D[Mobile]\n  A --> E[Backend Group]\n  E --> F[API]\n  E --> G[Database]\n```\n\nExplanation: This flowchart starts with a \"Start\" node, then branches into a \"Frontend Group\" with \"Web\" and \"Mobile\". It also branches into a \"Backend Group\" with \"API\" and \"Database\". The diagram shows the flow from start to frontend and backend components.",
+   "completion_tokens": 118,
+   "prompt_tokens": 234,
+   "secs": 7.7,
+   "score": {
+    "id": "subC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "water",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "evaporat",
+     "cloud",
+     "rain"
+    ]
+   },
+   "answer": "I can help you create a simplified diagram of the water cycle. Here's a concise representation:\n\n```\nEvaporation\n|\n|   |\n|   | \n|   |   |\n|   |   | \n|   |   |   |\n|   |   |   |   |\n|   |   |   |   |   |\n|   |   |   |   |   |   |\n|   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |   |   |   |   |   |   |   |\n|   |   |   |   |",
+   "completion_tokens": 900,
+   "prompt_tokens": 105,
+   "secs": 66.4,
+   "score": {
+    "id": "waterA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "water",
+   "kind": "diagram",
+   "variant": "B",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "evaporat",
+     "cloud",
+     "rain"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| A\n```\n\nThe diagram shows a simple decision process where the user confirms if they are ready to proceed. The flowchart includes a start node, a decision node, and a go node. The diagram is self-contained and follows the specified layout.",
+   "completion_tokens": 85,
+   "prompt_tokens": 298,
+   "secs": 5.6,
+   "score": {
+    "id": "waterB",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "only 3 nodes"
+   }
+  },
+  {
+   "id": "water",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "evaporat",
+     "cloud",
+     "rain"
+    ]
+   },
+   "answer": "Short sentence: A diagram of the water cycle shows the movement of water through evaporation, condensation, precipitation, and collection.\n\n```mermaid\nflowchart TD\n  A[Start] --> B[Evaporation]\n  B --> C[Condensation]\n  C --> D[Precipitation]\n  D --> E[Collection]\n  E --> A\n```",
+   "completion_tokens": 75,
+   "prompt_tokens": 217,
+   "secs": 4.8,
+   "score": {
+    "id": "waterC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0.3333333333333333,
+    "ok": false,
+    "note": "words missing"
+   }
+  }
+ ]
+}

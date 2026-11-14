@@ -477,6 +477,114 @@ function stateToFlow(lines) {
   return [...out, ...stated, ...defs.map((d) => d[1]), ...body];
 }
 
+// ============================== charts: a JSON spec for Nivo ==============================
+// The model writes a ```chart block (JSON). It is checked and put into one canonical shape here, with no DOM, so a
+// bad spec stays a code block; the page then draws it with Nivo (nivo.js, loaded on first use).
+const CHART_TYPES = { bar: 'bar', column: 'bar', columns: 'bar', histogram: 'bar', hbar: 'bar', line: 'line', area: 'area', pie: 'pie', donut: 'pie', doughnut: 'pie', radar: 'radar', spider: 'radar', heatmap: 'heatmap', scatter: 'scatter', scatterplot: 'scatter', treemap: 'treemap', funnel: 'funnel', sankey: 'sankey', radialbar: 'radialbar', 'radial-bar': 'radialbar' };
+const CHART_SCHEMES = new Set(['nivo', 'category10', 'accent', 'dark2', 'paired', 'pastel1', 'pastel2', 'set1', 'set2', 'set3', 'tableau10', 'blues', 'greens', 'oranges', 'purples', 'reds', 'greys', 'viridis', 'cool', 'warm', 'spectral', 'rd_yl_gn', 'red_blue', 'yellow_green_blue']);
+const finite = (v) => typeof v === 'number' && Number.isFinite(v);
+const num = (v) => (finite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(+v.replace(/[,%$]/g, '')) ? +v.replace(/[,%$]/g, '') : null);
+const txt = (v, n = 80) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+const isRec = (v) => v && typeof v === 'object' && !Array.isArray(v);
+
+/// JSON a small model left one or two closing brackets short of: the missing `]` and `}` are added (strings are respected).
+function closeJson(t) {
+  const stack = []; let str = false; let out = ''; let fixes = 0; const closer = (c) => (c === '{' ? '}' : ']');
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (str) { out += c; if (c === '\\') out += t[++i] ?? ''; else if (c === '"') str = false; continue; }
+    if (c === '"') str = true;
+    else if (c === '{' || c === '[') stack.push(c);
+    else if (c === '}' || c === ']') { const want = c === '}' ? '{' : '['; while (stack.length && stack[stack.length - 1] !== want && fixes < 3) { out += closer(stack.pop()); fixes++; } if (stack.pop() !== want) return t; }
+    out += c;
+  }
+  if (str || fixes + stack.length > 3 || fixes + stack.length === 0) return t;
+  return out.replace(/,\s*$/, '') + stack.reverse().map(closer).join('');
+}
+
+/// The chart in a ```chart block as a canonical spec, or `{ error }`.
+export function chartSpec(src) {
+  let j; try { j = JSON.parse(String(src).trim()); } catch { try { j = JSON.parse(closeJson(String(src).trim())); } catch { return { error: 'The chart data is not valid JSON.' }; } }
+  if (!isRec(j)) return { error: 'The chart must be a JSON object.' };
+  const type = CHART_TYPES[txt(j.type ?? j.kind ?? j.chart, 20).toLowerCase().replace(/\s*chart$/, '').replace(/ /g, '')];
+  if (!type) return { error: `Unknown chart type "${txt(j.type ?? j.kind ?? j.chart, 20)}".` };
+  const out = { type, title: txt(j.title, 100), subtitle: txt(j.subtitle ?? j.description, 140), xLabel: txt(j.xLabel ?? j.xAxis ?? j.x_label, 40), yLabel: txt(j.yLabel ?? j.yAxis ?? j.y_label, 40), unit: txt(j.unit, 12) };
+  const sch = txt(j.colors ?? j.scheme ?? j.palette, 24).toLowerCase(); if (CHART_SCHEMES.has(sch)) out.scheme = sch;
+  let data = j.data ?? j.series ?? j.values ?? j.items;
+  // Chart.js shape: { labels: [...], datasets: [{ label, data: [...] }] }
+  const cj = isRec(data) && Array.isArray(data.labels) && Array.isArray(data.datasets) ? data : (Array.isArray(j.labels) && Array.isArray(j.datasets) ? j : null);
+  if (cj) data = cj.labels.map((l, i) => { const r = { label: txt(l) }; cj.datasets.forEach((d, k) => { r[txt(d.label ?? d.name ?? `Series ${k + 1}`, 40)] = num(d.data?.[i]); }); return r; });
+  else if (Array.isArray(j.labels) && Array.isArray(data) && data.every((x) => finite(num(x)))) data = j.labels.map((l, i) => ({ label: txt(l), value: num(data[i]) }));
+  else if (isRec(data) && !data.nodes && !data.children && !data.links) data = Object.entries(data).map(([k, v]) => (isRec(v) ? { label: txt(k), ...v } : { label: txt(k), value: num(v) }));
+  if (type === 'sankey') {
+    let nodes = (j.nodes ?? data?.nodes), links = (j.links ?? data?.links);
+    if (!links && Array.isArray(data) && data.every((d) => isRec(d) && (d.source ?? d.from) != null && (d.target ?? d.to) != null)) { links = data; nodes = [...new Set(data.flatMap((d) => [d.source ?? d.from, d.target ?? d.to]))]; }
+    if (!Array.isArray(nodes) || !Array.isArray(links)) return { error: 'A sankey chart needs "nodes" and "links".' };
+    const ids = new Set(); const ns = nodes.map((n) => txt(isRec(n) ? n.id ?? n.name : n, 40)).filter((id) => id && !ids.has(id) && ids.add(id)).map((id) => ({ id }));
+    const ls = links.map((l) => ({ source: txt(l.source ?? l.from, 40), target: txt(l.target ?? l.to, 40), value: num(l.value ?? l.weight ?? l.amount ?? l.flow) })).filter((l) => ids.has(l.source) && ids.has(l.target) && l.source !== l.target && l.value > 0);
+    if (ns.length < 2 || !ls.length || ns.length > 60 || ls.length > 150) return { error: 'The sankey chart has no valid links.' };
+    return { ...out, nodes: ns, links: ls };
+  }
+  if (type === 'treemap') {
+    const root = isRec(j.data) && (j.data.children || j.data.value != null) ? j.data : isRec(j.root) ? j.root : Array.isArray(data) ? { name: out.title || 'root', children: data } : null;
+    let count = 0; const walk = (n, d) => { if (!isRec(n) || d > 5 || ++count > 300) return null; const name = txt(n.name ?? n.label ?? n.id, 40) || '?'; if (Array.isArray(n.children) && n.children.length) { const ch = n.children.map((c) => walk(c, d + 1)).filter(Boolean); return ch.length ? { name, children: ch } : null; } const v = num(n.value ?? n.size); return v > 0 ? { name, value: v } : null; };
+    const tree = root && walk(root, 0); return tree?.children ? { ...out, root: tree } : { error: 'The treemap needs a tree of names and positive values.' };
+  }
+  if (!Array.isArray(data) || !data.length) return { error: 'The chart has no data.' };
+  if (data.length > 400) return { error: 'The chart has too many points.' };
+  // Series charts: [{ id, data: [{ x, y }] }] (line, area, scatter, heatmap, radial bar). A flat table of rows is turned into series.
+  const toSeries = (rows) => {
+    const hasNested = rows.every((r) => isRec(r) && Array.isArray(r.data));
+    if (hasNested) return rows.map((r, i) => ({ id: txt(r.id ?? r.name ?? r.label ?? `Series ${i + 1}`, 40), data: r.data.map((p) => (isRec(p) ? { x: finite(num(p.x)) && typeof p.x !== 'string' ? p.x : (typeof p.x === 'string' && num(p.x) !== null && type !== 'line' && type !== 'area' ? num(p.x) : txt(p.x ?? p.label, 40)), y: num(p.y ?? p.value) } : { x: txt(p), y: null })).filter((p) => p.y !== null) })).filter((r) => r.data.length);
+    if (!rows.every(isRec)) return null;
+    const keys = Object.keys(rows[0]); const xk = j.indexBy ?? j.x ?? keys.find((k) => typeof rows[0][k] === 'string') ?? keys[0];
+    const yk = (Array.isArray(j.keys) ? j.keys : keys.filter((k) => k !== xk && rows.some((r) => num(r[k]) !== null))).map(String);
+    return yk.map((k) => ({ id: txt(k, 40), data: rows.map((r) => ({ x: typeof r[xk] === 'number' ? r[xk] : txt(r[xk], 40), y: num(r[k]) })).filter((p) => p.y !== null) })).filter((r) => r.data.length);
+  };
+  if (type === 'line' || type === 'area' || type === 'scatter' || type === 'heatmap' || type === 'radialbar') {
+    const series = toSeries(data); if (!series?.length) return { error: 'The chart data could not be read as series of points.' };
+    if (series.length > 12 && type !== 'heatmap') return { error: 'The chart has too many series.' };
+    if ((type === 'line' || type === 'area') && series.some((r) => r.data.some((p) => typeof p.x === 'number')) && !series.every((r) => r.data.every((p) => typeof p.x === 'number'))) series.forEach((r) => r.data.forEach((p) => (p.x = String(p.x))));
+    if (type === 'scatter' && !series.every((r) => r.data.every((p) => typeof p.x === 'number'))) return { error: 'A scatter chart needs numeric x and y.' };
+    if (type === 'radialbar') series.forEach((r) => r.data.forEach((p) => (p.x = String(p.x))));
+    return { ...out, series, stacked: !!j.stacked };
+  }
+  // Row charts: bar, radar, pie, funnel.
+  const rows = data.map((r) => (isRec(r) ? r : { label: txt(r), value: num(r) })).filter(isRec);
+  const keys0 = Object.keys(rows[0] || {});
+  if (type === 'pie' || type === 'funnel') {
+    const pts = rows.map((r) => ({ id: txt(r.id ?? r.label ?? r.name ?? r.x ?? r[keys0[0]], 40), value: num(r.value ?? r.y ?? r.count ?? r.amount ?? r[keys0.find((k) => num(r[k]) !== null && typeof r[k] !== 'string') ?? keys0[1]]) })).filter((r) => r.id && r.value !== null && r.value >= 0);
+    if (!pts.length || pts.length > 40) return { error: 'The chart has no usable values.' };
+    const seen = new Set(); pts.forEach((r) => { while (seen.has(r.id)) r.id += ' '; seen.add(r.id); r.label = r.id.trim(); });
+    return { ...out, data: pts, donut: type === 'pie' && (j.donut === true || /^dou?ghnut|^donut/i.test(String(j.type))) };
+  }
+  const wanted = j.indexBy ?? j.x ?? j.index; const textKey = keys0.find((k) => typeof rows[0][k] === 'string' || num(rows[0][k]) === null) ?? keys0[0];
+  const idx = String(wanted != null && keys0.includes(String(wanted)) ? wanted : textKey);
+  const keys = (Array.isArray(j.keys) ? j.keys.map(String) : Array.isArray(j.series) && j.series.every((x) => typeof x === 'string') ? j.series : keys0.filter((k) => k !== idx && rows.some((r) => num(r[k]) !== null))).slice(0, 12);
+  const present = keys.filter((k) => rows.some((r) => num(r[k]) !== null));
+  const keysOk = present.length ? present : keys0.filter((k) => k !== idx && rows.some((r) => num(r[k]) !== null)).slice(0, 12);
+  if (!keysOk.length) return { error: 'The chart has no numeric columns.' };
+  keys.splice(0, keys.length, ...keysOk);
+  const table = rows.map((r) => { const o = { [idx]: txt(r[idx], 40) || '?' }; for (const k of keys) o[k] = num(r[k]) ?? 0; return o; });
+  return { ...out, data: table, keys, indexBy: idx, horizontal: j.horizontal === true || String(j.layout ?? j.orientation ?? '').toLowerCase().startsWith('h') || String(j.type).toLowerCase() === 'hbar', stacked: j.stacked === true || String(j.grouping ?? j.mode ?? '').toLowerCase() === 'stacked' };
+}
+
+/// The figure for a chart: a placeholder the page fills with Nivo, the data as a table for screen readers and as the
+/// no-script fallback, and the JSON as the chart's source.
+function chartFigure(spec, body) {
+  const rowsOf = () => {
+    if (spec.data && spec.keys) return { head: [spec.indexBy, ...spec.keys], rows: spec.data.map((r) => [r[spec.indexBy], ...spec.keys.map((k) => r[k])]) };
+    if (spec.data) return { head: ['Name', 'Value'], rows: spec.data.map((r) => [r.label, r.value]) };
+    if (spec.series) return { head: ['Series', 'x', 'y'], rows: spec.series.flatMap((s) => s.data.map((p) => [s.id, p.x, p.y])).slice(0, 200) };
+    if (spec.links) return { head: ['From', 'To', 'Value'], rows: spec.links.map((l) => [l.source, l.target, l.value]) };
+    const leaves = []; const walk = (n, path) => (n.children ? n.children.forEach((c) => walk(c, [...path, n.name])) : leaves.push([[...path, n.name].slice(1).join(' / ') || n.name, n.value])); walk(spec.root, []); return { head: ['Name', 'Value'], rows: leaves };
+  };
+  const { head, rows } = rowsOf();
+  const table = `<table><thead><tr>${head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.slice(0, 200).map((r) => `<tr>${r.map((c) => `<td>${esc(c ?? '')}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const label = `${spec.type} chart${spec.title ? `: ${spec.title}` : ''}`;
+  return `<figure class="diagram nvchart" data-kind="chart" data-chart="${esc(JSON.stringify(spec))}"><div class="fig-bar"><span class="lang">chart · ${esc(spec.type)}</span><span class="grow"></span><button type="button" class="fig-btn" data-act="source">Source</button><button type="button" class="fig-btn" data-act="copysrc">Copy source</button><button type="button" class="fig-btn" data-act="csv">Save CSV</button><button type="button" class="fig-btn" data-act="svg">Save SVG</button><button type="button" class="fig-btn" data-act="png">Save PNG</button><button type="button" class="fig-btn" data-act="full" aria-label="Open the chart larger">Expand</button></div>${spec.title || spec.subtitle ? `<div class="chart-head">${spec.title ? `<b>${esc(spec.title)}</b>` : ''}${spec.subtitle ? `<span>${esc(spec.subtitle)}</span>` : ''}</div>` : ''}<div class="fig-body chart-body" role="img" aria-label="${esc(label)}"><div class="chart-mount"></div><div class="chart-wait">Drawing the chart…</div></div><details class="chart-data"><summary>Show the data</summary><div class="tablewrap">${table}</div></details><pre class="fig-source" hidden><code>${esc(body)}</code></pre></figure>`;
+}
+
 /// Mermaid text to SVG, or null when the kind or the text is not understood (the caller shows the code).
 export function mermaid(src) {
   const lines = String(src).replace(/\r/g, '').split('\n').filter((l) => l.trim() && !/^\s*%%/.test(l));
@@ -517,12 +625,20 @@ const splitRow = (l) => { const cells = []; let cur = ''; let tick = false; cons
 
 const mathBlock = (tex) => `<div class="math" data-tex="${esc(tex.trim())}">${mathml(tex, true)}<button type="button" class="math-copy" data-act="tex" aria-label="Copy the formula as LaTeX">Copy LaTeX</button></div>`;
 
+const MERMAID_HEAD = /^\s*(flowchart|graph\s+(TB|TD|BT|LR|RL)|sequenceDiagram|stateDiagram(-v2)?|pie(\s+showData|\s+title\b|\s*$))/i;
+
 function codeBlock(lang, code, ctx) {
   const body = code.replace(/\n$/, '');
   const l = (lang || '').trim().split(/\s+/)[0].toLowerCase();
-  if (l === 'mermaid' && ctx.closed) {
-    const svg = mermaid(body);
-    if (svg) return `<figure class="diagram" data-kind="diagram"><div class="fig-bar"><span class="lang">diagram</span><span class="grow"></span><button type="button" class="fig-btn" data-act="source">Source</button><button type="button" class="fig-btn" data-act="copysrc">Copy source</button><button type="button" class="fig-btn" data-act="svg">Save SVG</button><button type="button" class="fig-btn" data-act="png">Save PNG</button><button type="button" class="fig-btn" data-act="full" aria-label="Open the diagram larger">Expand</button></div><div class="fig-body">${svg}</div><pre class="fig-source" hidden><code>${esc(body)}</code></pre></figure>`;
+  // Small models forget the language tag or write `json`: a block that is a chart spec, or a Mermaid diagram, is drawn all the same.
+  const bare = !l || l === 'text' || l === 'plain' || l === 'markdown' || l === 'md';
+  if ((l === 'chart' || l === 'nivo' || ((bare || l === 'json') && /^\s*\{/.test(body))) && ctx.closed) { const sp = chartSpec(body); if (!sp.error) return chartFigure(sp, body); }
+  // A model may put the diagram in a `python` block under a comment line: leading comment lines are dropped.
+  const noComments = body.replace(/^(?:\s*(?:#|%%|\/\/)[^\n]*\n)+/, '');
+  const isMermaid = l === 'mermaid' || l === 'mmd' || ((bare || l === 'python' || l === 'py' || l === 'text') && MERMAID_HEAD.test(noComments) && /(-->|->>|--x|---|:\s*\d)/.test(noComments));
+  if (isMermaid && ctx.closed) {
+    const svg = mermaid(noComments);
+    if (svg) return `<figure class="diagram" data-kind="diagram"><div class="fig-bar"><span class="lang">diagram</span><span class="grow"></span><button type="button" class="fig-btn" data-act="source">Source</button><button type="button" class="fig-btn" data-act="copysrc">Copy source</button><button type="button" class="fig-btn" data-act="svg">Save SVG</button><button type="button" class="fig-btn" data-act="png">Save PNG</button><button type="button" class="fig-btn" data-act="full" aria-label="Open the diagram larger">Expand</button></div><div class="fig-body">${svg}</div><pre class="fig-source" hidden><code>${esc(noComments)}</code></pre></figure>`;
   }
   if ((l === 'math' || l === 'latex' || l === 'tex' || l === 'katex') && ctx.closed) return mathBlock(body);
   if ((l === 'svg') && ctx.closed && /^\s*<svg[\s>]/i.test(body)) return `<pre class="code"><span class="lang">svg</span><button class="copy" type="button">copy</button><code>${esc(body)}</code></pre>`;
@@ -552,10 +668,23 @@ function listItems(lines, start, ctx) {
 }
 
 /// Markdown to HTML. `cites`, when given, is the set of source numbers [n] may turn into citation buttons.
+/// A chart spec or a Mermaid diagram that the model wrote with no fence at all, at the end of its answer (or as all of it), is
+/// put in one, so it is drawn. Only a complete, valid one counts, so a half-written one stays text while it streams.
+function bareVisual(s) {
+  if (s.includes('```') || s.includes('~~~')) return s;
+  const lines = s.split('\n');
+  for (let i = 0, tries = 0; i < lines.length && tries < 4; i++) {
+    const l = lines[i];
+    if (/^\s*\{\s*("|$)/.test(l)) { tries++; const rest = lines.slice(i).join('\n').trim(); if (rest.endsWith('}') && !chartSpec(rest).error) return `${lines.slice(0, i).join('\n')}\n\n\`\`\`chart\n${rest}\n\`\`\`\n`; }
+    else if (MERMAID_HEAD.test(l) && lines.length - i >= 2) { tries++; const rest = lines.slice(i).join('\n').replace(/\s+$/, ''); if (mermaid(rest)) return `${lines.slice(0, i).join('\n')}\n\n\`\`\`mermaid\n${rest}\n\`\`\`\n`; }
+  }
+  return s;
+}
+
 export function markdown(src, cites = null) {
   if (!src) return '';
   const ctx = { cites, closed: true };
-  let s = String(src).replace(/\r/g, '');
+  let s = bareVisual(String(src).replace(/\r/g, ''));
   const blocks = [];
   // Fenced code first (``` or ~~~), by lines, so nothing inside it is read as Markdown. A fence that never closes
   // (an answer still streaming) runs to the end and is drawn as plain code until it closes.

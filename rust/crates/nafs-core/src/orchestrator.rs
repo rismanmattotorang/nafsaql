@@ -885,6 +885,14 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         let verification = req.verification.clone().unwrap_or_default();
         let verifiable = verification.is_verifiable();
         let dom = domain::classify(&user.content, req.domain_hint, Some(&verification));
+        // A question that asks for a chart or a diagram gets the instruction for the block the page draws, in place of
+        // the domain's own, and is not treated as maths or a fact to check.
+        let visual = if cfg.assistant.visual_hints && req.domain_hint.is_none() && !verifiable {
+            crate::visual::instruction(&user.content, dom)
+        } else {
+            None
+        };
+        let dom = if visual.is_some() { Domain::Open } else { dom };
         let conditioned = req.ablation_draft_conditioned == Some(true);
 
         // Context (FR-003): stored history for persistent conversations; the client's history for ephemeral ones.
@@ -905,7 +913,9 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             match &verification.lean {
                 // FR-090: the Open Math Harness prover's rules, and the frozen statement to keep.
                 Some(l) => lean_instruction(&l.statement, !cfg.verifiers.lean_path.is_empty()),
-                None => domain_instruction(dom).to_string(),
+                None => visual
+                    .clone()
+                    .unwrap_or_else(|| domain_instruction(dom).to_string()),
             }
         );
         // FR-061: earlier verified answers, delimited as data with provenance (SR-001).

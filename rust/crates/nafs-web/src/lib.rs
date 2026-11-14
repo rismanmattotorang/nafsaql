@@ -3,6 +3,7 @@
 pub const INDEX_HTML: &str = include_str!("../assets/index.html");
 pub const APP_JS: &str = include_str!("../assets/app.js");
 pub const RENDER_JS: &str = include_str!("../assets/render.js");
+pub const NIVO_JS: &str = include_str!("../assets/nivo.js");
 pub const APP_CSS: &str = include_str!("../assets/app.css");
 pub const FAVICON_SVG: &str = include_str!("../assets/favicon.svg");
 
@@ -23,6 +24,7 @@ pub fn asset(name: &str, dir: Option<&str>) -> Option<(String, &'static str)> {
         "index.html" => INDEX_HTML,
         "app.js" => APP_JS,
         "render.js" => RENDER_JS,
+        "nivo.js" => NIVO_JS,
         "app.css" => APP_CSS,
         "favicon.svg" => FAVICON_SVG,
         _ => return None,

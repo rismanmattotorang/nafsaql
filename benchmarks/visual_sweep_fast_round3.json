@@ -1,0 +1,1472 @@
+{
+ "model": "fast",
+ "load_at_end": [
+  16.2646484375,
+  13.6884765625,
+  13.6708984375
+ ],
+ "rows": [
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Monthly Sales\",\n  \"indexBy\": \"month\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"month\": \"Jan\", \"value\": 120},\n    {\"month\": \"Feb\", \"value\": 150},\n    {\"month\": \"Mar\", \"value\": 90},\n    {\"month\": \"Apr\", \"value\": 200}\n  ]\n}\n```",
+   "completion_tokens": 102,
+   "prompt_tokens": 277,
+   "secs": 11.1,
+   "score": {
+    "id": "barC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Monthly Sales\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"label\": \"Jan\", \"value\": 120},\n    {\"label\": \"Feb\", \"value\": 150},\n    {\"label\": \"Mar\", \"value\": 90},\n    {\"label\": \"Apr\", \"value\": 200}\n  ]\n}\n```",
+   "completion_tokens": 102,
+   "prompt_tokens": 398,
+   "secs": 11.9,
+   "score": {
+    "id": "barD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"line\",\n  \"title\": \"Temperature by Hour\",\n  \"indexBy\": \"x\",\n  \"keys\": [\"y\"],\n  \"data\": [\n    {\"x\": \"6am\", \"y\": 12},\n    {\"x\": \"9am\", \"y\": 16},\n    {\"x\": \"12pm\", \"y\": 21},\n    {\"x\": \"3pm\", \"y\": 24},\n    {\"x\": \"6pm\", \"y\": 19}\n  ]\n}\n```",
+   "completion_tokens": 120,
+   "prompt_tokens": 291,
+   "secs": 9.8,
+   "score": {
+    "id": "lineC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"line\",\n  \"title\": \"Temperature by Hour\",\n  \"series\": [\n    {\n      \"id\": \"Temperature\",\n      \"data\": [\n        {\"x\": \"6am\", \"y\": 12},\n        {\"x\": \"9am\", \"y\": 16},\n        {\"x\": \"12pm\", \"y\": 21},\n        {\"x\": \"3pm\", \"y\": 24},\n        {\"x\": \"6pm\", \"y\": 19}\n      ]\n    }\n  ]\n}\n```",
+   "completion_tokens": 123,
+   "prompt_tokens": 412,
+   "secs": 14.1,
+   "score": {
+    "id": "lineD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"pie\",\n  \"title\": \"Browser Share\",\n  \"data\": [\n    {\"label\": \"Chrome\", \"value\": 65},\n    {\"label\": \"Safari\", \"value\": 20},\n    {\"label\": \"Firefox\", \"value\": 8},\n    {\"label\": \"Edge\", \"value\": 7}\n  ]\n}\n```",
+   "completion_tokens": 83,
+   "prompt_tokens": 272,
+   "secs": 8.4,
+   "score": {
+    "id": "pieC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"pie\",\n  \"title\": \"Browser Share\",\n  \"data\": [\n    {\"label\": \"Chrome 65\", \"value\": 65},\n    {\"label\": \"Safari 20\", \"value\": 15},\n    {\"label\": \"Firefox 8\", \"value\": 6},\n    {\"label\": \"Edge 7\", \"value\": 3}\n  ]\n}\n```",
+   "completion_tokens": 93,
+   "prompt_tokens": 393,
+   "secs": 7.5,
+   "score": {
+    "id": "pieD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 0.25,
+    "labels": 1,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "donut",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     40,
+     25,
+     15,
+     20
+    ],
+    "labels": [
+     "rent",
+     "food",
+     "travel",
+     "savings"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"donut\",\n  \"title\": \"Budget\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"label\": \"Rent\", \"value\": 40},\n    {\"label\": \"Food\", \"value\": 25},\n    {\"label\": \"Travel\", \"value\": 15},\n    {\"label\": \"Savings\", \"value\": 20}\n  ]\n}\n```",
+   "completion_tokens": 100,
+   "prompt_tokens": 275,
+   "secs": 6.8,
+   "score": {
+    "id": "donutC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "donut",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     40,
+     25,
+     15,
+     20
+    ],
+    "labels": [
+     "rent",
+     "food",
+     "travel",
+     "savings"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"donut\",\n  \"title\": \"Budget Allocation\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"rent\", \"food\", \"travel\", \"savings\"],\n  \"data\": [\n    {\"label\": \"rent\", \"value\": 40},\n    {\"label\": \"food\", \"value\": 25},\n    {\"label\": \"travel\", \"value\": 15},\n    {\"label\": \"savings\", \"value\": 20}\n  ]\n}\n```",
+   "completion_tokens": 111,
+   "prompt_tokens": 396,
+   "secs": 7.9,
+   "score": {
+    "id": "donutD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "grouped",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     100,
+     70,
+     140,
+     90,
+     160,
+     110
+    ],
+    "labels": [
+     "q1",
+     "q2",
+     "q3",
+     "revenue",
+     "cost"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Revenue and Cost by Quarter\",\n  \"indexBy\": \"quarter\",\n  \"keys\": [\"revenue\", \"cost\"],\n  \"data\": [\n    {\"quarter\": \"Q1\", \"revenue\": 100, \"cost\": 70},\n    {\"quarter\": \"Q2\", \"revenue\": 140, \"cost\": 90},\n    {\"quarter\": \"Q3\", \"revenue\": 160, \"cost\": 110}\n  ]\n}\n```",
+   "completion_tokens": 123,
+   "prompt_tokens": 294,
+   "secs": 8.9,
+   "score": {
+    "id": "groupedC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "grouped",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     100,
+     70,
+     140,
+     90,
+     160,
+     110
+    ],
+    "labels": [
+     "q1",
+     "q2",
+     "q3",
+     "revenue",
+     "cost"
+    ]
+   },
+   "answer": "```json\n{\n  \"title\": \"Revenue vs. Cost by Quarter\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"revenue\", \"cost\"],\n  \"data\": [\n    {\"label\": \"Q1\", \"value\": {\"revenue\": 100, \"cost\": 70}},\n    {\"label\": \"Q2\", \"value\": {\"revenue\": 140, \"cost\": 90}},\n    {\"label\": \"Q3\", \"value\": {\"revenue\": 160, \"cost\": 110}}\n  ]\n}\n```",
+   "completion_tokens": 126,
+   "prompt_tokens": 415,
+   "secs": 9.1,
+   "score": {
+    "id": "groupedD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "json that is not a chart spec"
+   }
+  },
+  {
+   "id": "radar",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "radar",
+    "numbers": [
+     8,
+     6,
+     9,
+     5,
+     6,
+     9,
+     7,
+     8
+    ],
+    "labels": [
+     "battery",
+     "camera",
+     "speed",
+     "price",
+     "phone a",
+     "phone b"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"radar\",\n  \"title\": \"Phone Performance\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"battery\", \"camera\", \"speed\", \"price\"],\n  \"data\": [\n    {\n      \"label\": \"Phone A\",\n      \"battery\": 8,\n      \"camera\": 6,\n      \"speed\": 9,\n      \"price\": 5\n    },\n    {\n      \"label\": \"Phone B\",\n      \"battery\": 6,\n      \"camera\": 9,\n      \"speed\": 7,\n      \"price\": 8\n    }\n  ]\n}\n```",
+   "completion_tokens": 133,
+   "prompt_tokens": 290,
+   "secs": 9.0,
+   "score": {
+    "id": "radarC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "radar",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "radar",
+    "numbers": [
+     8,
+     6,
+     9,
+     5,
+     6,
+     9,
+     7,
+     8
+    ],
+    "labels": [
+     "battery",
+     "camera",
+     "speed",
+     "price",
+     "phone a",
+     "phone b"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Battery, Camera, Speed, Price\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"Battery\", \"Camera\", \"Speed\", \"Price\"],\n  \"data\": [\n    {\n      \"label\": \"Phone A\",\n      \"value\": [8, 6, 9, 5]\n    },\n    {\n      \"label\": \"Phone B\",\n      \"value\": [6, 9, 7, 8]\n    }\n  ]\n}\n```",
+   "completion_tokens": 113,
+   "prompt_tokens": 411,
+   "secs": 8.2,
+   "score": {
+    "id": "radarD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "json that is not a chart spec"
+   }
+  },
+  {
+   "id": "scatter",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "scatter",
+    "numbers": [
+     150,
+     50,
+     160,
+     58,
+     170,
+     66,
+     180,
+     77,
+     190,
+     88
+    ],
+    "labels": []
+   },
+   "answer": "```json\n{\n  \"type\": \"scatter\",\n  \"title\": \"Height vs. Weight\",\n  \"indexBy\": \"x\",\n  \"keys\": [\"y\"],\n  \"data\": [\n    {\"x\": \"Jan\", \"y\": 120},\n    {\"x\": \"Feb\", \"y\": 130},\n    {\"x\": \"Mar\", \"y\": 140},\n    {\"x\": \"Apr\", \"y\": 150},\n    {\"x\": \"May\", \"y\": 160}\n  ]\n}\n```",
+   "completion_tokens": 120,
+   "prompt_tokens": 300,
+   "secs": 8.3,
+   "score": {
+    "id": "scatterC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "json that is not a chart spec"
+   }
+  },
+  {
+   "id": "scatter",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "scatter",
+    "numbers": [
+     150,
+     50,
+     160,
+     58,
+     170,
+     66,
+     180,
+     77,
+     190,
+     88
+    ],
+    "labels": []
+   },
+   "answer": "```json\n{\n  \"type\": \"scatter\",\n  \"series\": [\n    {\n      \"id\": \"height vs weight\",\n      \"data\": [\n        {\"x\": 150, \"y\": 50},\n        {\"x\": 160, \"y\": 58},\n        {\"x\": 170, \"y\": 66},\n        {\"x\": 180, \"y\": 77},\n        {\"x\": 190, \"y\": 88}\n      ]\n    }\n  ]\n}\n```",
+   "completion_tokens": 120,
+   "prompt_tokens": 421,
+   "secs": 9.7,
+   "score": {
+    "id": "scatterD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 0,
+    "ok": false,
+    "note": "labels missing"
+   }
+  },
+  {
+   "id": "treemap",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "treemap",
+    "numbers": [
+     40,
+     90,
+     30,
+     10
+    ],
+    "labels": [
+     "photos",
+     "videos",
+     "apps",
+     "docs"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"treemap\",\n  \"title\": \"Storage Use\",\n  \"data\": [\n    {\n      \"label\": \"Photos\",\n      \"value\": 40\n    },\n    {\n      \"label\": \"Videos\",\n      \"value\": 90\n    },\n    {\n      \"label\": \"Apps\",\n      \"value\": 30\n    },\n    {\n      \"label\": \"Docs\",\n      \"value\": 10\n    }\n  ]\n}\n```",
+   "completion_tokens": 105,
+   "prompt_tokens": 278,
+   "secs": 6.9,
+   "score": {
+    "id": "treemapC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "treemap",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "treemap",
+    "numbers": [
+     40,
+     90,
+     30,
+     10
+    ],
+    "labels": [
+     "photos",
+     "videos",
+     "apps",
+     "docs"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"treemap\",\n  \"data\": {\n    \"name\": \"all\",\n    \"children\": [\n      {\n        \"name\": \"Photos\",\n        \"value\": 40\n      },\n      {\n        \"name\": \"Videos\",\n        \"value\": 90\n      },\n      {\n        \"name\": \"Apps\",\n        \"value\": 30\n      },\n      {\n        \"name\": \"Docs\",\n        \"value\": 10\n      }\n    ]\n  }\n}\n```",
+   "completion_tokens": 111,
+   "prompt_tokens": 399,
+   "secs": 7.3,
+   "score": {
+    "id": "treemapD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "funnel",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "funnel",
+    "numbers": [
+     1000,
+     300,
+     120,
+     40
+    ],
+    "labels": [
+     "visits",
+     "signups",
+     "trials",
+     "paid"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"funnel\",\n  \"title\": \"Signups\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"value\"],\n  \"data\": [\n    {\"label\": \"Visits\", \"value\": 1000},\n    {\"label\": \"Signups\", \"value\": 300},\n    {\"label\": \"Trials\", \"value\": 120},\n    {\"label\": \"Paid\", \"value\": 40}\n  ]\n}\n```",
+   "completion_tokens": 107,
+   "prompt_tokens": 280,
+   "secs": 7.4,
+   "score": {
+    "id": "funnelC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "funnel",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "funnel",
+    "numbers": [
+     1000,
+     300,
+     120,
+     40
+    ],
+    "labels": [
+     "visits",
+     "signups",
+     "trials",
+     "paid"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"funnel\",\n  \"title\": \"Funnel Chart\",\n  \"data\": [\n    {\"label\": \"Visits\", \"value\": 1000},\n    {\"label\": \"Signups\", \"value\": 300},\n    {\"label\": \"Trials\", \"value\": 120},\n    {\"label\": \"Paid\", \"value\": 40}\n  ]\n}\n```",
+   "completion_tokens": 93,
+   "prompt_tokens": 401,
+   "secs": 6.4,
+   "score": {
+    "id": "funnelD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"sankey\",\n  \"title\": \"Energy Flow\",\n  \"data\": [\n    {\n      \"source\": \"Coal\",\n      \"target\": \"Electricity\",\n      \"amount\": 30\n    },\n    {\n      \"source\": \"Gas\",\n      \"target\": \"Electricity\",\n      \"amount\": 40\n    },\n    {\n      \"source\": \"Electricity\",\n      \"target\": \"Homes\",\n      \"amount\": 50\n    },\n    {\n      \"source\": \"Electricity\",\n      \"target\": \"Industry\",\n      \"amount\": 20\n    }\n  ]\n}\n```",
+   "completion_tokens": 138,
+   "prompt_tokens": 282,
+   "secs": 9.0,
+   "score": {
+    "id": "sankeyC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"sankey\",\n  \"nodes\": [{\"id\": \"energy\"}, {\"id\": \"coal\", \"value\": 30}, {\"id\": \"gas\", \"value\": 40}, {\"id\": \"electricity\", \"value\": 50}, {\"id\": \"homes\", \"value\": 20}, {\"id\": \"industry\", \"value\": 10}],\n  \"links\": [{\"source\": \"energy\", \"target\": \"coal\", \"value\": 30}, {\"source\": \"energy\", \"target\": \"gas\", \"value\": 40}, {\"source\": \"energy\", \"target\": \"electricity\", \"value\": 50}, {\"source\": \"energy\", \"target\": \"homes\", \"value\": 20}, {\"source\": \"energy\", \"target\": \"industry\", \"value\": 10}]\n}\n```",
+   "completion_tokens": 190,
+   "prompt_tokens": 403,
+   "secs": 12.5,
+   "score": {
+    "id": "sankeyD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "heatmap",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "heatmap",
+    "numbers": [
+     5,
+     8,
+     7,
+     3,
+     9,
+     6
+    ],
+    "labels": [
+     "mon",
+     "tue",
+     "wed"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"heatmap\",\n  \"title\": \"Sales by Day and Store\",\n  \"data\": [\n    {\"x\": \"Mon\", \"y\": {\"store A\": 5, \"store B\": 8}},\n    {\"x\": \"Tue\", \"y\": {\"store A\": 7, \"store B\": 3}},\n    {\"x\": \"Wed\", \"y\": {\"store A\": 9, \"store B\": 6}}\n  ]\n}\n```",
+   "completion_tokens": 103,
+   "prompt_tokens": 289,
+   "secs": 7.3,
+   "score": {
+    "id": "heatmapC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "json that is not a chart spec"
+   }
+  },
+  {
+   "id": "heatmap",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "heatmap",
+    "numbers": [
+     5,
+     8,
+     7,
+     3,
+     9,
+     6
+    ],
+    "labels": [
+     "mon",
+     "tue",
+     "wed"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"heatmap\",\n  \"title\": \"Sales by Day and Store\",\n  \"data\": [\n    {\n      \"id\": \"Mon\",\n      \"data\": [\n        {\"x\": \"store A\", \"y\": 5},\n        {\"x\": \"store B\", \"y\": 8}\n      ]\n    },\n    {\n      \"id\": \"Tue\",\n      \"data\": [\n        {\"x\": \"store A\", \"y\": 7},\n        {\"x\": \"store B\", \"y\": 3}\n      ]\n    },\n    {\n      \"id\": \"Wed\",\n      \"data\": [\n        {\"x\": \"store A\", \"y\": 9},\n        {\"x\": \"store B\", \"y\": 6}\n      ]\n    }\n  ]\n}\n```",
+   "completion_tokens": 169,
+   "prompt_tokens": 410,
+   "secs": 11.6,
+   "score": {
+    "id": "heatmapD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "stacked",
+   "kind": "chart",
+   "variant": "C",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     60,
+     40,
+     55,
+     45
+    ],
+    "labels": [
+     "paris",
+     "rome",
+     "yes",
+     "no"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Votes by City\",\n  \"indexBy\": \"city\",\n  \"keys\": [\"yes\", \"no\"],\n  \"data\": [\n    {\"city\": \"Paris\", \"yes\": 60, \"no\": 40},\n    {\"city\": \"Rome\", \"yes\": 55, \"no\": 45}\n  ]\n}\n```",
+   "completion_tokens": 90,
+   "prompt_tokens": 277,
+   "secs": 6.1,
+   "score": {
+    "id": "stackedC",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "stacked",
+   "kind": "chart",
+   "variant": "D",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     60,
+     40,
+     55,
+     45
+    ],
+    "labels": [
+     "paris",
+     "rome",
+     "yes",
+     "no"
+    ]
+   },
+   "answer": "```json\n{\n  \"type\": \"bar\",\n  \"title\": \"Votes by City\",\n  \"indexBy\": \"label\",\n  \"keys\": [\"yes\", \"no\"],\n  \"data\": [\n    {\"label\": \"Paris\", \"value\": 60},\n    {\"label\": \"Rome\", \"value\": 55}\n  ]\n}\n```",
+   "completion_tokens": 76,
+   "prompt_tokens": 398,
+   "secs": 5.4,
+   "score": {
+    "id": "stackedD",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": true,
+    "type": true,
+    "numbers": 0.5,
+    "labels": 0.5,
+    "ok": false,
+    "note": "numbers differ"
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B[Boil water]\n  B --> C[Add tea bag]\n  C --> D[Steep for 3 minutes]\n  D --> E[Check strength]\n  E -->|yes| F[Steep more]\n  E -->|no| G[Serve]\n```\n\nExplanation: This flowchart represents the steps to make tea: boil water, add a tea bag, steep for 3 minutes, check if it's strong enough, and then either steep more or serve.",
+   "completion_tokens": 114,
+   "prompt_tokens": 249,
+   "secs": 10.3,
+   "score": {
+    "id": "teaC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "```\nflowchart TD\n  A[Boil water] --> B[Add tea bag]\n  B --> C[Steep for 3 minutes]\n  C --> D[Check strength]\n  D -->|yes| E[Serve]\n  D -->|no| C\n```\n\nThe flowchart shows the steps to make tea: boil water, add a tea bag, steep for 3 minutes, check if it is strong enough, and serve if needed.",
+   "completion_tokens": 96,
+   "prompt_tokens": 308,
+   "secs": 10.1,
+   "score": {
+    "id": "teaD",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "login",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "password",
+     "lock",
+     "login"
+    ]
+   },
+   "answer": "```python\n# This is a simple flowchart for a login process with a decision for a correct password and a locked account after 3 failures.\n# The diagram uses the flowchart TD format.\n\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| D[Lock]\n  D --> E[End]\n  C --> F{Password Correct?}\n  F -->|yes| G[Success]\n  F -->|no| H[Fail]\n  H --> I[End]\n```\n\nExplanation:\n- The flowchart starts at \"Start\" and asks if the user is ready.\n- If \"Ready?\" is yes, it proceeds to \"Go\".\n- If \"Ready?\" is no, it goes to \"Lock\".\n- If the password is correct, it proceeds to \"Success\"; if not, it goes to \"Fail\" and ends.\n- The diagram shows the decision for a correct password and a locked account after 3 failures.",
+   "completion_tokens": 211,
+   "prompt_tokens": 233,
+   "secs": 13.1,
+   "score": {
+    "id": "loginC",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0.6666666666666666,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "login",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "password",
+     "lock",
+     "login"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| A\n```\n\nThe flowchart represents a login process with a decision for a correct password and a locked account after 3 failures.",
+   "completion_tokens": 62,
+   "prompt_tokens": 292,
+   "secs": 4.3,
+   "score": {
+    "id": "loginD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "only 3 nodes"
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nsequenceDiagram\n    participant Browser in\n    participant Server in\n    participant DB in\n    Browser->>Server: request web page\n    Server->>DB: query database\n    DB->>Server: return data\n    Server->>Browser: send web page\n```\n\nExplanation: This sequence diagram shows a browser requesting a web page from a server, which then queries a database to retrieve data, and sends the web page back to the browser.",
+   "completion_tokens": 97,
+   "prompt_tokens": 229,
+   "secs": 6.3,
+   "score": {
+    "id": "webC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nsequenceDiagram\n    participant C as Customer\n    participant B as Browser\n    participant D as Server\n    participant E as Database\n    C->>B: Request\n    B-->>D: Query\n    D-->>E: Query\n    E-->>D: Reply\n    D-->>B: Reply\n    B-->>C: Page\n```\n\nExplanation: This sequence diagram shows a browser (B) requesting a web page from a server (D), which then queries a database (E). The response from the database is sent back to the server, which then sends the page back to the browser.",
+   "completion_tokens": 132,
+   "prompt_tokens": 288,
+   "secs": 11.2,
+   "score": {
+    "id": "webD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "```mermaid\nstateDiagram\n    [Start] --> G: Green\n    G --> Y: Yellow\n    Y --> R: Red\n    R --> G: Cycle\n```\n\nExplanation: This state diagram represents the cycle of a traffic light, with states for Green, Yellow, and Red. The diagram shows the transitions between these states in a cycle.",
+   "completion_tokens": 74,
+   "prompt_tokens": 224,
+   "secs": 9.6,
+   "score": {
+    "id": "trafficC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "Nafs-Aql is a fast-and-careful assistant built on open Qwen models, designed to provide accurate and concise answers.\n\n```mermaid\nstateDiagram-v2\n  [*] --> Idle\n  Idle --> Busy: start\n  Busy --> Green: next\n  Green --> Yellow: next\n  Yellow --> Red: next\n  Red --> Green: next\n```",
+   "completion_tokens": 77,
+   "prompt_tokens": 283,
+   "secs": 10.6,
+   "score": {
+    "id": "trafficD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "mpie",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "pie",
+    "min": 4,
+    "words": [
+     "work",
+     "sleep",
+     "leisure",
+     "commute"
+    ]
+   },
+   "answer": "Short sentence: A pie chart shows the distribution of time spent in different activities of a day.\n\n```mermaid\npie\nWork: 8\nSleep: 8\nLeisure: 4\nCommute: 2\n```",
+   "completion_tokens": 48,
+   "prompt_tokens": 239,
+   "secs": 6.0,
+   "score": {
+    "id": "mpieC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "mpie",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "pie",
+    "min": 4,
+    "words": [
+     "work",
+     "sleep",
+     "leisure",
+     "commute"
+    ]
+   },
+   "answer": "```\npie\nWork 8\nSleep 8\nLeisure 4\nCommute 2\n```\n\nThe pie chart shows the distribution of a day, with Work taking 8 units, Sleep taking 8 units, Leisure taking 4 units, and Commute taking 2 units.",
+   "completion_tokens": 61,
+   "prompt_tokens": 298,
+   "secs": 6.1,
+   "score": {
+    "id": "mpieD",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "Short sentence: A CI pipeline consists of stages for commit, build, test, deploy to staging, approval, and deploy to production.\n\n```mermaid\nsequenceDiagram\n    participant User\n    participant Git\n    participant Build\n    participant Test\n    participant Staging\n    participant Prod\n    \n    User->>Git: Commit\n    Git->>Build: Build\n    Build->>Test: Test\n    Test->>Staging: Deploy to Staging\n    Staging->>Prod: Approval\n    Prod->>User: Deploy to Production\n```",
+   "completion_tokens": 115,
+   "prompt_tokens": 233,
+   "secs": 8.6,
+   "score": {
+    "id": "ciC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": false,
+    "size": true,
+    "words": 1,
+    "ok": false,
+    "note": "kind sequencediagram"
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Commit] --> B[Build]\n  B --> C[Test]\n  C --> D[Deploy to Staging]\n  D --> E[Approval]\n  E --> F[Deploy to Production]\n```\n\nExplanation: This flowchart represents a CI pipeline with steps: commit, build, test, deploy to staging, approval, and deploy to production. Each step is a node in the flowchart, showing the sequence of actions in the pipeline.",
+   "completion_tokens": 100,
+   "prompt_tokens": 292,
+   "secs": 7.4,
+   "score": {
+    "id": "ciD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pipeline",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "ingest",
+     "clean",
+     "train",
+     "evaluate",
+     "publish"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TL\n  A[Ingest] --> B[Clean]\n  B --> C[Train]\n  C --> D[Evaluate]\n  D --> E[Publish]\n```\n\nExplanation: This flowchart represents a left-to-right data pipeline with the steps: Ingest, Clean, Train, Evaluate, and Publish. Each step is represented by a node with an arrow pointing to the next step.",
+   "completion_tokens": 86,
+   "prompt_tokens": 231,
+   "secs": 5.7,
+   "score": {
+    "id": "pipelineC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pipeline",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "ingest",
+     "clean",
+     "train",
+     "evaluate",
+     "publish"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Ingest] --> B[Clean]\n  B --> C[Train]\n  C --> D[Evaluate]\n  D --> E[Publish]\n```\n\nExplanation: This flowchart represents a left-to-right data pipeline with steps: Ingest, Clean, Train, Evaluate, and Publish. Each step is a node in the flowchart, showing the sequence of operations.",
+   "completion_tokens": 85,
+   "prompt_tokens": 290,
+   "secs": 7.1,
+   "score": {
+    "id": "pipelineD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "atm",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "customer",
+     "atm",
+     "bank"
+    ]
+   },
+   "answer": "Short sentence: A diagram shows an ATM withdrawal process with customer, ATM, and bank interacting.\n\n```mermaid\nflowchart TD\n  A[Customer] --> B[ATM] --> C[Bank]\n  B --> D[ATM Processor]\n  D --> E[Bank Processor]\n  A --> B\n  B --> D\n  D --> E\n  E --> C\n  C --> A\n```",
+   "completion_tokens": 86,
+   "prompt_tokens": 228,
+   "secs": 9.5,
+   "score": {
+    "id": "atmC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": false,
+    "size": false,
+    "words": 1,
+    "ok": false,
+    "note": "kind flowchart td"
+   }
+  },
+  {
+   "id": "atm",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "customer",
+     "atm",
+     "bank"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| A\n```\n\nAn ATM withdrawal involves the customer initiating a request, the ATM processing the transaction, and the bank verifying the details. The diagram shows the flow of messages between the customer, ATM, and bank.",
+   "completion_tokens": 78,
+   "prompt_tokens": 287,
+   "secs": 8.4,
+   "score": {
+    "id": "atmD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "kind flowchart td"
+   }
+  },
+  {
+   "id": "sub",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "web",
+     "mobile",
+     "api",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B[Frontend Group]\n  B --> C[Web]\n  B --> D[Mobile]\n  A --> E[Backend Group]\n  E --> F[API]\n  E --> G[Database]\n```\n\nExplanation: This flowchart starts with a \"Start\" node, then branches into a \"Frontend Group\" with \"Web\" and \"Mobile\". It also branches into a \"Backend Group\" with \"API\" and \"Database\". The diagram shows the flow from start to frontend and backend components.",
+   "completion_tokens": 118,
+   "prompt_tokens": 234,
+   "secs": 12.1,
+   "score": {
+    "id": "subC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "sub",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "web",
+     "mobile",
+     "api",
+     "database"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B[Frontend Group]\n  B --> C[Mobile]\n  B --> D[Web]\n  C --> E[Backend Group]\n  D --> E\n  E --> F[API]\n  F --> G[Database]\n```\n\nExplanation: This flowchart represents a two-group structure. The frontend group includes mobile and web, while the backend group includes API and database. The diagram shows the flow from start to frontend, then to backend, and finally to API and database.",
+   "completion_tokens": 112,
+   "prompt_tokens": 293,
+   "secs": 11.7,
+   "score": {
+    "id": "subD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "water",
+   "kind": "diagram",
+   "variant": "C",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "evaporat",
+     "cloud",
+     "rain"
+    ]
+   },
+   "answer": "Short sentence: A diagram of the water cycle shows the movement of water through evaporation, condensation, precipitation, and collection.\n\n```mermaid\nflowchart TD\n  A[Start] --> B[Evaporation]\n  B --> C[Condensation]\n  C --> D[Precipitation]\n  D --> E[Collection]\n  E --> A\n```",
+   "completion_tokens": 75,
+   "prompt_tokens": 217,
+   "secs": 7.3,
+   "score": {
+    "id": "waterC",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 0.3333333333333333,
+    "ok": false,
+    "note": "words missing"
+   }
+  },
+  {
+   "id": "water",
+   "kind": "diagram",
+   "variant": "D",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 4,
+    "words": [
+     "evaporat",
+     "cloud",
+     "rain"
+    ]
+   },
+   "answer": "```mermaid\nflowchart TD\n  A[Start] --> B{Ready?}\n  B -->|yes| C[Go]\n  B -->|no| A\n```\n\nThe diagram represents a simple decision-making flow where the user confirms if they are ready, and if so, the process proceeds.",
+   "completion_tokens": 64,
+   "prompt_tokens": 276,
+   "secs": 6.5,
+   "score": {
+    "id": "waterD",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "only 3 nodes"
+   }
+  }
+ ]
+}

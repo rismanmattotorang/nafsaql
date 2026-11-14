@@ -12,6 +12,7 @@ pub mod orchestrator;
 pub mod parallel;
 pub mod sequential;
 pub mod support;
+pub mod visual;
 
 pub use backend::{Backend, BackendHealth, GenOutput, GenRequest};
 pub use config::Config;

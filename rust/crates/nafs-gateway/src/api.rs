@@ -232,6 +232,10 @@ pub fn router(state: AppState) -> Router {
             get(|s: State<AppState>| serve_asset(s, "render.js")),
         )
         .route(
+            "/nivo.js",
+            get(|s: State<AppState>| serve_asset(s, "nivo.js")),
+        )
+        .route(
             "/app.css",
             get(|s: State<AppState>| serve_asset(s, "app.css")),
         )

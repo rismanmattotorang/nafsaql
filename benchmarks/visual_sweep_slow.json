@@ -1,0 +1,534 @@
+{
+ "model": "slow",
+ "load_at_end": [
+  8.6396484375,
+  6.615234375,
+  7.728515625
+ ],
+ "rows": [
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "I can't generate images directly, but here's how to create the bar chart:  \n1. **Excel/Sheets**: Enter data \u2192 Select cells \u2192 Insert \u2192 Bar Chart.  \n2. **Python (Matplotlib)**:  \n```python\nimport matplotlib.pyplot as plt\nmonths = ['Jan', 'Feb', 'Mar', 'Apr']\nsales = [120, 150, 90, 200]\nplt.bar(months, sales)\nplt.xlabel('Month')\nplt.ylabel('Sales')\nplt.title('Monthly Sales')\nplt.show()\n```  \n*(Data: Jan=120, Feb=150, Mar=90, Apr=200)*",
+   "completion_tokens": 658,
+   "prompt_tokens": 639,
+   "secs": 114.8,
+   "score": {
+    "id": "barA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "bar",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "bar",
+    "numbers": [
+     120,
+     150,
+     90,
+     200
+    ],
+    "labels": [
+     "jan",
+     "feb",
+     "mar",
+     "apr"
+    ]
+   },
+   "answer": "Here's the bar chart for monthly sales:\n\n```chart\n{\"type\":\"bar\",\"title\":\"Monthly Sales\",\"indexBy\":\"label\",\"keys\":[\"sales\"],\"data\":[{\"label\":\"Jan\",\"sales\":120},{\"label\":\"Feb\",\"sales\":150},{\"label\":\"Mar\",\"sales\":90},{\"label\":\"Apr\",\"sales\":200}]}\n```",
+   "completion_tokens": 586,
+   "prompt_tokens": 764,
+   "secs": 98.8,
+   "score": {
+    "id": "barE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "I can't generate images directly, but here's concise Python code to create the line chart using Matplotlib:\n\n```python\nimport matplotlib.pyplot as plt\n\nhours = [6, 9, 12, 15, 18]  # 6am \u2192 6pm converted to 24h format\ntemps = [12, 16, 21, 24, 19]\n\nplt.plot(hours, temps, marker='o')\nplt.xlabel('Hour')\nplt.ylabel('Temperature (\u00b0C)')\nplt.title('Temperature by Hour')\nplt.grid(True)\nplt.show()\n```\n\nThis will produce a line chart showing the temperature trend from 6am to 6pm. Let me know if you'd like help adapting it!",
+   "completion_tokens": 671,
+   "prompt_tokens": 653,
+   "secs": 108.5,
+   "score": {
+    "id": "lineA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "line",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "line",
+    "numbers": [
+     12,
+     16,
+     21,
+     24,
+     19
+    ],
+    "labels": [
+     "6am",
+     "9am",
+     "12pm",
+     "3pm",
+     "6pm"
+    ]
+   },
+   "answer": "Here's a line chart of temperature by hour.\n\n```chart\n{\"type\":\"line\",\"title\":\"Temperature by Hour\",\"series\":[{\"id\":\"Temperature\",\"data\":[{\"x\":\"6am\",\"y\":12},{\"x\":\"9am\",\"y\":16},{\"x\":\"12pm\",\"y\":21},{\"x\":\"3pm\",\"y\":24},{\"x\":\"6pm\",\"y\":19}]}]}\n```",
+   "completion_tokens": 598,
+   "prompt_tokens": 774,
+   "secs": 100.0,
+   "score": {
+    "id": "lineE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "I can't generate images, but here's a text-based description of the pie chart:\n\n- **Chrome**: 65% (largest slice)  \n- **Safari**: 20%  \n- **Firefox**: 8%  \n- **Edge**: 7%  \n\n*Total: 100%*  \n\nFor a visual, use tools like Excel, Google Sheets, or Python (matplotlib) to create the chart. Let me know if you'd like a simple code example!",
+   "completion_tokens": 355,
+   "prompt_tokens": 119,
+   "secs": 65.4,
+   "score": {
+    "id": "pieA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "pie",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "pie",
+    "numbers": [
+     65,
+     20,
+     8,
+     7
+    ],
+    "labels": [
+     "chrome",
+     "safari",
+     "firefox",
+     "edge"
+    ]
+   },
+   "answer": "Here's the pie chart for browser shares:\n\n```chart\n{\"type\":\"pie\",\"title\":\"Browser Share\",\"data\":[{\"label\":\"Chrome\",\"value\":65},{\"label\":\"Safari\",\"value\":20},{\"label\":\"Firefox\",\"value\":8},{\"label\":\"Edge\",\"value\":7}]}\n```",
+   "completion_tokens": 573,
+   "prompt_tokens": 747,
+   "secs": 92.2,
+   "score": {
+    "id": "pieE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "A",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "I can't generate images, but here's a concise description of the Sankey flow:  \n- **Coal (30)** \u2192 **Electricity (70)**  \n- **Gas (40)** \u2192 **Electricity (70)**  \n- **Electricity (70)** \u2192 **Homes (50)** + **Industry (20)**  \n\nTotal energy conserved (30 + 40 = 70; 50 + 20 = 70). For a visual, use tools like [Plotly](https://plotly.com/python/sankey-diagram/) (Python), [Excel](https://www.exceljet.net/sankey-diagram), or [online Sankey generators](https://www.sankeydiagram.com/).",
+   "completion_tokens": 675,
+   "prompt_tokens": 645,
+   "secs": 115.9,
+   "score": {
+    "id": "sankeyA",
+    "kind": "chart",
+    "canonical": false,
+    "drawn": false,
+    "type": false,
+    "numbers": 0,
+    "labels": 0,
+    "ok": false,
+    "note": "no chart"
+   }
+  },
+  {
+   "id": "sankey",
+   "kind": "chart",
+   "variant": "E",
+   "expect": {
+    "type": "sankey",
+    "numbers": [
+     30,
+     40,
+     50,
+     20
+    ],
+    "labels": [
+     "coal",
+     "gas",
+     "electricity",
+     "homes",
+     "industry"
+    ]
+   },
+   "answer": "A sankey chart visualizing the energy flow from sources to end uses.\n\n```chart\n{\"type\":\"sankey\",\"title\":\"Energy Flow\",\"nodes\":[{\"id\":\"Coal\"},{\"id\":\"Gas\"},{\"id\":\"Electricity\"},{\"id\":\"Homes\"},{\"id\":\"Industry\"}],\"links\":[{\"source\":\"Coal\",\"target\":\"Electricity\",\"value\":30},{\"source\":\"Gas\",\"target\":\"Electricity\",\"value\":40},{\"source\":\"Electricity\",\"target\":\"Homes\",\"value\":50},{\"source\":\"Electricity\",\"target\":\"Industry\",\"value\":20}]}\n```",
+   "completion_tokens": 627,
+   "prompt_tokens": 773,
+   "secs": 104.3,
+   "score": {
+    "id": "sankeyE",
+    "kind": "chart",
+    "canonical": true,
+    "drawn": true,
+    "type": true,
+    "numbers": 1,
+    "labels": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "Here's a concise flowchart description (text-based):\n\n```\nStart  \n\u2193  \nBoil water  \n\u2193  \nAdd tea bag  \n\u2193  \nSteep 3 minutes  \n\u2193  \n[Check strength?]  \n\u2502  \n\u251c\u2500 Yes \u2192 Serve \u2192 End  \n\u2502  \n\u2514\u2500 No \u2192 Steep more \u2192 Back to [Check strength?]\n```\n\n**Key points**:  \n- Clear decision point after steeping (loop only if weak)  \n- Exact sequence: boil \u2192 add \u2192 steep \u2192 check \u2192 serve or repeat  \n- Ends when tea is strong enough (no infinite loops implied)  \n\n*Concise and matches your steps exactly.*",
+   "completion_tokens": 642,
+   "prompt_tokens": 649,
+   "secs": 102.5,
+   "score": {
+    "id": "teaA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "tea",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 5,
+    "words": [
+     "boil",
+     "tea bag",
+     "steep",
+     "serve"
+    ]
+   },
+   "answer": "Here's the flowchart for making tea:\n\n```mermaid\nflowchart TD\n  A[Boil water] --> B[Add tea bag]\n  B --> C[Steep 3 min]\n  C --> D{Is strong?}\n  D -->|yes| E[Serve]\n  D -->|no| C\n```",
+   "completion_tokens": 582,
+   "prompt_tokens": 768,
+   "secs": 96.5,
+   "score": {
+    "id": "teaE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "Here's a concise sequence diagram (text-based):\n\n```\nBrowser \u2192 Server: GET /page\nServer \u2192 Database: Query DB\nDatabase \u2192 Server: [Data]\nServer \u2192 Browser: HTTP 200 (HTML)\nBrowser: Render page\n```\n\n*Key flow*: Browser \u2192 Server (request) \u2192 Server \u2192 DB (query) \u2192 DB \u2192 Server (response) \u2192 Server \u2192 Browser (response).  \n*(No extra steps; assumes standard HTTP + DB interaction)*",
+   "completion_tokens": 522,
+   "prompt_tokens": 113,
+   "secs": 85.1,
+   "score": {
+    "id": "webA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "web",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "sequenceDiagram",
+    "min": 3,
+    "words": [
+     "browser",
+     "server",
+     "database"
+    ]
+   },
+   "answer": "Here's the sequence diagram:\n\n```mermaid\nsequenceDiagram\n  participant B as Browser\n  participant S as Server\n  participant D as Database\n  B->>S: GET /page\n  S->>D: Query data\n  D-->>S: Data\n  S-->>B: HTML response\n```",
+   "completion_tokens": 580,
+   "prompt_tokens": 736,
+   "secs": 93.3,
+   "score": {
+    "id": "webE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "**State Diagram for Traffic Light (Green \u2192 Yellow \u2192 Red \u2192 Green):**\n\n```\n    G (Green) \u2192 [time] \u2192 Y (Yellow) \u2192 [time] \u2192 R (Red) \u2192 [time] \u2192 G (Green)\n```\n\n**Key:**  \n- Transitions occur after fixed time intervals (e.g., 30s green \u2192 5s yellow \u2192 30s red \u2192 repeat).  \n- **No self-loops**; each state moves to the next in sequence.  \n\n*Concise and accurate for a basic cycle.*",
+   "completion_tokens": 629,
+   "prompt_tokens": 623,
+   "secs": 96.5,
+   "score": {
+    "id": "trafficA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "traffic",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "stateDiagram",
+    "min": 3,
+    "words": [
+     "green",
+     "yellow",
+     "red"
+    ]
+   },
+   "answer": "Here's the state diagram for your traffic light:\n\n```mermaid\nstateDiagram-v2\n  [*] --> Green\n  Green --> Yellow: change\n  Yellow --> Red: change\n  Red --> Green: change\n  Red --> [*]\n```",
+   "completion_tokens": 564,
+   "prompt_tokens": 726,
+   "secs": 89.0,
+   "score": {
+    "id": "trafficE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "A",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "Here's a concise text diagram of the CI pipeline:\n\n```\n[Commit] \u2192 [Build] \u2192 [Test] \u2192 [Deploy to Staging] \u2192 [Approval] \u2192 [Deploy to Production]\n```\n\n*Key*: Arrows show sequential flow. Each step represents a phase in the pipeline.",
+   "completion_tokens": 573,
+   "prompt_tokens": 632,
+   "secs": 84.3,
+   "score": {
+    "id": "ciA",
+    "kind": "diagram",
+    "canonical": false,
+    "drawn": false,
+    "kindOk": false,
+    "size": false,
+    "words": 0,
+    "ok": false,
+    "note": "mermaid that does not draw"
+   }
+  },
+  {
+   "id": "ci",
+   "kind": "diagram",
+   "variant": "E",
+   "expect": {
+    "kind": "flowchart|graph",
+    "min": 6,
+    "words": [
+     "commit",
+     "build",
+     "test",
+     "staging",
+     "production"
+    ]
+   },
+   "answer": "Here's the CI pipeline diagram:\n\n```mermaid\nflowchart TD\n  A[commit] --> B[build]\n  B --> C[test]\n  C --> D[deploy to staging]\n  D --> E[approval]\n  E --> F[deploy to production]\n```",
+   "completion_tokens": 569,
+   "prompt_tokens": 753,
+   "secs": 89.5,
+   "score": {
+    "id": "ciE",
+    "kind": "diagram",
+    "canonical": true,
+    "drawn": true,
+    "kindOk": true,
+    "size": true,
+    "words": 1,
+    "ok": true,
+    "note": ""
+   }
+  }
+ ]
+}

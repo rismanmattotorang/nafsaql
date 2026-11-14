@@ -228,13 +228,13 @@ const md = (src, cites = null) => markdown(src, cites);
 // Saving a diagram: its colours live in the page's style sheet, so a copy for a file carries them inline, with a
 // background, a size and the SVG namespace. PNG is that SVG drawn at 3x on a canvas.
 const SVG_PROPS = ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'font-family', 'font-size', 'font-weight', 'opacity', 'text-anchor'];
-const diagramName = (fig) => { const t = ($('.fig-source code', fig)?.textContent || '').trim().split(/\s+/)[0] || 'diagram'; return `nafs-aql-${t.replace(/[^\w-]+/g, '') || 'diagram'}-${new Date().toISOString().slice(0, 10)}`; };
+const diagramName = (fig) => { let t = fig.dataset.kind === 'chart' ? (JSON.parse(fig.dataset.chart || '{}').type || 'chart') + '-chart' : ($('.fig-source code', fig)?.textContent || '').trim().split(/\s+/)[0] || 'diagram'; return `nafs-aql-${t.replace(/[^\w-]+/g, '') || 'diagram'}-${new Date().toISOString().slice(0, 10)}`; };
 const flash = (b, text) => { const was = b.dataset.was ?? (b.dataset.was = b.textContent); b.textContent = text; clearTimeout(b._t); b._t = setTimeout(() => { b.textContent = b.closest('figure')?.classList.contains('fig-full') && b.dataset.act === 'full' ? 'Close' : was; }, 1500); };
 function standaloneSvg(svg, fig) {
   const clone = svg.cloneNode(true); const src = [svg, ...svg.querySelectorAll('*')], dst = [clone, ...clone.querySelectorAll('*')];
-  src.forEach((el, i) => { const cs = getComputedStyle(el); dst[i].setAttribute('style', SVG_PROPS.map((p) => `${p}:${cs.getPropertyValue(p)}`).join(';')); });
-  const vb = svg.viewBox.baseVal; const W = Math.ceil(vb.width), H = Math.ceil(vb.height);
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg'); clone.setAttribute('width', W); clone.setAttribute('height', H); clone.setAttribute('style', 'overflow:hidden');
+  src.forEach((el, i) => { const cs = getComputedStyle(el); dst[i].setAttribute('style', [dst[i].getAttribute('style') || '', ...SVG_PROPS.map((p) => `${p}:${cs.getPropertyValue(p)}`)].filter(Boolean).join(';')); });
+  const vb = svg.viewBox?.baseVal; const box = svg.getBoundingClientRect(); const W = Math.ceil(vb && vb.width ? vb.width : box.width), H = Math.ceil(vb && vb.height ? vb.height : box.height);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg'); if (!vb || !vb.width) clone.setAttribute('viewBox', `0 0 ${W} ${H}`); clone.setAttribute('width', W); clone.setAttribute('height', H); clone.setAttribute('style', 'overflow:hidden');
   const bg = getComputedStyle($('.fig-body', fig)).backgroundColor; const fill = /rgba\(.*, 0\)|transparent/.test(bg) ? getComputedStyle(fig).backgroundColor : bg;
   const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); rect.setAttribute('width', W); rect.setAttribute('height', H); rect.setAttribute('fill', fill); clone.insertBefore(rect, clone.firstChild);
   return { xml: '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone), W, H };
@@ -247,14 +247,33 @@ function svgToPng(svg, fig) {
 }
 const downloadBlob = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { const f = $('figure.fig-full'); if (f) { f.classList.remove('fig-full'); document.body.classList.remove('fig-lock'); const bt = $('[data-act="full"]', f); bt.textContent = 'Expand'; bt.setAttribute('aria-pressed', 'false'); bt.focus(); } } });
+// Charts (```chart blocks): Nivo is loaded the first time one appears, then each figure is drawn into its placeholder.
+// A figure is drawn again when the answer is re-rendered while streaming (no animation the second time) and when the
+// light/dark theme changes.
+let nivoP = null; const drawn = new Set();
+const loadNivo = () => (nivoP ||= import('/nivo.js').catch((e) => { nivoP = null; throw e; }));
+async function drawCharts(root = document) {
+  const figs = $$('figure.nvchart:not([data-drawn])', root); if (!figs.length) return;
+  let nivo; try { nivo = await loadNivo(); } catch { figs.forEach((f) => { const w = $('.chart-wait', f); if (w) w.textContent = 'The chart could not be drawn. The data is below.'; const d = $('.chart-data', f); if (d) d.open = true; }); return; }
+  for (const f of figs) { if (f.dataset.drawn) continue; f.dataset.drawn = '1'; let spec; try { spec = JSON.parse(f.dataset.chart); } catch { continue; }
+    const key = f.dataset.chart; const seen = drawn.has(key); drawn.add(key); if (drawn.size > 200) drawn.delete(drawn.values().next().value);
+    try { nivo.mount($('.chart-mount', f), spec, { animate: !seen, tight: f.offsetWidth < 460 }); f.dataset.t = Date.now(); $('.chart-wait', f)?.remove(); } catch { const w = $('.chart-wait', f); if (w) w.textContent = 'The chart could not be drawn. The data is below.'; const d = $('.chart-data', f); if (d) d.open = true; } }
+}
+new MutationObserver((ms) => { if (ms.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches?.('figure.nvchart') || n.querySelector?.('figure.nvchart'))))) drawCharts(); }).observe(document.documentElement, { childList: true, subtree: true });
+const redrawCharts = () => { $$('figure.nvchart[data-drawn]').forEach((f) => { f.removeAttribute('data-drawn'); }); setTimeout(() => $$('figure.nvchart:not([data-drawn])').forEach((f) => { try { f.dataset.drawn = '1'; loadNivo().then((n) => n.mount($('.chart-mount', f), JSON.parse(f.dataset.chart), { animate: false, tight: f.offsetWidth < 460 })); } catch {} }), 60); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', redrawCharts);
+new MutationObserver(redrawCharts).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
 // Controls inside rendered answers: expand a long code block, show a diagram's source, save a diagram.
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.dataset.act === 'expand') { const pre = b.closest('pre'); pre.classList.remove('long'); b.remove(); }
   else if (b.dataset.act === 'source') { const fig = b.closest('figure'); const src = $('.fig-source', fig); src.hidden = !src.hidden; b.textContent = src.hidden ? 'Source' : 'Hide source'; b.setAttribute('aria-pressed', String(!src.hidden)); }
   else if (b.dataset.act === 'svg' || b.dataset.act === 'png') { const fig = b.closest('figure'); const svg = $('svg', fig); if (!svg) return; const name = diagramName(fig);
-    if (b.dataset.act === 'svg') { const { xml } = standaloneSvg(svg, fig); downloadText(`${name}.svg`, xml, 'image/svg+xml'); flash(b, 'Saved'); }
-    else svgToPng(svg, fig).then((blob) => { downloadBlob(`${name}.png`, blob); flash(b, 'Saved'); }).catch(() => flash(b, 'Not saved')); }
+    // A chart saved while its bars are still growing would be saved half drawn: wait for the animation to end.
+    const settled = new Promise((res) => setTimeout(res, Math.max(0, 1700 - (Date.now() - (+fig.dataset.t || 0)))));
+    if (b.dataset.act === 'svg') settled.then(() => { const { xml } = standaloneSvg(svg, fig); downloadText(`${name}.svg`, xml, 'image/svg+xml'); flash(b, 'Saved'); });
+    else settled.then(() => svgToPng(svg, fig)).then((blob) => { downloadBlob(`${name}.png`, blob); flash(b, 'Saved'); }).catch(() => flash(b, 'Not saved')); }
+  else if (b.dataset.act === 'csv') { const fig = b.closest('figure'); const rows = $$('.chart-data tr', fig).map((r) => $$('th,td', r).map((c) => `"${c.textContent.replace(/"/g, '""')}"`).join(',')); downloadText(`${diagramName(fig)}.csv`, rows.join('\n') + '\n', 'text/csv'); flash(b, 'Saved'); }
   else if (b.dataset.act === 'copysrc') { copyText($('.fig-source code', b.closest('figure')).textContent).then((ok) => flash(b, ok ? 'Copied' : 'Press Ctrl/Cmd+C')); }
   else if (b.dataset.act === 'tex') { copyText(b.closest('.math').dataset.tex || '').then((ok) => flash(b, ok ? 'Copied' : 'Press Ctrl/Cmd+C')); }
   else if (b.dataset.act === 'full') { const fig = b.closest('figure'); const on = fig.classList.toggle('fig-full'); document.body.classList.toggle('fig-lock', on); b.textContent = on ? 'Close' : 'Expand'; b.setAttribute('aria-pressed', String(on)); if (on) b.focus(); }

@@ -115,6 +115,9 @@ The gate escalates only when the error it expects to save is worth the waiting t
 <td colspan="2"><img src="docs/shared/screenshots/rich_answer.png" alt="An answer with a table, a callout, a flowchart and formulas" width="100%"><br><sub><b>Answers drawn as you read them.</b> Tables, formulas, diagrams and code are rendered, with copy buttons; unfinished ones stay plain text until they close. The same sample in the <a href="docs/shared/screenshots/rich_answer_dark.png">dark theme</a>. A real streamed answer, a phone-width page and both themes were checked.</sub></td>
 </tr>
 <tr>
+<td colspan="2"><img src="docs/shared/screenshots/charts.png" alt="Charts drawn with Nivo: bar, line, donut, radar, heat map, treemap, sankey" width="100%"><br><sub><b>Charts that look like charts.</b> Ask for a bar, line, pie, donut, radar, scatter, heat map, treemap, funnel or sankey chart and the answer is drawn with <a href="https://nivo.rocks">Nivo</a>; save it as PNG, SVG or CSV, or expand it. The <a href="docs/shared/screenshots/charts_dark.png">dark theme</a> follows the page. Diagrams (flowchart, sequence, state, pie) and formulas have the same save buttons.</sub></td>
+</tr>
+<tr>
 <td colspan="2"><img src="docs/shared/screenshots/knowledge_graph.png" alt="The map of a set of documents" width="100%"><br><sub><b>A map of your documents.</b> Drawn from the text the moment a file is read; a deeper pass adds relations, each with the sentence that states it.</sub></td>
 </tr>
 </table>
