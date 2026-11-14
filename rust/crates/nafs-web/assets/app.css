@@ -812,3 +812,16 @@ details.fold-card>summary h3::before{content:"▸ ";color:var(--faint)}details.f
 .pal-row.on{background:var(--accent-weak,rgba(13,115,119,.14))}
 .pal-foot{padding:8px 14px;border-top:1px solid var(--border)}
 @media (prefers-reduced-motion:no-preference){.palette{animation:palIn .12s ease-out}@keyframes palIn{from{opacity:0;transform:translateY(-6px)}}}
+
+/* Diagram toolbar, expanded view and copy-LaTeX (Phase 32) */
+.answer .fig-bar{flex-wrap:wrap}
+.answer figure.diagram.fig-full{position:fixed;inset:3vh 3vw;z-index:90;margin:0;display:flex;flex-direction:column;box-shadow:0 20px 70px rgba(0,0,0,.45)}
+.answer figure.diagram.fig-full .fig-body{flex:1;display:flex;align-items:center;justify-content:center;overflow:auto;padding:24px}
+.answer figure.diagram.fig-full .mm-svg{max-width:none;width:min(100%,calc(var(--w,0px) * 1.6));min-width:0}
+body.fig-lock{overflow:hidden} body.fig-lock::after{content:"";position:fixed;inset:0;background:rgba(10,14,20,.55);z-index:89}
+.answer .math{position:relative}
+.answer .math .math-copy{position:absolute;top:6px;right:6px;opacity:0;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:6px;font-size:11px;padding:2px 8px;cursor:pointer;transition:opacity .15s}
+.answer .math:hover .math-copy,.answer .math .math-copy:focus-visible{opacity:1} .answer .math .math-copy:hover{color:var(--text);border-color:var(--accent)}
+@media (hover:none){.answer .math .math-copy{opacity:1}}
+@media print{.answer .math .math-copy{display:none}}
+.mm-node .mm-solid{fill:var(--text);stroke:none} .mm-node .mm-ring{fill:none;stroke:var(--text);stroke-width:1.5}

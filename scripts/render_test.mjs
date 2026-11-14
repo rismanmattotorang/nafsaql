@@ -57,7 +57,7 @@ has('inline and display math', h, '<math', 'display="block"', '<msup>');
 t('dollar amounts are not math', (h.match(/<math/g) || []).length === 4, String((h.match(/<math/g) || []).length));
 lacks('unclosed display math stays text', markdown('so $$x = \\frac{1}{2'), '<math');
 has('math in a code span is code', markdown('`$x^2$`'), '<code>$x^2$</code>');
-has('math fence', markdown('```math\n\\frac{1}{2}\n```'), '<div class="math"><math');
+has('math fence', markdown('```math\n\\frac{1}{2}\n```'), '<div class="math" data-tex="\\frac{1}{2}"><math', 'data-act="tex"');
 
 // ---- mermaid
 const flow = 'graph TD\n  A[Question] --> B{Checkable?}\n  B -- yes --> C[Exact checker]\n  B -->|no| D(Quick model)\n  D --> E([Gate])\n  E -.-> F[(Ledger)]\n  C --> G((Done))\n  subgraph Fast\n    D\n    E\n  end\n  classDef hot fill:#fde68a,stroke:#b45309\n  class C hot';
@@ -79,7 +79,10 @@ t('pie renders', !!svg); has('pie parts', svg || '', 'Where time goes', 'Reading
 t('unknown kinds fall back to code', markdown('```mermaid\ngantt\n title x\n```').includes('<pre class="code">') && !markdown('```mermaid\ngantt\n title x\n```').includes('<svg'));
 t('broken mermaid falls back to code', markdown('```mermaid\ngraph TD\n```').includes('<pre class="code">'));
 t('mermaid in an unclosed fence is still code', markdown('```mermaid\ngraph TD\n A --> B').includes('<pre class="code">'));
-has('diagram figure', markdown('```mermaid\ngraph TD\n A --> B\n```'), '<figure class="diagram"', 'data-act="source"', 'data-act="svg"');
+has('diagram figure', markdown('```mermaid\ngraph TD\n A --> B\n```'), '<figure class="diagram"', 'data-act="source"', 'data-act="svg"', 'data-act="png"', 'data-act="copysrc"', 'data-act="full"');
+const st = mermaid('stateDiagram-v2\n  [*] --> Idle\n  Idle --> Running : start\n  Running --> Idle : stop\n  state Running {\n    [*] --> Warm\n    Warm --> Hot\n  }\n  Running --> [*]\n  Idle : waiting for work');
+t('state diagram draws', !!st && st.includes('State diagram') && st.includes('Idle') && st.includes('Warm') && st.includes('start'), String(st).slice(0, 200));
+t('empty state diagram falls back', mermaid('stateDiagram-v2') === null);
 
 // ---- citations and safety
 const cited = markdown('Memory is 768 MB [1] and fast [2, 3] but [9] is not a source.', new Set([1, 2, 3]));

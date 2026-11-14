@@ -225,12 +225,39 @@ const api = {
 // Make common LaTeX from the models readable without a math renderer.
 // The renderer is its own module (render.js): Markdown, tables, code, maths as MathML, Mermaid as SVG.
 const md = (src, cites = null) => markdown(src, cites);
+// Saving a diagram: its colours live in the page's style sheet, so a copy for a file carries them inline, with a
+// background, a size and the SVG namespace. PNG is that SVG drawn at 3x on a canvas.
+const SVG_PROPS = ['fill', 'stroke', 'stroke-width', 'stroke-dasharray', 'font-family', 'font-size', 'font-weight', 'opacity', 'text-anchor'];
+const diagramName = (fig) => { const t = ($('.fig-source code', fig)?.textContent || '').trim().split(/\s+/)[0] || 'diagram'; return `nafs-aql-${t.replace(/[^\w-]+/g, '') || 'diagram'}-${new Date().toISOString().slice(0, 10)}`; };
+const flash = (b, text) => { const was = b.dataset.was ?? (b.dataset.was = b.textContent); b.textContent = text; clearTimeout(b._t); b._t = setTimeout(() => { b.textContent = b.closest('figure')?.classList.contains('fig-full') && b.dataset.act === 'full' ? 'Close' : was; }, 1500); };
+function standaloneSvg(svg, fig) {
+  const clone = svg.cloneNode(true); const src = [svg, ...svg.querySelectorAll('*')], dst = [clone, ...clone.querySelectorAll('*')];
+  src.forEach((el, i) => { const cs = getComputedStyle(el); dst[i].setAttribute('style', SVG_PROPS.map((p) => `${p}:${cs.getPropertyValue(p)}`).join(';')); });
+  const vb = svg.viewBox.baseVal; const W = Math.ceil(vb.width), H = Math.ceil(vb.height);
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg'); clone.setAttribute('width', W); clone.setAttribute('height', H); clone.setAttribute('style', 'overflow:hidden');
+  const bg = getComputedStyle($('.fig-body', fig)).backgroundColor; const fill = /rgba\(.*, 0\)|transparent/.test(bg) ? getComputedStyle(fig).backgroundColor : bg;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); rect.setAttribute('width', W); rect.setAttribute('height', H); rect.setAttribute('fill', fill); clone.insertBefore(rect, clone.firstChild);
+  return { xml: '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(clone), W, H };
+}
+function svgToPng(svg, fig) {
+  const { xml, W, H } = standaloneSvg(svg, fig); const scale = Math.min(3, 8192 / Math.max(W, H));
+  return new Promise((res, rej) => { const img = new Image(); const url = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' }));
+    img.onload = () => { const c = document.createElement('canvas'); c.width = Math.round(W * scale); c.height = Math.round(H * scale); const g = c.getContext('2d'); g.scale(scale, scale); g.drawImage(img, 0, 0, W, H); URL.revokeObjectURL(url); c.toBlob((bl) => (bl ? res(bl) : rej(new Error('png'))), 'image/png'); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('svg')); }; img.src = url; });
+}
+const downloadBlob = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { const f = $('figure.fig-full'); if (f) { f.classList.remove('fig-full'); document.body.classList.remove('fig-lock'); const bt = $('[data-act="full"]', f); bt.textContent = 'Expand'; bt.setAttribute('aria-pressed', 'false'); bt.focus(); } } });
 // Controls inside rendered answers: expand a long code block, show a diagram's source, save a diagram.
 document.addEventListener('click', (e) => {
   const b = e.target.closest('[data-act]'); if (!b) return;
   if (b.dataset.act === 'expand') { const pre = b.closest('pre'); pre.classList.remove('long'); b.remove(); }
   else if (b.dataset.act === 'source') { const fig = b.closest('figure'); const src = $('.fig-source', fig); src.hidden = !src.hidden; b.textContent = src.hidden ? 'Source' : 'Hide source'; b.setAttribute('aria-pressed', String(!src.hidden)); }
-  else if (b.dataset.act === 'svg') { const svg = $('svg', b.closest('figure')); if (!svg) return; const xml = new XMLSerializer().serializeToString(svg).replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" '); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([xml], { type: 'image/svg+xml' })); a.download = 'diagram.svg'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }
+  else if (b.dataset.act === 'svg' || b.dataset.act === 'png') { const fig = b.closest('figure'); const svg = $('svg', fig); if (!svg) return; const name = diagramName(fig);
+    if (b.dataset.act === 'svg') { const { xml } = standaloneSvg(svg, fig); downloadText(`${name}.svg`, xml, 'image/svg+xml'); flash(b, 'Saved'); }
+    else svgToPng(svg, fig).then((blob) => { downloadBlob(`${name}.png`, blob); flash(b, 'Saved'); }).catch(() => flash(b, 'Not saved')); }
+  else if (b.dataset.act === 'copysrc') { copyText($('.fig-source code', b.closest('figure')).textContent).then((ok) => flash(b, ok ? 'Copied' : 'Press Ctrl/Cmd+C')); }
+  else if (b.dataset.act === 'tex') { copyText(b.closest('.math').dataset.tex || '').then((ok) => flash(b, ok ? 'Copied' : 'Press Ctrl/Cmd+C')); }
+  else if (b.dataset.act === 'full') { const fig = b.closest('figure'); const on = fig.classList.toggle('fig-full'); document.body.classList.toggle('fig-lock', on); b.textContent = on ? 'Close' : 'Expand'; b.setAttribute('aria-pressed', String(on)); if (on) b.focus(); }
   else if (b.dataset.act === 'table') { const t = b.closest('.tablewrap'); const rows = $$('tr', t).map(r => $$('th,td', r).map(c => c.textContent.replace(/\s+/g, ' ').trim())); const tsv = rows.map(r => r.join('\t')).join('\n'); copyText(tsv).then(ok => { b.textContent = ok ? 'Copied' : 'Press Ctrl/Cmd+C'; setTimeout(() => (b.textContent = 'Copy table'), 1500); }); }
 });
 document.addEventListener('click', async (e) => {

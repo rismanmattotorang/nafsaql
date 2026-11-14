@@ -29,3 +29,15 @@ Date 2026-11-14. Status: **adopted.** Code: `rust/crates/nafs-web/assets/render.
 ## Also in Phase 31
 
 A command palette (Ctrl/Cmd+K, any page: pages, new chat, settings, theme, Advanced mode; arrow keys, Enter, Esc; new chat moves to Ctrl/Cmd+Shift+O), a Latest button when the chat is scrolled more than 240 px from the newest text, and a shorter welcome screen (a question, four examples, one line of help). Checked in the browser; no automated UI tests for these.
+
+## Phase 32 addendum (2026-11-14): saving diagrams, state diagrams, copy LaTeX
+
+- **Save SVG was unstyled.** Diagram colours come from the page style sheet, so the saved file drew black shapes. Saving now
+  copies the computed styles inline, adds the namespace, size and a background. **Save PNG** draws that SVG at up to 3x on
+  a canvas (checked in the browser: valid PNG, 1365x402 for a four-node flowchart, nodes and labels styled).
+- **Diagram bar:** Source, Copy source, Save SVG, Save PNG, Expand (full-window view, Esc closes).
+- **State diagrams** (`stateDiagram` / `-v2`: `[*]` start and end dots, labelled transitions, descriptions, composite
+  states as frames, choice/fork) are read as flowcharts. Two arrows between the same pair are drawn side by side.
+- **Display maths** shows a "Copy LaTeX" button on hover (always on touch screens).
+- Still code blocks: class, ER, gantt, mindmap, journey and other Mermaid kinds.
+- Tests: `node scripts/render_test.mjs` (148 checks).

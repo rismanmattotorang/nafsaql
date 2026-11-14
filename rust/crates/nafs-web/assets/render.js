@@ -265,7 +265,7 @@ function layoutFlow(g) {
   for (const n of g.nodes) {
     const lines = n.label.split('\n'); const w = Math.max(...lines.map((l) => textW(l))) + PAD_X * 2; const h = Math.max(NODE_H, lines.length * 18 + 20);
     const extra = n.shape === 'diamond' ? [1.5, 1.7] : n.shape === 'hex' ? [1.25, 1] : n.shape === 'circle' ? [1.1, 1.1] : [1, 1];
-    let W = Math.max(NODE_W_MIN, w * extra[0]), H = h * extra[1]; if (n.shape === 'circle') { W = H = Math.max(W, H); } if (n.shape === 'db') H += 16;
+    let W = Math.max(NODE_W_MIN, w * extra[0]), H = h * extra[1]; if (n.shape === 'circle') { W = H = Math.max(W, H); } if (n.dot) { W = H = n.dot === 'end' ? 24 : 18; } if (n.shape === 'db') H += 16;
     sz.set(n.id, { w: W, h: H, lines });
   }
   // Layers by longest path, ignoring edges that would close a cycle.
@@ -330,7 +330,7 @@ function layoutFlow(g) {
 const FLOW_STYLE = (cls, classes, styles, id) => { const s = [classes.get(cls) || '', styles.get(id) || ''].join(','); const get = (k) => new RegExp(`${k}\\s*:\\s*([^,;]+)`).exec(s)?.[1]?.trim(); return { fill: get('fill'), stroke: get('stroke'), color: get('color'), w: get('stroke-width') }; };
 const safeColour = (c) => (c && /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]+|rgba?\([\d\s,.%]+\))$/.test(c) ? c : null);
 
-function flowSvg(g) {
+function flowSvg(g, kind = 'Flowchart') {
   const { place, sz, path } = layoutFlow(g);
   if (!g.nodes.length) return null;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -353,12 +353,15 @@ function flowSvg(g) {
     if (e.from === e.to) { const p = place.get(e.from), sc = sz.get(e.from); const x = p.x + ox + sc.w / 2, y = p.y + oy; s += `<path class="mm-edge" d="M${x} ${y - 8} q26 -8 26 8 q0 16 -26 8" fill="none" marker-end="url(#mm-arrow)"/>`; return; }
     const ids = path.get(e) || [e.from, e.to];
     const pts = ids.map((id) => place.get(id)); const A = edgeEnd(ids[0], ids[1]), B = edgeEnd(ids[ids.length - 1], ids[ids.length - 2]);
-    const P = [A, ...pts.slice(1, -1), B].map((p) => ({ x: p.x + ox, y: p.y + oy }));
+    let P = [A, ...pts.slice(1, -1), B].map((p) => ({ x: p.x + ox, y: p.y + oy }));
+    // Two states that point at each other: draw the two arrows side by side, not on top of one another.
+    const twin = g.edges.some((o) => o !== e && o.from === e.to && o.to === e.from); let nrm = null;
+    if (twin) { const a = P[0], b = P[P.length - 1]; const len = Math.hypot(b.x - a.x, b.y - a.y) || 1; nrm = { x: -(b.y - a.y) / len, y: (b.x - a.x) / len }; P = P.map((p) => ({ x: p.x + nrm.x * 8, y: p.y + nrm.y * 8 })); }
     let d = `M${P[0].x} ${P[0].y}`;
     for (let i = 1; i < P.length; i++) { const a = P[i - 1], b = P[i]; d += horiz ? ` C${(a.x + b.x) / 2} ${a.y} ${(a.x + b.x) / 2} ${b.y} ${b.x} ${b.y}` : ` C${a.x} ${(a.y + b.y) / 2} ${b.x} ${(a.y + b.y) / 2} ${b.x} ${b.y}`; }
     const mk = (t) => (t === 'arrow' ? 'url(#mm-arrow)' : t === 'cross' ? 'url(#mm-cross)' : t === 'dot' ? 'url(#mm-dot)' : null);
     s += `<path class="mm-edge${e.dotted ? ' dotted' : ''}${e.thick ? ' thick' : ''}" d="${d}" fill="none"${mk(e.head) ? ` marker-end="${mk(e.head)}"` : ''}${mk(e.tail) ? ` marker-start="${mk(e.tail)}"` : ''}/>`;
-    if (e.label) { const k = Math.floor((P.length - 1) / 2); const a = P[k], b = P[k + 1]; const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; const w = textW(e.label, 12) + 12;
+    if (e.label) { const k = Math.floor((P.length - 1) / 2); const a = P[k], b = P[k + 1]; const w = textW(e.label, 12) + 12; const sh = nrm ? Math.abs(nrm.x) * (w / 2 + 2) + Math.abs(nrm.y) * 12 : 0; const mx = (a.x + b.x) / 2 + (nrm ? nrm.x * sh : 0), my = (a.y + b.y) / 2 + (nrm ? nrm.y * sh : 0);
       labelBoxes.push(`<g class="mm-elabel"><rect x="${mx - w / 2}" y="${my - 10}" width="${w}" height="20" rx="5"/><text x="${mx}" y="${my + 4}" text-anchor="middle">${esc(e.label)}</text></g>`); }
   });
   s += labelBoxes.join('');
@@ -370,7 +373,7 @@ function flowSvg(g) {
       round: `<rect x="${cx - w / 2}" y="${cy - h / 2}" width="${w}" height="${h}" rx="14"/>`,
       stadium: `<rect x="${cx - w / 2}" y="${cy - h / 2}" width="${w}" height="${h}" rx="${h / 2}"/>`,
       sub: `<rect x="${cx - w / 2}" y="${cy - h / 2}" width="${w}" height="${h}" rx="3"/><line x1="${cx - w / 2 + 8}" y1="${cy - h / 2}" x2="${cx - w / 2 + 8}" y2="${cy + h / 2}"/><line x1="${cx + w / 2 - 8}" y1="${cy - h / 2}" x2="${cx + w / 2 - 8}" y2="${cy + h / 2}"/>`,
-      circle: `<circle cx="${cx}" cy="${cy}" r="${w / 2}"/>`,
+      circle: n.dot ? `<circle cx="${cx}" cy="${cy}" r="${w / 2 - (n.dot === 'end' ? 3 : 0)}" class="mm-solid"/>${n.dot === 'end' ? `<circle cx="${cx}" cy="${cy}" r="${w / 2}" class="mm-ring"/>` : ''}` : `<circle cx="${cx}" cy="${cy}" r="${w / 2}"/>`,
       diamond: `<polygon points="${cx},${cy - h / 2} ${cx + w / 2},${cy} ${cx},${cy + h / 2} ${cx - w / 2},${cy}"/>`,
       hex: `<polygon points="${cx - w / 2},${cy} ${cx - w / 2 + 16},${cy - h / 2} ${cx + w / 2 - 16},${cy - h / 2} ${cx + w / 2},${cy} ${cx + w / 2 - 16},${cy + h / 2} ${cx - w / 2 + 16},${cy + h / 2}"/>`,
       para: `<polygon points="${cx - w / 2 + 12},${cy - h / 2} ${cx + w / 2},${cy - h / 2} ${cx + w / 2 - 12},${cy + h / 2} ${cx - w / 2},${cy + h / 2}"/>`,
@@ -382,7 +385,7 @@ function flowSvg(g) {
     s += `<g class="mm-node mm-${n.shape}"${sty ? ` style="${sty}"` : ''}>${shape}<text text-anchor="middle"${safeColour(st.color) ? ` style="fill:${safeColour(st.color)}"` : ''}>${label}</text></g>`;
   }
   const defs = '<defs><marker id="mm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" class="mm-head"/></marker><marker id="mm-cross" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M1 1 9 9M9 1 1 9" class="mm-x"/></marker><marker id="mm-dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7"><circle cx="5" cy="5" r="4" class="mm-head"/></marker></defs>';
-  return `<svg class="mm-svg" viewBox="0 0 ${Math.ceil(W)} ${Math.ceil(H)}" width="${Math.ceil(W)}" style="--w:${Math.ceil(W)}px" role="img" aria-label="Flowchart with ${g.nodes.length} steps">${defs}${s}</svg>`;
+  return `<svg class="mm-svg" viewBox="0 0 ${Math.ceil(W)} ${Math.ceil(H)}" width="${Math.ceil(W)}" style="--w:${Math.ceil(W)}px" role="img" aria-label="${kind} with ${g.nodes.length} ${kind === 'Flowchart' ? 'steps' : 'states'}">${defs}${s}</svg>`;
 }
 
 // ---- sequence diagram ----
@@ -447,6 +450,33 @@ function pieSvg(lines) {
   return `<svg class="mm-svg" viewBox="0 0 ${Math.ceil(W)} ${Math.ceil(H)}" width="${Math.ceil(W)}" style="--w:${Math.ceil(W)}px" role="img" aria-label="Pie chart${title ? ': ' + esc(title) : ''}">${s}</svg>`;
 }
 
+// ---- state diagram: read as a flowchart (states are rounded boxes, [*] a dot, composites are frames) ----
+function stateToFlow(lines) {
+  const out = ['flowchart TD']; const labels = new Map(); const defs = []; const body = []; const stack = []; let k = 0;
+  const q = (t) => `"${String(t).replace(/"/g, "'")}"`; const scope = () => stack[stack.length - 1] || 'root';
+  const node = (raw, role) => { const id = raw.trim(); if (id === '[*]') { const nid = `${role}_${scope().replace(/\W/g, '_')}`; if (!labels.has(nid)) { labels.set(nid, 1); defs.push([stack.slice(), `${nid}${role === 'start' ? '((" "))' : '((" "))'}`]); } return nid; } return id.replace(/\W/g, '_') || id; };
+  for (const raw of lines.slice(1)) {
+    const line = raw.replace(/%%.*$/, '').trim(); if (!line || /^(note|end note|accTitle|accDescr|classDef|class |style )/i.test(line)) continue;
+    let m;
+    if ((m = line.match(/^direction\s+(TB|TD|BT|LR|RL)/i))) { out[0] = `flowchart ${m[1].toUpperCase()}`; continue; }
+    if ((m = line.match(/^state\s+"([^"]+)"\s+as\s+(\w+)/i))) { defs.push([stack.slice(), `${m[2]}(${q(m[1])})`]); continue; }
+    if ((m = line.match(/^state\s+(\w+)\s*<<(choice|fork|join)>>/i))) { defs.push([stack.slice(), m[2] === 'choice' ? `${m[1]}{" "}` : `${m[1]}[" "]`]); continue; }
+    if ((m = line.match(/^state\s+"?([^"{]+?)"?\s*\{$/i))) { const id = m[1].trim().replace(/\W/g, '_'); stack.push(id); body.push(`subgraph ${id}[${q(m[1].trim())}]`); continue; }
+    if (line === '}') { stack.pop(); body.push('end'); continue; }
+    if ((m = line.match(/^(\[\*\]|[\w.-]+)\s*(-->|<--)\s*(\[\*\]|[\w.-]+)\s*(?::\s*(.*))?$/))) {
+      const rev = m[2] === '<--'; const a = node(rev ? m[3] : m[1], 'start'), b = node(rev ? m[1] : m[3], 'end');
+      body.push(`${a} -->${m[4] ? `|${q(m[4].trim())}|` : ''} ${b}`); k++; continue;
+    }
+    if ((m = line.match(/^(\w+)\s*:\s*(.+)$/))) { labels.set(m[1], (labels.get(m[1]) ? labels.get(m[1]) + '<br>' : '') + m[2].trim()); continue; }
+    if ((m = line.match(/^(\w+)$/))) { defs.push([stack.slice(), `${m[1]}(${q(m[1])})`]); }
+  }
+  if (!k && !defs.length) return null;
+  // Plain states become rounded boxes; described ones carry their text.
+  const seen = new Set(); const stated = []; const declare = (id) => { if (seen.has(id)) return; seen.add(id); if (!/^(start|end)_/.test(id)) stated.push(`${id}(${q(labels.get(id) && typeof labels.get(id) === 'string' ? `${id}<br>${labels.get(id)}` : id)})`); };
+  for (const l of body) { const mm = l.match(/^(\S+) -->(?:\|"[^"]*"\|)? (\S+)$/); if (mm) { declare(mm[1]); declare(mm[2]); } }
+  return [...out, ...stated, ...defs.map((d) => d[1]), ...body];
+}
+
 /// Mermaid text to SVG, or null when the kind or the text is not understood (the caller shows the code).
 export function mermaid(src) {
   const lines = String(src).replace(/\r/g, '').split('\n').filter((l) => l.trim() && !/^\s*%%/.test(l));
@@ -456,6 +486,7 @@ export function mermaid(src) {
     if (/^(graph|flowchart)\b/i.test(first)) { const g = parseFlow(lines.flatMap((l) => l.split(/;\s*(?=\S)/))); return g.nodes.length > 80 ? null : flowSvg(g); }
     if (/^sequenceDiagram\b/i.test(first)) return sequenceSvg(lines);
     if (/^pie\b/i.test(first)) return pieSvg(lines);
+    if (/^stateDiagram(-v2)?\b/i.test(first)) { const fl = stateToFlow(lines); if (!fl) return null; const g = parseFlow(fl); for (const n of g.nodes) if (/^(start|end)_/.test(n.id)) n.dot = n.id.slice(0, n.id.indexOf('_')); return g.nodes.length > 80 ? null : flowSvg(g, 'State diagram'); }
   } catch { return null; }
   return null;
 }
@@ -484,14 +515,16 @@ const isTableRow = (l) => /^\s*\|.*\|\s*$/.test(l) || (/\|/.test(l) && /^[^|]+\|
 const isDelim = (l) => /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(l || '') && /\|/.test(l || '');
 const splitRow = (l) => { const cells = []; let cur = ''; let tick = false; const t = l.trim().replace(/^\||\|$/g, ''); for (let i = 0; i < t.length; i++) { const c = t[i]; if (c === '`') tick = !tick; if (c === '\\' && t[i + 1] === '|') { cur += '|'; i++; continue; } if (c === '|' && !tick) { cells.push(cur.trim()); cur = ''; } else cur += c; } cells.push(cur.trim()); return cells; };
 
+const mathBlock = (tex) => `<div class="math" data-tex="${esc(tex.trim())}">${mathml(tex, true)}<button type="button" class="math-copy" data-act="tex" aria-label="Copy the formula as LaTeX">Copy LaTeX</button></div>`;
+
 function codeBlock(lang, code, ctx) {
   const body = code.replace(/\n$/, '');
   const l = (lang || '').trim().split(/\s+/)[0].toLowerCase();
   if (l === 'mermaid' && ctx.closed) {
     const svg = mermaid(body);
-    if (svg) return `<figure class="diagram" data-kind="diagram"><div class="fig-bar"><span class="lang">diagram</span><span class="grow"></span><button type="button" class="fig-btn" data-act="source">Source</button><button type="button" class="fig-btn" data-act="svg">Save SVG</button></div><div class="fig-body">${svg}</div><pre class="fig-source" hidden><code>${esc(body)}</code></pre></figure>`;
+    if (svg) return `<figure class="diagram" data-kind="diagram"><div class="fig-bar"><span class="lang">diagram</span><span class="grow"></span><button type="button" class="fig-btn" data-act="source">Source</button><button type="button" class="fig-btn" data-act="copysrc">Copy source</button><button type="button" class="fig-btn" data-act="svg">Save SVG</button><button type="button" class="fig-btn" data-act="png">Save PNG</button><button type="button" class="fig-btn" data-act="full" aria-label="Open the diagram larger">Expand</button></div><div class="fig-body">${svg}</div><pre class="fig-source" hidden><code>${esc(body)}</code></pre></figure>`;
   }
-  if ((l === 'math' || l === 'latex' || l === 'tex' || l === 'katex') && ctx.closed) return `<div class="math">${mathml(body, true)}</div>`;
+  if ((l === 'math' || l === 'latex' || l === 'tex' || l === 'katex') && ctx.closed) return mathBlock(body);
   if ((l === 'svg') && ctx.closed && /^\s*<svg[\s>]/i.test(body)) return `<pre class="code"><span class="lang">svg</span><button class="copy" type="button">copy</button><code>${esc(body)}</code></pre>`;
   const lines = body.split('\n').length; const long = lines > 28;
   return `<pre class="code${long ? ' long' : ''}"><span class="lang">${esc(l || 'text')}</span><button class="copy" type="button">copy</button><code>${highlight(body, l)}</code>${long ? `<button type="button" class="more" data-act="expand">Show all ${lines} lines</button>` : ''}</pre>`;
@@ -546,7 +579,7 @@ export function markdown(src, cites = null) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const bm = line.match(new RegExp(`^${BLOCK}(\\d+)${BLOCK}$`));
-    if (bm) { flush(); const b = blocks[+bm[1]]; out.push(b.math != null ? `<div class="math">${mathml(b.math, true)}</div>` : codeBlock(b.lang, b.code, { ...ctx, closed: b.closed })); continue; }
+    if (bm) { flush(); const b = blocks[+bm[1]]; out.push(b.math != null ? mathBlock(b.math) : codeBlock(b.lang, b.code, { ...ctx, closed: b.closed })); continue; }
     if (!line.trim()) { flush(); continue; }
     if (/^ {0,3}([-*_])(\s*\1){2,}\s*$/.test(line)) { flush(); out.push('<hr>'); continue; }
     const hm = line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/); if (hm) { flush(); const lv = Math.min(5, hm[1].length + 1); out.push(`<h${lv}>${inline(hm[2], ctx)}</h${lv}>`); continue; }
