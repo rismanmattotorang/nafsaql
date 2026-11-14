@@ -416,6 +416,36 @@ document.addEventListener('keydown', (e) => { if (e.key !== 'Enter' && e.key !==
 const stubPage = (title, html) => ({ title, async render(view) { view.innerHTML = `<div class="page"><div class="card"><div class="card-b stub">${html}</div></div></div>`;
   const on = $('#stubAdv', view); if (on) on.onclick = () => { setAdvanced(true); route(); }; } });
 let routeGen = 0, routeSeen = false;
+
+// ---- command palette: Ctrl/Cmd+K, from any page ----
+function palette() {
+  if ($('#palette')) return;
+  const go = (hash) => () => { location.hash = hash; };
+  const pages = [['Chat', '#/chat'], ['Rooms', '#/rooms'], ['Knowledge', '#/knowledge'], ['Files', '#/files'], ['Quality', '#/gate', 1], ['Learning', '#/tazkiya', 1], ['Experiments', '#/eval', 1], ['Speed', '#/bench', 1], ['Status', '#/system', 1]]
+    .filter(x => !x[2] || advanced()).map(([t, hash]) => ({ t, k: 'Go to', fn: go(hash) }));
+  const acts = [
+    { t: 'New chat', k: 'Do', fn: () => { location.hash = '#/chat'; setTimeout(() => $('#newConv')?.click(), 60); } },
+    { t: 'Settings', k: 'Do', fn: () => $('#settingsBtn')?.click() },
+    { t: 'Switch between light and dark', k: 'Do', fn: () => $('#themeBtn')?.click() },
+    { t: advanced() ? 'Turn off Advanced mode' : 'Turn on Advanced mode', k: 'Do', fn: () => { setAdvanced(!advanced()); route(); } },
+    { t: 'Keyboard shortcuts', k: 'Help', fn: () => { location.hash = '#/chat'; setTimeout(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: '?' })), 80); } }];
+  const all = [...acts, ...pages];
+  const root = h(`<div id="palette" class="palette-back"><div class="palette" role="dialog" aria-modal="true" aria-label="Go to a page or do something"><input id="palQ" type="text" placeholder="Go to a page or do something…" autocomplete="off" spellcheck="false" aria-controls="palList" role="combobox" aria-expanded="true"><div id="palList" class="pal-list" role="listbox"></div><div class="pal-foot tiny faint"><kbd>↑</kbd> <kbd>↓</kbd> to move · <kbd>Enter</kbd> to choose · <kbd>Esc</kbd> to close</div></div></div>`);
+  document.body.appendChild(root);
+  const q = $('#palQ', root), list = $('#palList', root); let sel = 0, shown = all; const prev = document.activeElement;
+  const close = () => { root.remove(); document.removeEventListener('keydown', onKey, true); try { prev?.focus?.(); } catch {} };
+  const draw = () => { const t = q.value.trim().toLowerCase(); shown = t ? all.filter(x => x.t.toLowerCase().includes(t)) : all; sel = Math.min(sel, Math.max(0, shown.length - 1));
+    list.innerHTML = shown.length ? shown.map((x, i) => `<div class="pal-row${i === sel ? ' on' : ''}" role="option" id="pal${i}" aria-selected="${i === sel}" data-i="${i}"><span>${esc(x.t)}</span><span class="tiny faint">${x.k}</span></div>`).join('') : '<div class="empty small">Nothing matches.</div>';
+    q.setAttribute('aria-activedescendant', shown.length ? 'pal' + sel : ''); $('.pal-row.on', list)?.scrollIntoView({ block: 'nearest' }); };
+  const pick = (i) => { const x = shown[i]; if (!x) return; close(); x.fn(); };
+  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } else if (e.key === 'ArrowDown') { e.preventDefault(); sel = (sel + 1) % Math.max(1, shown.length); draw(); } else if (e.key === 'ArrowUp') { e.preventDefault(); sel = (sel - 1 + shown.length) % Math.max(1, shown.length); draw(); } else if (e.key === 'Enter') { e.preventDefault(); pick(sel); } else if (e.key === 'Tab') { e.preventDefault(); } };
+  document.addEventListener('keydown', onKey, true); q.oninput = () => { sel = 0; draw(); };
+  list.onclick = (e) => { const r = e.target.closest('.pal-row'); if (r) pick(+r.dataset.i); }; list.onmousemove = (e) => { const r = e.target.closest('.pal-row'); if (r && +r.dataset.i !== sel) { sel = +r.dataset.i; draw(); } };
+  root.onclick = (e) => { if (e.target === root) close(); };
+  draw(); q.focus();
+}
+document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); if ($('#palette')) $('#palQ').focus(); else palette(); } });
+
 async function route() {
   const name = (location.hash.replace(/^#\/?/, '').split(/[/?]/)[0]) || 'chat';
   const my = ++routeGen; // a slower, older render must not overwrite a newer page (review L8)
@@ -874,13 +904,13 @@ const storedRequest = (reply) => { const src = (reply.sources || []).find(x => x
 routes.chat = { title: 'Chat', async render(view, alive) {
   const cfg = settingsBar(); const S = cfg.s;
   view.innerHTML = `<div class="chat noinspect" id="chatGrid">
-    <aside class="convs"><div class="head" style="flex-direction:column;align-items:stretch;gap:8px"><button class="btn" id="newConv" style="justify-content:center" title="New chat (Ctrl/Cmd+K)">${icon.plus}New chat</button>
+    <aside class="convs"><div class="head" style="flex-direction:column;align-items:stretch;gap:8px"><button class="btn" id="newConv" style="justify-content:center" title="New chat (Ctrl/Cmd+Shift+O)">${icon.plus}New chat</button>
       <input id="convSearch" type="search" placeholder="Search chats" aria-label="Search chats"></div><nav class="list" id="convList" aria-label="Your chats"></nav></aside>
     <div class="thread"><div class="mbar"><button class="btn sm ghost" id="convsToggle" type="button" aria-label="Show conversations"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Chats</button><span class="sp"></span><button class="btn sm" id="mbNew" type="button">${icon.plus}New chat</button></div><div class="threadbar" id="threadBar" hidden><b id="tbTitle" class="t1"></b><span class="sp"></span>
         <div class="menu-wrap"><button class="btn sm ghost icon-only" id="tbMenu" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Chat options" title="Chat options"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
           <div class="pop menu" id="tbPop" hidden><button type="button" id="tbExport">${icon.download}Download chat</button>
             <label class="toggle"><input type="checkbox" id="tbOptOut"> Don't use to improve answers</label></div></div></div>
-      <div class="msgs" id="msgs" role="log" aria-label="Conversation" tabindex="0"><div class="inner" id="inner"></div></div>
+      <div class="msgs" id="msgs" role="log" aria-label="Conversation" tabindex="0"><div class="inner" id="inner"></div><div class="tolatest-wrap"><button type="button" class="tolatest" id="toLatest" hidden aria-label="Jump to the latest message">Latest <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10l6 6 6-6"/></svg></button></div></div>
       <div class="composer"><div class="inner">
         <div id="verifyPanel" class="verify-panel" hidden>
           <div class="row" style="margin-bottom:8px"><b class="small">Add a check</b><span class="hint">The reply is checked against this exactly, and is marked Checked only if it passes.</span><span class="sp"></span><button class="btn ghost sm" id="vClear" type="button">Clear</button></div>
@@ -966,10 +996,13 @@ routes.chat = { title: 'Chat', async render(view, alive) {
     if (L.done) LIVE.cur = null; else setBusy(L.ctrl); scrollDown();
   }
   const scrollDown = () => { msgs.scrollTop = msgs.scrollHeight; };
-  const welcome = () => { inner.innerHTML = `<div class="welcome"><h2>Fast when it can, careful when it must.</h2><p>Simple questions get an instant answer. Hard ones get time to think. Answers that can be checked exactly are marked <b>Checked</b>.</p>
-      <div class="starters">${EXAMPLES.map((x, i) => `<div class="starter ex" data-i="${i}" tabindex="0" role="button"><span class="st-ico">${icon[x.i] || icon.bolt}</span><div><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div></div>`).join('')}</div>
+  // A button appears when the page is scrolled away from the newest text, so a long answer can be left and returned to.
+  const toLatest = $('#toLatest'); const farUp = () => msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight > 240;
+  msgs.addEventListener('scroll', () => { toLatest.hidden = !farUp(); }, { passive: true }); toLatest.onclick = () => { msgs.scrollTo({ top: msgs.scrollHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); };
+  const welcome = () => { inner.innerHTML = `<div class="welcome"><h2>What can I help with?</h2><p>Ask anything, or start from an example. Answers that can be checked exactly are marked <b>Checked</b>.</p>
+      <div class="starters">${EXAMPLES.slice(0, 4).map((x, i) => `<div class="starter ex" data-i="${i}" tabindex="0" role="button"><span class="st-ico">${icon[x.i] || icon.bolt}</span><div><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div></div>`).join('')}</div>
       <div class="journey adv-only" aria-label="How an answer is made">${journeyHTML(['A', 'L', 'M', 'T'], ['A', 'L', 'M', 'T'], null, null, null)}<span class="jlive"><span class="faint">or</span></span><span class="jstep x" title="${esc(STATIONS.X.tip)}"><span class="n">X</span>${STATIONS.X.en}</span></div>
-      <p class="tiny faint" style="margin-top:10px"><button class="linkbtn" id="dnBtn">About the name Nafs-Aql</button></p></div>`;
+      <p class="tiny faint welcome-foot"><kbd>Ctrl/Cmd</kbd> + <kbd>K</kbd> jumps to any page · <button class="linkbtn" id="dnBtn">About the name Nafs-Aql</button></p></div>`;
     $('#dnBtn') && ($('#dnBtn').onclick = designNotes);
     $$('.ex', inner).forEach(el => { const go = () => { const x = EXAMPLES[+el.dataset.i]; input.value = x.prompt; autosize(); fillVerification(x.v || null); input.focus(); }; el.onclick = go; }); };
   const addUser = (text, who) => { const el = h(`<div class="msg user">${who ? `<div class="who">${esc(who)}</div>` : ''}</div>`); el.appendChild(document.createTextNode(text)); inner.appendChild(el); };
@@ -1064,11 +1097,11 @@ routes.chat = { title: 'Chat', async render(view, alive) {
   function onVerify(t) { vp.hidden = false; input.value = t.prompt || ''; autosize(); setTab(t.reply?.domain === 'code' ? 'tests' : t.reply?.domain === 'structured' ? 'schema' : 'ref'); (t.reply?.domain === 'code' ? $('#vTests') : t.reply?.domain === 'structured' ? $('#vSchema') : $('#vRef')).focus(); toast('Add what the answer must match, then press Enter'); }
   const keys = (e) => {
     const mod = e.metaKey || e.ctrlKey; const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '');
-    if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); newConv(); }
-    else if (mod && e.key.toLowerCase() === 'i' && advanced()) { e.preventDefault(); showInspector(grid.classList.contains('noinspect')); }
+    if (mod && e.key.toLowerCase() === 'i' && advanced()) { e.preventDefault(); showInspector(grid.classList.contains('noinspect')); }
+    else if (mod && e.shiftKey && e.key.toLowerCase() === 'o') { e.preventDefault(); newConv(); }
     else if (e.key === 'Escape' && busy) { busy.abort(); }
     else if (!typing && e.key === '/') { e.preventDefault(); input.focus(); }
-    else if (!typing && e.key === '?') { modal(`<h3 style="margin-top:0">Keyboard shortcuts</h3><table class="t small"><tr><td><kbd>Enter</kbd></td><td>Send</td></tr><tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>New line</td></tr><tr><td><kbd>Esc</kbd></td><td>Stop the answer</td></tr><tr><td><kbd>/</kbd></td><td>Focus the message box</td></tr><tr><td><kbd>Ctrl/Cmd</kbd>+<kbd>K</kbd></td><td>New chat</td></tr>${advanced() ? '<tr><td><kbd>Ctrl/Cmd</kbd>+<kbd>I</kbd></td><td>Show or hide answer details</td></tr>' : ''}</table>`); }
+    else if (!typing && e.key === '?') { modal(`<h3 style="margin-top:0">Keyboard shortcuts</h3><table class="t small"><tr><td><kbd>Enter</kbd></td><td>Send</td></tr><tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd></td><td>New line</td></tr><tr><td><kbd>Esc</kbd></td><td>Stop the answer</td></tr><tr><td><kbd>/</kbd></td><td>Focus the message box</td></tr><tr><td><kbd>Ctrl/Cmd</kbd>+<kbd>K</kbd></td><td>Go to a page or do something</td></tr><tr><td><kbd>Ctrl/Cmd</kbd>+<kbd>Shift</kbd>+<kbd>O</kbd></td><td>New chat</td></tr>${advanced() ? '<tr><td><kbd>Ctrl/Cmd</kbd>+<kbd>I</kbd></td><td>Show or hide answer details</td></tr>' : ''}</table>`); }
   };
   document.addEventListener('keydown', keys);
   liveMark();

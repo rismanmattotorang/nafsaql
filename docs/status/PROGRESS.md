@@ -182,4 +182,4 @@ Decision 003: condition 1 (>= 10 items, no loss, median ratio < 0.7) is met; con
 
 ## Phase 31 (2026-11-14): answers drawn as people read them, and a graph that reads as a map
 
-`render.js` (tables, maths as MathML, a Mermaid subset as SVG, highlighted code, callouts; 142 tests in `scripts/render_test.mjs`), a redesigned knowledge graph (hover, choose, double-click, drag, zoom, full screen, legend), new screenshots `rich_answer` and `knowledge_graph`. Decision 024. Not done: command palette, scroll-to-latest button, simpler welcome screen.
+`render.js` (tables, maths as MathML, a Mermaid subset as SVG, highlighted code, callouts; 142 tests in `scripts/render_test.mjs`), a redesigned knowledge graph (hover, choose, double-click, drag, zoom, full screen, legend), new screenshots `rich_answer` and `knowledge_graph`. Decision 024. Also: command palette (Ctrl/Cmd+K), Latest button, shorter welcome screen.
