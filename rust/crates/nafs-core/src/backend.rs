@@ -816,6 +816,47 @@ impl Backend {
         self.kind == "llama"
     }
 
+    /// ShadowPrefill (Phase 30) is a Smiley Core server feature (`"shadow"` on a chat completion).
+    pub fn supports_shadow(&self) -> bool {
+        self.kind == "smiley"
+    }
+
+    /// ShadowPrefill: ask the server to read `messages` into its cache at the lowest priority, for a request that may
+    /// come later. Takes no request permit (a real request must never queue behind a shadow) and is not retried.
+    /// `messages` may end with the assistant's turn: then the conversation so far is read. `duty` is the share of time
+    /// the shadow may compute while it is the server's only work. Returns (positions read, positions already cached).
+    pub async fn shadow(
+        &self,
+        messages: &[Message],
+        thinking: bool,
+        duty: f32,
+    ) -> Result<(u64, u64)> {
+        if !self.supports_shadow() {
+            return Ok((0, 0));
+        }
+        let body = json!({
+            "model": self.cfg.model, "messages": messages, "max_tokens": 1, "temperature": 0.0,
+            "chat_template_kwargs": {"enable_thinking": thinking},
+            "shadow": {"duty": duty.clamp(0.05, 1.0)},
+        });
+        let url = format!("{}/chat/completions", self.cfg.url.trim_end_matches('/'));
+        let resp = self
+            .client
+            .post(&url)
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| NafsError::BackendUnavailable(format!("{}: {e}", self.role)))?;
+        let v: Value = resp
+            .json()
+            .await
+            .map_err(|e| NafsError::BackendProtocol(format!("{}: {e}", self.role)))?;
+        Ok((
+            v["timings"]["prompt_n"].as_u64().unwrap_or(0),
+            v["timings"]["cache_n"].as_u64().unwrap_or(0),
+        ))
+    }
+
     /// Raw continuation with a cached prefix is a llama-server feature (`/completion`, `/apply-template`).
     pub fn supports_raw(&self) -> bool {
         self.kind == "llama"

@@ -75,6 +75,8 @@ pub struct Orchestrator {
     pub inflight: Arc<AtomicUsize>,
     /// Knowledge-base retrieval (Phase 20), set by the gateway when `[knowledge]` is on.
     knowledge: RwLock<Option<Arc<dyn crate::knowledge::Knowledge>>>,
+    /// ShadowPrefill (Phase 30): the between-turns shadow in flight, stopped when the next request arrives.
+    shadow_job: std::sync::Mutex<Option<tokio::task::AbortHandle>>,
 }
 
 /// Event emitter that tolerates a missing or closed receiver.
@@ -394,6 +396,20 @@ impl Orchestrator {
             params: RwLock::new(params),
             inflight: Arc::new(AtomicUsize::new(0)),
             knowledge: RwLock::new(None),
+            shadow_job: std::sync::Mutex::new(None),
+        }
+    }
+
+    /// ShadowPrefill: stop the between-turns shadow (a request has arrived and needs the cores). The server keeps
+    /// what the shadow read.
+    fn stop_shadow(&self) {
+        if let Some(h) = self
+            .shadow_job
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take()
+        {
+            h.abort();
         }
     }
 
@@ -842,6 +858,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         external: Option<Arc<AtomicBool>>,
     ) -> Result<ChatReply> {
         self.validate(&req)?;
+        self.stop_shadow();
         self.inflight.fetch_add(1, Ordering::SeqCst);
         let _count = InflightCount(self.inflight.clone());
         let t0 = Instant::now();
@@ -1118,6 +1135,18 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 Ok(None) => {}
                 Err(e) => tracing::warn!(error = %e, "the memory files could not be read"),
             }
+            // Phase 29: a saved skill for a task question, its instructions first.
+            if cfg.context.skills_in_chat {
+                match self.store.skill_context(&user.content) {
+                    Ok(Some((block, uris))) => {
+                        system.push_str("\n\n");
+                        system.push_str(&delimit("skill", &block, 2400));
+                        sources.push(json!({"skills": uris}));
+                    }
+                    Ok(None) => {}
+                    Err(e) => tracing::warn!(error = %e, "the skills could not be read"),
+                }
+            }
             if let Some(note) = nafs_memory::recall::note_request(&user.content) {
                 // The note is also a memory file (with its diff row), so it can be read and edited as a file.
                 for c in nafs_context::memory::extract(&user.content) {
@@ -1194,10 +1223,44 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 m.content = crate::knowledge::strip_placeholder(&m.content, ph);
             }
         }
+        // ShadowPrefill (Phase 30): which shadows run for this request, and the prompt's layout.
+        let (shadow_between, shadow_arrival) = match req.shadow.as_deref() {
+            Some("off") => (false, false),
+            Some("between") => (true, false),
+            Some("arrival") => (false, true),
+            Some("both") => (true, true),
+            _ => (cfg.shadow.between_turns, cfg.shadow.at_arrival),
+        };
+        // With a stable prefix the system prompt is the assistant's own text alone; what changes with the question
+        // (the domain instruction, earlier answers, passages, notes) goes before the question, so the next turn's
+        // prompt begins with this one's and a model that read it (itself, or a shadow) reads only what is new.
+        // Memory tokens stay in the system prompt, where their placeholder positions are.
+        let stable = req.stable_prefix.unwrap_or(cfg.shadow.stable_prefix) && memory.is_none();
+        let (prompt_system, prompt_user) = if stable {
+            let head = cfg.assistant.system_prompt.trim().to_string();
+            let extra = system
+                .strip_prefix(cfg.assistant.system_prompt.as_str())
+                .unwrap_or(&system)
+                .trim();
+            let content = if extra.is_empty() {
+                user.content.clone()
+            } else {
+                format!("{extra}\n\nQuestion: {}", user.content)
+            };
+            (
+                head,
+                Message {
+                    role: "user".into(),
+                    content,
+                },
+            )
+        } else {
+            (system.clone(), user.clone())
+        };
         let prompt = assemble_prompt(
-            &system,
+            &prompt_system,
             &history,
-            std::slice::from_ref(&user),
+            std::slice::from_ref(&prompt_user),
             cfg.server.max_prompt_tokens,
         );
         em.send(StreamEvent::Start {
@@ -1227,6 +1290,15 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         let mut rounds: Vec<RoundRecord> = vec![];
         let cal = self.calibration();
 
+        // ShadowPrefill at arrival: the reasoning model reads this prompt while the quick model drafts, at a capped
+        // duty (both share the cores). Stopped once the gate has decided; an escalation takes over what it read.
+        let arrival_shadow =
+            (shadow_arrival && need_draft && req.force_mode.is_none() && pair.s2.supports_shadow())
+                .then(|| {
+                    let (s2, msgs, duty) =
+                        (pair.s2.clone(), prompt.clone(), cfg.shadow.arrival_duty);
+                    tokio::spawn(async move { s2.shadow(&msgs, true, duty).await })
+                });
         // ---------------- State A: System 1 draft + k cheap samples (one prefill, concurrent) ----------------
         let mut draft: Option<GenOutput> = None;
         let mut draft_verdict: Option<VerifierResult> = None;
@@ -1715,8 +1787,16 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             {
                 notice = Some("Fast-only mode: this draft failed verification and was returned without deliberation.".into());
             }
+            if let Some(h) = &arrival_shadow {
+                h.abort();
+                metrics::counter!("nafs_shadow_total", "kind" => "arrival").increment(1);
+            }
             states.push(TraceState::T);
         } else {
+            if let Some(h) = &arrival_shadow {
+                h.abort();
+                metrics::counter!("nafs_shadow_total", "kind" => "arrival").increment(1);
+            }
             // ---------------- States L -> M: draft-blind, budget-forced, verifier-gated loop ----------------
             states.push(TraceState::L);
             em.send(StreamEvent::Phase {
@@ -2572,6 +2652,55 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         }
         if let Err(e) = self.store.save_reply(&reply, ephemeral || req.lab, req.lab) {
             tracing::warn!(error = %e, reply = %reply.reply_id, "could not store the reply");
+        }
+        // ShadowPrefill between turns: the model that did not answer reads the conversation so far, once nothing else
+        // runs, so if the next turn switches to it, it reads only the new question. A request that arrives first
+        // stops it; the server keeps what it read.
+        if shadow_between && !ephemeral && conv.is_some() {
+            let (target, thinking) = if mode == ReasoningMode::Slow {
+                (pair.s1.clone(), pair.s1.cfg.thinking)
+            } else {
+                (pair.s2.clone(), true)
+            };
+            if target.supports_shadow() {
+                let mut msgs = prompt.clone();
+                // The next turn's history holds the question as the person wrote it.
+                if let Some(last) = msgs.last_mut() {
+                    last.content = user.content.clone();
+                }
+                msgs.push(Message {
+                    role: "assistant".into(),
+                    content: final_text.clone(),
+                });
+                let inflight = self.inflight.clone();
+                let delay = Duration::from_millis(cfg.shadow.idle_delay_ms);
+                let h = tokio::spawn(async move {
+                    tokio::time::sleep(delay).await;
+                    if inflight.load(Ordering::SeqCst) > 0 {
+                        return;
+                    }
+                    // Counted as work in flight, so the idle-time workers (audits, labels) wait for it.
+                    inflight.fetch_add(1, Ordering::SeqCst);
+                    let _count = InflightCount(inflight);
+                    let t = Instant::now();
+                    match target.shadow(&msgs, thinking, 1.0).await {
+                        Ok((read, cached)) => {
+                            metrics::counter!("nafs_shadow_total", "kind" => "between")
+                                .increment(1);
+                            tracing::info!(model = %target.role, read, cached, ms = t.elapsed().as_millis() as u64, "shadow prefill between turns");
+                        }
+                        Err(e) => tracing::debug!(error = %e, "shadow prefill failed"),
+                    }
+                });
+                if let Some(old) = self
+                    .shadow_job
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .replace(h.abort_handle())
+                {
+                    old.abort();
+                }
+            }
         }
         // Phase 26: the turn becomes a note that a later conversation can find. An answer that declined is not one.
         if let (true, Some(c), false) =

@@ -315,6 +315,39 @@ fn rules() -> &'static [Rule] {
     })
 }
 
+/// Words that make a want, like or love about how to answer (a preference), not about what to do now.
+const STYLE: &[&str] = &[
+    "answer",
+    "answers",
+    "reply",
+    "replies",
+    "response",
+    "responses",
+    "explanation",
+    "explanations",
+    "format",
+    "language",
+    "english",
+    "indonesian",
+    "tone",
+    "style",
+    "summary",
+    "summaries",
+    "bullet",
+    "bullets",
+    "units",
+    "spelling",
+    "examples",
+    "short",
+    "long",
+    "brief",
+    "detailed",
+    "formal",
+    "informal",
+    "sources",
+    "citations",
+];
+
 fn sentences(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     for line in text.lines() {
@@ -322,7 +355,9 @@ fn sentences(text: &str) -> Vec<String> {
         let b = line.as_bytes();
         for i in 0..b.len() {
             if matches!(b[i], b'.' | b'!' | b'?') && (i + 1 == b.len() || b[i + 1] == b' ') {
-                let s = line[start..i].trim();
+                // A question keeps its mark, so it is recognised as one and never remembered.
+                let end = if b[i] == b'?' { i + 1 } else { i };
+                let s = line[start..end].trim();
                 if !s.is_empty() {
                     out.push(s.to_string());
                 }
@@ -418,7 +453,33 @@ pub fn extract(user_message: &str) -> Vec<Candidate> {
                 },
                 "preferences" => {
                     // "I'd rather not say" declines; it states no preference.
-                    if c["x"].trim().to_lowercase().starts_with("not") {
+                    let object = c["x"].trim().to_lowercase();
+                    if object.starts_with("not") {
+                        break;
+                    }
+                    // "I want a script that parses CSV" asks for something now; it is not how to answer in general.
+                    // A want, like or love is a preference only when it is about the answers themselves.
+                    let verb0 = c["verb"].to_lowercase();
+                    let task = [
+                        "this ",
+                        "the following",
+                        "for this",
+                        "these ",
+                        "that file",
+                        "it ",
+                    ]
+                    .iter()
+                    .any(|w| object.starts_with(w) || object.contains(&format!(" {w}")));
+                    if task {
+                        break;
+                    }
+                    if ["want", "like", "love"].contains(&verb0.as_str())
+                        && !STYLE.iter().any(|w| {
+                            object
+                                .split(|ch: char| !ch.is_alphanumeric())
+                                .any(|x| x == *w)
+                        })
+                    {
                         break;
                     }
                     let verb = c["verb"]
@@ -552,6 +613,10 @@ mod tests {
         assert_eq!(got[4].date, NaiveDate::from_ymd_opt(2026, 11, 3));
         assert!(got[4].key().starts_with("2026-11-03-"));
         assert!(extract("What is my manager's name? Is it Dewi?").is_empty());
+        assert!(extract("My manager is who?").is_empty());
+        assert!(extract("I want a Python script that parses CSV.").is_empty());
+        assert!(extract("I like this approach.").is_empty());
+        assert_eq!(extract("I want short answers.")[0].kind, "preferences");
         assert!(extract("My question is about BM25.").is_empty());
     }
 

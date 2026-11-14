@@ -364,6 +364,12 @@ function openSettings() {
         <label class="toggle"><input type="checkbox" id="stReason" ${PREFS.reason ? 'checked' : ''}> Show the thinking while a careful answer is written</label>
         <label class="toggle"><input type="checkbox" id="stMemory" ${PREFS.memory ? 'checked' : ''}> Reuse earlier checked answers to similar questions</label>
       </section>
+      <section><h4>Speed</h4>
+        <label class="f"><span>Get the careful model ready while you read</span><select id="stShadow">${[['server', 'As this service is set up'], ['off', 'Off'], ['between', 'Between messages'], ['both', 'Between messages and while drafting']].map(([v, l]) => `<option value="${v}" ${(PREFS.shadow || 'server') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          <span class="hint">While you read an answer, the careful model reads the conversation, so if your next question needs it, it starts sooner. It stops as soon as you send something.</span></label>
+        <label class="toggle"><input type="checkbox" id="stStable" ${PREFS.stablePrefix === false ? '' : 'checked'}> Keep the start of a conversation the same</label>
+        <span class="hint">Sources and notes for a question go next to the question, so both models can reuse what they already read.</span>
+      </section>
       <section><h4>Appearance</h4>
         <div class="seg" id="stTheme">${[['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button type="button" data-t="${k}" class="${theme === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       </section>
@@ -386,6 +392,8 @@ function openSettings() {
   $('#stBudget').onchange = (e) => { PREFS.budget = +e.target.value; savePrefs(); };
   $('#stReason').onchange = (e) => { PREFS.reason = e.target.checked; savePrefs(); };
   $('#stMemory').onchange = (e) => { PREFS.memory = e.target.checked; savePrefs(); };
+  $('#stShadow').onchange = (e) => { PREFS.shadow = e.target.value; savePrefs(); };
+  $('#stStable').onchange = (e) => { PREFS.stablePrefix = e.target.checked; savePrefs(); };
   $$('#stTheme button').forEach(b => b.onclick = () => { setTheme(b.dataset.t === 'system' ? null : b.dataset.t); $$('#stTheme button').forEach(x => x.classList.toggle('on', x === b)); });
   $('#stAdv').onchange = (e) => { setAdvanced(e.target.checked); route(); };
   $('#stTok').onchange = (e) => { store.set('token', e.target.value.trim()); toast(e.target.value.trim() ? 'Access key saved' : 'Access key removed'); refreshStatus(); };
@@ -577,7 +585,8 @@ routes.files = { title: 'Files', sub: 'documents, memories, skills and sessions 
       <div class="row" style="gap:8px;margin-top:8px"><button class="btn" type="button" id="fsSave">Save</button></div><div class="rerr" id="fsErr" role="alert"></div>`);
     $('#fsSave').onclick = async () => {
       let target = u;
-      const slug = (t) => t.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-').slice(0, 64);
+      // The server's rule: lower-case ASCII letters and digits joined by single dashes, at most 64, no dash at either end.
+      const slug = (t) => t.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64).replace(/-+$/, '');
       if (!target) { const name = slug($('#fsName').value || ''); if (!name) { $('#fsErr').textContent = 'Give it a name.'; return; }
         target = isSkill ? `nafs://skills/${name}` : `nafs://memory/${$('#fsKind').value}/${name}`; }
       let text = $('#fsText').value;
@@ -1047,7 +1056,9 @@ routes.chat = { title: 'Chat', async render(view, alive) {
     // Asking again keeps the knowledge base the answer was first asked with; a new question uses the one chosen below the box.
     const kn = reqOverride && 'knowledge' in reqOverride ? (reqOverride.knowledge || undefined) : PREFS.kb ? { kb: PREFS.kb, mode: PREFS.kbMode || 'auto' } : undefined;
     const body = { conversation_id: convId, messages: [{ role: 'user', content: text }], lambda: S.lambda, thinking_budget: S.budget > 0 ? S.budget : undefined, show_reasoning: S.reason,
-      force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined, knowledge: kn };
+      force_mode: mode === 'auto' ? null : mode, verification: v || undefined, retrieve: S.memory ? true : undefined, knowledge: kn,
+      // ShadowPrefill (Settings → Speed): unset means the server's own setting.
+      shadow: PREFS.shadow && PREFS.shadow !== 'server' ? PREFS.shadow : undefined, stable_prefix: typeof PREFS.stablePrefix === 'boolean' ? PREFS.stablePrefix : undefined };
     const turn = new Turn(inner, { onSelect: select, onRetry: retry, prompt: text, request: body, onVerify }); turns.push(turn); select(turn);
     turn.onUpdate = onTurnUpdate; scrollDown();
     setBusy(startLive({ text, body, turn }).ctrl);

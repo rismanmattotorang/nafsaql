@@ -68,6 +68,11 @@ pub struct SlotCfg {
     pub stop: Vec<u32>,
     /// Report each token's log-probability (the gate's rule reads it).
     pub logprobs: bool,
+    // nafs-aql (ShadowPrefill, Phase 30): a shadow request only reads its prompt into the cache, for a request that
+    // may come later (the other model of a pair warming the conversation it may be switched to). It is the lowest
+    // priority: its chunks run only when no other prompt is waiting, it is never decoded, and a real request that
+    // shares its beginning takes over what it has read so far.
+    pub shadow: bool,
 }
 
 impl Default for SlotCfg {
@@ -81,6 +86,7 @@ impl Default for SlotCfg {
             max_tokens: 256,
             stop: vec![],
             logprobs: false,
+            shadow: false,
         }
     }
 }
@@ -199,6 +205,14 @@ pub struct Engine {
     pub decode_steps: u64,
     pub decode_rows: u64,
     samp: crate::sample::Scratch,
+    // nafs-aql (ShadowPrefill): while real requests are decoding, one shadow chunk runs every `shadow_every` steps
+    // (0: shadows run only when nothing else is being served); `since_shadow` counts the steps since the last one.
+    pub shadow_every: usize,
+    since_shadow: usize,
+    /// Shadow requests read to the end, taken over by a real request, and positions they read.
+    pub shadow_done: u64,
+    pub shadow_taken: u64,
+    pub shadow_positions: u64,
 }
 
 impl Engine {
@@ -268,6 +282,11 @@ impl Engine {
             decode_steps: 0,
             decode_rows: 0,
             samp: crate::sample::Scratch::default(),
+            shadow_every: 0,
+            since_shadow: 0,
+            shadow_done: 0,
+            shadow_taken: 0,
+            shadow_positions: 0,
         }
     }
 
@@ -316,6 +335,32 @@ impl Engine {
                 prompt.len()
             );
             return Err((prompt, msg));
+        }
+        // nafs-aql (ShadowPrefill): a real request never waits for a shadow. A shadow that has read part of this
+        // prompt hands it over (cancelling keeps what it read, and the lookup below restores it); a full engine
+        // gives up its oldest shadow to make room.
+        if !cfg.shadow {
+            let sharing: Vec<SlotId> = self
+                .slots
+                .iter()
+                .filter(|s| {
+                    s.cfg.shadow
+                        && crate::prefix::common_prefix(
+                            &s.prompt[..s.fed.min(s.prompt.len())],
+                            &prompt,
+                        ) >= crate::prefix::MIN_PREFIX
+                })
+                .map(|s| s.id)
+                .collect();
+            for id in sharing {
+                self.shadow_taken += 1;
+                self.cancel(id);
+            }
+            if !self.has_room() {
+                if let Some(id) = self.slots.iter().find(|s| s.cfg.shadow).map(|s| s.id) {
+                    self.cancel(id);
+                }
+            }
         }
         if !self.has_room() {
             return Err((prompt, "every slot is busy".into()));
@@ -438,9 +483,45 @@ impl Engine {
         if self.slots.is_empty() {
             return vec![];
         }
-        // A prompt that is not yet in the cache comes first, oldest slot first: a user waiting for their first
+        // nafs-aql (ShadowPrefill): a shadow that has read its whole prompt is done; its cache goes to the store.
+        if let Some(i) = self.slots.iter().position(|s| s.cfg.shadow && s.ready()) {
+            let s = self.slots.remove(i);
+            self.shadow_done += 1;
+            self.shadow_positions += s.prefilled as u64;
+            self.keep_prefix(&s);
+            return vec![Emission {
+                slot: s.id,
+                token: 0,
+                text: String::new(),
+                logprob: 0.0,
+                finish: Some(Finish::Stop),
+                cost: Some(SlotCost {
+                    prompt_tokens: s.prompt_tokens,
+                    prefilled: s.prefilled,
+                    produced: 0,
+                    prefill_s: s.prefill_s,
+                    decode_s: 0.0,
+                }),
+            }];
+        }
+        let real = self.slots.iter().any(|s| !s.cfg.shadow);
+        // A real prompt that is not yet in the cache comes first, oldest slot first: a user waiting for their first
         // token is the one most sensitive to delay, and one chunk is a bounded interruption for the others.
-        if let Some(i) = self.slots.iter().position(|s| !s.ready()) {
+        let pending = self.slots.iter().position(|s| !s.ready() && !s.cfg.shadow);
+        // A shadow chunk runs when nothing else is served, or once every `shadow_every` steps of decoding.
+        let shadow = self.slots.iter().position(|s| !s.ready() && s.cfg.shadow);
+        let shadow_turn = match (real, shadow) {
+            (_, None) => false,
+            (false, Some(_)) => true,
+            (true, Some(_)) => {
+                self.since_shadow += 1;
+                pending.is_none() && self.shadow_every > 0 && self.since_shadow >= self.shadow_every
+            }
+        };
+        if shadow_turn {
+            self.since_shadow = 0;
+        }
+        if let Some(i) = pending.or(shadow.filter(|_| shadow_turn)) {
             if let Err(e) = self.prefill_chunk(i) {
                 let id = self.slots[i].id;
                 self.slots.remove(i);
@@ -455,7 +536,28 @@ impl Engine {
             }
             return vec![];
         }
+        if !real {
+            return vec![];
+        }
+        // Shadows are never decoded: they step aside while the real rows take their step.
+        if self.slots.iter().any(|s| s.cfg.shadow) {
+            let (parked, rest): (Vec<Slot>, Vec<Slot>) = std::mem::take(&mut self.slots)
+                .into_iter()
+                .partition(|s| s.cfg.shadow);
+            self.slots = rest;
+            let out = self.decode();
+            self.slots.extend(parked);
+            return out;
+        }
         self.decode()
+    }
+
+    // nafs-aql (ShadowPrefill): whether the engine holds work other than shadows, and whether it holds a shadow.
+    pub fn real_active(&self) -> usize {
+        self.slots.iter().filter(|s| !s.cfg.shadow).count()
+    }
+    pub fn shadow_active(&self) -> usize {
+        self.slots.iter().filter(|s| s.cfg.shadow).count()
     }
 
     /// Feed the next chunk of slot `i`'s prompt. Its last token is left for the first decode step, which is
@@ -864,6 +966,102 @@ mod tests {
         assert!(e
             .admit_with_inputs(prompt.clone(), cfg(8), vec![(2, vec![0.0; 7])])
             .is_err());
+    }
+
+    // nafs-aql (ShadowPrefill): a shadow reads its prompt only when nothing else is waiting, is never decoded, and a
+    // real request with the same beginning takes over what it read; the real request's tokens are what a cold
+    // engine produces.
+    #[test]
+    fn a_shadow_warms_the_cache_and_a_real_request_takes_it_over() {
+        let Some(m) = model() else {
+            eprintln!("skipped: set SMILEY_CORE_MODEL");
+            return;
+        };
+        let prompt: Vec<u32> = (0..300u32).map(|i| 300 + (i * 7) % 900).collect();
+        let mut real = prompt.clone();
+        real.extend([450u32, 29871, 1576]);
+        let run_to_end = |e: &mut Engine, id: SlotId| -> Vec<u32> {
+            let mut out = vec![];
+            for _ in 0..200 {
+                for em in e.step() {
+                    if em.slot == id {
+                        if em.finish.is_none() || em.token != 0 {
+                            out.push(em.token);
+                        }
+                        if em.finish.is_some() {
+                            return out;
+                        }
+                    }
+                }
+            }
+            out
+        };
+        // Cold reference.
+        let mut cold = Engine::new(m.clone(), 2, 512, 1, KvPrec::F16, 64 << 20);
+        let id = cold.admit(real.clone(), cfg(6)).unwrap();
+        let want = run_to_end(&mut cold, id);
+        // A shadow alone reads to the end, then a real request restores it.
+        let mut e = Engine::new(m.clone(), 2, 512, 1, KvPrec::F16, 64 << 20);
+        let sh = e
+            .admit(
+                prompt.clone(),
+                SlotCfg {
+                    shadow: true,
+                    ..cfg(6)
+                },
+            )
+            .unwrap();
+        let mut done = None;
+        for _ in 0..64 {
+            for em in e.step() {
+                if em.slot == sh && em.finish.is_some() {
+                    done = em.cost;
+                }
+            }
+            if done.is_some() {
+                break;
+            }
+        }
+        let cost = done.expect("the shadow finished");
+        assert_eq!(
+            cost.prefilled,
+            prompt.len() - 1,
+            "a shadow reads every position but its last"
+        );
+        assert_eq!(cost.produced, 0, "a shadow is never decoded");
+        assert_eq!(e.shadow_done, 1);
+        let (_, _, hits0, _) = e.prefix_stats();
+        let id = e.admit(real.clone(), cfg(6)).unwrap();
+        assert_eq!(
+            run_to_end(&mut e, id),
+            want,
+            "a warm request answers as a cold one"
+        );
+        let (_, _, hits1, saved) = e.prefix_stats();
+        assert!(
+            hits1 > hits0 && saved as usize >= prompt.len() - 2,
+            "the shadow's cache was not restored"
+        );
+        // A shadow cut short: the real request arrives after one chunk and takes over the part read.
+        let mut f = Engine::new(m, 2, 512, 1, KvPrec::F16, 64 << 20);
+        f.admit(
+            prompt.clone(),
+            SlotCfg {
+                shadow: true,
+                ..cfg(6)
+            },
+        )
+        .unwrap();
+        let _ = f.step();
+        let id = f.admit(real.clone(), cfg(6)).unwrap();
+        assert_eq!(
+            f.shadow_taken, 1,
+            "the real request did not take the shadow over"
+        );
+        assert_eq!(f.shadow_active(), 0);
+        let (_, _, hits, _) = f.prefix_stats();
+        assert_eq!(hits, 1, "the partial shadow was not restored");
+        assert_eq!(run_to_end(&mut f, id), want);
     }
 
     #[test]

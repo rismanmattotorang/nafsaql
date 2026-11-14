@@ -41,6 +41,24 @@ pub struct OutFile {
     pub content: String,
 }
 
+/// Unique file names: a name already taken gets `-2`, `-3`, ... (two documents with one title, or titles that all
+/// slug to `item`, would otherwise overwrite each other's page).
+fn unique_names<'a>(names: impl Iterator<Item = &'a str>) -> Vec<String> {
+    let mut seen: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    names
+        .map(|n| {
+            let base = slug(n);
+            let k = seen.entry(base.clone()).or_insert(0);
+            *k += 1;
+            if *k == 1 {
+                base
+            } else {
+                format!("{base}-{k}")
+            }
+        })
+        .collect()
+}
+
 /// An overview without its own first heading (the page supplies it).
 fn body_of(overview: &str) -> &str {
     let t = overview.trim();
@@ -53,7 +71,18 @@ fn body_of(overview: &str) -> &str {
 /// A wiki: `index.md`, one page per document and one per term shared by two or more documents.
 pub fn wiki(name: &str, overview: &str, docs: &[DocInfo]) -> Vec<OutFile> {
     let mut out = Vec::new();
-    let page = |d: &DocInfo| format!("docs/{}.md", slug(&d.title));
+    let names = unique_names(docs.iter().map(|d| d.title.as_str()));
+    let by_uri: std::collections::HashMap<&str, &str> = docs
+        .iter()
+        .zip(&names)
+        .map(|(d, n)| (d.uri.as_str(), n.as_str()))
+        .collect();
+    let page = |d: &DocInfo| {
+        format!(
+            "docs/{}.md",
+            by_uri.get(d.uri.as_str()).copied().unwrap_or("item")
+        )
+    };
     let mut index = format!("# {name}\n\n{}\n\n## Documents\n\n", body_of(overview));
     for d in docs {
         index.push_str(&format!("- [{}]({}) — {}\n", d.title, page(d), d.l0.trim()));
@@ -66,12 +95,18 @@ pub fn wiki(name: &str, overview: &str, docs: &[DocInfo]) -> Vec<OutFile> {
         }
     }
     by_term.retain(|_, ds| ds.len() >= 2);
+    let term_names: std::collections::HashMap<String, String> = by_term
+        .keys()
+        .cloned()
+        .zip(unique_names(by_term.keys().map(String::as_str)))
+        .collect();
+    let topic = |t: &str| term_names.get(t).cloned().unwrap_or_else(|| slug(t));
     if !by_term.is_empty() {
         index.push_str("\n## Shared topics\n\n");
         for (t, ds) in &by_term {
             index.push_str(&format!(
                 "- [{t}](topics/{}.md) ({} documents)\n",
-                slug(t),
+                topic(t),
                 ds.len()
             ));
         }
@@ -101,7 +136,7 @@ pub fn wiki(name: &str, overview: &str, docs: &[DocInfo]) -> Vec<OutFile> {
         if !shared.is_empty() {
             p.push_str("\n## See also\n\n");
             for t in shared {
-                p.push_str(&format!("- [{t}](../topics/{}.md)\n", slug(t)));
+                p.push_str(&format!("- [{t}](../topics/{}.md)\n", topic(t)));
             }
         }
         out.push(OutFile {
@@ -120,7 +155,7 @@ pub fn wiki(name: &str, overview: &str, docs: &[DocInfo]) -> Vec<OutFile> {
             ));
         }
         out.push(OutFile {
-            path: format!("topics/{}.md", slug(t)),
+            path: format!("topics/{}.md", topic(t)),
             content: p,
         });
     }
@@ -130,7 +165,8 @@ pub fn wiki(name: &str, overview: &str, docs: &[DocInfo]) -> Vec<OutFile> {
 /// A knowledge graph: one page per entity and `relations.jsonl` with evidence URIs.
 pub fn graph(entities: &[Entity], relations: &[Relation]) -> Vec<OutFile> {
     let mut out = Vec::new();
-    for e in entities {
+    let names = unique_names(entities.iter().map(|e| e.name.as_str()));
+    for (e, file) in entities.iter().zip(&names) {
         let mut p = format!(
             "---\nname: {}\ntype: {}\nmentions: {}\n---\n# {}\n\n",
             e.name,
@@ -158,7 +194,7 @@ pub fn graph(entities: &[Entity], relations: &[Relation]) -> Vec<OutFile> {
             p.push_str(&format!("- `{m}`\n"));
         }
         out.push(OutFile {
-            path: format!("entities/{}.md", slug(&e.name)),
+            path: format!("entities/{file}.md"),
             content: p,
         });
     }
@@ -229,6 +265,23 @@ mod tests {
             files[1].content.contains("../topics/bm25.md")
                 && !files[1].content.contains("verifier.md")
         );
+    }
+
+    #[test]
+    fn pages_of_documents_with_one_title_do_not_collide() {
+        let mut a = doc("Notes", &[]);
+        let mut b = doc("Notes", &[]);
+        a.uri = "nafs://kb/b/1".into();
+        b.uri = "nafs://kb/b/2".into();
+        let (mut c, mut d) = (doc("Обзор", &[]), doc("Сводка", &[]));
+        c.uri = "nafs://kb/b/3".into();
+        d.uri = "nafs://kb/b/4".into();
+        let files = wiki("W", "o", &[a, b, c, d]);
+        let mut paths: Vec<&str> = files.iter().map(|f| f.path.as_str()).collect();
+        let n = paths.len();
+        paths.sort();
+        paths.dedup();
+        assert_eq!(paths.len(), n, "{paths:?}");
     }
 
     #[test]

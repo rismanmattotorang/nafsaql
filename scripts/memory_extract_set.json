@@ -32,7 +32,7 @@
  ["Write a poem that begins: My heart is a harbour.", []],
  ["Is my laptop fast enough for the 4B model?", []],
  ["Thanks, that helps.", []],
- ["I want the report by Monday.", ["preferences"]],
+ ["I want the report by Monday.", []],
  ["Remember: never push to main without CI.", ["notes"]],
  ["My team is the search team.", ["entities"]],
  ["We released the Rooms feature on 30 October 2026.", ["events"]],

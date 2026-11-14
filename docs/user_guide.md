@@ -70,6 +70,15 @@ Open **Knowledge** in the left bar to give the assistant documents of your own. 
 - **Memory** modes (experimental, *Advanced* only) use a module trained on the base's documents; they appear once a module has been trained and activated from the *Memory* card. A module that gives the same memory whatever is asked is recognised and not used; the answer then comes from passages and says why.
 
 
+## Speed
+
+**Settings → Speed.** *Get the careful model ready while you read*: after each answer, while you read, the careful
+(reasoning) model reads the conversation, so if your next question needs it, it starts in a couple of seconds instead of
+half a minute; anything you send stops it at once. *Between messages* is the default; *also while drafting* makes every
+quick answer slower on this kind of computer and is off unless you choose it. *Keep the start of a conversation the
+same* puts the sources and notes for a question next to the question, so both models can reuse what they read; it is on
+by default and changed no answers in testing.
+
 ## Files
 
 **Files** shows everything the assistant knows in one tree, each item with a one-line summary: your knowledge bases and

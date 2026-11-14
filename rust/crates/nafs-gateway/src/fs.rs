@@ -47,6 +47,13 @@ fn not_found(u: &Uri) -> ApiError {
     ApiError(NafsError::NotFound(u.to_string()))
 }
 
+/// A base the in-process index has not loaded yet: a passing state (503), not a bad request.
+fn not_indexed() -> ApiError {
+    ApiError(NafsError::BackendUnavailable(
+        "this base is not in the in-process index yet; try again in a moment".into(),
+    ))
+}
+
 fn kb_err(e: nafs_kb::KbError) -> ApiError {
     match e {
         nafs_kb::KbError::NotFound(m) => ApiError(NafsError::NotFound(m.to_string())),
@@ -130,6 +137,8 @@ async fn children(s: &AppState, u: &Uri, layers: bool) -> ApiResult<Vec<Value>> 
         }
         (Some(Space::Kb), [base]) => {
             let kb = kb_of(s)?;
+            // An unknown base is a 404, not an empty folder.
+            kb.store().get_kb(base).await.map_err(kb_err)?;
             let docs = kb.store().list_documents(base).await.map_err(kb_err)?;
             let ix = kb.index_of(base).await.ok().flatten();
             Ok(docs
@@ -157,7 +166,10 @@ async fn children(s: &AppState, u: &Uri, layers: bool) -> ApiResult<Vec<Value>> 
                 .index_of(base)
                 .await
                 .map_err(kb_err)?
-                .ok_or_else(|| bad("this base is not in the in-process index yet"))?;
+                .ok_or_else(not_indexed)?;
+            if !ix.documents_list().iter().any(|(d, _)| d == doc) {
+                return Err(not_found(u));
+            }
             Ok(ix
                 .passages_of(doc)
                 .iter()
@@ -395,7 +407,7 @@ async fn layers_of(s: &AppState, u: &Uri) -> ApiResult<Layers> {
                 .index_of(base)
                 .await
                 .map_err(kb_err)?
-                .ok_or_else(|| bad("this base is not in the in-process index yet"))?;
+                .ok_or_else(not_indexed)?;
             let (l0, l1) = ix.base_layers(kb.analyzer(), &info.name, &info.description);
             Ok(Layers {
                 l0,
@@ -411,7 +423,7 @@ async fn layers_of(s: &AppState, u: &Uri) -> ApiResult<Layers> {
                 .index_of(base)
                 .await
                 .map_err(kb_err)?
-                .ok_or_else(|| bad("this base is not in the in-process index yet"))?;
+                .ok_or_else(not_indexed)?;
             let l = ix
                 .doc_layers(kb.analyzer(), doc)
                 .ok_or_else(|| not_found(u))?;
@@ -439,7 +451,7 @@ async fn layers_of(s: &AppState, u: &Uri) -> ApiResult<Layers> {
                 .index_of(base)
                 .await
                 .map_err(kb_err)?
-                .ok_or_else(|| bad("this base is not in the in-process index yet"))?;
+                .ok_or_else(not_indexed)?;
             let h = ix.passage_at(doc, ord).ok_or_else(|| not_found(u))?;
             Ok(Layers {
                 l0: passage_l0(&h.heading, &h.text),
@@ -551,6 +563,11 @@ async fn glob(State(s): State<AppState>, Query(q): Query<UriQ>) -> ApiResult<Jso
     let pattern = q
         .pattern
         .ok_or_else(|| bad("give a pattern, for example nafs://memory/**"))?;
+    if !nafs_context::uri::glob_ok(&pattern) {
+        return Err(bad(
+            "a pattern is at most 256 characters with at most four **",
+        ));
+    }
     // Walk from the fixed part of the pattern (before the first wildcard).
     let fixed: String = pattern.split('*').next().unwrap_or("nafs://").to_string();
     let start = fixed
@@ -617,7 +634,8 @@ async fn grep(State(s): State<AppState>, Json(b): Json<GrepReq>) -> ApiResult<Js
     let scope = parse_uri(b.scope.as_deref())?;
     let limit = b.limit.unwrap_or(100).min(1000);
     let mut out = Vec::new();
-    for (uri, text) in texts_in(&s, &scope).await? {
+    let (texts, cut) = texts_in(&s, &scope, GREP_MAX_BYTES).await?;
+    for (uri, text) in texts {
         for (n, line) in text.lines().enumerate() {
             if re.is_match(line) {
                 out.push(json!({"uri": uri, "line": n + 1, "text": clip(line.trim(), 300)}));
@@ -627,12 +645,26 @@ async fn grep(State(s): State<AppState>, Json(b): Json<GrepReq>) -> ApiResult<Js
             }
         }
     }
-    Ok(Json(json!({"matches": out, "truncated": false})))
+    Ok(Json(json!({"matches": out, "truncated": cut})))
 }
 
-/// Every readable text under a scope: (URI, text). Passages for documents.
-async fn texts_in(s: &AppState, scope: &Uri) -> ApiResult<Vec<(String, String)>> {
-    let mut out = Vec::new();
+/// Text a grep reads at most (a scope of every base and every session is cut there and says so).
+const GREP_MAX_BYTES: usize = 32 << 20;
+
+/// Every readable text under a scope: (URI, text), passages for documents, at most `max_bytes` of text; the flag
+/// says whether the limit cut the list.
+async fn texts_in(
+    s: &AppState,
+    scope: &Uri,
+    max_bytes: usize,
+) -> ApiResult<(Vec<(String, String)>, bool)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    let mut bytes = 0usize;
+    let mut full = |out: &mut Vec<(String, String)>, uri: String, text: String| -> bool {
+        bytes += text.len();
+        out.push((uri, text));
+        bytes >= max_bytes
+    };
     let want = |sp: Space| scope.space.is_none() || scope.space == Some(sp);
     if want(Space::Kb) {
         if let Some(kb) = s.kb.clone() {
@@ -658,8 +690,8 @@ async fn texts_in(s: &AppState, scope: &Uri) -> ApiResult<Vec<(String, String)>>
                     }
                     for h in ix.passages_of(&doc) {
                         let pu = Uri::passage(&base, &doc, h.ord);
-                        if scope.contains(&pu) {
-                            out.push((pu.to_string(), h.text));
+                        if scope.contains(&pu) && full(&mut out, pu.to_string(), h.text) {
+                            return Ok((out, true));
                         }
                     }
                 }
@@ -668,16 +700,22 @@ async fn texts_in(s: &AppState, scope: &Uri) -> ApiResult<Vec<(String, String)>>
     }
     if want(Space::Memory) {
         for f in s.store.memory_files(None)? {
-            if scope.contains(&f.uri()) {
-                out.push((f.uri().to_string(), format!("{}\n{}", f.title, f.body)));
+            if scope.contains(&f.uri())
+                && full(
+                    &mut out,
+                    f.uri().to_string(),
+                    format!("{}\n{}", f.title, f.body),
+                )
+            {
+                return Ok((out, true));
             }
         }
     }
     if want(Space::Skills) {
         for k in s.store.skills()? {
             let u = Uri::skill(&k.name);
-            if scope.contains(&u) {
-                out.push((u.to_string(), k.to_markdown()));
+            if scope.contains(&u) && full(&mut out, u.to_string(), k.to_markdown()) {
+                return Ok((out, true));
             }
         }
     }
@@ -686,12 +724,14 @@ async fn texts_in(s: &AppState, scope: &Uri) -> ApiResult<Vec<(String, String)>>
             let u = Uri::session(&x.id);
             if scope.contains(&u) {
                 if let Some(f) = s.store.session_file(&x.id)? {
-                    out.push((u.to_string(), f.transcript));
+                    if full(&mut out, u.to_string(), f.transcript) {
+                        return Ok((out, true));
+                    }
                 }
             }
         }
     }
-    Ok(out)
+    Ok((out, false))
 }
 
 // ------------------------------------------------------------------------------------------------- find / search
@@ -758,13 +798,18 @@ async fn find_in(s: &AppState, query: &str, scope: &Uri, k: usize) -> ApiResult<
             };
             for (base, _) in bases {
                 let docs = scope.path.get(1).map(|d| HashSet::from([d.clone()]));
-                let r = kb
-                    .find_scoped(&base, query, k, docs)
-                    .await
-                    .map_err(kb_err)?;
+                // A base that cannot be searched just now is left out of a search of everything; a search of that
+                // base alone says why.
+                let r = match kb.find_scoped(&base, query, k, docs).await {
+                    Ok(r) => r,
+                    Err(_) if scope.space.is_none() || scope.path.is_empty() => continue,
+                    Err(e) => return Err(kb_err(e)),
+                };
                 let mut list: Vec<Value> = r
                     .results
                     .iter()
+                    // A scope of one passage keeps only that passage.
+                    .filter(|h| scope.contains(&Uri::passage(&base, &h.doc_id, h.ord)))
                     .map(|h| {
                         let u = Uri::passage(&base, &h.doc_id, h.ord);
                         hit(
@@ -1028,6 +1073,9 @@ async fn assemble_route(
     State(s): State<AppState>,
     Json(b): Json<AssembleReq>,
 ) -> ApiResult<Json<Value>> {
+    if b.query.trim().is_empty() || b.query.chars().count() > 2000 {
+        return Err(bad("a query is 1 to 2,000 characters"));
+    }
     let scope = parse_uri(b.scope.as_deref())?;
     let hits = find_in(&s, &b.query, &scope, 12).await?;
     let items: Vec<Item> = hits
@@ -1120,6 +1168,7 @@ async fn rm(State(s): State<AppState>, Query(q): Query<UriQ>) -> ApiResult<Json<
 }
 
 async fn commit(State(s): State<AppState>, Path(id): Path<Uuid>) -> ApiResult<Json<Value>> {
+    // The store refuses a room's chat (other people's words are not this person's memory).
     let r = s.store.commit_session(id, &[])?;
     Ok(Json(
         json!({"session": Uri::session(&r.session).to_string(), "messages_read": r.messages_read, "diff": r.diff}),
@@ -1163,7 +1212,7 @@ async fn compile_route(
         .index_of(base)
         .await
         .map_err(kb_err)?
-        .ok_or_else(|| bad("this base is not in the in-process index yet"))?;
+        .ok_or_else(not_indexed)?;
     let (_, overview) = ix.base_layers(kb.analyzer(), &info.name, &info.description);
     let docs: Vec<DocInfo> = ix
         .documents_list()
