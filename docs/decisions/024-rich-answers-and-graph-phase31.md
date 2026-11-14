@@ -26,6 +26,6 @@ Date 2026-11-14. Status: **adopted.** Code: `rust/crates/nafs-web/assets/render.
    state each relation), a double tap opens what is around it, dragging moves it, scroll zooms, labels never overlap,
    legend chips by group, full-screen. A tap is handled on pointer-up because pointer capture sends the click to the SVG.
 
-## Not done
+## Also in Phase 31
 
-Command palette, scroll-to-latest button and a simpler welcome screen were considered and left for a later phase.
+A command palette (Ctrl/Cmd+K, any page: pages, new chat, settings, theme, Advanced mode; arrow keys, Enter, Esc; new chat moves to Ctrl/Cmd+Shift+O), a Latest button when the chat is scrolled more than 240 px from the newest text, and a shorter welcome screen (a question, four examples, one line of help). Checked in the browser; no automated UI tests for these.

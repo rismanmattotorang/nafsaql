@@ -797,3 +797,18 @@ details.fold-card>summary h3::before{content:"▸ ";color:var(--faint)}details.f
 .kb-noscroll{overflow:hidden}
 @media (max-width:820px){.kb-gwrap{grid-template-columns:1fr}.kb-svg{height:56vh}.kb-entity{max-height:none}}
 @media (prefers-reduced-motion:reduce){.kb-node,.kb-edge,.kb-node .kb-halo{transition:none}}
+
+/* Jump to the latest message, and the command palette (Phase 31) */
+.tolatest-wrap{position:sticky;bottom:10px;height:0;display:flex;justify-content:center;pointer-events:none;z-index:3}
+.tolatest{pointer-events:auto;position:absolute;bottom:0;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:999px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:600 12.5px/1 inherit;box-shadow:0 4px 18px rgba(0,0,0,.16);cursor:pointer}
+.tolatest[hidden]{display:none}
+.tolatest:hover{border-color:var(--accent)} .tolatest svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.welcome-foot kbd{font-size:11px}
+.palette-back{position:fixed;inset:0;z-index:60;background:rgba(10,14,20,.45);display:flex;justify-content:center;align-items:flex-start;padding-top:14vh}
+.palette{width:min(560px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.35);overflow:hidden}
+.palette input{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--border);background:transparent;color:var(--text);font:inherit;font-size:15px;padding:14px 16px;outline:none}
+.pal-list{max-height:min(46vh,360px);overflow:auto;padding:6px}
+.pal-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:9px;cursor:pointer}
+.pal-row.on{background:var(--accent-weak,rgba(13,115,119,.14))}
+.pal-foot{padding:8px 14px;border-top:1px solid var(--border)}
+@media (prefers-reduced-motion:no-preference){.palette{animation:palIn .12s ease-out}@keyframes palIn{from{opacity:0;transform:translateY(-6px)}}}

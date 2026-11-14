@@ -30,6 +30,10 @@ Nafs-Aql answers in two ways. A quick model answers at once. A thorough model th
 - **Next** suggests a follow-up: *Think harder* (or *Quick answer*), *Explain step by step*, or *Check this answer*.
 - **👍 / 👎** records your rating. Ratings help reviewers; they never change the answers directly.
 
+## Finding your way
+
+Press **Ctrl/Cmd + K** on any page to jump to a page or do something (new chat, settings, light or dark, Advanced mode). Type to narrow the list, **Enter** to choose, **Esc** to close. A new chat is **Ctrl/Cmd + Shift + O**. When you scroll up in a long chat, a **Latest** button brings you back to the newest message.
+
 ## Tables, formulas, diagrams and code
 
 Answers are drawn the way you would read them. A table can be copied (button above it) and pastes into a spreadsheet. A formula such as $x^2$ is typeset. A diagram (flowchart, sequence or pie) has a **Source** button to see its text and **Save SVG**. Code has a **Copy** button, and long code folds with **Show all lines**. While an answer is still being written, a half-finished formula or diagram shows as plain text and turns into the picture when it is complete.
