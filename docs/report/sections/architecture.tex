@@ -149,6 +149,22 @@ relations, the 40 most mentioned shown, coloured by group.}
 \label{fig:ui-graph}
 \end{figure}
 
+Around the answer, the page starts a new chat with a short welcome (one
+question, four examples; Fig.~\ref{fig:ui-welcome}), offers a command palette on
+Ctrl/Cmd+K from every page (pages, new chat, settings, theme, Advanced mode),
+and shows a \emph{Latest} button once a chat is scrolled well above its newest
+text. These were checked by hand in a browser at desktop and phone width, in
+both themes and with one real streamed answer containing a table, a formula and a
+diagram; there are no automated tests of the page itself, only of the renderer.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../shared/screenshots/welcome.png}
+\caption{A new chat: one question, four examples, and a pointer to the command
+palette.}
+\label{fig:ui-welcome}
+\end{figure}
+
 \subsection{Model profiles}
 \label{sec:models}
 The reference profile uses two dense Qwen3 checkpoints \cite{qwen2025qwen3},

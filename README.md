@@ -108,7 +108,11 @@ The gate escalates only when the error it expects to save is worth the waiting t
 <td width="50%"><img src="docs/shared/screenshots/settings_speed.png" alt="Settings, Speed"><br><sub><b>Ready when you need it.</b> The careful model reads the conversation while you read the answer.</sub></td>
 </tr>
 <tr>
-<td colspan="2"><img src="docs/shared/screenshots/rich_answer.png" alt="An answer with a table, a callout, a flowchart and formulas" width="100%"><br><sub><b>Answers drawn as you read them.</b> Tables, formulas, diagrams and code are rendered, with copy buttons; unfinished ones stay plain text until they close.</sub></td>
+<td width="50%"><img src="docs/shared/screenshots/welcome.png" alt="The welcome screen of a new chat"><br><sub><b>A clear start.</b> One question, four examples, and a hint that Ctrl/Cmd+K jumps anywhere.</sub></td>
+<td width="50%"><img src="docs/shared/screenshots/palette.png" alt="The command palette"><br><sub><b>Jump anywhere.</b> Ctrl/Cmd+K lists pages and actions; type to narrow, Enter to choose.</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/shared/screenshots/rich_answer.png" alt="An answer with a table, a callout, a flowchart and formulas" width="100%"><br><sub><b>Answers drawn as you read them.</b> Tables, formulas, diagrams and code are rendered, with copy buttons; unfinished ones stay plain text until they close. The same sample in the <a href="docs/shared/screenshots/rich_answer_dark.png">dark theme</a>. A real streamed answer, a phone-width page and both themes were checked.</sub></td>
 </tr>
 <tr>
 <td colspan="2"><img src="docs/shared/screenshots/knowledge_graph.png" alt="The map of a set of documents" width="100%"><br><sub><b>A map of your documents.</b> Drawn from the text the moment a file is read; a deeper pass adds relations, each with the sentence that states it.</sub></td>

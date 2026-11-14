@@ -132,6 +132,29 @@ def main():
               document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
             time.sleep(1.5)
             tab.shot("rich_answer", 1700)
+        if want("welcome"):
+            go("chat")
+            tab.wait_for("!!document.getElementById('newConv')", 30)
+            tab.js("document.getElementById('newConv').click(); true")
+            time.sleep(1)
+            tab.shot("welcome")
+        if want("palette"):
+            go("chat")
+            tab.wait_for("!!document.getElementById('newConv')", 30)
+            tab.js("document.dispatchEvent(new KeyboardEvent('keydown', {key: 'k', ctrlKey: true, bubbles: true})); true")
+            time.sleep(1)
+            tab.shot("palette")
+            tab.js("document.getElementById('palette')?.remove(); true")
+        if want("rich_dark"):
+            tab.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-color-scheme", "value": "dark"}])
+            sample = open(os.path.join(ROOT, "scripts", "rich_sample.md")).read()
+            go("chat")
+            tab.wait_for("!!document.getElementById('inner')", 30)
+            tab.js("""(async () => { const { markdown } = await import('/render.js?v=' + Date.now()); const md = %s;
+              document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
+            time.sleep(1.5)
+            tab.shot("rich_answer_dark", 1700)
+            tab.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-color-scheme", "value": "light"}])
         if want("lab"):
             go("eval")
             tab.wait_for("!!document.querySelector('table.policy-map')", 30)
