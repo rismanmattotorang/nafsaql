@@ -209,7 +209,8 @@ pub struct ChatRequest {
     /// FR-082: use (true) or skip (false) the adaptive reasoning exit; default from config.
     #[serde(default)]
     pub adaptive_exit: Option<bool>,
-    /// ShadowPrefill (Phase 30): "off", "between" (warm the other model after the reply), "arrival" (warm the
+    /// ShadowPrefill (Phase 30): "off", "between" (after the reply, the models read the conversation as the next turn
+    /// will show it), "other" (only the model that did not answer, as before Phase 34), "arrival" (warm the
     /// reasoning model while the quick one drafts) or "both"; default from `[shadow]`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shadow: Option<String>,

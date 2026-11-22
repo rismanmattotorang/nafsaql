@@ -24,7 +24,7 @@ use crate::attn;
 use crate::gguf::{f16, Format, Gguf, TensorInfo};
 use crate::kv::KvCache;
 use crate::lbq::Slb;
-use crate::pool::{share, Pool};
+use crate::pool::{share, Claims, Pool};
 use crate::quant::{dot_batch, row_bytes, QuantAct};
 use crate::tokenizer::Tokenizer;
 use std::time::Instant;
@@ -458,6 +458,18 @@ impl SharedMl {
 /// so the result is the same as the serial loop's.
 const ROW_PARALLEL: usize = 2;
 
+// nafs-aql: weight rows a worker claims at a time in a matmul (`pool::Claims`), by batch width. One row against one
+// activation is about 0.1 µs, against a 64-row prefill chunk a few µs; either way a block is tens of microseconds, long
+// enough that the claim (one atomic add) is free and short enough that a stalled worker holds little.
+#[inline]
+fn claim_rows(nb: usize) -> usize {
+    match nb {
+        0..=3 => 64,
+        4..=15 => 16,
+        _ => 8,
+    }
+}
+
 /// One matrix of a fused matmul group, and where its output goes.
 #[derive(Clone, Copy)]
 struct MatJob<'a> {
@@ -843,6 +855,63 @@ impl Model {
             + self.lb.as_ref().map_or(0, |s| s.data_bytes)
     }
 
+    // nafs-aql (Phase 34, after FreeToken's double-buffered prefill): bring the weights into memory in the order a
+    // forward pass reads them, from a thread of its own, so the first request does not wait for the disk one page
+    // fault at a time.
+    //
+    // FreeToken streams layer l+1's experts to the GPU while layer l computes, because moving weights and computing
+    // with them use different resources and need not take turns. A CPU engine has the same two resources one level
+    // down: the disk (and the system's page cache) and the cores. The model file is mapped, not read, so a freshly
+    // started server holds none of it; the first pass then stops at every page it has not seen, and each stop is a
+    // small synchronous read. This walks the layers ahead of that pass: it tells the system the whole of the next
+    // tensor is wanted (one large sequential read) and touches each page so it is mapped when the pass arrives. It
+    // is safe to serve while it runs — a request simply finds pages already there, or faults as before on the ones
+    // the walker has not reached. Returns the bytes walked.
+    pub fn read_ahead(&self) -> u64 {
+        let mut done = 0u64;
+        let mut walk = |t: &TensorInfo| {
+            self.g.will_need(t);
+            let b = self.g.bytes(t);
+            let mut sum = 0u8;
+            // One read per page (4 KiB: the smallest page of the systems this runs on).
+            for i in (0..b.len()).step_by(4096) {
+                // SAFETY: `i` is in bounds; a volatile read so the touch is not optimised away.
+                sum = sum.wrapping_add(unsafe { std::ptr::read_volatile(b.as_ptr().add(i)) });
+            }
+            std::hint::black_box(sum);
+            done += b.len() as u64;
+        };
+        fn dense(l: &Linear) -> Option<&TensorInfo> {
+            match l {
+                Linear::Dense(t) => Some(t),
+                Linear::Lb(_) => None,
+            }
+        }
+        for l in &self.layers {
+            walk(&l.attn_norm);
+            for lin in [&l.wq, &l.wk, &l.wv, &l.wo] {
+                if let Some(t) = dense(lin) {
+                    walk(t);
+                }
+            }
+            walk(&l.ffn_norm);
+            for lin in [&l.gate, &l.up, &l.down] {
+                if let Some(t) = dense(lin) {
+                    walk(t);
+                }
+            }
+        }
+        // The head is read by the first decode step, after every layer; a tied head is the embedding table.
+        walk(&self.out_norm);
+        if let Some(t) = dense(&self.head) {
+            walk(t);
+        }
+        if !matches!(&self.head, Linear::Dense(t) if t.offset == self.tok_embd.offset) {
+            walk(&self.tok_embd);
+        }
+        done
+    }
+
     /// The file's metadata, for the template detector and the host's telemetry.
     pub fn gguf(&self) -> &Gguf {
         &self.g
@@ -923,31 +992,36 @@ impl Model {
         let t0 = Instant::now();
         let total: usize = jobs.iter().map(|j| j.w.dims[1] as usize).sum();
         let acts = &acts[..nb];
-        pool.run(|wk, nw| {
-            let (lo, hi) = share(total, wk, nw);
+        // nafs-aql (Phase 34): rows are claimed in blocks, each worker's own contiguous share first, so a worker
+        // the system has descheduled does not hold the whole pass back (`pool::Claims`). A block is a few tens of
+        // microseconds of work: 64 rows against one activation, fewer as the batch widens.
+        let claims = Claims::new(total, pool.width(), claim_rows(nb));
+        pool.run(|wk, _| {
             let mut tmp = [0.0f32; MAX_BATCH];
-            let mut off = 0usize;
-            for j in jobs {
-                let n = j.w.dims[0] as usize;
-                let rows = j.w.dims[1] as usize;
-                let (a, z) = (lo.max(off), hi.min(off + rows));
-                if a < z {
-                    let rb = row_bytes(j.w.kind, n);
-                    let bytes = self.g.bytes(j.w);
-                    for r in (a - off)..(z - off) {
-                        dot_batch(j.w.kind, &bytes[r * rb..(r + 1) * rb], acts, &mut tmp[..nb]);
-                        for (b, &v) in tmp[..nb].iter().enumerate() {
-                            // SAFETY: `share` partitions the concatenated row space into
-                            // disjoint contiguous ranges, so `(job, r)` — hence the index
-                            // `b*rows + r` within this job's output — is written by exactly
-                            // one worker. The outputs outlive the call because `run` does
-                            // not return until every worker has finished.
-                            unsafe { j.out.set(b * rows + r, v) };
+            claims.drain(wk, |lo, hi| {
+                let mut off = 0usize;
+                for j in jobs {
+                    let n = j.w.dims[0] as usize;
+                    let rows = j.w.dims[1] as usize;
+                    let (a, z) = (lo.max(off), hi.min(off + rows));
+                    if a < z {
+                        let rb = row_bytes(j.w.kind, n);
+                        let bytes = self.g.bytes(j.w);
+                        for r in (a - off)..(z - off) {
+                            dot_batch(j.w.kind, &bytes[r * rb..(r + 1) * rb], acts, &mut tmp[..nb]);
+                            for (b, &v) in tmp[..nb].iter().enumerate() {
+                                // SAFETY: `Claims` hands every index of the concatenated row space to
+                                // exactly one call, so `(job, r)` — hence the index `b*rows + r` within
+                                // this job's output — is written by exactly one worker. The outputs
+                                // outlive the call because `run` does not return until every worker has
+                                // finished.
+                                unsafe { j.out.set(b * rows + r, v) };
+                            }
                         }
                     }
+                    off += rows;
                 }
-                off += rows;
-            }
+            });
         });
         // Counted once per matrix: the bytes crossed the memory interface once,
         // however many activations reused them.
@@ -1730,33 +1804,37 @@ impl Model {
         let scratch = SharedScratch(st8.attn.as_mut_ptr());
         let part = SharedBuf(st8.attn_part.as_mut_ptr());
         let part_ml = SharedMl(st8.attn_ml.as_mut_ptr());
-        let body = |wk: usize, nw: usize| {
-            let (lo, hi) = share(tasks, wk, nw);
+        // nafs-aql (Phase 34): tasks are claimed one at a time, own share first (`pool::Claims`); a task writes
+        // only its own slots, whoever runs it.
+        let claims = Claims::new(tasks, if plan.parallel { pool.width() } else { 1 }, 1);
+        let body = |wk: usize, _nw: usize| {
             // SAFETY: worker `wk` alone uses scratch `wk` (the pool has as many workers
             // as `State` has scratches).
             let sc = unsafe { scratch.get(wk) };
-            for i in lo..hi {
-                let t = attn::task(&sh, &plan, i);
-                attn::run(kv, li, &sh, q, &t, sc);
-                let pi = i % plan.pos_chunks;
-                for bi in 0..t.b1 - t.b0 {
-                    let b = t.b0 + bi;
-                    for g in 0..gqa {
-                        let r = bi * gqa + g;
-                        let o = &sc.o[r * hd..(r + 1) * hd];
-                        if split {
-                            // SAFETY: the slot `(kh, chunk, row)` belongs to this task.
-                            let slot = (t.kh * plan.pos_chunks + pi) * rows_all + b * gqa + g;
-                            unsafe { part.slice(slot * hd, hd) }.copy_from_slice(o);
-                            unsafe { part_ml.set(slot, (sc.m[r], sc.l[r])) };
-                        } else {
-                            // SAFETY: head `kh·gqa + g` of row `b` belongs to this task.
-                            let dst = unsafe { out.slice(b * qd + (t.kh * gqa + g) * hd, hd) };
-                            attn::finish_row(o, sc.l[r], rotated, dst);
+            claims.drain(wk, |lo, hi| {
+                for i in lo..hi {
+                    let t = attn::task(&sh, &plan, i);
+                    attn::run(kv, li, &sh, q, &t, sc);
+                    let pi = i % plan.pos_chunks;
+                    for bi in 0..t.b1 - t.b0 {
+                        let b = t.b0 + bi;
+                        for g in 0..gqa {
+                            let r = bi * gqa + g;
+                            let o = &sc.o[r * hd..(r + 1) * hd];
+                            if split {
+                                // SAFETY: the slot `(kh, chunk, row)` belongs to this task.
+                                let slot = (t.kh * plan.pos_chunks + pi) * rows_all + b * gqa + g;
+                                unsafe { part.slice(slot * hd, hd) }.copy_from_slice(o);
+                                unsafe { part_ml.set(slot, (sc.m[r], sc.l[r])) };
+                            } else {
+                                // SAFETY: head `kh·gqa + g` of row `b` belongs to this task.
+                                let dst = unsafe { out.slice(b * qd + (t.kh * gqa + g) * hd, hd) };
+                                attn::finish_row(o, sc.l[r], rotated, dst);
+                            }
                         }
                     }
                 }
-            }
+            });
         };
         if plan.parallel {
             pool.run(body);

@@ -1234,12 +1234,18 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             }
         }
         // ShadowPrefill (Phase 30): which shadows run for this request, and the prompt's layout.
-        let (shadow_between, shadow_arrival) = match req.shadow.as_deref() {
-            Some("off") => (false, false),
-            Some("between") => (true, false),
-            Some("arrival") => (false, true),
-            Some("both") => (true, true),
-            _ => (cfg.shadow.between_turns, cfg.shadow.at_arrival),
+        // "other" is "between" without the model that answered (the behaviour before Phase 34), for comparing the two.
+        let (shadow_between, shadow_arrival, shadow_own) = match req.shadow.as_deref() {
+            Some("off") => (false, false, false),
+            Some("between") => (true, false, cfg.shadow.answering_model),
+            Some("other") => (true, false, false),
+            Some("arrival") => (false, true, false),
+            Some("both") => (true, true, cfg.shadow.answering_model),
+            _ => (
+                cfg.shadow.between_turns,
+                cfg.shadow.at_arrival,
+                cfg.shadow.answering_model,
+            ),
         };
         // With a stable prefix the system prompt is the assistant's own text alone; what changes with the question
         // (the domain instruction, earlier answers, passages, notes) goes before the question, so the next turn's
@@ -2663,16 +2669,35 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         if let Err(e) = self.store.save_reply(&reply, ephemeral || req.lab, req.lab) {
             tracing::warn!(error = %e, reply = %reply.reply_id, "could not store the reply");
         }
-        // ShadowPrefill between turns: the model that did not answer reads the conversation so far, once nothing else
-        // runs, so if the next turn switches to it, it reads only the new question. A request that arrives first
-        // stops it; the server keeps what it read.
+        // ShadowPrefill between turns: once nothing else runs, the models read the conversation so far as the next turn
+        // will show it, so the next turn reads only its new question. A request that arrives first stops it; the server
+        // keeps what it read.
+        //
+        // Phase 34 (after FreeToken's semantic anchors): the model that answered reads it too, and first. Its cache
+        // holds this turn as it was generated: the question with its passages, the reply after a reasoning block. The
+        // next turn replays the question alone and the reply without that block, so the cache stops matching at the
+        // question, and the model would read the question and its own reply again before the new question (measured:
+        // `benchmarks/engine_phase34`). Then the model that did not answer, as before: if the turn switches, it reads
+        // only what is new.
         if shadow_between && !ephemeral && conv.is_some() {
-            let (target, thinking) = if mode == ReasoningMode::Slow {
-                (pair.s1.clone(), pair.s1.cfg.thinking)
+            let (own, other) = if mode == ReasoningMode::Slow {
+                (
+                    (pair.s2.clone(), true),
+                    (pair.s1.clone(), pair.s1.cfg.thinking),
+                )
             } else {
-                (pair.s2.clone(), true)
+                (
+                    (pair.s1.clone(), pair.s1.cfg.thinking),
+                    (pair.s2.clone(), true),
+                )
             };
-            if target.supports_shadow() {
+            let mut targets = Vec::with_capacity(2);
+            if shadow_own {
+                targets.push((own.0, own.1, "own"));
+            }
+            targets.push((other.0, other.1, "between"));
+            targets.retain(|(t, _, _)| t.supports_shadow());
+            if !targets.is_empty() {
                 let mut msgs = prompt.clone();
                 // The next turn's history holds the question as the person wrote it.
                 if let Some(last) = msgs.last_mut() {
@@ -2692,14 +2717,15 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                     // Counted as work in flight, so the idle-time workers (audits, labels) wait for it.
                     inflight.fetch_add(1, Ordering::SeqCst);
                     let _count = InflightCount(inflight);
-                    let t = Instant::now();
-                    match target.shadow(&msgs, thinking, 1.0).await {
-                        Ok((read, cached)) => {
-                            metrics::counter!("nafs_shadow_total", "kind" => "between")
-                                .increment(1);
-                            tracing::info!(model = %target.role, read, cached, ms = t.elapsed().as_millis() as u64, "shadow prefill between turns");
+                    for (target, thinking, kind) in targets {
+                        let t = Instant::now();
+                        match target.shadow(&msgs, thinking, 1.0).await {
+                            Ok((read, cached)) => {
+                                metrics::counter!("nafs_shadow_total", "kind" => kind).increment(1);
+                                tracing::info!(model = %target.role, kind, read, cached, ms = t.elapsed().as_millis() as u64, "shadow prefill between turns");
+                            }
+                            Err(e) => tracing::debug!(error = %e, "shadow prefill failed"),
                         }
-                        Err(e) => tracing::debug!(error = %e, "shadow prefill failed"),
                     }
                 });
                 if let Some(old) = self

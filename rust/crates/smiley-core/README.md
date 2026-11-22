@@ -30,5 +30,18 @@ Modifications for Nafs-Aql, each marked `// nafs-aql:` in the source:
   run's bit for bit; `attn.rs` itself is untouched.
 - `embed.rs` (`Embedder`) and `Model::final_hidden`: last-token-pooled, L2-normalised embeddings from a decoder-only
   embedding model (Qwen3-Embedding), with the text followed by `<|endoftext|>`; the output head is never read (Phase 20).
+- Phase 34, after FreeToken (arXiv 2608.16157; `docs/research/freetoken_assessment.md`):
+  - `prefix::CacheStore` and `prefix::supersedes`: the batching engine's store keeps the caches themselves. A finished
+    slot's cache moves in, and a request that continues the conversation takes it out; nothing is copied. The template's
+    turn token (`Template::turn_start`, `Engine::turn_starts`) decides when a kept cache may be taken and when it must be
+    copied from. `KvCache::copy_prefix_from` and `occupied_bytes` serve it. `PrefixStore` stays for the single session.
+  - `Engine::fuse_first_token`: the chunk that reaches the end of a prompt carries the prompt's last token and its logits,
+    so the first token needs no pass of its own.
+  - `pool::Claims`: rows of a matmul group and tasks of attention are claimed in blocks, each worker's own share first,
+    then from the back of the others', so a worker the system has descheduled does not hold a pass back
+    (`SMILEY_CORE_CLAIM=0`, `pool::set_work_conserving`).
+  - `Model::read_ahead` and `Gguf::will_need`: the weights are brought into memory in the order a pass reads them.
+  - `Engine::set_prefix_budget` / `flush_prefixes` / `handoff_stats`.
+  - Examples `handoff_bench` and `claim_bench` measure the first and third of these.
 
 The upstream tests are kept; those that need model files under `~/models` skip when the files are absent.

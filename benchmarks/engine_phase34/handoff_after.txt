@@ -1,0 +1,24 @@
+Qwen3-1.7B-Q4_K_M.gguf on 3 threads, 5 turns of +8 prompt tokens and 6 new tokens
+depth  turn  admit_ms  first_token_ms  decode_step_ms  finish_step_ms  prefilled
+  512     1       0.0           212.4            60.5            55.6          8
+  512     2       0.0           187.2            52.7            53.4          8
+  512     3       0.0           174.4            55.8            50.5          8
+  512     4       0.0           175.9            54.3            54.6          8
+  512     5       0.0           438.4            68.8            73.0          8
+ 2048     1       0.0           235.1            74.1            77.0          8
+ 2048     2       0.0           265.9            78.8            71.5          8
+ 2048     3       0.0           251.2            74.6            78.3          8
+ 2048     4       0.0           252.6            74.4            67.1          8
+ 2048     5       0.0           247.2            75.9            69.3          8
+Qwen3-4B-Thinking-2507-Q4_K_M.gguf on 3 threads, 5 turns of +8 prompt tokens and 6 new tokens
+depth  turn  admit_ms  first_token_ms  decode_step_ms  finish_step_ms  prefilled
+  512     1       0.0           437.3           109.9           110.8          8
+  512     2       0.0           440.1           112.1           112.0          8
+  512     3       0.0           449.0           110.7           110.7          8
+  512     4       0.0           445.9           110.6           112.3          8
+  512     5       0.0           464.6           112.7           110.8          8
+ 2048     1       0.0           585.7           141.0           136.8          8
+ 2048     2       0.0           570.9           138.2           146.6          8
+ 2048     3       0.0           636.4           148.2           153.4          8
+ 2048     4       0.0           664.3           138.8           137.0          8
+ 2048     5       0.0           572.7           136.0           136.1          8

@@ -1,0 +1,145 @@
+{
+ "threads": 3,
+ "rounds": 3,
+ "turns": 5,
+ "suffix_tokens": 8,
+ "new_tokens": 6,
+ "note": "medians over turns 2.. of every round; arms interleaved; the system1 rows of this run were taken while the load average was 60 to 95 (another session's builds) and are kept only under superseded_rows_load_60_to_95: see handoff_ab_system1.json for the repeat at load 6 to 12",
+ "rows": [
+  {
+   "model": "system2",
+   "depth": 512,
+   "arm": "move",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 534.7,
+   "decode_step_ms": 121.6,
+   "finish_step_ms": 119.0,
+   "handoff_ms": 0.0
+  },
+  {
+   "model": "system2",
+   "depth": 512,
+   "arm": "new",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 448.1,
+   "decode_step_ms": 122.0,
+   "finish_step_ms": 123.4,
+   "handoff_ms": 1.4
+  },
+  {
+   "model": "system2",
+   "depth": 512,
+   "arm": "old",
+   "n": 12,
+   "admit_ms": 41.0,
+   "first_token_ms": 601.9,
+   "decode_step_ms": 121.4,
+   "finish_step_ms": 196.2,
+   "handoff_ms": 115.8
+  },
+  {
+   "model": "system2",
+   "depth": 2048,
+   "arm": "move",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 658.0,
+   "decode_step_ms": 141.9,
+   "finish_step_ms": 143.9,
+   "handoff_ms": 2.0
+  },
+  {
+   "model": "system2",
+   "depth": 2048,
+   "arm": "new",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 568.0,
+   "decode_step_ms": 147.6,
+   "finish_step_ms": 141.8,
+   "handoff_ms": 0.0
+  },
+  {
+   "model": "system2",
+   "depth": 2048,
+   "arm": "old",
+   "n": 12,
+   "admit_ms": 95.8,
+   "first_token_ms": 1074.7,
+   "decode_step_ms": 150.7,
+   "finish_step_ms": 512.3,
+   "handoff_ms": 457.4
+  }
+ ],
+ "superseded_rows_load_60_to_95": [
+  {
+   "model": "system1",
+   "depth": 512,
+   "arm": "move",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 262.5,
+   "decode_step_ms": 63.2,
+   "finish_step_ms": 68.2,
+   "handoff_ms": 5.0
+  },
+  {
+   "model": "system1",
+   "depth": 512,
+   "arm": "new",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 206.2,
+   "decode_step_ms": 61.6,
+   "finish_step_ms": 59.3,
+   "handoff_ms": 0.0
+  },
+  {
+   "model": "system1",
+   "depth": 512,
+   "arm": "old",
+   "n": 12,
+   "admit_ms": 99.7,
+   "first_token_ms": 707.1,
+   "decode_step_ms": 155.7,
+   "finish_step_ms": 248.3,
+   "handoff_ms": 192.3
+  },
+  {
+   "model": "system1",
+   "depth": 2048,
+   "arm": "move",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 309.4,
+   "decode_step_ms": 79.9,
+   "finish_step_ms": 85.2,
+   "handoff_ms": 5.3
+  },
+  {
+   "model": "system1",
+   "depth": 2048,
+   "arm": "new",
+   "n": 12,
+   "admit_ms": 0.0,
+   "first_token_ms": 585.8,
+   "decode_step_ms": 186.2,
+   "finish_step_ms": 163.8,
+   "handoff_ms": 0.0
+  },
+  {
+   "model": "system1",
+   "depth": 2048,
+   "arm": "old",
+   "n": 12,
+   "admit_ms": 85.8,
+   "first_token_ms": 517.1,
+   "decode_step_ms": 112.2,
+   "finish_step_ms": 343.4,
+   "handoff_ms": 317.0
+  }
+ ],
+ "load": "system2 rows: load average 12 to 21"
+}

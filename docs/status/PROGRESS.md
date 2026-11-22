@@ -187,3 +187,40 @@ Decision 003: condition 1 (>= 10 items, no loss, median ratio < 0.7) is met; con
 ## Phase 32-33 (2026-11-14): saved diagrams, Nivo charts, and asking the models for them
 
 Phase 32 (`3bcc02c`): saved SVG now carries its styles, Save PNG, state diagrams, Expand, Copy LaTeX. Phase 33: real Nivo 0.99 vendored (`nivo.js`, built by `tools/nivo-bundle`), a `chart` JSON block with eleven kinds, a Save CSV/SVG/PNG bar, a lenient reader for small models (fence, brackets, shapes), `visual.rs` (one instruction with an example of the kind asked for; `assistant.visual_hints`), a sweep of the quick model (`scripts/visual_sweep.py`: nothing added 0/22 drawn; adopted wording 21/22 drawn and 16/22 exactly right). Decision 025; 197 renderer checks.
+
+## Phase 34 (2026-11-22): FreeToken assessed for Smiley Core
+
+Request: research FreeToken (arXiv 2608.16157, code in `third_party/FreeToken`), assess Smiley Core against it, implement what
+improves inference on a CPU, measure, review, document. Research and strategy: `docs/research/freetoken_assessment.md`.
+The machine was shared throughout (a second session building and testing the upstream Smiley project, a model download, a
+browser; load 8 to 25, at times far higher), so every comparison is interleaved and reported with its load.
+
+| When | Unit of work | Evidence |
+|---|---|---|
+| 06:35 | Paper read; FreeToken's source traced (anchors, double buffering, CPU executor, bandwidth profile, cache rebuild, loading). The code has one anchor (the tool-call opener), off by default, and it does nothing for full-attention models | research note §1 |
+| 06:45 | `models/` and `rust/target` found empty; owner approved the download of the two chat models and the embedding model (4.2 GB); engine rebuilt | `scripts/fetch_models.sh` |
+| 06:55 | Baseline: what a request pays to take a kept conversation over and give it back (27 to 74 ms in, 53 to 205 ms out) | `benchmarks/engine_phase34/handoff_before.txt` |
+| 07:05 | Engine: `prefix::CacheStore` (caches moved, not copied; turn tokens decide take or copy; a live slot is a source; the newest conversation always kept), first token from the last prompt chunk's pass, error returns the cache | `handoff_after.txt`; 7 serving tests against the real model pass |
+| 07:25 | Engine: `pool::Claims` (blocks claimed, own share first) in the matmul groups and attention; `Model::read_ahead`; server: `/v1/cache`, `--no-read-ahead`, `--no-fuse-first-token`, metrics; gateway: `[shadow] answering_model` | unit tests for claims, the store and the cache pass |
+| 07:57 | Interleaved comparison, three rounds, old engine against new: 4B model at 2,048 tokens, hand-off 457 ms to 0, first token 1.07 s to 0.57 s. The 1.7B rows ran at load 60 to 95 and are being repeated | `benchmarks/engine_phase34/handoff_ab.json` |
+| 08:13 | Claimed blocks, first version (idle workers took from the front of a neighbour's share): 5 to 10 % slower than fixed shares with three threads. Changed to take from the back and leave each owner its last block | `benchmarks/engine_phase34/claim_system1_run1.txt` |
+| 08:22 | Claimed blocks against fixed shares, 1.7B model, 12 paired rounds per setting (load 7 to 17): four threads write +19 % (12 of 12 rounds) and read +14 % (12 of 12); three threads +2 % (7 of 12, inside noise); with one busy thread beside the engine +8 % writing at either width | `benchmarks/engine_phase34/claim_system1.txt` |
+| 08:22 | Kernel guard: Q4_K 95 ns a row in the old and the new build (two interleaved runs); the claim sits outside the dot kernels | `benchmarks/engine_phase34/kbench_old_new.txt` |
+| 08:33 | 1.7B model repeated at load 6 to 12: hand-off 84 ms to 0 at 512 tokens and 240 ms to 0 at 2,048; first token 244 to 184 ms and 329 to 229 ms. Prompt reading on four threads: new at or above old in 3 of 3 pairs (58.1/52.3, 53.1/45.5, 51.2/50.0 tokens a second) | `handoff_ab_system1.json`, `prefill_old_new.txt` |
+| 08:40 | Six engine tests against the real model written for the new store, the copy from a live slot, the fused first token and the budget (`serve::tests`, the block after "Phase 34"); **not yet run** | `rust/crates/smiley-core/src/serve.rs` |
+| 08:45 | Whole-workspace release build started (needed for the gateway); session stopped here at its usage limit | - |
+
+**State when the session stopped (nothing committed, nothing pushed):**
+
+- Done and measured: zero-copy prefix store, first token from the last prompt chunk, claimed blocks (see the rows above).
+- Built, compiled, not yet measured: `Model::read_ahead` (`scripts/cold_start.py` is written for it), `[shadow] answering_model`
+  (`scripts/turn_reuse.py` is written for it; needs the full stack up), `/v1/cache`.
+- Not done: run the new engine tests and `cargo test --release --workspace`, `cargo fmt` and clippy; claim_bench on the 4B
+  model; the cold-start and between-turns measurements; the live sweeps (`scripts/live_sweep.sh`); the independent code
+  review (started, stopped unfinished); results section of `docs/research/freetoken_assessment.md`; decision 026;
+  ASSUMPTIONS A-175 onward; the report (`docs/report/sections/inference.tex`, `evaluation.tex`, `refs.bib`), README,
+  `docs/features_and_results.md`, `docs/roadmap/STATUS.md`, the config schema (`scripts/gen_config_schema.py`); commit and
+  push to GitHub `origin/main`.
+- Left for the owner: `models/README.md` shows as deleted in the working tree (it was deleted before this session; not
+  staged). A side worktree of the previous commit, used for old-against-new runs, is registered in git
+  (`git worktree list`); remove it with `git worktree remove --force <path>` when the comparisons are finished.

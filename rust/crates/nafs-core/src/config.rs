@@ -546,6 +546,9 @@ impl Default for ContextCfg {
 pub struct ShadowCfg {
     /// After a reply, while nothing else runs, the model that did not answer reads the conversation so far.
     pub between_turns: bool,
+    /// Between turns, the model that answered reads the conversation as well, and first (Phase 34): the next turn
+    /// replays its reply without the reasoning block it was generated after, so its own cache stops matching there.
+    pub answering_model: bool,
     /// Wait this long after a reply, with no request in flight, before starting.
     pub idle_delay_ms: u64,
     /// While the quick model drafts, the reasoning model reads the same prompt (both share the cores).
@@ -562,6 +565,7 @@ impl Default for ShadowCfg {
         // 2.0 s with the same right answers (42/50 both layouts); a shadow during the draft slowed every draft by 75 %.
         Self {
             between_turns: true,
+            answering_model: true,
             idle_delay_ms: 1500,
             at_arrival: false,
             arrival_duty: 0.25,

@@ -1,0 +1,6 @@
+old 1: Qwen3-1.7B-Q4_K_M.gguf on 4 threads: a prompt of 256 tokens, 2 rounds chunk   64: best   52.3 tokens/s, median   52.3  matmul 90 % attention 3 % head 0 % other 7 %  (rounds: 52.3 52.3) 
+new 1: Qwen3-1.7B-Q4_K_M.gguf on 4 threads: a prompt of 256 tokens, 2 rounds chunk   64: best   58.1 tokens/s, median   58.1  matmul 89 % attention 3 % head 0 % other 8 %  (rounds: 58.1 57.6) 
+old 2: Qwen3-1.7B-Q4_K_M.gguf on 4 threads: a prompt of 256 tokens, 2 rounds chunk   64: best   45.5 tokens/s, median   45.5  matmul 89 % attention 3 % head 0 % other 7 %  (rounds: 45.5 37.1) 
+new 2: Qwen3-1.7B-Q4_K_M.gguf on 4 threads: a prompt of 256 tokens, 2 rounds chunk   64: best   53.1 tokens/s, median   53.1  matmul 90 % attention 2 % head 0 % other 7 %  (rounds: 47.8 53.1) 
+old 3: Qwen3-1.7B-Q4_K_M.gguf on 4 threads: a prompt of 256 tokens, 2 rounds chunk   64: best   50.0 tokens/s, median   50.0  matmul 90 % attention 3 % head 0 % other 7 %  (rounds: 50.0 46.5) 
+new 3: Qwen3-1.7B-Q4_K_M.gguf on 4 threads: a prompt of 256 tokens, 2 rounds chunk   64: best   51.2 tokens/s, median   51.2  matmul 91 % attention 2 % head 0 % other 7 %  (rounds: 49.8 51.2) 

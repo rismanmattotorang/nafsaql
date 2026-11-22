@@ -96,6 +96,15 @@ impl Template {
         ids
     }
 
+    // nafs-aql (Phase 34): the token that opens every turn under this template. A harness edits a conversation a
+    // whole turn at a time, so this is where a kept cache's reusable part ends (`prefix::supersedes`).
+    pub fn turn_start(self) -> &'static str {
+        match self {
+            Template::ChatMl | Template::Qwen3 => "<|im_start|>",
+            Template::Llama3 => "<|start_header_id|>",
+        }
+    }
+
     /// The system message the model's own template inserts when the caller gives
     /// none. SmolLM2 and Qwen2.5 each name themselves; Llama 3.2 inserts only its
     /// date header (rendered in `system_block`).

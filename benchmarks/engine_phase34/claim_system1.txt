@@ -1,0 +1,14 @@
+Qwen3-1.7B-Q4_K_M.gguf: 12 rounds, 20 tokens written at depth 128, a prompt of 128 tokens read in chunks of 64
+threads  busy  shares   write_tok_s  read_tok_s
+      3     0  fixed          20.77        52.2
+      3     0  claimed        21.78        53.7
+      3     0  claimed/fixed, median of 12 paired rounds: write 1.017 (7 of 12 faster), read 1.025 (7 of 12 faster)
+      3     1  fixed          13.01        35.8
+      3     1  claimed        14.56        38.4
+      3     1  claimed/fixed, median of 12 paired rounds: write 1.077 (8 of 12 faster), read 0.995 (5 of 12 faster)
+      4     0  fixed          14.72        47.5
+      4     0  claimed        17.53        54.3
+      4     0  claimed/fixed, median of 12 paired rounds: write 1.189 (12 of 12 faster), read 1.137 (12 of 12 faster)
+      4     1  fixed          14.10        43.1
+      4     1  claimed        14.91        45.9
+      4     1  claimed/fixed, median of 12 paired rounds: write 1.078 (9 of 12 faster), read 1.054 (9 of 12 faster)

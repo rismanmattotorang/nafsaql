@@ -311,6 +311,21 @@ impl Gguf {
         &self.map[s..s + t.bytes() as usize]
     }
 
+    // nafs-aql (Phase 34): tell the system `t`'s bytes will be read soon, so it reads them from the file in large
+    // sequential pieces now instead of a page at a time when they are first touched. Advice only: an error (or a
+    // system without `madvise`) changes nothing but speed.
+    pub fn will_need(&self, t: &TensorInfo) {
+        #[cfg(unix)]
+        {
+            let s = self.data_start + t.offset as usize;
+            let _ = self
+                .map
+                .advise_range(memmap2::Advice::WillNeed, s, t.bytes() as usize);
+        }
+        #[cfg(not(unix))]
+        let _ = t;
+    }
+
     pub fn tensor(&self, name: &str) -> Result<&TensorInfo, String> {
         self.tensors
             .get(name)

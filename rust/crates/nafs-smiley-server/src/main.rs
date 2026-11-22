@@ -19,6 +19,9 @@
 //! - `memory_embeds` (Phase 20) -> Memorilla's memory tokens: the vectors replace the embeddings of the placeholder
 //!   token's positions in the prompt (`Engine::admit_with_inputs`).
 //!
+//! - `GET /v1/cache`, `POST /v1/cache` (Phase 34): the prefix store's size and budget, and changing them while the
+//!   server runs (`{"prefix_cache_mb": 256}`, `{"flush": true}`), applied by the engine thread between steps.
+//!
 //! One session per process (one stream at a time; requests queue): run one process per model, as with llama-server.
 mod embed;
 
@@ -88,6 +91,15 @@ struct Args {
     /// beside a model must not switch the weights silently. A missing or corrupt sidecar refuses to start.
     #[arg(long, default_value_t = false)]
     littlebit: bool,
+    /// Do not read the weights into memory ahead of the first request (Phase 34). By default a thread walks the model
+    /// file in the order a forward pass reads it, so a freshly started server's first request does not wait for the
+    /// disk a page at a time; the server answers requests meanwhile.
+    #[arg(long = "no-read-ahead", default_value_t = false)]
+    no_read_ahead: bool,
+    /// Give the prompt's last token a pass over the weights of its own, as before Phase 34, instead of sampling the
+    /// first token from the last prompt chunk's pass (for measuring the two against each other).
+    #[arg(long = "no-fuse-first-token", default_value_t = false)]
+    no_fuse_first_token: bool,
     /// Serve an embedding model (Qwen3-Embedding) behind `POST /v1/embeddings` instead of the chat API (Phase 20).
     #[arg(long, default_value_t = false)]
     embedding: bool,
@@ -185,7 +197,25 @@ async fn main() {
         a.prefix_cache_mb << 20,
     );
     engine.shadow_every = a.shadow_every;
+    engine.fuse_first_token = !a.no_fuse_first_token;
+    // The token that opens a turn: with it the engine can tell a conversation that has moved past its last turn
+    // (whose cache the next request takes) from another conversation or another sample (copied from).
+    engine.turn_starts = model.tk.id_of(template.turn_start()).into_iter().collect();
     let cache_mb = engine.cache_bytes_per_slot() >> 20;
+    if !a.no_read_ahead {
+        let m = model.clone();
+        let _ = std::thread::Builder::new()
+            .name("smiley-read-ahead".into())
+            .spawn(move || {
+                let t = Instant::now();
+                let bytes = m.read_ahead();
+                tracing::info!(
+                    "read-ahead: {} MB of weights in memory after {:.1} s",
+                    bytes >> 20,
+                    t.elapsed().as_secs_f64()
+                );
+            });
+    }
     let (jobs, rx) = std::sync::mpsc::channel::<EngineMsg>();
     let shared = Arc::new(EngineShared::default());
     {
@@ -240,6 +270,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/v1/models", get(models))
         .route("/metrics", get(metrics))
+        .route("/v1/cache", get(cache_get).post(cache_post))
         .route("/v1/chat/completions", post(chat))
         .with_state(app);
     let addr = format!("{}:{}", a.host, a.port);
@@ -259,8 +290,14 @@ async fn models(State(s): State<Arc<App>>) -> Json<Value> {
 }
 
 async fn metrics(State(s): State<Arc<App>>) -> String {
+    let (entries, bytes, hits, saved) = *s
+        .engine
+        .prefix_full
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let (taken, copied, evicted) = *s.engine.handoff.lock().unwrap_or_else(|e| e.into_inner());
     format!(
-        "# Smiley Core server\nllamacpp:requests_processing {}\nllamacpp:requests_deferred {}\nsmiley_slots_total {}\nsmiley_requests_total {}\nsmiley_tokens_predicted_total {}\nsmiley_decode_steps_total {}\nsmiley_decode_rows_total {}\nsmiley_uptime_seconds {}\n",
+        "# Smiley Core server\nllamacpp:requests_processing {}\nllamacpp:requests_deferred {}\nsmiley_slots_total {}\nsmiley_requests_total {}\nsmiley_tokens_predicted_total {}\nsmiley_decode_steps_total {}\nsmiley_decode_rows_total {}\nsmiley_uptime_seconds {}\nsmiley_prefix_entries {}\nsmiley_prefix_bytes {}\nsmiley_prefix_budget_bytes {}\nsmiley_prefix_reuses_total {}\nsmiley_prefix_positions_saved_total {}\nsmiley_prefix_taken_total {}\nsmiley_prefix_copied_total {}\nsmiley_prefix_evicted_total {}\n",
         s.engine.active.load(Ordering::SeqCst),
         s.engine.waiting.load(Ordering::SeqCst),
         s.max_slots,
@@ -268,8 +305,83 @@ async fn metrics(State(s): State<Arc<App>>) -> String {
         s.tokens.load(Ordering::SeqCst),
         s.engine.steps.load(Ordering::SeqCst),
         s.engine.rows.load(Ordering::SeqCst),
-        s.started.elapsed().as_secs()
+        s.started.elapsed().as_secs(),
+        entries,
+        bytes,
+        s.engine.budget.load(Ordering::SeqCst),
+        hits,
+        saved,
+        taken,
+        copied,
+        evicted
     )
+}
+
+/// The prefix store as the engine thread last published it.
+fn cache_json(c: &CacheState) -> Value {
+    json!({"prefix_store": {"entries": c.entries, "mb": c.bytes >> 20, "bytes": c.bytes,
+        "budget_mb": c.budget >> 20, "reuses": c.hits, "positions_saved": c.saved,
+        "taken": c.taken, "copied": c.copied, "evicted": c.evicted}})
+}
+
+async fn cache_get(State(s): State<Arc<App>>) -> Response {
+    cache_ask(&s, None, false).await
+}
+
+/// Largest prefix-store budget a request may set (MB): a typing slip must not ask for more than a machine has.
+const MAX_PREFIX_CACHE_MB: u64 = 1 << 16;
+
+/// `POST /v1/cache {"prefix_cache_mb": n}` changes the memory the prefix store may hold; `{"flush": true}` drops what
+/// it holds. Both are applied by the engine thread between two steps, so requests being served are not disturbed
+/// (their caches are their own); the reply is the store after the change.
+async fn cache_post(State(s): State<Arc<App>>, Json(b): Json<Value>) -> Response {
+    let budget = match &b["prefix_cache_mb"] {
+        Value::Null => None,
+        v => match v.as_u64() {
+            Some(mb) if mb <= MAX_PREFIX_CACHE_MB => Some((mb as usize) << 20),
+            _ => {
+                return bad(format!(
+                    "prefix_cache_mb must be a whole number of megabytes from 0 to {MAX_PREFIX_CACHE_MB}"
+                ))
+            }
+        },
+    };
+    let flush = match &b["flush"] {
+        Value::Null => false,
+        Value::Bool(f) => *f,
+        _ => return bad("flush must be true or false"),
+    };
+    if budget.is_none() && !flush {
+        return bad("give prefix_cache_mb, flush, or both");
+    }
+    cache_ask(&s, budget, flush).await
+}
+
+async fn cache_ask(s: &App, budget: Option<usize>, flush: bool) -> Response {
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    if s.jobs
+        .send(EngineMsg::Cache {
+            budget,
+            flush,
+            reply: tx,
+        })
+        .is_err()
+    {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error": {"message": "the engine is not running", "type": "server_error", "code": 503}})),
+        )
+            .into_response();
+    }
+    // The engine thread answers between two steps: at most one prompt chunk or one token away.
+    match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
+        Ok(Ok(c)) => Json(cache_json(&c)).into_response(),
+        _ => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"error": {"message": "the engine did not answer", "type": "server_error", "code": 503}})),
+        )
+            .into_response(),
+    }
 }
 
 fn bad(msg: impl Into<String>) -> Response {
@@ -505,6 +617,49 @@ struct Job {
 enum EngineMsg {
     Run(Box<Job>),
     Cancel(SlotId),
+    /// Phase 34: read the prefix store's state, after changing its budget and/or dropping what it holds.
+    Cache {
+        budget: Option<usize>,
+        flush: bool,
+        reply: tokio::sync::oneshot::Sender<CacheState>,
+    },
+}
+
+/// The prefix store, as `/v1/cache` reports it.
+#[derive(Debug, Clone, Copy, Default)]
+struct CacheState {
+    entries: usize,
+    bytes: usize,
+    budget: usize,
+    hits: u64,
+    saved: u64,
+    taken: u64,
+    copied: u64,
+    evicted: u64,
+}
+
+fn cache_state(engine: &Engine) -> CacheState {
+    let (entries, bytes, hits, saved) = engine.prefix_stats();
+    let (taken, copied, evicted) = engine.handoff_stats();
+    CacheState {
+        entries,
+        bytes,
+        budget: engine.prefix_budget(),
+        hits,
+        saved,
+        taken,
+        copied,
+        evicted,
+    }
+}
+
+/// Publish the prefix store's counters for `/metrics` and the timings block.
+fn publish_cache(engine: &Engine, shared: &EngineShared) {
+    let c = cache_state(engine);
+    shared.budget.store(c.budget as u64, Ordering::SeqCst);
+    *shared.prefix_full.lock().unwrap_or_else(|e| e.into_inner()) =
+        (c.entries, c.bytes, c.hits, c.saved);
+    *shared.handoff.lock().unwrap_or_else(|e| e.into_inner()) = (c.taken, c.copied, c.evicted);
 }
 
 /// The engine thread: it owns the model and serves every request, several at a time in one pass over the weights.
@@ -520,14 +675,32 @@ fn engine_thread(
     // ShadowPrefill: the duty of each shadow slot.
     let mut duties: HashMap<SlotId, f32> = HashMap::new();
     let mut waiting: VecDeque<Job> = VecDeque::new();
-    let take = |msg,
-                waiting: &mut VecDeque<Job>,
-                engine: &mut Engine,
-                routes: &mut HashMap<_, _>| match msg {
+    publish_cache(&engine, &shared);
+    let shared_take = shared.clone();
+    // Every message is taken between two steps of the engine, which is the safe point for all of them: no pass
+    // over the weights is in progress, and each slot's cache is whole.
+    let take = move |msg,
+                     waiting: &mut VecDeque<Job>,
+                     engine: &mut Engine,
+                     routes: &mut HashMap<_, _>| match msg {
         EngineMsg::Run(j) => waiting.push_back(*j),
         EngineMsg::Cancel(id) => {
             engine.cancel(id);
             routes.remove(&id);
+        }
+        EngineMsg::Cache {
+            budget,
+            flush,
+            reply,
+        } => {
+            if flush {
+                engine.flush_prefixes();
+            }
+            if let Some(b) = budget {
+                engine.set_prefix_budget(b);
+            }
+            publish_cache(engine, &shared_take);
+            let _ = reply.send(cache_state(engine));
         }
     };
     loop {
@@ -615,16 +788,7 @@ fn engine_thread(
         }
         shared.steps.store(engine.decode_steps, Ordering::SeqCst);
         shared.rows.store(engine.decode_rows, Ordering::SeqCst);
-        let (entries, bytes, hits, saved) = engine.prefix_stats();
-        shared.prefix.store(
-            ((entries as u64) << 48)
-                | ((bytes as u64 >> 20) << 32)
-                | ((hits & 0xffff) << 16)
-                | (saved & 0xffff),
-            Ordering::SeqCst,
-        );
-        *shared.prefix_full.lock().unwrap_or_else(|e| e.into_inner()) =
-            (entries, bytes, hits, saved);
+        publish_cache(&engine, &shared);
         *shared.phases.lock().unwrap_or_else(|e| e.into_inner()) = engine.phases_ms();
         *shared.shadow.lock().unwrap_or_else(|e| e.into_inner()) = (
             engine.shadow_done,
@@ -641,8 +805,10 @@ struct EngineShared {
     waiting: AtomicUsize,
     steps: AtomicU64,
     rows: AtomicU64,
-    prefix: AtomicU64,
     prefix_full: Mutex<(usize, usize, u64, u64)>,
+    /// Phase 34: reuses that took a kept cache, reuses that copied from one, caches evicted; and the store's budget.
+    handoff: Mutex<(u64, u64, u64)>,
+    budget: AtomicU64,
     phases: Mutex<[f64; 6]>,
     /// ShadowPrefill: shadows read to the end, shadows a real request took over, positions shadows read.
     shadow: Mutex<(u64, u64, u64)>,
@@ -821,6 +987,7 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
     }
     let wall_ms = t0.elapsed().as_secs_f64() * 1e3;
     let shadow = *app.engine.shadow.lock().unwrap_or_else(|e| e.into_inner());
+    let (taken, copied, evicted) = *app.engine.handoff.lock().unwrap_or_else(|e| e.into_inner());
     let _ = tx.send(Msg::Done {
         finish,
         usage: json!({"prompt_tokens": run.prompt_n + run.cache_n, "completion_tokens": predicted_n, "total_tokens": run.prompt_n + run.cache_n + predicted_n}),
@@ -831,7 +998,8 @@ async fn generate(app: &App, p: &Plan, tx: tokio::sync::mpsc::UnboundedSender<Ms
                 "concurrency": {"slots": app.max_slots, "active": app.engine.active.load(Ordering::SeqCst), "waiting": app.engine.waiting.load(Ordering::SeqCst),
                     "decode_steps": steps, "decode_rows": rows,
                     "rows_per_step": if steps > 0 { rows as f64 / steps as f64 } else { 0.0 }},
-                "prefix_store": {"entries": entries, "mb": bytes >> 20, "restores": hits, "positions_saved": saved},
+                "prefix_store": {"entries": entries, "mb": bytes >> 20, "restores": hits, "positions_saved": saved,
+                    "taken": taken, "copied": copied, "evicted": evicted},
                 "shadow": {"done": shadow.0, "taken_over": shadow.1, "positions": shadow.2}}}),
     });
 }

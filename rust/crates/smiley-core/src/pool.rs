@@ -344,6 +344,162 @@ pub fn share(total: usize, w: usize, n: usize) -> (usize, usize) {
     (lo, hi)
 }
 
+// nafs-aql (Phase 34, after FreeToken's CPU executor): shares that are handed out in blocks, so that the workers
+// that are running finish the work of one that is not.
+//
+// # Why
+//
+// `share` gives each worker a fixed range, and a fork-join ends when the slowest worker ends. On a machine that is
+// the engine's alone that is the right split: the ranges are contiguous, so each worker's reads are one stream. On
+// a personal machine it is not the engine's alone. When another process takes a core, one worker is descheduled in
+// the middle of its range, and the others finish theirs and wait — the whole pass runs at the pace of the one
+// worker that is not running. FreeToken's CPU executor (its workers claim 32-row blocks from a shared counter)
+// does not have that failure, because unclaimed work is anybody's.
+//
+// # How
+//
+// Each worker owns a contiguous share and claims `block` items at a time from its front: on a quiet machine the
+// reads are the same streams as with fixed shares, and the cost is one uncontended compare-and-swap per block. A
+// worker whose own share is done takes blocks from the *back* of the others' shares, and leaves each owner its last
+// block. From the back, because the front is where the owner is reading: a thief there would fetch the lines the
+// owner's prefetcher has already asked for, and on a machine bound by memory that traffic is paid twice (FreeToken
+// caps its prefetch distance for the same reason). The first version of this claimed from the front and was 5 to
+// 10 % slower than fixed shares with three workers. An item is claimed exactly once (front and back move toward
+// each other in one atomic word), so the disjoint-writes argument of `share` still holds, and the result does not
+// depend on who computed which block: every item is computed from the same inputs.
+
+/// Workers a `Claims` can serve; a wider pool falls back to fixed shares.
+const MAX_CLAIM_WORKERS: usize = 32;
+
+/// One worker's unclaimed range, front in the high half and back in the low half of one word, alone on its cache
+/// line so that an owner claiming from its own share does not contend with anyone.
+#[repr(align(64))]
+struct Range(AtomicU64);
+
+#[inline]
+fn pack(front: usize, back: usize) -> u64 {
+    ((front as u64) << 32) | back as u64
+}
+
+#[inline]
+fn unpack(v: u64) -> (usize, usize) {
+    ((v >> 32) as usize, (v & 0xffff_ffff) as usize)
+}
+
+static WORK_CONSERVING: AtomicBool = AtomicBool::new(true);
+
+/// Whether a worker that has finished its own share takes work from the others (the default), or every worker runs
+/// exactly its own share as `share` gives it. `SMILEY_CORE_CLAIM=0` in the environment turns it off at start; this
+/// switch exists so the two can be measured against each other in one process.
+pub fn set_work_conserving(on: bool) {
+    WORK_CONSERVING.store(on, Ordering::Relaxed);
+}
+
+pub fn work_conserving() -> bool {
+    use std::sync::Once;
+    static ENV: Once = Once::new();
+    ENV.call_once(|| {
+        if std::env::var("SMILEY_CORE_CLAIM").as_deref() == Ok("0") {
+            WORK_CONSERVING.store(false, Ordering::Relaxed);
+        }
+    });
+    WORK_CONSERVING.load(Ordering::Relaxed)
+}
+
+/// `total` items split among `n` workers, claimed in blocks: see the note above. Every one of the `n` workers must
+/// call `drain` (a pool's `run` does): a worker's last block is its own to take.
+pub struct Claims {
+    ranges: [Range; MAX_CLAIM_WORKERS],
+    total: usize,
+    n: usize,
+    block: usize,
+    steal: bool,
+}
+
+impl Claims {
+    pub fn new(total: usize, n: usize, block: usize) -> Claims {
+        let n = n.max(1);
+        let steal =
+            n > 1 && n <= MAX_CLAIM_WORKERS && total <= u32::MAX as usize && work_conserving();
+        let ranges: [Range; MAX_CLAIM_WORKERS] = std::array::from_fn(|w| {
+            let (lo, hi) = if steal && w < n {
+                share(total, w, n)
+            } else {
+                (0, 0)
+            };
+            Range(AtomicU64::new(pack(lo, hi)))
+        });
+        Claims {
+            ranges,
+            total,
+            n,
+            block: block.max(1),
+            steal,
+        }
+    }
+
+    /// Run `f(lo, hi)` on every block worker `w` gets: its own share front to back, then blocks from the back of
+    /// the shares the other workers have not finished. Once all `n` workers have drained, every item of `total`
+    /// has been passed to exactly one call.
+    #[inline]
+    pub fn drain(&self, w: usize, mut f: impl FnMut(usize, usize)) {
+        if !self.steal {
+            let (lo, hi) = share(self.total, w, self.n);
+            if lo < hi {
+                f(lo, hi);
+            }
+            return;
+        }
+        // Relaxed throughout: a claim only decides who computes a block; what the block's computation writes
+        // reaches the caller through the pool's own join.
+        let own = &self.ranges[w].0;
+        let mut cur = own.load(Ordering::Relaxed);
+        loop {
+            let (front, back) = unpack(cur);
+            if front >= back {
+                break;
+            }
+            let next = (front + self.block).min(back);
+            match own.compare_exchange_weak(
+                cur,
+                pack(next, back),
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => {
+                    f(front, next);
+                    cur = own.load(Ordering::Relaxed);
+                }
+                Err(now) => cur = now,
+            }
+        }
+        for k in 1..self.n {
+            let theirs = &self.ranges[(w + k) % self.n].0;
+            let mut cur = theirs.load(Ordering::Relaxed);
+            loop {
+                let (front, back) = unpack(cur);
+                // The owner keeps its last block: it is running, or will be, and that block is where it reads.
+                if back <= front + self.block {
+                    break;
+                }
+                let from = back - self.block;
+                match theirs.compare_exchange_weak(
+                    cur,
+                    pack(front, from),
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                ) {
+                    Ok(_) => {
+                        f(from, back);
+                        cur = theirs.load(Ordering::Relaxed);
+                    }
+                    Err(now) => cur = now,
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -491,5 +647,84 @@ mod tests {
         }
         assert_eq!(c.load(Ordering::Relaxed), 4000);
         drop(p); // must join every worker rather than hang
+    }
+
+    // nafs-aql: claimed blocks cover every item exactly once, whatever the worker count and block size, with and
+    // without taking from other workers, and also when one worker does nothing at all (the others take its share).
+    #[test]
+    fn claims_cover_every_item_exactly_once() {
+        for steal in [true, false] {
+            set_work_conserving(steal);
+            for n in [1usize, 2, 3, 4, 8] {
+                let p = Pool::new(n);
+                for total in [0usize, 1, 7, 100, 2560] {
+                    for block in [1usize, 8, 64, 5000] {
+                        let hits: Vec<AtomicUsize> =
+                            (0..total).map(|_| AtomicUsize::new(0)).collect();
+                        let claims = Claims::new(total, n, block);
+                        p.run(|w, _| {
+                            claims.drain(w, |lo, hi| {
+                                assert!(lo < hi && hi <= total);
+                                for h in &hits[lo..hi] {
+                                    h.fetch_add(1, Ordering::Relaxed);
+                                }
+                            })
+                        });
+                        assert!(
+                            hits.iter().all(|h| h.load(Ordering::Relaxed) == 1),
+                            "steal={steal} n={n} total={total} block={block}"
+                        );
+                    }
+                }
+            }
+        }
+        set_work_conserving(true);
+        // A worker that runs before the others: its own share front to back, then the others' from the back, all
+        // but each owner's last block, which the owner finds when it arrives.
+        let (n, total) = (4usize, 1000usize);
+        let hits: Vec<AtomicUsize> = (0..total).map(|_| AtomicUsize::new(0)).collect();
+        let claims = Claims::new(total, n, 16);
+        let mut order = vec![];
+        claims.drain(2, |lo, hi| {
+            order.push((lo, hi));
+            for h in &hits[lo..hi] {
+                h.fetch_add(1, Ordering::Relaxed);
+            }
+        });
+        assert_eq!(
+            order[0],
+            (500, 516),
+            "a worker starts at the front of its own share"
+        );
+        assert!(
+            order[..16].windows(2).all(|w| w[1].0 == w[0].1),
+            "and walks it front to back"
+        );
+        assert_eq!(
+            order[16],
+            (984, 1000),
+            "then takes from the back of the next worker's"
+        );
+        let done: usize = hits.iter().map(|h| h.load(Ordering::Relaxed)).sum();
+        // A share is 250 items: fifteen whole blocks are taken from its back, and ten items stay with the owner.
+        assert_eq!(done, total - 3 * 10, "every owner keeps its last block");
+        for w in [0usize, 1, 3] {
+            let mut mine = vec![];
+            claims.drain(w, |lo, hi| {
+                mine.push((lo, hi));
+                for h in &hits[lo..hi] {
+                    h.fetch_add(1, Ordering::Relaxed);
+                }
+            });
+            assert_eq!(mine, vec![(w * 250, w * 250 + 10)]);
+        }
+        assert!(hits.iter().all(|h| h.load(Ordering::Relaxed) == 1));
+        // A pool wider than the cursor table falls back to fixed shares.
+        let wide = Claims::new(100, MAX_CLAIM_WORKERS + 1, 4);
+        let mut seen = 0;
+        for w in 0..MAX_CLAIM_WORKERS + 1 {
+            wide.drain(w, |lo, hi| seen += hi - lo);
+        }
+        assert_eq!(seen, 100);
     }
 }

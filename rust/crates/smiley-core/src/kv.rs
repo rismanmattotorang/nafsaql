@@ -127,6 +127,9 @@ pub struct KvCache {
     rotated: bool,
     /// Positions currently filled.
     pub len: usize,
+    // nafs-aql: the most positions this cache has held since it was made. The buffers are allocated zeroed and the
+    // system backs a page only once it is written, so this, not `max_ctx`, is what the cache occupies in memory.
+    high: usize,
 }
 
 impl KvCache {
@@ -157,7 +160,46 @@ impl KvCache {
                 && head_dim <= MAX_ROTATED_DIM
                 && std::env::var("SMILEY_CORE_KV_ROTATE").as_deref() != Ok("0"),
             len: 0,
+            high: 0,
         }
+    }
+
+    // nafs-aql: bytes of memory this cache occupies: the positions it has ever held (see `high`), K and V and scales.
+    pub fn occupied_bytes(&self) -> usize {
+        self.high.max(self.len) * self.bytes_per_position() as usize
+    }
+
+    // nafs-aql: copy the first `len` positions of `src` (a cache of the same shape, possibly of another length) and
+    // make them the filled length. False, and no change, when the shapes differ or `src` holds fewer positions. This
+    // is the copy a request pays when it shares a beginning with a cache somebody else still needs; a request that
+    // continues a kept conversation takes the cache itself instead (`prefix::CacheStore`).
+    pub fn copy_prefix_from(&mut self, src: &KvCache, len: usize) -> bool {
+        if src.prec != self.prec
+            || src.rotated != self.rotated
+            || src.n_layer != self.n_layer
+            || src.n_kv_head != self.n_kv_head
+            || src.head_dim != self.head_dim
+            || len > src.len
+            || len > self.max_ctx
+        {
+            return false;
+        }
+        let vectors = self.n_layer * self.n_kv_head;
+        let elem = self.head_dim * self.prec.elem();
+        for vec in 0..vectors {
+            let dst = vec * self.max_ctx * elem;
+            let from = vec * src.max_ctx * elem;
+            self.k[dst..dst + len * elem].copy_from_slice(&src.k[from..from + len * elem]);
+            self.v[dst..dst + len * elem].copy_from_slice(&src.v[from..from + len * elem]);
+            if self.prec == KvPrec::I8 {
+                let (d, sc) = (vec * self.max_ctx, vec * src.max_ctx);
+                self.ks[d..d + len].copy_from_slice(&src.ks[sc..sc + len]);
+                self.vs[d..d + len].copy_from_slice(&src.vs[sc..sc + len]);
+            }
+        }
+        self.high = self.high.max(self.len).max(len);
+        self.len = len;
+        true
     }
 
     // nafs-aql: positions currently filled.
@@ -221,6 +263,7 @@ impl KvCache {
                 self.vs[d..d + len].copy_from_slice(&snap.vs[sc..sc + len]);
             }
         }
+        self.high = self.high.max(self.len).max(len);
         self.len = len;
         true
     }
@@ -233,6 +276,7 @@ impl KvCache {
     }
 
     pub fn clear(&mut self) {
+        self.high = self.high.max(self.len);
         self.len = 0;
     }
 
@@ -240,6 +284,7 @@ impl KvCache {
     /// partly accepted: the rejected positions were written before verification and
     /// must not be visible to the next step.
     pub fn truncate(&mut self, pos: usize) {
+        self.high = self.high.max(self.len);
         self.len = self.len.min(pos);
     }
 
@@ -327,6 +372,7 @@ impl KvCache {
     }
 
     pub fn advance(&mut self, to: usize) {
+        self.high = self.high.max(self.len).max(to);
         self.len = to;
     }
 
@@ -504,6 +550,53 @@ mod tests {
             assert_eq!(b.len, 3);
             let mut other = KvCache::new(prec, 3, 4, hd, 16);
             assert!(!other.restore(&snap, 2));
+        }
+    }
+
+    // nafs-aql: a prefix copied from another cache reads back as the source does, whatever the two caches' lengths,
+    // and a cache accounts for the most positions it has held, not for what it holds now.
+    #[test]
+    fn a_prefix_copies_between_caches_of_different_lengths() {
+        for prec in [KvPrec::F16, KvPrec::I8] {
+            let hd = 32;
+            let mut a = KvCache::new(prec, 3, 2, hd, 16);
+            for pos in 0..6 {
+                for layer in 0..3 {
+                    for head in 0..2 {
+                        let k = ramp(hd, 1.0 + (layer * 2 + head + pos) as f32);
+                        let v = ramp(hd, 0.5 + pos as f32);
+                        a.put(layer, head, pos, &k, &v);
+                    }
+                }
+            }
+            a.advance(6);
+            let mut b = KvCache::new(prec, 3, 2, hd, 40);
+            assert!(b.copy_prefix_from(&a, 4), "{prec:?}");
+            assert_eq!(b.len, 4);
+            for layer in 0..3 {
+                for head in 0..2 {
+                    for pos in 0..4 {
+                        for is_k in [true, false] {
+                            assert_eq!(
+                                decoded(&a, is_k, layer, head, pos),
+                                decoded(&b, is_k, layer, head, pos),
+                                "{prec:?} l{layer} h{head} p{pos}"
+                            );
+                        }
+                    }
+                }
+            }
+            assert!(!b.copy_prefix_from(&a, 7), "more than the source holds");
+            assert_eq!(b.len, 4);
+            let mut other = KvCache::new(prec, 3, 4, hd, 16);
+            assert!(!other.copy_prefix_from(&a, 2), "another shape");
+            // Shortening a cache does not give its memory back.
+            let per = a.bytes_per_position() as usize;
+            assert_eq!(a.occupied_bytes(), 6 * per);
+            a.truncate(2);
+            assert_eq!(a.occupied_bytes(), 6 * per);
+            a.advance(3);
+            assert_eq!(a.occupied_bytes(), 6 * per);
         }
     }
 
