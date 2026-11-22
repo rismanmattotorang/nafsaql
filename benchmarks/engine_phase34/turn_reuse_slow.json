@@ -1,0 +1,218 @@
+{
+ "mode": "slow",
+ "rounds": 2,
+ "think_s": 30.0,
+ "budget": 32,
+ "load_end": [
+  26.3935546875,
+  26.92626953125,
+  22.49267578125
+ ],
+ "note": "medians over turns 2.. of every session; arms interleaved by round",
+ "rows": {
+  "other": [
+   [
+    {
+     "turn": 1,
+     "mode": "slow",
+     "wall_s": 75.28,
+     "ttft_ms": 21028,
+     "prompt_tokens": 484,
+     "read_tokens": 2,
+     "cached_tokens": 482,
+     "prefill_ms": 90.1,
+     "calls": 1
+    },
+    {
+     "turn": 2,
+     "mode": "slow",
+     "wall_s": 71.34,
+     "ttft_ms": 13198,
+     "prompt_tokens": 345,
+     "read_tokens": 2,
+     "cached_tokens": 343,
+     "prefill_ms": 115.6,
+     "calls": 1
+    },
+    {
+     "turn": 3,
+     "mode": "slow",
+     "wall_s": 76.27,
+     "ttft_ms": 14774,
+     "prompt_tokens": 510,
+     "read_tokens": 2,
+     "cached_tokens": 508,
+     "prefill_ms": 108.6,
+     "calls": 1
+    },
+    {
+     "turn": 4,
+     "mode": "slow",
+     "wall_s": 110.07,
+     "ttft_ms": 20343,
+     "prompt_tokens": 662,
+     "read_tokens": 2,
+     "cached_tokens": 660,
+     "prefill_ms": 200.1,
+     "calls": 1
+    }
+   ],
+   [
+    {
+     "turn": 1,
+     "mode": "slow",
+     "wall_s": 80.23,
+     "ttft_ms": 22382,
+     "prompt_tokens": 484,
+     "read_tokens": 2,
+     "cached_tokens": 482,
+     "prefill_ms": 108.2,
+     "calls": 1
+    },
+    {
+     "turn": 2,
+     "mode": "slow",
+     "wall_s": 117.06,
+     "ttft_ms": 26394,
+     "prompt_tokens": 332,
+     "read_tokens": 2,
+     "cached_tokens": 330,
+     "prefill_ms": 212.3,
+     "calls": 1
+    },
+    {
+     "turn": 3,
+     "mode": "slow",
+     "wall_s": 105.67,
+     "ttft_ms": 18952,
+     "prompt_tokens": 495,
+     "read_tokens": 3,
+     "cached_tokens": 492,
+     "prefill_ms": 203.7,
+     "calls": 1
+    },
+    {
+     "turn": 4,
+     "mode": "slow",
+     "wall_s": 102.62,
+     "ttft_ms": 18330,
+     "prompt_tokens": 684,
+     "read_tokens": 3,
+     "cached_tokens": 681,
+     "prefill_ms": 222.2,
+     "calls": 1
+    }
+   ]
+  ],
+  "between": [
+   [
+    {
+     "turn": 1,
+     "mode": "slow",
+     "wall_s": 85.2,
+     "ttft_ms": 32040,
+     "prompt_tokens": 485,
+     "read_tokens": 2,
+     "cached_tokens": 483,
+     "prefill_ms": 99.7,
+     "calls": 1
+    },
+    {
+     "turn": 2,
+     "mode": "slow",
+     "wall_s": 56.96,
+     "ttft_ms": 2354,
+     "prompt_tokens": 337,
+     "read_tokens": 2,
+     "cached_tokens": 335,
+     "prefill_ms": 119.6,
+     "calls": 1
+    },
+    {
+     "turn": 3,
+     "mode": "slow",
+     "wall_s": 76.61,
+     "ttft_ms": 2494,
+     "prompt_tokens": 496,
+     "read_tokens": 2,
+     "cached_tokens": 494,
+     "prefill_ms": 107.0,
+     "calls": 1
+    },
+    {
+     "turn": 4,
+     "mode": "slow",
+     "wall_s": 63.92,
+     "ttft_ms": 2153,
+     "prompt_tokens": 657,
+     "read_tokens": 2,
+     "cached_tokens": 655,
+     "prefill_ms": 111.5,
+     "calls": 1
+    }
+   ],
+   [
+    {
+     "turn": 1,
+     "mode": "slow",
+     "wall_s": 80.35,
+     "ttft_ms": 19983,
+     "prompt_tokens": 484,
+     "read_tokens": 2,
+     "cached_tokens": 482,
+     "prefill_ms": 108.7,
+     "calls": 1
+    },
+    {
+     "turn": 2,
+     "mode": "slow",
+     "wall_s": 60.03,
+     "ttft_ms": 2223,
+     "prompt_tokens": 310,
+     "read_tokens": 2,
+     "cached_tokens": 308,
+     "prefill_ms": 125.1,
+     "calls": 1
+    },
+    {
+     "turn": 3,
+     "mode": "slow",
+     "wall_s": 72.44,
+     "ttft_ms": 18640,
+     "prompt_tokens": 479,
+     "read_tokens": 2,
+     "cached_tokens": 477,
+     "prefill_ms": 112.3,
+     "calls": 1
+    },
+    {
+     "turn": 4,
+     "mode": "slow",
+     "wall_s": 55.33,
+     "ttft_ms": 2561,
+     "prompt_tokens": 640,
+     "read_tokens": 2,
+     "cached_tokens": 638,
+     "prefill_ms": 120.0,
+     "calls": 1
+    }
+   ]
+  ]
+ },
+ "median": {
+  "other": {
+   "turns": 6,
+   "first_token_s": 18.64,
+   "read_tokens": 2.0,
+   "prefill_s": 0.2,
+   "turn_s": 104.1
+  },
+  "between": {
+   "turns": 6,
+   "first_token_s": 2.42,
+   "read_tokens": 2.0,
+   "prefill_s": 0.12,
+   "turn_s": 62.0
+  }
+ }
+}

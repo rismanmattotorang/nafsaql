@@ -114,9 +114,13 @@ pub fn routes(state: AppState) -> Router<AppState> {
     let upload_limit = upload_limit + 1024 * 1024;
     let uploads = Router::new()
         .route("/v1/kb/{kb}/documents", get(list_documents).post(upload))
+        // Phase 35: one file read for one question (no base involved; same size limit as an upload).
+        .route("/v1/parse", post(crate::docs::parse_upload))
         .layer(DefaultBodyLimit::max(upload_limit))
         .layer(tower_http::limit::RequestBodyLimitLayer::new(upload_limit));
     let rest = Router::new()
+        .route("/v1/export", post(crate::docs::export_doc))
+        .route("/v1/export/formats", get(crate::docs::formats))
         .route("/v1/kb/status", get(status))
         .route("/v1/kb", get(list_kbs).post(create_kb))
         .route(
@@ -239,7 +243,7 @@ async fn status(State(s): State<AppState>) -> Json<Value> {
             "max_documents_per_base": c.max_documents_per_base, "max_chunks_per_document": c.max_chunks_per_document,
             "max_queued_jobs": c.max_queued_jobs, "parse_timeout_s": c.parse_timeout_s, "search_timeout_s": c.search_timeout_s,
             "max_concurrent_trainers": c.max_concurrent_trainers, "vector_cache_mb": c.vector_cache_mb },
-        "kinds": ["pdf", "docx", "pptx", "tex", "html", "md", "txt"],
+        "kinds": nafs_kb::parse::Kind::ALL.iter().map(|k| k.as_str()).collect::<Vec<_>>(),
     }))
 }
 

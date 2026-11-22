@@ -35,6 +35,43 @@ struct Env<'a> {
     calls: u64,
     /// Cut the stream after the first complete action.
     cut: bool,
+    /// Phase 35: where each finished step goes while the run is still going, and the flag that stops the run
+    /// (it also ends a model call in progress).
+    progress: Option<tokio::sync::mpsc::UnboundedSender<CodeAgentStep>>,
+    stop: Option<Arc<std::sync::atomic::AtomicBool>>,
+    /// The run's model, by name, for the step records.
+    model_name: String,
+}
+
+/// A step of the loop as the API reports it.
+fn step_reply(s: agent::Step, model: &str) -> CodeAgentStep {
+    CodeAgentStep {
+        step: s.step,
+        action: s.action,
+        observation: s.observation,
+        passed: s.verdict.as_ref().map(|v| v.passed),
+        score: s.verdict.as_ref().map(|v| v.score),
+        ms: s.ms,
+        usage: s.usage.map(|u| CodeAgentUsage {
+            prompt_tokens: u.prompt_tokens,
+            cached_tokens: u.cached_tokens,
+            prefill_ms: u.prefill_ms,
+            decode_ms: u.decode_ms,
+            completion_tokens: u.completion_tokens,
+            reasoning_tokens: u.reasoning_tokens,
+            finish_reason: u.finish_reason,
+            constrained: u.constrained,
+        }),
+        compacted: s.compacted,
+        pruned: s.pruned,
+        model: match s.stage {
+            Stage::Cheap => "system1".into(),
+            Stage::Main => model.to_string(),
+        },
+        samples: s.samples,
+        retries: s.retries,
+        rolled_back: s.rolled_back,
+    }
 }
 
 impl Env<'_> {
@@ -78,7 +115,11 @@ impl Env<'_> {
             thinking: Some(thinking),
             thinking_budget: thinking.then_some(budget),
             seed: Some(self.calls),
-            cancel: None,
+            // Stopping the run also ends the call that is being written.
+            cancel: self
+                .stop
+                .clone()
+                .map(|s| crate::backend::CancelFlag(Arc::new(move || s.load(Ordering::Relaxed)))),
             response_format: None,
             early_stop: None,
             // Codex dispatches a tool call when its item is done, not when the response ends; here the
@@ -147,6 +188,12 @@ else:
 "#;
 
 impl AgentEnv for Env<'_> {
+    fn step_done(&mut self, step: &agent::Step) {
+        if let Some(tx) = &self.progress {
+            let _ = tx.send(step_reply(step.clone(), &self.model_name));
+        }
+    }
+
     fn complete(
         &mut self,
         messages: Vec<(String, String)>,
@@ -383,6 +430,17 @@ impl Orchestrator {
         &self,
         req: CodeAgentRequest,
     ) -> std::result::Result<CodeAgentReply, String> {
+        self.run_code_agent_watched(req, None, None).await
+    }
+
+    /// `run_code_agent`, with each step sent to `progress` as it ends and a flag that stops the run (Phase 35: the
+    /// app shows a run while it is going and can stop it).
+    pub async fn run_code_agent_watched(
+        &self,
+        req: CodeAgentRequest,
+        progress: Option<tokio::sync::mpsc::UnboundedSender<CodeAgentStep>>,
+        stop: Option<Arc<std::sync::atomic::AtomicBool>>,
+    ) -> std::result::Result<CodeAgentReply, String> {
         self.validate_code_agent(&req)?;
         self.inflight.fetch_add(1, Ordering::SeqCst);
         struct Done<'a>(&'a Orchestrator);
@@ -434,6 +492,9 @@ impl Orchestrator {
             inputs: req.verification.clone(),
             calls: 0,
             cut: req.stream_cut.unwrap_or(h.stream_cut),
+            progress,
+            stop: stop.clone(),
+            model_name: model.clone(),
         };
         let cfg = AgentConfig {
             max_steps: req.max_steps.unwrap_or(h.max_steps),
@@ -458,6 +519,7 @@ impl Orchestrator {
             stuck_after: req.stuck_after.unwrap_or(h.stuck_after),
             guidance: req.guidance.clone(),
             deadline: Some(t0 + Duration::from_secs(h.wall_clock_s)),
+            stop,
             ..AgentConfig::default()
         };
         let out = agent::run_agent(&mut env, &req.task, req.files.clone(), &cfg).await;
@@ -508,33 +570,7 @@ impl Orchestrator {
             steps: out
                 .steps
                 .into_iter()
-                .map(|s| CodeAgentStep {
-                    step: s.step,
-                    action: s.action,
-                    observation: s.observation,
-                    passed: s.verdict.as_ref().map(|v| v.passed),
-                    score: s.verdict.as_ref().map(|v| v.score),
-                    ms: s.ms,
-                    usage: s.usage.map(|u| CodeAgentUsage {
-                        prompt_tokens: u.prompt_tokens,
-                        cached_tokens: u.cached_tokens,
-                        prefill_ms: u.prefill_ms,
-                        decode_ms: u.decode_ms,
-                        completion_tokens: u.completion_tokens,
-                        reasoning_tokens: u.reasoning_tokens,
-                        finish_reason: u.finish_reason,
-                        constrained: u.constrained,
-                    }),
-                    compacted: s.compacted,
-                    pruned: s.pruned,
-                    model: match s.stage {
-                        Stage::Cheap => "system1".into(),
-                        Stage::Main => model.clone(),
-                    },
-                    samples: s.samples,
-                    retries: s.retries,
-                    rolled_back: s.rolled_back,
-                })
+                .map(|s| step_reply(s, &model))
                 .collect(),
             model_calls: out.model_calls,
             model,

@@ -1,0 +1,116 @@
+{
+ "label": "before",
+ "note": "one step per task (the quick model's), empty workspace",
+ "load": [
+  45.83349609375,
+  53.69921875,
+  53.5927734375
+ ],
+ "summary": {
+  "tasks": 12,
+  "actions": {
+   "run": 11,
+   "write": 1
+  },
+  "passed_on_the_first_step": 1,
+  "median_s": 4.0
+ },
+ "rows": [
+  {
+   "task": "median",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 2.1,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "rle",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 13.0,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef rle(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    prev"
+  },
+  {
+   "task": "flatten",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 4.5,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "gcd",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 3.8,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "is_prime",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 3.8,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "reverse_words",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 3.8,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "count_vowels",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 4.2,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "fib",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 4.1,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "clamp",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 4.0,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "dedupe",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 4.0,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "is_anagram",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 4.0,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  },
+  {
+   "task": "chunks",
+   "action": "run",
+   "passed": false,
+   "model": "system1",
+   "s": 3.3,
+   "observation": "No such file in the workspace: check.py. The files are: ."
+  }
+ ]
+}

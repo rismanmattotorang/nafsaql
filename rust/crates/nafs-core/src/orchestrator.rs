@@ -905,6 +905,10 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             let c = self
                 .store
                 .ensure_conversation(req.conversation_id, &user.content, None)?;
+            // An edited message or an answer asked for again: the conversation goes back to that point first.
+            if let (Some(keep), Some(_)) = (req.rewind_to, req.conversation_id) {
+                self.store.rewind_conversation(c, keep)?;
+            }
             (Some(c), self.store.history(c)?)
         };
         let mut system = format!(

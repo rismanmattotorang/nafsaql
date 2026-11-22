@@ -29,6 +29,10 @@ jsonschema = { workspace = true }
 htmd = "0.5.6"
 rust-stemmers = "1.2.0"
 text-splitter = { version = "0.33.1", features = ["markdown"] }
+# Phase 35, documents out. Both are already part of the build (pulldown-cmark through text-splitter, office_oxide
+# through pdf_oxide), so these lines add no download: they make them usable from this crate.
+pulldown-cmark = { version = "0.13.6", default-features = false }
+office_oxide = { version = "0.1.16", default-features = false }
 
 [dev-dependencies]
 nafs-core = { path = "../nafs-core" }

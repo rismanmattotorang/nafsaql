@@ -565,6 +565,43 @@
       },
       "additionalProperties": false
     },
+    "context": {
+      "type": "object",
+      "properties": {
+        "skills_in_chat": {
+          "type": "boolean"
+        },
+        "commit_idle_minutes": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "shadow": {
+      "type": "object",
+      "properties": {
+        "between_turns": {
+          "type": "boolean"
+        },
+        "answering_model": {
+          "type": "boolean"
+        },
+        "idle_delay_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "at_arrival": {
+          "type": "boolean"
+        },
+        "arrival_duty": {
+          "type": "number"
+        },
+        "stable_prefix": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "recall": {
       "type": "object",
       "properties": {
@@ -780,6 +817,12 @@
         },
         "fuzzy_terms": {
           "type": "boolean"
+        },
+        "piece_chars": {
+          "type": "integer"
+        },
+        "piece_mix": {
+          "type": "number"
         },
         "followup_context": {
           "type": "boolean"

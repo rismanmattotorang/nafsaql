@@ -1,0 +1,8 @@
+Qwen3-4B-Thinking-2507-Q4_K_M.gguf: 8 rounds, 10 tokens written at depth 128, a prompt of 128 tokens read in chunks of 64
+threads  busy  shares   write_tok_s  read_tok_s
+      3     0  fixed           6.95        14.8
+      3     0  claimed         7.30        15.8
+      3     0  claimed/fixed, median of 8 paired rounds: write 1.079 (5 of 8 faster), read 1.147 (7 of 8 faster)
+      4     0  fixed           5.65        15.2
+      4     0  claimed         7.65        17.4
+      4     0  claimed/fixed, median of 8 paired rounds: write 1.326 (8 of 8 faster), read 1.100 (7 of 8 faster)

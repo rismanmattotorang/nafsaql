@@ -187,6 +187,12 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/verify", post(verify_adhoc))
         .route("/v1/harness", get(harness_info))
         .route("/v1/harness/code", post(code_agent))
+        .route(
+            "/v1/harness/runs",
+            get(crate::agent_runs::list).post(crate::agent_runs::start),
+        )
+        .route("/v1/harness/runs/{id}", get(crate::agent_runs::get))
+        .route("/v1/harness/runs/{id}/stop", post(crate::agent_runs::stop))
         .route("/v1/judge", post(judge_adhoc))
         .route("/v1/verifiers", get(get_rates))
         .route("/v1/verifiers/runs", get(list_rate_runs).post(start_rates))
@@ -1695,7 +1701,7 @@ async fn system(State(s): State<AppState>) -> Json<Value> {
     let active = s.orch.active().name.clone();
     let c = &s.cfg;
     Json(json!({
-        "version": env!("CARGO_PKG_VERSION"), "config_hash": c.hash, "profile": c.assistant.profile, "active_backend": active, "auth_enabled": !s.tokens.is_empty(),
+        "version": env!("CARGO_PKG_VERSION"), "config_hash": c.hash, "config_warnings": c.warnings, "profile": c.assistant.profile, "active_backend": active, "auth_enabled": !s.tokens.is_empty(),
         "security": {"auth_enabled": !s.tokens.is_empty(), "bind": c.server.bind, "loopback_only": crate::security::is_loopback(&c.server.bind),
             "sandbox_isolation": nafs_verify::sandbox::isolation_available(), "retention_days": c.storage.retention_days, "tls": "terminate at a reverse proxy (deploy/tls/)", "same_origin_only": true},
         "uptime_s": s.started.elapsed().as_secs(), "inflight": s.orch.inflight.load(Ordering::Relaxed),

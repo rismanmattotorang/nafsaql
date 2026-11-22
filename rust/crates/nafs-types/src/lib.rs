@@ -194,6 +194,11 @@ pub struct ChatRequest {
     /// Do not persist the conversation (evaluation and benchmark traffic).
     #[serde(default)]
     pub ephemeral: Option<bool>,
+    /// Phase 35: before answering, go back in the stored conversation to its first `rewind_to` messages (0 = the
+    /// start) and drop the rest. An edited message, or an answer asked for again, replaces what followed it instead
+    /// of being added after it. Ignored for ephemeral requests and refused for rooms.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rewind_to: Option<usize>,
     /// Force this request into the audit stream (FR-040); evaluation and operator use.
     #[serde(default)]
     pub audit: Option<bool>,
@@ -741,7 +746,8 @@ pub struct CodeAgentUsage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeAgentReply {
     pub run_id: Uuid,
-    /// verified, exhausted, deadline, model_error or stuck (the same failure on `stuck_after` consecutive steps).
+    /// verified, exhausted, deadline, model_error, stuck (the same failure on `stuck_after` consecutive steps) or
+    /// stopped (by the person who started it).
     pub status: String,
     /// `verified` only when the exact verifier accepted the returned files; otherwise `unverified`.
     pub assurance: Assurance,

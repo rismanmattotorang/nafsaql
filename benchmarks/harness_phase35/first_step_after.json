@@ -1,0 +1,115 @@
+{
+ "label": "after",
+ "note": "one step per task (the quick model's), empty workspace",
+ "load": [
+  28.435546875,
+  57.0009765625,
+  57.4736328125
+ ],
+ "summary": {
+  "tasks": 12,
+  "actions": {
+   "write": 12
+  },
+  "passed_on_the_first_step": 12,
+  "median_s": 7.9
+ },
+ "rows": [
+  {
+   "task": "median",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 9.0,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef median(xs):\n    xs.sort()\n    n = len(xs)\n    if n % 2 == 1:\n        return xs"
+  },
+  {
+   "task": "rle",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 12.7,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef rle(s):\n    if not s:\n        return \"\"\n    result = []\n    count = 1\n    char"
+  },
+  {
+   "task": "flatten",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 9.2,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef flatten(xs):\n    result = []\n    def recurse(lst):\n        for item in lst:\n  "
+  },
+  {
+   "task": "gcd",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 6.7,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a\n```"
+  },
+  {
+   "task": "is_prime",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 10.3,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef is_prime(n):\n    if n < 2:\n        return False\n    if n == 2:\n        return "
+  },
+  {
+   "task": "reverse_words",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 6.0,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef reverse_words(s):\n    words = s.split()\n    reversed_words = words[::-1]\n    r"
+  },
+  {
+   "task": "count_vowels",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 8.7,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef count_vowels(s):\n    vowels = {'a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U"
+  },
+  {
+   "task": "fib",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 7.9,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef fib(n):\n    if n == 0:\n        return 0\n    elif n == 1:\n        return 1\n    "
+  },
+  {
+   "task": "clamp",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 5.1,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef clamp(x, lo, hi):\n    return max(lo, min(x, hi))\n```"
+  },
+  {
+   "task": "dedupe",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 7.3,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef dedupe(xs):\n    seen = set()\n    result = []\n    for x in xs:\n        if x not"
+  },
+  {
+   "task": "is_anagram",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 7.0,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef is_anagram(a, b):\n    a = a.lower().replace(' ', '')\n    b = b.lower().replace"
+  },
+  {
+   "task": "chunks",
+   "action": "write",
+   "passed": true,
+   "model": "system1",
+   "s": 7.7,
+   "observation": "Success. Replaced solution.py.\nHidden tests: passed.\nCurrent solution.py:\n```\ndef chunks(xs, n):\n    \"\"\"Split the list xs into consecutive lists of length n; th"
+  }
+ ]
+}

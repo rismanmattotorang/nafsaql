@@ -1,0 +1,77 @@
+{
+ "model": "Qwen3-1.7B-Q4_K_M.gguf",
+ "rounds": 3,
+ "wait_s": 0.0,
+ "load_end": [
+  11.162109375,
+  13.97021484375,
+  9.55712890625
+ ],
+ "note": "each run starts a server on a copy of the model the system has not cached; arms interleaved",
+ "rows": {
+  "off": [
+   {
+    "start_s": 0.51,
+    "first_request_s": 12.85,
+    "second_request_s": 5.36,
+    "first_prompt_ms": 12671,
+    "second_prompt_ms": 5264,
+    "prompt_n": 171
+   },
+   {
+    "start_s": 1.21,
+    "first_request_s": 14.63,
+    "second_request_s": 5.95,
+    "first_prompt_ms": 14505,
+    "second_prompt_ms": 5615,
+    "prompt_n": 172
+   },
+   {
+    "start_s": 0.57,
+    "first_request_s": 15.09,
+    "second_request_s": 4.98,
+    "first_prompt_ms": 14907,
+    "second_prompt_ms": 4858,
+    "prompt_n": 172
+   }
+  ],
+  "on": [
+   {
+    "start_s": 0.47,
+    "first_request_s": 9.21,
+    "second_request_s": 5.05,
+    "first_prompt_ms": 9018,
+    "second_prompt_ms": 4882,
+    "prompt_n": 171
+   },
+   {
+    "start_s": 0.48,
+    "first_request_s": 9.23,
+    "second_request_s": 5.07,
+    "first_prompt_ms": 9056,
+    "second_prompt_ms": 4965,
+    "prompt_n": 172
+   },
+   {
+    "start_s": 0.86,
+    "first_request_s": 9.83,
+    "second_request_s": 6.1,
+    "first_prompt_ms": 9629,
+    "second_prompt_ms": 5927,
+    "prompt_n": 172
+   }
+  ]
+ },
+ "median": {
+  "off": {
+   "start_s": 0.57,
+   "first_request_s": 14.63,
+   "second_request_s": 5.36
+  },
+  "on": {
+   "start_s": 0.48,
+   "first_request_s": 9.23,
+   "second_request_s": 5.07
+  }
+ }
+}

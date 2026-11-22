@@ -76,6 +76,8 @@ pub trait AgentEnv: Send {
     fn lint(&mut self, _ws: &Workspace, _file: &str) -> BoxFuture<'_, Option<String>> {
         Box::pin(async { None })
     }
+    /// Phase 35: called as each step ends, so a host can show a run while it is going. The default does nothing.
+    fn step_done(&mut self, _step: &Step) {}
 }
 
 /// Which model a turn goes to.
@@ -260,6 +262,9 @@ pub struct AgentConfig {
     /// part in Codex, Claude Code and Gemini CLI), shown to the model with the task.
     pub guidance: Option<String>,
     pub deadline: Option<Instant>,
+    /// Phase 35: set by whoever started the run to stop it. It is read before each step, and a model call that
+    /// fails after it was set ends the run as [`Status::Stopped`] rather than as an error.
+    pub stop: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl Default for AgentConfig {
@@ -286,6 +291,7 @@ impl Default for AgentConfig {
             max_file_bytes: 6000,
             main_file: "solution.py".into(),
             deadline: None,
+            stop: None,
         }
     }
 }
@@ -351,16 +357,27 @@ pub fn parse_action(reply: &str) -> Action {
         return Action::Patch(p);
     }
     let blocks = fenced_blocks(reply);
-    if let Some(file) = blocks
-        .iter()
-        .rev()
-        .find(|b| is_run(&b.info))
-        .and_then(|b| run_target(&b.body))
-    {
+    let run = blocks.iter().rev().find(|b| is_run(&b.info));
+    if let Some(file) = run.and_then(|b| run_target(&b.body)) {
         return Action::Run(file);
     }
-    if let Some(b) = blocks.iter().rev().find(|b| is_python(&b.info)) {
+    // Phase 35: of several Python blocks, the file is the last one that defines something. A small model often
+    // follows its solution with a block that only calls it ("example usage"), and that block is not the file.
+    let python: Vec<&Block> = blocks.iter().filter(|b| is_python(&b.info)).collect();
+    if let Some(b) = python
+        .iter()
+        .rev()
+        .find(|b| defines_something(&b.body))
+        .or(python.last())
+    {
         return Action::WholeFile(format!("{}\n", b.body.trim_end()));
+    }
+    // A run block that names no file of the workspace (pytest, a shell command): say what a run block can do,
+    // instead of "no action found", which sent the model looking for a formatting mistake it had not made.
+    if run.is_some() {
+        return Action::Disallowed(
+            "A run block runs one Python file of the workspace, written as: python name.py. It cannot run pytest or other commands. The tests run by themselves after every edit, so there is no need to run them.",
+        );
     }
     if reply
         .lines()
@@ -381,7 +398,7 @@ pub fn action_end(text: &str) -> Option<usize> {
     {
         ends.push(end + "*** End Patch".len());
     }
-    if let Some(b) = fenced_blocks(text)
+    if let Some(b) = fenced_blocks_of(text, false)
         .into_iter()
         .find(|b| is_run(&b.info) || is_python(&b.info))
     {
@@ -415,12 +432,26 @@ fn line_start(text: &str, marker: &str, from: usize) -> Option<usize> {
     None
 }
 
+/// The language tag of a fence: its first word, without what small models add to it (`python3`, `py:solution.py`).
+fn tag(info: &str) -> &str {
+    info.split(|c: char| c.is_whitespace() || matches!(c, ':' | ',' | '{' | '='))
+        .next()
+        .unwrap_or("")
+}
+
 fn is_run(info: &str) -> bool {
-    matches!(info, "run" | "bash" | "sh")
+    matches!(tag(info), "run" | "bash" | "sh" | "shell" | "console")
 }
 
 fn is_python(info: &str) -> bool {
-    matches!(info, "python" | "py")
+    matches!(tag(info), "python" | "py" | "python3" | "py3")
+}
+
+/// Whether a block of code defines a function or a class at the top level: a file, as against a few calls that
+/// show how to use one.
+fn defines_something(body: &str) -> bool {
+    body.lines()
+        .any(|l| l.starts_with("def ") || l.starts_with("async def ") || l.starts_with("class "))
 }
 
 struct Block {
@@ -431,6 +462,12 @@ struct Block {
 }
 
 fn fenced_blocks(text: &str) -> Vec<Block> {
+    fenced_blocks_of(text, true)
+}
+
+/// `whole`: the reply is complete. While a reply is still arriving only a fence line ends a block; three backticks
+/// inside a line may be code whose own closing fence has not arrived yet.
+fn fenced_blocks_of(text: &str, whole: bool) -> Vec<Block> {
     let mut out = vec![];
     let mut at = 0;
     while let Some(start) = text[at..].find("```") {
@@ -440,7 +477,29 @@ fn fenced_blocks(text: &str) -> Vec<Block> {
         };
         let info = text[after..after + nl].trim().to_lowercase();
         let body_start = after + nl + 1;
-        let Some(close) = text[body_start..].find("```") else {
+        // Phase 35: the block ends at a line that is nothing but a fence, indented at most three spaces (Markdown's
+        // own rule). Three backticks inside a line of code, or on a line of their own inside an indented docstring
+        // that shows Markdown, do not end it: read as the end, they cut the file there and the rest of the reply was
+        // taken for prose. Only when no such line exists is the first run of backticks the end, as before (a model
+        // that closes the fence at the end of a code line).
+        let mut line_close = None;
+        let mut off = body_start;
+        for line in text[body_start..].split_inclusive('\n') {
+            let t = line.trim();
+            let indent = line.len() - line.trim_start_matches(' ').len();
+            if t.len() >= 3
+                && t.bytes().all(|b| b == b'`')
+                && indent <= 3
+                && !line.starts_with('\t')
+            {
+                line_close = Some(off - body_start + (line.len() - line.trim_start().len()));
+                break;
+            }
+            off += line.len();
+        }
+        let Some(close) =
+            line_close.or_else(|| whole.then(|| text[body_start..].find("```")).flatten())
+        else {
             break;
         };
         let end = body_start + close + 3;
@@ -534,6 +593,8 @@ pub enum Status {
     ModelError,
     /// The same failure on `stuck_after` consecutive steps: the run stopped instead of spending its budget.
     Stuck,
+    /// The person who started the run stopped it.
+    Stopped,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -648,7 +709,16 @@ pub async fn run_agent(
         },
         first,
     );
+    let stopped = || {
+        cfg.stop
+            .as_ref()
+            .is_some_and(|s| s.load(std::sync::atomic::Ordering::Relaxed))
+    };
     for step in 1..=cfg.max_steps {
+        if stopped() {
+            status = Status::Stopped;
+            break;
+        }
         if cfg.deadline.is_some_and(|d| Instant::now() >= d) {
             status = Status::Deadline;
             break;
@@ -708,7 +778,7 @@ pub async fn run_agent(
                 Ok(_) => break Err("the model returned no reply".to_string()),
                 Err(e) => {
                     let over = cfg.deadline.is_some_and(|d| Instant::now() >= d);
-                    if over || retries >= cfg.retries || e.contains("wall-clock cap") {
+                    if over || stopped() || retries >= cfg.retries || e.contains("wall-clock cap") {
                         break Err(e);
                     }
                     retries += 1;
@@ -741,7 +811,12 @@ pub async fn run_agent(
                     retries,
                     rolled_back: false,
                 });
-                status = if over {
+                if let Some(s) = steps.last() {
+                    env.step_done(s);
+                }
+                status = if stopped() {
+                    Status::Stopped
+                } else if over {
                     Status::Deadline
                 } else {
                     Status::ModelError
@@ -953,6 +1028,9 @@ pub async fn run_agent(
             retries,
             rolled_back,
         });
+        if let Some(s) = steps.last() {
+            env.step_done(s);
+        }
         if verdict.as_ref().is_some_and(|v| v.passed) {
             let c = transcript.compactions;
             return finish(Status::Verified, ws, verdict, steps, calls, &judge, c);
@@ -1044,6 +1122,16 @@ async fn apply_action(
             }
             Err(e) => Applied::new("patch", format!("The patch was not applied: {e}"), false),
         },
+        // Phase 35: a file shown in a shortened view carries a marker where its middle was left out. A whole-file
+        // reply that repeats the marker was written from that view, and would replace the file by its two ends.
+        Action::WholeFile(code) if code.contains("chars truncated…") => Applied::new(
+            "write",
+            format!(
+                "{} was not replaced: your reply contains the marker of a shortened view (\"… chars truncated …\"), so the middle of the file would be lost. Change only the lines that need it, with a patch.",
+                cfg.main_file
+            ),
+            false,
+        ),
         Action::WholeFile(code) => {
             ws.insert(cfg.main_file.clone(), code.clone());
             let mut a = Applied::new(
@@ -1192,10 +1280,18 @@ fn task_message(
             )
         })
         .unwrap_or_default();
-    let ask = if patch_offered(cfg, ws) {
-        "Reply with one action."
-    } else {
-        "Reply with one action: the whole new solution.py in one ```python block, or a ```run block."
+    let runnable = ws.keys().any(|k| k.ends_with(".py"));
+    let ask = match (patch_offered(cfg, ws), runnable) {
+        (true, _) => "Reply with one action.",
+        (false, true) => {
+            "Reply with one action: the whole new solution.py in one ```python block, or a ```run block."
+        }
+        // Phase 35: nothing exists to run yet. Offering a run here made the quick model copy the system prompt's
+        // example and spend the first step running a file that was not there (seen live: "No such file in the
+        // workspace: check.py"). Under a grammar the same turn cannot sample a run; this says so in words.
+        (false, false) => {
+            "Reply with one action: the whole solution.py in one ```python block. There is no file to run yet."
+        }
     };
     format!("{head}{guidance}{ask}")
 }
@@ -1370,6 +1466,80 @@ mod tests {
     }
 
     const FIX: &str = "Fix the sign.\n*** Begin Patch\n*** Update File: solution.py\n@@ def add(a, b):\n-    return a - b\n+    return a + b\n*** End Patch";
+
+    // Phase 35: a turn with nothing to run does not offer a run.
+    #[test]
+    fn an_empty_workspace_is_not_offered_a_run() {
+        let cfg = AgentConfig::default();
+        let empty = Workspace::new();
+        let first = task_message("Write f.", &empty, &None, &[], &cfg);
+        assert!(first.ends_with("There is no file to run yet."), "{first}");
+        assert!(!first.contains("```run"), "{first}");
+        let mut ws = Workspace::new();
+        ws.insert("solution.py".into(), "def f():\n    return 1\n".into());
+        let later = task_message("Write f.", &ws, &None, &[], &cfg);
+        assert!(later.ends_with("or a ```run block."), "{later}");
+    }
+
+    // Phase 35: what small models actually write.
+    #[test]
+    fn replies_of_small_models_are_read_as_meant() {
+        // Three backticks inside the code do not end the block.
+        let doc = "```python\ndef f():\n    \"\"\"Use it like:\n    ```\n    f()\n    ```\n    \"\"\"\n    return 1\n```\nDone.";
+        let Action::WholeFile(code) = parse_action(doc) else {
+            panic!("no file in {doc:?}")
+        };
+        assert!(code.contains("return 1") && code.contains("f()"), "{code}");
+        let inline = "```python\ns = \"```\"\ndef g():\n    return s\n```";
+        assert!(matches!(parse_action(inline), Action::WholeFile(c) if c.contains("return s")));
+        // A fence closed at the end of a code line still closes the block.
+        assert!(
+            matches!(parse_action("```python\ndef h(): return 2```"), Action::WholeFile(c) if c.contains("return 2"))
+        );
+        // Language tags as they are written.
+        for tag in [
+            "python3",
+            "py3",
+            "Python",
+            "python title=solution.py",
+            "py:solution.py",
+        ] {
+            let r = format!("```{tag}\ndef k():\n    return 3\n```");
+            assert!(
+                matches!(parse_action(&r), Action::WholeFile(c) if c.contains("return 3")),
+                "{tag}"
+            );
+        }
+        // The solution, then a block that only uses it: the solution is the file.
+        let two = "```python\ndef add(a, b):\n    return a + b\n```\nExample:\n```python\nprint(add(1, 2))\n```";
+        assert!(
+            matches!(parse_action(two), Action::WholeFile(c) if c.contains("def add") && !c.contains("print(add"))
+        );
+        // Two versions of the file: the later one.
+        let rev = "```python\ndef add(a, b):\n    return a - b\n```\nCorrected:\n```python\ndef add(a, b):\n    return a + b\n```";
+        assert!(matches!(parse_action(rev), Action::WholeFile(c) if c.contains("a + b")));
+        // Only calls: still the file (a script is a file too).
+        assert!(matches!(
+            parse_action("```python\nprint(1)\n```"),
+            Action::WholeFile(_)
+        ));
+        // A run block that cannot run says what a run block is for; with an edit beside it, the edit wins.
+        assert!(
+            matches!(parse_action("```bash\npytest -q\n```"), Action::Disallowed(m) if m.contains("python name.py"))
+        );
+        assert!(matches!(
+            parse_action("```run\npython -m pytest\n```"),
+            Action::Disallowed(_)
+        ));
+        assert!(matches!(
+            parse_action("```python\ndef z():\n    return 0\n```\n```bash\npytest\n```"),
+            Action::WholeFile(_)
+        ));
+        assert_eq!(
+            parse_action("```run\npython3 check.py\n```"),
+            Action::Run("check.py".into())
+        );
+    }
 
     #[test]
     fn actions_are_parsed_from_fenced_text() {

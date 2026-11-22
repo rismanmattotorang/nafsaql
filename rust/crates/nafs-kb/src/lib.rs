@@ -6,6 +6,7 @@
 pub mod chunk;
 pub mod dataset;
 pub mod embed;
+pub mod export;
 pub mod graph;
 pub mod index;
 pub mod layout;
@@ -381,7 +382,7 @@ impl Kb {
             )));
         }
         let kind = Kind::from_filename(&filename).ok_or_else(|| {
-            KbError::Unsupported(format!("{filename}: only PDF, Word (.docx), PowerPoint (.pptx), LaTeX, HTML, Markdown and text files are accepted"))
+            KbError::Unsupported(format!("{filename}: only PDF, Word (.docx), PowerPoint (.pptx), Excel (.xlsx), CSV, LaTeX, HTML, Markdown and text files are accepted"))
         })?;
         kind.sniff(bytes)
             .map_err(|e| KbError::Unsupported(format!("{filename}: {e}")))?;

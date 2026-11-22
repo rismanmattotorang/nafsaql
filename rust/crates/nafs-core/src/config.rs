@@ -48,6 +48,10 @@ pub struct Config {
     pub knowledge: KnowledgeCfg,
     #[serde(skip)]
     pub hash: String,
+    /// Phase 35: things in the file that are not wrong enough to refuse it but that the person should know: keys
+    /// this version does not know (they are ignored), and options the active engine cannot honour.
+    #[serde(skip)]
+    pub warnings: Vec<String>,
 }
 
 /// `[knowledge]` (IF-K02): the SurrealDB connection, the upload limits and the chunker's settings.
@@ -1220,6 +1224,22 @@ impl Config {
                 cfg.backend.active
             )));
         }
+        // Phase 35: a value outside what the program understands stops the start, with the key and what is allowed;
+        // before, a mistyped name was read as its default and a count of zero as "never".
+        let problems = cfg.problems();
+        if !problems.is_empty() {
+            return Err(NafsError::Config(format!(
+                "{path}: {}",
+                problems.join("; ")
+            )));
+        }
+        cfg.warnings = unknown_keys(&raw, &cfg)
+            .into_iter()
+            .map(|k| {
+                format!("{k} is not a setting of this version and is ignored (check the spelling)")
+            })
+            .collect();
+        cfg.warnings.extend(cfg.inactive_options());
         let mut h = Sha256::new();
         h.update(raw.as_bytes());
         cfg.hash = h
@@ -1230,6 +1250,140 @@ impl Config {
             .collect();
         Ok(cfg)
     }
+    /// Values the program cannot run with, each as "key = value: what is allowed".
+    pub fn problems(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut one_of = |key: &str, value: &str, allowed: &[&str]| {
+            if !allowed.contains(&value) {
+                out.push(format!(
+                    "{key} = \"{value}\": must be one of {}",
+                    allowed
+                        .iter()
+                        .map(|a| format!("\"{a}\""))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
+            }
+        };
+        one_of(
+            "gate.mode",
+            &self.gate.mode,
+            &["fixed", "calibrated", "budget"],
+        );
+        one_of(
+            "gate.on_unknown",
+            &self.gate.on_unknown,
+            &["escalate", "keep"],
+        );
+        one_of(
+            "deliberation.repair_policy",
+            &self.deliberation.repair_policy,
+            &["best", "last"],
+        );
+        one_of(
+            "deliberation.adaptive_exit.exit_rule",
+            &self.deliberation.adaptive_exit.exit_rule,
+            &["consistency", "posterior"],
+        );
+        one_of(
+            "judge.backend",
+            &self.judge.backend,
+            &["system1", "system2"],
+        );
+        one_of(
+            "harness.model",
+            &self.harness.model,
+            &["system1", "system2"],
+        );
+        one_of(
+            "knowledge.fusion",
+            &self.knowledge.fusion,
+            &["rrf", "convex"],
+        );
+        for (name, b) in &self.backends {
+            one_of(
+                &format!("backends.{name}.kind"),
+                &b.kind,
+                &["llama", "vllm", "smiley"],
+            );
+        }
+        let mut range = |key: &str, value: f64, lo: f64, hi: f64| {
+            if !(lo..=hi).contains(&value) {
+                out.push(format!("{key} = {value}: must be from {lo} to {hi}"));
+            }
+        };
+        range(
+            "gate.lambda_default",
+            self.gate.lambda_default as f64,
+            0.0,
+            1.0,
+        );
+        range(
+            "gate.escalation_budget",
+            self.gate.escalation_budget as f64,
+            0.0,
+            1.0,
+        );
+        let h = &self.harness;
+        range("harness.max_steps", h.max_steps as f64, 1.0, 12.0);
+        range("harness.wall_clock_s", h.wall_clock_s as f64, 10.0, 7200.0);
+        range(
+            "harness.step_max_tokens",
+            h.step_max_tokens as f64,
+            32.0,
+            8192.0,
+        );
+        range(
+            "harness.compact_at_tokens",
+            h.compact_at_tokens as f64,
+            256.0,
+            1_000_000.0,
+        );
+        range(
+            "harness.cascade_samples",
+            h.cascade_samples as f64,
+            1.0,
+            4.0,
+        );
+        range("knowledge.rag_k", self.knowledge.rag_k as f64, 1.0, 100.0);
+        range(
+            "server.max_prompt_tokens",
+            self.server.max_prompt_tokens as f64,
+            64.0,
+            1_000_000.0,
+        );
+        out
+    }
+
+    /// Options that are switched on but that the active engine cannot honour, in words for the person who set them.
+    pub fn inactive_options(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        let Some(active) = self.backends.get(&self.backend.active) else {
+            return out;
+        };
+        let name = &self.backend.active;
+        if active.kind != "llama" {
+            if self.harness.code_agent_enabled && self.harness.constrain {
+                out.push(format!("harness.constrain is on, but the active engine ({name}) has no constrained sampling: the code agent's replies are parsed as free text"));
+            }
+            if self.deliberation.adaptive_exit.enabled {
+                out.push(format!("deliberation.adaptive_exit is on, but it needs llama-server's raw continuation: it does nothing with the active engine ({name})"));
+            }
+        }
+        if self.harness.code_agent_enabled
+            && self.harness.cascade
+            && self.harness.cascade_samples as usize > active.system1.max_in_flight.max(1)
+        {
+            out.push(format!(
+                "harness.cascade_samples = {} but the quick model of the active engine ({name}) serves {} at a time: the code agent's first step tries {}",
+                self.harness.cascade_samples,
+                active.system1.max_in_flight,
+                active.system1.max_in_flight.max(1)
+            ));
+        }
+        out
+    }
+
     pub fn caps(&self, d: Domain) -> Caps {
         self.deliberation
             .caps
@@ -1246,5 +1400,132 @@ impl Config {
     }
     pub fn delta_c(&self, d: Domain) -> f32 {
         *self.gate.delta_c_s.get(d.as_str()).unwrap_or(&90.0)
+    }
+}
+
+/// Keys of the configuration file that the program does not know, as dotted paths. A key that is misspelt, or left
+/// from another version, is read by nothing; this is how the person finds out.
+pub fn unknown_keys(raw: &str, cfg: &Config) -> Vec<String> {
+    let (Ok(file), Ok(known)) = (
+        toml::from_str::<toml::Value>(raw),
+        toml::Value::try_from(cfg),
+    ) else {
+        return Vec::new();
+    };
+    fn walk(file: &toml::Value, known: &toml::Value, path: &str, out: &mut Vec<String>) {
+        let (Some(f), Some(k)) = (file.as_table(), known.as_table()) else {
+            return;
+        };
+        for (key, v) in f {
+            let p = if path.is_empty() {
+                key.clone()
+            } else {
+                format!("{path}.{key}")
+            };
+            match k.get(key) {
+                None => out.push(p),
+                Some(kv) => walk(v, kv, &p, out),
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(&file, &known, "", &mut out);
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn shipped(name: &str) -> String {
+        format!("{}/../../../config/{name}", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// The configurations in the repository load, hold no unknown key and no value out of range.
+    #[test]
+    fn the_shipped_configurations_load_clean() {
+        for name in [
+            "nafs-aql.sample.toml",
+            "nafs-aql.toml",
+            "nafs-aql.docker.toml",
+        ] {
+            let cfg = Config::load(&shipped(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let unknown: Vec<&String> = cfg
+                .warnings
+                .iter()
+                .filter(|w| w.contains("is not a setting"))
+                .collect();
+            assert!(unknown.is_empty(), "{name}: {unknown:?}");
+            assert!(cfg.problems().is_empty(), "{name}: {:?}", cfg.problems());
+        }
+    }
+
+    #[test]
+    fn a_misspelt_key_is_reported_and_a_bad_value_refused() {
+        let raw = std::fs::read_to_string(shipped("nafs-aql.sample.toml")).unwrap();
+        let dir = std::env::temp_dir().join(format!("nafs-cfg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let write = |name: &str, text: &str| {
+            let p = dir.join(name);
+            std::fs::write(&p, text).unwrap();
+            p.to_string_lossy().into_owned()
+        };
+        // A key that does not exist, in a section that does and at the top level.
+        let typo = raw.replace("[harness]", "[harness]\nmax_step = 3")
+            + "\n[shadows]\nbetween_turns = false\n";
+        let cfg = Config::load(&write("typo.toml", &typo)).unwrap();
+        assert!(
+            cfg.warnings
+                .iter()
+                .any(|w| w.starts_with("harness.max_step ")),
+            "{:?}",
+            cfg.warnings
+        );
+        assert!(
+            cfg.warnings.iter().any(|w| w.starts_with("shadows ")),
+            "{:?}",
+            cfg.warnings
+        );
+        // A value that names nothing, and a count that would mean "never".
+        for (from, to, key) in [
+            ("model = \"system2\"", "model = \"sytem2\"", "harness.model"),
+            ("max_steps = 6", "max_steps = 0", "harness.max_steps"),
+        ] {
+            // Changed inside [harness] only: the same words appear in other sections.
+            let at = raw
+                .find("[harness]")
+                .expect("the sample has a [harness] section");
+            let (head, tail) = raw.split_at(at);
+            assert!(
+                tail.contains(from),
+                "the sample's [harness] no longer has `{from}`"
+            );
+            let e = Config::load(&write(
+                "bad.toml",
+                &format!("{head}{}", tail.replacen(from, to, 1)),
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(e.contains(key), "{e}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// With the engine that has no constrained sampling and one sample a request, the options that need them say so.
+    #[test]
+    fn options_the_active_engine_cannot_honour_are_named() {
+        let mut cfg = Config::load(&shipped("nafs-aql.sample.toml")).unwrap();
+        cfg.backend.active = "smiley".into();
+        cfg.harness.constrain = true;
+        cfg.harness.cascade = true;
+        cfg.harness.cascade_samples = 4;
+        let w = cfg.inactive_options();
+        assert!(w.iter().any(|x| x.contains("harness.constrain")), "{w:?}");
+        assert!(w.iter().any(|x| x.contains("cascade_samples")), "{w:?}");
+        cfg.backend.active = "llama".into();
+        assert!(!cfg
+            .inactive_options()
+            .iter()
+            .any(|x| x.contains("harness.constrain")));
     }
 }

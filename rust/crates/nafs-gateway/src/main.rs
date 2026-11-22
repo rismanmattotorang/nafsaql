@@ -1,5 +1,7 @@
 //! nafs-gateway: the Rust Gateway (IF-001..IF-004, IF-009, NFR-011, NFR-021, NFR-022).
+mod agent_runs;
 mod api;
+mod docs;
 mod fs;
 mod gates;
 mod kb;
@@ -38,6 +40,9 @@ async fn main() -> anyhow::Result<()> {
         tracing_subscriber::fmt().with_env_filter(filter).init();
     }
     let cfg = Arc::new(nafs_core::Config::load(&args.config)?);
+    for w in &cfg.warnings {
+        tracing::warn!("configuration: {w}");
+    }
     if args.check {
         let tokens = security::load_tokens(&cfg.server.auth_tokens_env);
         let bind = tokens.as_ref().map_err(|e| e.clone()).and_then(|t| {

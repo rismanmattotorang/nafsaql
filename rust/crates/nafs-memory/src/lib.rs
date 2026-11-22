@@ -393,6 +393,54 @@ impl Store {
         })
     }
 
+    /// Phase 35: keep the first `keep` messages of a conversation and delete the rest, with the replies those
+    /// messages point at. This is what "edit and send again" and "write the answer again" do: the conversation goes
+    /// back to the point before the message, and continues from there. Returns the number of messages removed. A
+    /// room's conversation is shared by several people and is never rewound.
+    pub fn rewind_conversation(&self, id: Uuid, keep: usize) -> Result<usize> {
+        let c = self.db();
+        let in_room: bool = c
+            .query_row(
+                "SELECT room_id IS NOT NULL FROM conversations WHERE id=?1",
+                params![id.to_string()],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(st)?
+            .ok_or_else(|| NafsError::NotFound(format!("conversation {id}")))?;
+        if in_room {
+            return Err(NafsError::BadRequest(
+                "a room's conversation cannot be rewound".into(),
+            ));
+        }
+        let tx = c.unchecked_transaction().map_err(st)?;
+        // The first message to go: the one after the `keep` oldest.
+        let first: Option<i64> = tx
+            .query_row(
+                "SELECT id FROM messages WHERE conversation_id=?1 ORDER BY id LIMIT 1 OFFSET ?2",
+                params![id.to_string(), keep as i64],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(st)?;
+        let Some(first) = first else {
+            return Ok(0);
+        };
+        tx.execute(
+            "DELETE FROM replies WHERE id IN (SELECT reply_id FROM messages WHERE conversation_id=?1 AND id>=?2 AND reply_id IS NOT NULL)",
+            params![id.to_string(), first],
+        )
+        .map_err(st)?;
+        let n = tx
+            .execute(
+                "DELETE FROM messages WHERE conversation_id=?1 AND id>=?2",
+                params![id.to_string(), first],
+            )
+            .map_err(st)?;
+        tx.commit().map_err(st)?;
+        Ok(n)
+    }
+
     pub fn rename_conversation(&self, id: Uuid, title: &str) -> Result<()> {
         self.db()
             .execute(
@@ -1538,6 +1586,37 @@ mod tests {
             Store::open(&d.join("db.sqlite"), &d.join("t.jsonl")).unwrap(),
             d,
         )
+    }
+
+    #[test]
+    fn a_conversation_can_be_rewound_to_an_earlier_message() {
+        let (s, dir) = tmp_store();
+        let c = s.ensure_conversation(None, "first question", None).unwrap();
+        for (role, text) in [
+            ("user", "first question"),
+            ("assistant", "first answer"),
+            ("user", "second question"),
+            ("assistant", "second answer"),
+        ] {
+            s.append_message(c, role, text, None).unwrap();
+        }
+        // Back to before the second question: the first exchange stays.
+        assert_eq!(s.rewind_conversation(c, 2).unwrap(), 2);
+        let h = s.history(c).unwrap();
+        assert_eq!(h.len(), 2);
+        assert_eq!(h[1].content, "first answer");
+        // Nothing beyond the end to remove; rewinding to the start empties it; an unknown conversation is an error.
+        assert_eq!(s.rewind_conversation(c, 9).unwrap(), 0);
+        assert_eq!(s.rewind_conversation(c, 0).unwrap(), 2);
+        assert!(s.history(c).unwrap().is_empty());
+        assert!(s.rewind_conversation(Uuid::new_v4(), 0).is_err());
+        // A room's conversation is shared and is never rewound.
+        let room = Uuid::new_v4();
+        let rc = s.ensure_conversation(None, "room", Some(room)).unwrap();
+        s.append_message(rc, "user", "hello", None).unwrap();
+        assert!(s.rewind_conversation(rc, 0).is_err());
+        assert_eq!(s.history(rc).unwrap().len(), 1);
+        let _ = std::fs::remove_dir_all(dir);
     }
     fn fake_reply(st: &Store, conv: Uuid, assurance: &str, mode: &str) -> Uuid {
         let id = Uuid::new_v4();

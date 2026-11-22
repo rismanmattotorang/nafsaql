@@ -615,6 +615,8 @@ function inline(t, ctx) {
     .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<em>$2</em>').replace(/(^|[^\w])_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>')
     .replace(/~~([^~]+)~~/g, '<del>$1</del>').replace(/==([^=]+)==/g, '<mark>$1</mark>')
     .replace(/&lt;br\s*\/?&gt;/g, '<br>').replace(/&lt;(sub|sup|kbd)&gt;([^<&]{1,40})&lt;\/\1&gt;/g, '<$1>$2</$1>');
+  if (ctx.notes && ctx.notes.size) s = s.replace(/\[\^([^\]\s]{1,40})\]/g, (m, id) => { if (!ctx.notes.has(id)) return m; let n = ctx.noteOrder.indexOf(id); if (n < 0) { ctx.noteOrder.push(id); n = ctx.noteOrder.length - 1; }
+    return `<sup class="fn" title="${esc(ctx.notes.get(id))}"><span class="sr-only">Footnote </span>${n + 1}</sup>`; });
   if (ctx.cites) s = s.replace(/\[(\d{1,2}(?:\s*[,;]\s*\d{1,2})*)\]/g, (m, ns) => ns.split(/\s*[,;]\s*/).map((n) => (ctx.cites.has(+n) ? `<button type="button" class="cite" data-cite="${+n}" aria-haspopup="dialog" aria-expanded="false" aria-label="Source ${+n}: show the passage">${+n}</button>` : `[${+n}]`)).join(''));
   return s.replace(new RegExp(`${CODE}(\\d+)${CODE}`, 'g'), (_, i) => keep[+i]);
 }
@@ -643,7 +645,11 @@ function codeBlock(lang, code, ctx) {
   if ((l === 'math' || l === 'latex' || l === 'tex' || l === 'katex') && ctx.closed) return mathBlock(body);
   if ((l === 'svg') && ctx.closed && /^\s*<svg[\s>]/i.test(body)) return `<pre class="code"><span class="lang">svg</span><button class="copy" type="button">copy</button><code>${esc(body)}</code></pre>`;
   const lines = body.split('\n').length; const long = lines > 28;
-  return `<pre class="code${long ? ' long' : ''}"><span class="lang">${esc(l || 'text')}</span><button class="copy" type="button">copy</button><code>${highlight(body, l)}</code>${long ? `<button type="button" class="more" data-act="expand">Show all ${lines} lines</button>` : ''}</pre>`;
+  // Line numbers from six lines on: a gutter of its own beside the code, so copying the code never copies them. Wrap
+  // and Save are offered for every block that could need them (more than one line).
+  const nums = lines >= 6 ? `<span class="gutter" aria-hidden="true">${Array.from({ length: lines }, (_, i) => i + 1).join('\n')}</span>` : '';
+  const acts = lines > 1 ? `<button type="button" class="code-act" data-act="wrap" aria-pressed="false" aria-label="Wrap long lines">wrap</button><button type="button" class="code-act" data-act="savecode" aria-label="Save this code as a file">save</button>` : '';
+  return `<pre class="code${long ? ' long' : ''}"${nums ? ' data-nums' : ''}><span class="lang">${esc(l || 'text')}</span><button class="copy" type="button">copy</button>${acts}${nums}<code>${highlight(body, l)}</code>${long ? `<button type="button" class="more" data-act="expand">Show all ${lines} lines</button>` : ''}</pre>`;
 }
 
 function listItems(lines, start, ctx) {
@@ -703,6 +709,11 @@ export function markdown(src, cites = null) {
   // Display maths. An unclosed $$ stays text until it closes.
   s = s.replace(/\$\$([\s\S]+?)\$\$/g, (_, m) => { blocks.push({ math: m.trim() }); return `\n${BLOCK}${blocks.length - 1}${BLOCK}\n`; })
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => { blocks.push({ math: m.trim() }); return `\n${BLOCK}${blocks.length - 1}${BLOCK}\n`; });
+  // Footnotes: `[^id]: text` lines are taken out and listed after the answer; `[^id]` in the text becomes a small
+  // number that carries the note as its description. A mark with no note stays as written.
+  const notes = new Map();
+  s = s.replace(/^[ \t]{0,3}\[\^([^\]\s]{1,40})\]:[ \t]+(.+)$/gm, (_, id, text) => { if (!notes.has(id)) notes.set(id, text.trim()); return ''; });
+  ctx.notes = notes; ctx.noteOrder = [];
   const lines = s.split('\n'); const out = []; let para = [];
   const flush = () => { if (para.length) { out.push(`<p>${inline(para.join('\n'), ctx).replace(/\n/g, '<br>')}</p>`); para = []; } };
   for (let i = 0; i < lines.length; i++) {
@@ -722,12 +733,13 @@ export function markdown(src, cites = null) {
       const isNum = (c) => /^[-+−]?[$€£]?[\d,.]+(\s?[%a-zA-Zµ]{0,4})?$/.test(c.replace(/\*\*/g, '').trim());
       const num = (k) => body.some((r) => r[k]) && body.every((r) => !r[k] || isNum(r[k]));
       const hh = head.map((c, k) => { if (!al[k] && num(k)) al[k] = 'right'; return cell('th', c, k); }).join('');
-      out.push(`<div class="tablewrap"><button type="button" class="tbl-copy" data-act="table">Copy table</button><table><thead><tr>${hh}</tr></thead><tbody>${body.map((r) => `<tr>${head.map((_, k) => cell('td', r[k] ?? '', k)).join('')}</tr>`).join('')}</tbody></table></div>`); continue;
+      out.push(`<div class="tablewrap"><div class="tbl-bar"><button type="button" class="tbl-copy" data-act="table" aria-label="Copy the table, to paste into a spreadsheet">Copy table</button><button type="button" class="tbl-copy" data-act="tablemd" aria-label="Copy the table as Markdown">Copy Markdown</button><button type="button" class="tbl-copy" data-act="tablecsv" aria-label="Save the table as a CSV file">Save CSV</button></div><table><thead><tr>${hh}</tr></thead><tbody>${body.map((r) => `<tr>${head.map((_, k) => cell('td', r[k] ?? '', k)).join('')}</tr>`).join('')}</tbody></table></div>`); continue;
     }
     if (/^(\s*)([-*+]|\d+[.)])\s+/.test(line)) { flush(); const [html, next] = listItems(lines, i, ctx); out.push(html); i = next - 1; continue; }
     para.push(line);
   }
   flush();
+  if (ctx.noteOrder.length) out.push(`<ol class="footnotes" aria-label="Footnotes">${ctx.noteOrder.map((id) => `<li>${inline(notes.get(id), { ...ctx, notes: null })}</li>`).join('')}</ol>`);
   return out.join('');
 }
 

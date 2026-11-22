@@ -150,5 +150,20 @@ let threw = 0; const t0 = Date.now(); for (let i = 0; i <= rich.length; i++) { t
 t('every prefix renders', threw === 0, String(threw)); t('streaming is fast enough', Date.now() - t0 < 1500, `${Date.now() - t0} ms`);
 t('diagram appears only when closed', !markdown(rich.slice(0, rich.indexOf('A --> B') + 7)).includes('<svg') && markdown(rich).includes('<svg'));
 
+// ---- Phase 35: actions on tables and code, line numbers, footnotes
+h = markdown('| a | b |\n|---|---|\n| 1 | x |\n| 2 | y |');
+has('table actions', h, 'class="tbl-bar"', 'data-act="table"', 'data-act="tablemd"', 'data-act="tablecsv"', 'aria-label="Save the table as a CSV file"');
+h = markdown('```py\n' + 'x = 1\n'.repeat(7) + '```');
+has('code actions and numbers', h, 'data-act="wrap"', 'aria-pressed="false"', 'data-act="savecode"', '<pre class="code" data-nums>', '<span class="gutter" aria-hidden="true">1\n2\n3\n4\n5\n6\n7</span>');
+h = markdown('```py\nprint(1)\n```');
+lacks('a one-line block has no wrap, save or numbers', h, 'data-act="wrap"', 'class="gutter"', 'data-nums');
+t('numbers are outside the code', !/<code>[^]*class="gutter"/.test(markdown('```\n' + 'a\n'.repeat(9) + '```')));
+h = markdown('Water boils at 100 °C[^1] at sea level[^alt].\n\n[^1]: At a pressure of 101.325 kPa.\n[^alt]: Lower on a **mountain**.\n\nAnd [^none] stays.');
+has('footnotes', h, '<sup class="fn" title="At a pressure of 101.325 kPa."><span class="sr-only">Footnote </span>1</sup>', '<ol class="footnotes" aria-label="Footnotes">', '<li>At a pressure of 101.325 kPa.</li>', '<li>Lower on a <strong>mountain</strong>.</li>', '[^none] stays');
+lacks('footnote definitions leave the text', h, '[^1]:', '[^alt]:');
+t('a footnote title cannot carry markup', !markdown('x[^1]\n\n[^1]: "><img src=x onerror=alert(1)>').includes('<img'));
+lacks('no footnote list without a note', markdown('plain [^1] text'), 'class="footnotes"');
+{ let bad = 0; const fn = 'A claim[^a] and code:\n```py\n' + 'y = 2\n'.repeat(8) + '```\n\n[^a]: The note.'; for (let i = 0; i <= fn.length; i++) { try { markdown(fn.slice(0, i), null); } catch { bad++; } } t('footnotes and numbered code render at every prefix', bad === 0, String(bad)); }
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

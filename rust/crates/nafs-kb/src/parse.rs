@@ -1,6 +1,6 @@
 //! Document parsing (FR-K02, FR-K10..K14): every supported kind becomes Markdown-ish text whose headings drive the
-//! chunker. Pure Rust: `pdf_oxide` for PDF, our own ZIP + XML readers for DOCX and PPTX (bounded against hostile
-//! archives, SR-K03), `htmd` for HTML, our own LaTeX stripper.
+//! chunker. Pure Rust: `pdf_oxide` for PDF, our own ZIP + XML readers for DOCX, PPTX and XLSX (bounded against
+//! hostile archives, SR-K03), our own CSV reader, `htmd` for HTML, our own LaTeX stripper.
 
 use std::io::{Cursor, Read};
 
@@ -13,6 +13,10 @@ pub enum Kind {
     Pdf,
     Docx,
     Pptx,
+    /// Excel workbooks (Phase 35): each sheet becomes a heading and Markdown tables.
+    Xlsx,
+    /// Comma-, semicolon- or tab-separated values (Phase 35).
+    Csv,
     Tex,
     Html,
     Md,
@@ -20,10 +24,12 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub const ALL: [Kind; 7] = [
+    pub const ALL: [Kind; 9] = [
         Kind::Pdf,
         Kind::Docx,
         Kind::Pptx,
+        Kind::Xlsx,
+        Kind::Csv,
         Kind::Tex,
         Kind::Html,
         Kind::Md,
@@ -37,6 +43,8 @@ impl Kind {
             "pdf" => Kind::Pdf,
             "docx" => Kind::Docx,
             "pptx" => Kind::Pptx,
+            "xlsx" | "xlsm" => Kind::Xlsx,
+            "csv" | "tsv" => Kind::Csv,
             "tex" | "latex" => Kind::Tex,
             "html" | "htm" | "xhtml" => Kind::Html,
             "md" | "markdown" => Kind::Md,
@@ -50,6 +58,8 @@ impl Kind {
             Kind::Pdf => "pdf",
             Kind::Docx => "docx",
             Kind::Pptx => "pptx",
+            Kind::Xlsx => "xlsx",
+            Kind::Csv => "csv",
             Kind::Tex => "tex",
             Kind::Html => "html",
             Kind::Md => "md",
@@ -70,14 +80,16 @@ impl Kind {
         let zip = bytes.starts_with(b"PK\x03\x04");
         match self {
             Kind::Pdf if !bytes.starts_with(b"%PDF-") => Err("the file is not a PDF".into()),
-            Kind::Docx | Kind::Pptx if !zip => Err(format!(
+            Kind::Docx | Kind::Pptx | Kind::Xlsx if !zip => Err(format!(
                 "the file is not a {} document",
                 self.as_str().to_uppercase()
             )),
-            Kind::Tex | Kind::Html | Kind::Md | Kind::Txt if bytes.starts_with(b"%PDF-") || zip => {
+            Kind::Tex | Kind::Html | Kind::Md | Kind::Txt | Kind::Csv
+                if bytes.starts_with(b"%PDF-") || zip =>
+            {
                 Err("the file content does not match its extension".into())
             }
-            Kind::Tex | Kind::Html | Kind::Md | Kind::Txt
+            Kind::Tex | Kind::Html | Kind::Md | Kind::Txt | Kind::Csv
                 if bytes.iter().take(8192).any(|&b| b == 0) =>
             {
                 Err("the file looks binary, not text".into())
@@ -120,6 +132,8 @@ pub fn parse(kind: Kind, bytes: &[u8]) -> Result<Parsed, String> {
             .map_err(|_| "the PDF could not be read (the reader failed on it)".to_string())??,
         Kind::Docx => parse_docx(bytes)?,
         Kind::Pptx => parse_pptx(bytes)?,
+        Kind::Xlsx => parse_xlsx(bytes)?,
+        Kind::Csv => parse_csv(&String::from_utf8_lossy(bytes)),
         Kind::Tex => parse_tex(&String::from_utf8_lossy(bytes)),
         Kind::Html => parse_html(&String::from_utf8_lossy(bytes))?,
         Kind::Md | Kind::Txt => {
@@ -554,8 +568,11 @@ fn parse_docx(bytes: &[u8]) -> Result<Parsed, String> {
     let mut in_text = false;
     let mut cell = String::new();
     let mut row: Vec<String> = Vec::new();
+    let mut rows: Vec<Vec<String>> = Vec::new();
     let mut table_depth = 0usize;
     let mut title = None;
+    // A paragraph with numbering properties is a list item; `w:ilvl` is how deep it sits.
+    let mut list: Option<usize> = None;
     loop {
         match r
             .read_event()
@@ -566,13 +583,27 @@ fn parse_docx(bytes: &[u8]) -> Result<Parsed, String> {
                     level = heading_level(&a.value);
                 }
             }
+            Event::Start(e) | Event::Empty(e) if e.name().as_ref() == "w:ilvl" => {
+                if let Ok(Some(a)) = e.try_get_attribute("w:val") {
+                    list = Some(a.value.parse::<usize>().unwrap_or(0).min(8));
+                }
+            }
+            Event::Start(e) | Event::Empty(e) if e.name().as_ref() == "w:numPr" => {
+                list.get_or_insert(0);
+            }
             Event::Start(e) => match e.name().as_ref() {
                 "w:t" => in_text = true,
                 "w:p" => {
                     para.clear();
                     level = None;
+                    list = None;
                 }
-                "w:tbl" => table_depth += 1,
+                "w:tbl" => {
+                    table_depth += 1;
+                    if table_depth == 1 {
+                        rows.clear();
+                    }
+                }
                 "w:tr" => row.clear(),
                 "w:tc" => cell.clear(),
                 _ => {}
@@ -602,23 +633,37 @@ fn parse_docx(bytes: &[u8]) -> Result<Parsed, String> {
                             Some(n) => {
                                 out.push_str(&format!("{} {text}\n\n", "#".repeat(n.min(6))))
                             }
-                            None => {
-                                out.push_str(text);
-                                out.push_str("\n\n");
-                            }
+                            None => match list {
+                                // List items sit on consecutive lines; the blank line comes with the next
+                                // paragraph that is not one.
+                                Some(depth) => {
+                                    if out.ends_with("\n\n") && last_was_list(&out) {
+                                        out.pop();
+                                    }
+                                    out.push_str(&format!("{}- {text}\n\n", "  ".repeat(depth)));
+                                }
+                                None => {
+                                    out.push_str(text);
+                                    out.push_str("\n\n");
+                                }
+                            },
                         }
                     }
                 }
                 "w:tc" => row.push(std::mem::take(&mut cell)),
                 "w:tr" => {
                     if row.iter().any(|c| !c.is_empty()) {
-                        out.push_str(&row.join(" | "));
-                        out.push('\n');
+                        rows.push(std::mem::take(&mut row));
                     }
                 }
                 "w:tbl" => {
                     table_depth = table_depth.saturating_sub(1);
-                    out.push('\n');
+                    // A table inside a cell is folded into the outer one's rows; the table is written when the
+                    // outermost one ends.
+                    if table_depth == 0 {
+                        md_table(&mut out, None, &rows);
+                        rows.clear();
+                    }
                 }
                 _ => {}
             },
@@ -637,6 +682,380 @@ fn parse_docx(bytes: &[u8]) -> Result<Parsed, String> {
         text: out,
         ..Default::default()
     })
+}
+
+/// Whether the text written so far ends with a list item (so the next one follows it without a blank line).
+fn last_was_list(out: &str) -> bool {
+    out.trim_end_matches('\n')
+        .rsplit('\n')
+        .next()
+        .is_some_and(|l| l.trim_start().starts_with("- "))
+}
+
+// ---------------------------------------------------------------- tables, spreadsheets, CSV (Phase 35)
+
+/// The most rows and columns of one sheet or CSV file that are kept; what is cut is said in the text.
+pub const TABLE_MAX_ROWS: usize = 5_000;
+pub const TABLE_MAX_COLS: usize = 64;
+/// Rows per Markdown table. A long sheet is written as several tables, each with the header row and a heading that
+/// says which rows it holds, so that a passage cut from the middle of a sheet still says what its columns are.
+const TABLE_GROUP: usize = 40;
+
+fn cell_md(s: &str) -> String {
+    s.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace('|', "\\|")
+}
+
+/// Write `rows` (the first is the header) as Markdown tables under `name`.
+fn md_table(out: &mut String, name: Option<&str>, rows: &[Vec<String>]) {
+    let rows: Vec<&Vec<String>> = rows
+        .iter()
+        .filter(|r| r.iter().any(|c| !c.trim().is_empty()))
+        .collect();
+    let width = rows
+        .iter()
+        .map(|r| {
+            r.iter()
+                .rposition(|c| !c.trim().is_empty())
+                .map_or(0, |i| i + 1)
+        })
+        .max()
+        .unwrap_or(0)
+        .min(TABLE_MAX_COLS);
+    if width == 0 {
+        return;
+    }
+    let line = |r: &Vec<String>| {
+        let cells: Vec<String> = (0..width)
+            .map(|k| r.get(k).map(|c| cell_md(c)).unwrap_or_default())
+            .collect();
+        format!("| {} |\n", cells.join(" | "))
+    };
+    let head = line(rows[0]);
+    let rule = format!("|{}\n", " --- |".repeat(width));
+    let body = &rows[1..];
+    if body.is_empty() {
+        // A single row has no header to speak of: it is written as a one-row table all the same.
+        out.push_str(&head);
+        out.push_str(&rule);
+        out.push('\n');
+        return;
+    }
+    for (g, group) in body.chunks(TABLE_GROUP).enumerate() {
+        if g > 0 {
+            let (a, b) = (g * TABLE_GROUP + 2, g * TABLE_GROUP + 1 + group.len());
+            match name {
+                Some(n) => out.push_str(&format!("### {n}, rows {a} to {b}\n\n")),
+                None => out.push_str(&format!("Rows {a} to {b}:\n\n")),
+            }
+        }
+        out.push_str(&head);
+        out.push_str(&rule);
+        for r in group {
+            out.push_str(&line(r));
+        }
+        out.push('\n');
+    }
+}
+
+/// The 0-based column of a cell reference such as `B2` or `AA10`.
+fn column_of(cell_ref: &str) -> Option<usize> {
+    let mut n = 0usize;
+    let mut seen = false;
+    for c in cell_ref.chars() {
+        if c.is_ascii_alphabetic() {
+            n = n * 26 + (c.to_ascii_uppercase() as usize - 'A' as usize + 1);
+            seen = true;
+        } else {
+            break;
+        }
+    }
+    seen.then(|| n - 1)
+}
+
+/// An Excel workbook: a heading per sheet, then its cells as Markdown tables (first row = header). Values are the
+/// ones the file holds: a formula shows its last computed value (or the formula itself when none was stored), and
+/// dates stay the numbers Excel stores. Charts, images, comments and formatting are not read.
+fn parse_xlsx(bytes: &[u8]) -> Result<Parsed, String> {
+    let mut zip = Zip::open(bytes)?;
+    let workbook = zip
+        .read("xl/workbook.xml")
+        .ok_or("not an Excel workbook (xl/workbook.xml is missing)")?;
+    // Sheet names in workbook order, each with the relationship id that names its part.
+    let mut sheets: Vec<(String, String)> = Vec::new();
+    let mut r = Reader::from_str(&workbook);
+    loop {
+        match r.read_event() {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.name().as_ref() == "sheet" => {
+                let name = e
+                    .try_get_attribute("name")
+                    .ok()
+                    .flatten()
+                    .map(|a| html_unescape(&a.value))
+                    .unwrap_or_default();
+                let rid = e
+                    .try_get_attribute("r:id")
+                    .ok()
+                    .flatten()
+                    .map(|a| a.value.to_string())
+                    .unwrap_or_default();
+                sheets.push((name, rid));
+            }
+            Ok(Event::Eof) | Err(_) => break,
+            _ => {}
+        }
+    }
+    // Relationship id -> part name.
+    let mut targets: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if let Some(rels) = zip.read("xl/_rels/workbook.xml.rels") {
+        let mut r = Reader::from_str(&rels);
+        loop {
+            match r.read_event() {
+                Ok(Event::Start(e)) | Ok(Event::Empty(e))
+                    if e.name().as_ref() == "Relationship" =>
+                {
+                    let get = |k: &str| {
+                        e.try_get_attribute(k)
+                            .ok()
+                            .flatten()
+                            .map(|a| a.value.to_string())
+                    };
+                    if let (Some(id), Some(t)) = (get("Id"), get("Target")) {
+                        let part = match t.strip_prefix('/') {
+                            Some(abs) => abs.to_string(),
+                            None => format!("xl/{t}"),
+                        };
+                        targets.insert(id, part);
+                    }
+                }
+                Ok(Event::Eof) | Err(_) => break,
+                _ => {}
+            }
+        }
+    }
+    // Shared strings: the text of each `si`, its runs joined, phonetic guides left out.
+    let mut shared: Vec<String> = Vec::new();
+    if let Some(xml) = zip.read("xl/sharedStrings.xml") {
+        let mut r = Reader::from_str(&xml);
+        let (mut cur, mut in_t, mut skip) = (String::new(), false, 0usize);
+        loop {
+            match r.read_event() {
+                Ok(Event::Start(e)) => match e.name().as_ref() {
+                    "si" => cur.clear(),
+                    "rPh" => skip += 1,
+                    "t" => in_t = skip == 0,
+                    _ => {}
+                },
+                Ok(Event::Text(t)) if in_t => cur.push_str(&t.xml10_content()),
+                Ok(Event::GeneralRef(g)) if in_t => cur.extend(xml_ref(&g.into_inner())),
+                Ok(Event::End(e)) => match e.name().as_ref() {
+                    "t" => in_t = false,
+                    "rPh" => skip = skip.saturating_sub(1),
+                    "si" => shared.push(std::mem::take(&mut cur)),
+                    _ => {}
+                },
+                Ok(Event::Eof) | Err(_) => break,
+                _ => {}
+            }
+        }
+    }
+    let mut out = String::new();
+    for (i, (name, rid)) in sheets.iter().enumerate() {
+        let part = targets
+            .get(rid)
+            .cloned()
+            .unwrap_or_else(|| format!("xl/worksheets/sheet{}.xml", i + 1));
+        let Some(xml) = zip.read(&part) else { continue };
+        let (rows, total) = sheet_rows(&xml, &shared);
+        let name = if name.trim().is_empty() {
+            format!("Sheet {}", i + 1)
+        } else {
+            name.trim().to_string()
+        };
+        out.push_str(&format!("## {name}\n\n"));
+        if rows.is_empty() {
+            out.push_str("(This sheet is empty.)\n\n");
+            continue;
+        }
+        md_table(&mut out, Some(&name), &rows);
+        if total > rows.len() {
+            out.push_str(&format!(
+                "(This sheet has {total} rows; the first {} are kept.)\n\n",
+                rows.len()
+            ));
+        }
+    }
+    if !zip.within_budget() {
+        return Err("the archive expands to more than 200 MB".into());
+    }
+    if sheets.is_empty() {
+        return Err("the workbook has no sheets".into());
+    }
+    Ok(Parsed {
+        title: docx_core_title(&mut zip),
+        text: out,
+        ..Default::default()
+    })
+}
+
+/// The rows of one worksheet part (at most [`TABLE_MAX_ROWS`] of them, each at most [`TABLE_MAX_COLS`] wide), and
+/// how many rows with content the sheet has in all.
+fn sheet_rows(xml: &str, shared: &[String]) -> (Vec<Vec<String>>, usize) {
+    let mut r = Reader::from_str(xml);
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut total = 0usize;
+    let mut row: Vec<String> = Vec::new();
+    // The cell being read: its column, its type, its value and its formula.
+    let (mut col, mut next_col) = (0usize, 0usize);
+    let (mut kind, mut value, mut formula) = (String::new(), String::new(), String::new());
+    let mut field = 0u8; // 1 = inside <v>, 2 = inside <t> of an inline string, 3 = inside <f>
+    loop {
+        match r.read_event() {
+            Ok(Event::Start(e)) | Ok(Event::Empty(e)) if e.name().as_ref() == "c" => {
+                col = e
+                    .try_get_attribute("r")
+                    .ok()
+                    .flatten()
+                    .and_then(|a| column_of(&a.value))
+                    .unwrap_or(next_col);
+                next_col = col + 1;
+                kind = e
+                    .try_get_attribute("t")
+                    .ok()
+                    .flatten()
+                    .map(|a| a.value.to_string())
+                    .unwrap_or_default();
+                value.clear();
+                formula.clear();
+            }
+            Ok(Event::Start(e)) => match e.name().as_ref() {
+                "row" => {
+                    row.clear();
+                    next_col = 0;
+                }
+                "v" => field = 1,
+                "t" => field = 2,
+                "f" => field = 3,
+                _ => {}
+            },
+            Ok(Event::Text(t)) if field != 0 => {
+                let text = t.xml10_content();
+                if field == 3 {
+                    formula.push_str(&text)
+                } else {
+                    value.push_str(&text)
+                }
+            }
+            Ok(Event::GeneralRef(g)) if field != 0 => {
+                let c = xml_ref(&g.into_inner());
+                if field == 3 {
+                    formula.extend(c)
+                } else {
+                    value.extend(c)
+                }
+            }
+            Ok(Event::End(e)) => match e.name().as_ref() {
+                "v" | "t" | "f" => field = 0,
+                "c" => {
+                    let text = match kind.as_str() {
+                        "s" => value
+                            .trim()
+                            .parse::<usize>()
+                            .ok()
+                            .and_then(|i| shared.get(i).cloned())
+                            .unwrap_or_default(),
+                        "b" => (if value.trim() == "1" { "TRUE" } else { "FALSE" }).to_string(),
+                        _ if value.is_empty() && !formula.is_empty() => format!("={formula}"),
+                        _ => value.clone(),
+                    };
+                    if col < TABLE_MAX_COLS && !text.trim().is_empty() {
+                        if row.len() <= col {
+                            row.resize(col + 1, String::new());
+                        }
+                        row[col] = text;
+                    }
+                }
+                "row" if row.iter().any(|c| !c.trim().is_empty()) => {
+                    total += 1;
+                    if rows.len() < TABLE_MAX_ROWS {
+                        rows.push(std::mem::take(&mut row));
+                    }
+                }
+                _ => {}
+            },
+            Ok(Event::Eof) | Err(_) => break,
+            _ => {}
+        }
+    }
+    (rows, total)
+}
+
+/// Comma-, semicolon- or tab-separated values: the delimiter is the one the first lines use most; quoted fields may
+/// hold the delimiter, line breaks and doubled quotes. The first row is the header.
+pub fn parse_csv(src: &str) -> Parsed {
+    let src = src.strip_prefix('\u{feff}').unwrap_or(src);
+    let head: String = src.lines().take(10).collect::<Vec<_>>().join("\n");
+    let delim = [',', ';', '\t', '|']
+        .into_iter()
+        .max_by_key(|d| (head.matches(*d).count(), *d == ','))
+        .unwrap_or(',');
+    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut total = 0usize;
+    let (mut row, mut field, mut quoted, mut any) = (Vec::new(), String::new(), false, false);
+    let mut chars = src.chars().peekable();
+    let mut end_row = |row: &mut Vec<String>, field: &mut String, any: &mut bool| {
+        row.push(std::mem::take(field));
+        if row.iter().any(|c: &String| !c.trim().is_empty()) {
+            total += 1;
+            if rows.len() < TABLE_MAX_ROWS {
+                rows.push(std::mem::take(row));
+            }
+        }
+        row.clear();
+        *any = false;
+    };
+    while let Some(c) = chars.next() {
+        if quoted {
+            if c == '"' {
+                if chars.peek() == Some(&'"') {
+                    field.push('"');
+                    chars.next();
+                } else {
+                    quoted = false;
+                }
+            } else {
+                field.push(c);
+            }
+        } else if c == '"' && field.is_empty() {
+            quoted = true;
+            any = true;
+        } else if c == delim {
+            row.push(std::mem::take(&mut field));
+            any = true;
+        } else if c == '\n' {
+            end_row(&mut row, &mut field, &mut any);
+        } else if c != '\r' {
+            field.push(c);
+            any = true;
+        }
+    }
+    if any || !field.is_empty() || !row.is_empty() {
+        end_row(&mut row, &mut field, &mut any);
+    }
+    let mut out = String::new();
+    md_table(&mut out, None, &rows);
+    if total > rows.len() {
+        out.push_str(&format!(
+            "(The file has {total} rows; the first {} are kept.)\n",
+            rows.len()
+        ));
+    }
+    Parsed {
+        text: out,
+        ..Default::default()
+    }
 }
 
 /// `Title` -> 0, `Heading1`..`Heading9` (and localised `heading 1`) -> 1..9.
@@ -1104,7 +1523,167 @@ mod tests {
             "{}",
             p.text
         );
-        assert!(p.text.contains("K | 16"), "{}", p.text);
+        assert!(p.text.contains("| K | 16 |\n| --- | --- |"), "{}", p.text);
+    }
+
+    #[test]
+    fn docx_lists_and_a_table_with_a_header_row() {
+        let item = |text: &str, lvl: usize| {
+            format!(
+                r#"<w:p><w:pPr><w:numPr><w:ilvl w:val="{lvl}"/><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>"#
+            )
+        };
+        let cell = |t: &str| format!("<w:tc><w:p><w:r><w:t>{t}</w:t></w:r></w:p></w:tc>");
+        let doc = format!(
+            r#"<?xml version="1.0"?><w:document xmlns:w="x"><w:body><w:p><w:r><w:t>Steps:</w:t></w:r></w:p>{}{}{}<w:p><w:r><w:t>After the list.</w:t></w:r></w:p>
+<w:tbl><w:tr>{}{}</w:tr><w:tr>{}{}</w:tr><w:tr>{}{}</w:tr></w:tbl></w:body></w:document>"#,
+            item("Unpack", 0),
+            item("Check the seal", 1),
+            item("Plug in", 0),
+            cell("Part"),
+            cell("Count"),
+            cell("Bolt | M6"),
+            cell("12"),
+            cell("Nut"),
+            cell("12"),
+        );
+        let p = parse(Kind::Docx, &zip_of(&[("word/document.xml", &doc)])).unwrap();
+        assert!(
+            p.text
+                .contains("Steps:\n\n- Unpack\n  - Check the seal\n- Plug in\n\nAfter the list."),
+            "{}",
+            p.text
+        );
+        assert!(
+            p.text
+                .contains("| Part | Count |\n| --- | --- |\n| Bolt \\| M6 | 12 |\n| Nut | 12 |"),
+            "{}",
+            p.text
+        );
+    }
+
+    fn xlsx_of(sheets: &[(&str, &str)], shared: &[&str]) -> Vec<u8> {
+        let wb = format!(
+            r#"<workbook xmlns:r="r"><sheets>{}</sheets></workbook>"#,
+            sheets
+                .iter()
+                .enumerate()
+                .map(|(i, (n, _))| format!(
+                    r#"<sheet name="{n}" sheetId="{0}" r:id="rId{0}"/>"#,
+                    i + 1
+                ))
+                .collect::<String>()
+        );
+        let rels = format!(
+            "<Relationships>{}</Relationships>",
+            (1..=sheets.len())
+                .map(|i| format!(r#"<Relationship Id="rId{i}" Target="worksheets/sheet{i}.xml"/>"#))
+                .collect::<String>()
+        );
+        let sst = format!(
+            "<sst>{}</sst>",
+            shared
+                .iter()
+                .map(|s| format!("<si><t>{s}</t></si>"))
+                .collect::<String>()
+        );
+        let mut parts: Vec<(String, String)> = vec![
+            ("xl/workbook.xml".into(), wb),
+            ("xl/_rels/workbook.xml.rels".into(), rels),
+            ("xl/sharedStrings.xml".into(), sst),
+        ];
+        for (i, (_, xml)) in sheets.iter().enumerate() {
+            parts.push((format!("xl/worksheets/sheet{}.xml", i + 1), xml.to_string()));
+        }
+        let refs: Vec<(&str, &str)> = parts
+            .iter()
+            .map(|(a, b)| (a.as_str(), b.as_str()))
+            .collect();
+        zip_of(&refs)
+    }
+
+    #[test]
+    fn xlsx_sheets_become_tables_with_their_names() {
+        let sheet1 = r#"<worksheet><sheetData>
+<row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c><c r="C1" t="s"><v>2</v></c></row>
+<row r="2"><c r="A2" t="s"><v>3</v></c><c r="B2"><v>12</v></c><c r="C2"><f>B2*1.5</f><v>18</v></c></row>
+<row r="3"><c r="A3" t="inlineStr"><is><t>Nut &amp; washer</t></is></c><c r="C3" t="b"><v>1</v></c></row>
+<row r="4"></row>
+<row r="5"><c r="A5" t="str"><f>A2&amp;"s"</f><v>Bolts</v></c><c r="B5"><f>SUM(B2:B3)</f></c></row>
+</sheetData></worksheet>"#;
+        let sheet2 = "<worksheet><sheetData/></worksheet>";
+        let bytes = xlsx_of(
+            &[("Parts", sheet1), ("Notes", sheet2)],
+            &["Part", "Count", "Cost", "Bolt"],
+        );
+        assert_eq!(Kind::from_filename("Stock.XLSX"), Some(Kind::Xlsx));
+        let p = parse(Kind::Xlsx, &bytes).unwrap();
+        assert!(p.text.contains("## Parts\n\n| Part | Count | Cost |\n| --- | --- | --- |\n| Bolt | 12 | 18 |\n| Nut & washer |  | TRUE |\n| Bolts | =SUM(B2:B3) |  |"), "{}", p.text);
+        assert!(
+            p.text.contains("## Notes\n\n(This sheet is empty.)"),
+            "{}",
+            p.text
+        );
+        // Not a workbook, and a text file named .xlsx.
+        assert!(parse(Kind::Xlsx, &zip_of(&[("word/document.xml", "<x/>")])).is_err());
+        assert!(parse(Kind::Xlsx, b"a,b\n1,2\n").is_err());
+    }
+
+    #[test]
+    fn a_long_sheet_repeats_its_header_and_says_what_was_cut() {
+        let mut xml = String::from(
+            r#"<worksheet><sheetData><row><c t="inlineStr"><is><t>n</t></is></c><c t="inlineStr"><is><t>square</t></is></c></row>"#,
+        );
+        let n = TABLE_MAX_ROWS + 25;
+        for i in 1..=n {
+            xml.push_str(&format!(
+                "<row><c><v>{i}</v></c><c><v>{}</v></c></row>",
+                i * i
+            ));
+        }
+        xml.push_str("</sheetData></worksheet>");
+        let p = parse(Kind::Xlsx, &xlsx_of(&[("Squares", &xml)], &[])).unwrap();
+        // The header comes back with every group of rows, under a heading that names the rows.
+        assert!(
+            p.text.contains(
+                "### Squares, rows 42 to 81\n\n| n | square |\n| --- | --- |\n| 41 | 1681 |"
+            ),
+            "{}",
+            &p.text[..1200]
+        );
+        assert_eq!(
+            p.text.matches("| n | square |").count(),
+            (TABLE_MAX_ROWS - 1).div_ceil(TABLE_GROUP)
+        );
+        assert!(
+            p.text.contains(&format!(
+                "(This sheet has {} rows; the first {TABLE_MAX_ROWS} are kept.)",
+                n + 1
+            )),
+            "tail"
+        );
+        assert!(!p.text.contains(&format!("| {} |", TABLE_MAX_ROWS + 5)));
+    }
+
+    #[test]
+    fn csv_with_quotes_other_delimiters_and_a_byte_order_mark() {
+        let p = parse(Kind::Csv, "\u{feff}name,note,qty\r\n\"Bolt, M6\",\"says \"\"hi\"\"\nsecond line\",12\r\n\r\nNut,,7\r\n".as_bytes()).unwrap();
+        assert_eq!(
+            p.text.trim(),
+            "| name | note | qty |\n| --- | --- | --- |\n| Bolt, M6 | says \"hi\" second line | 12 |\n| Nut |  | 7 |"
+        );
+        let semi = parse_csv("a;b\n1,5;2\n");
+        assert!(
+            semi.text.contains("| a | b |\n| --- | --- |\n| 1,5 | 2 |"),
+            "{}",
+            semi.text
+        );
+        let tabs = parse_csv("a\tb\n1\tx | y\n");
+        assert!(tabs.text.contains("| 1 | x \\| y |"), "{}", tabs.text);
+        assert_eq!(Kind::from_filename("data.TSV"), Some(Kind::Csv));
+        // Binary content named .csv is refused; an empty file is an empty document.
+        assert!(parse(Kind::Csv, &[0u8, 1, 2, 3]).is_err());
+        assert!(parse(Kind::Csv, b"").is_err());
     }
 
     #[test]

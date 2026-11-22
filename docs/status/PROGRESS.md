@@ -224,3 +224,46 @@ browser; load 8 to 25, at times far higher), so every comparison is interleaved 
 - Left for the owner: `models/README.md` shows as deleted in the working tree (it was deleted before this session; not
   staged). A side worktree of the previous commit, used for old-against-new runs, is registered in git
   (`git worktree list`); remove it with `git worktree remove --force <path>` when the comparisons are finished.
+
+### Resumed 2026-11-22 11:45 (the owner asked to continue, then for Phases 35 to 37: `docs/prompts/PRODUCT_QUALITY_PROMPT.md`)
+
+| When | Unit of work | Evidence |
+|---|---|---|
+| 11:46 | Phase 34 work committed locally as it stood (`4524c8f`) | git |
+| 11:49 | The 12 engine serving tests pass, six of them new (take, copy, live-slot copy, fused first token, budget) | `cargo test --release -p smiley-core --lib serve::` |
+| 11:52 | Read-ahead: first request of a server on a model file the system had not cached, 9.2 s with it against 14.6 s without (3 rounds: 9.2/9.2/9.8 against 12.9/14.6/15.1); a warm request takes about 5 s | `benchmarks/engine_phase34/cold_start_system1.json` |
+| 11:58 | Claimed blocks on the 4B model, 8 paired rounds: four threads write +33 % (8 of 8) and read +10 % (7 of 8); three threads write +8 % (5 of 8), read +15 % (7 of 8) | `benchmarks/engine_phase34/claim_system2.txt` |
+| 12:10 | Research for Phases 35 to 37 written down: UI audit and scorecard, harness literature, website benchmark and use cases | `docs/research/uiux_audit_phase35.md`, `harness_ux_research.md`, `website_benchmark.md` |
+| 12:20 | Between turns, the model that answered reads the conversation too. Quick conversations, 9 later turns each way, interleaved: first token 4.25 s to 0.71 s, tokens read 188 to 41, whole turn 11.3 s to 9.3 s | `benchmarks/engine_phase34/turn_reuse_fast.json` |
+| 12:49 | The same for conversations answered by the reasoning model, 6 later turns each way (load 22, another session and a build running): first token 18.6 s to 2.4 s, whole turn 104 s to 62 s; 5 of 6 turns at 2.2 to 2.6 s, one at 18.6 s where the reading had not finished in the 30 s pause. The script's token count shows only the last model call of a reasoning turn and is not used here | `benchmarks/engine_phase34/turn_reuse_slow.json` |
+
+## Phases 35 to 37 (started 2026-11-22): product quality
+
+Prompt: `docs/prompts/PRODUCT_QUALITY_PROMPT.md`. Audit and scorecard: `docs/research/uiux_audit_phase35.md`.
+
+| Part | State | Evidence |
+|---|---|---|
+| Settings dialog: explanation and default for every setting, presets, "as this service is set up" for the balance, find a setting, put one or all back, `#/settings` link | written, not yet tried in a browser | `app.js` `openSettings` |
+| Dialog shell: a plain container (rename of a knowledge base saves; Enter in a text box no longer closes it), unsaved-text guard for the file editor | written, not yet tried in a browser | `index.html`, `app.js` `closeModal` |
+| Segmented controls say which button is chosen (all pages) | written | `app.js` `segSync` |
+| Faint text darkened to pass contrast on the page background | written | `app.css` |
+| Answers: tables sort, copy as Markdown, save as CSV, buttons always visible; code wrap, save, line numbers; footnotes; a figure opened larger is a dialog with zoom | written; 221 render checks pass (24 new) | `node scripts/render_test.mjs` |
+| Chat: edit a message and send it again, Regenerate replaces the answer (store `rewind_conversation`, request `rewind_to`), one spoken "writing" and "ready" in place of the streamed words | written; store test written; not yet compiled or tried | `nafs-memory`, `nafs-types`, `app.js` |
+| Documents in: Excel (`.xlsx`, a heading and tables per sheet, header repeated every 40 rows), CSV/TSV, Word lists and Markdown tables | written, type-checks; tests running | `nafs-kb/src/parse.rs` |
+| Documents out: Markdown, text, web page, LaTeX, CSV (own writers) and Word, PowerPoint, Excel, PDF (libraries already in the build); `POST /v1/export`, "Save as…" on an answer and on a chat | written, type-checks; tests running | `nafs-kb/src/export.rs`, `nafs-gateway/src/docs.rs` |
+| Attach a file to one question (`POST /v1/parse`, paperclip, drop, paste; 8,000 characters beside the question, and it says what was cut) | written, type-checks | `app.js` |
+| Chat: rename a chat | written | `app.js` |
+| Knowledge page: files dropped anywhere; graph saved as SVG or PNG, filter by kind, Fit fits what is drawn, arrow keys and + − 0, relation labels on lit edges | written | `app.js` `drawGraph` |
+| Code page (`#/code`): task and tests form with checks beside the fields, each step as it ends, Stop, the checked program, earlier runs; routes `/v1/harness/runs` (start, list, read, stop) | written, type-checks | `nafs-gateway/src/agent_runs.rs`, `app.js` `routes.code` |
+| Agent loop: step notifications, stop flag (also ends the model call), status `stopped`; replies of small models read as meant (fence lines, `python3` tags, solution before example, run blocks that cannot run); a whole-file reply written from a shortened view is refused | written, type-checks; tests written | `nafs-harness/src/agent.rs` |
+| Config: values checked at load (named options, ranges), unknown keys reported at start and in `/v1/system`, options the active engine cannot honour named; schema regenerated (it had been missing `[shadow]` and `[context]`) | written, type-checks; tests written | `nafs-core/src/config.rs` |
+| Phase 34 review, decision 026, paper, README; push | pending | |
+| Workspace tests, clippy, live sweeps, version bump, screenshots, website, `third_party` clean-up | pending | |
+
+| When | Unit of work | Evidence |
+|---|---|---|
+| 13:05 | New unit tests pass: documents in and out 35 (round trips through Word, PowerPoint, Excel and PDF included), harness 92, config 3, gateway 23, copy lint 2, render 221; the workspace type-checks | `cargo test --release -p nafs-kb -p nafs-harness …`, `node scripts/render_test.mjs` |
+| 13:15 | In the browser on the new build: Settings (12 settings, presets, find, put back), table sort and export, code wrap and numbers, footnotes, attach a CSV to a question and get the right number, Regenerate replaces (2 stored messages before and after), edit and resend keeps the attachment, Save as (nine formats return a file), rename a chat | session |
+| 13:20 | Code page: a real run shown step by step, verified in 2 steps and 2 min 35 s. Its first step was wasted: the quick model copied the prompt's example and ran a file that does not exist | session |
+| 13:25 | Measured on 12 tasks that start with no file, one step each: **11 of 12 first steps tried to run `check.py`**, 1 wrote a program (and passed). Fix: a turn with nothing to run does not offer a run | `benchmarks/harness_phase35/first_step_before.json` |
+| 13:35 | The same 12 tasks after the fix: **12 of 12 first steps write the program and all 12 pass on that step** (median 7.9 s), against 1 of 12 before. A from-scratch task that took the reasoning model minutes (2 min 35 s in the live run above) is now answered by the quick model in seconds | `benchmarks/harness_phase35/first_step_after.json` |
