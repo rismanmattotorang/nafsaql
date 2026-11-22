@@ -116,28 +116,28 @@ Missing:
 
 Filled in at the end of Phase 35 (`before` from this audit, `after` from the tests and screenshots named).
 
-| Area | Check | Before |
-|---|---|---|
-| Forms | every field has a visible or programmatic label | fail |
-| Forms | no dialog loses a draft on Enter; rename works | fail |
-| Forms | segmented controls expose their state | fail |
-| Forms | invalid input is reported beside the field before sending | fail |
-| Forms | destructive actions confirm or undo, everywhere | fail |
-| Answers | tables: sort, copy, CSV, keyboard-reachable | fail |
-| Answers | code: copy, wrap, line numbers, download | fail |
-| Answers | every diagram kind the prompts name renders; expand is a dialog | fail |
-| Answers | charts: save image, data as table and CSV | pass |
-| Answers | maths: inline, display, copy, fallback | pass |
-| Answers | edit and resend; regenerate replaces | fail |
-| Answers | a screen reader hears the answer once | fail |
-| Documents | Word, PowerPoint, PDF, LaTeX, Markdown, HTML read | pass |
-| Documents | Excel and CSV read | fail |
-| Documents | a document can be attached to one question | fail |
-| Documents | answers export to Markdown, HTML, Word, PowerPoint, Excel, LaTeX, PDF | fail |
-| Knowledge | drop anywhere; per-document progress and retry | partly |
-| Knowledge | graph: save image, filter, fit, keyboard | fail |
-| Knowledge | every knowledge route in the live sweep | fail |
-| Settings | explanation, default and reset for every setting | fail |
-| Settings | config files validate against the schema in CI | fail |
-| Settings | unknown config keys are reported | fail |
-| Harness | an agent run can be watched, stopped and inspected in the app | fail |
+| Area | Check | Before | After | Evidence |
+|---|---|---|---|---|
+| Forms | every field has a visible or programmatic label | fail | pass | the UI sweep reads every control of every page for a name (`scripts/e2e_sweep.py`) |
+| Forms | no dialog loses a draft on Enter; rename works | fail | pass | dialog is a plain container; rename tried in the browser |
+| Forms | segmented controls expose their state | fail | pass | `segSync` sets `aria-pressed`; checked in the UI sweep |
+| Forms | invalid input is reported beside the field before sending | fail | pass on the Code form and the check panel; other forms report on sending | UI sweep, Code form check |
+| Forms | destructive actions confirm or undo, everywhere | fail | pass | every delete call in `app.js` confirms or offers Undo (the single memory note gained Undo in the review round) |
+| Answers | tables: sort, copy, CSV, keyboard-reachable | fail | pass | `scripts/render_test.mjs`, browser |
+| Answers | code: copy, wrap, line numbers, download | fail | pass | `scripts/render_test.mjs`, browser |
+| Answers | every diagram kind the prompts name renders; expand is a dialog | fail | pass for the four kinds the prompts name (flowchart, sequence, state, pie); other kinds show their source | render tests; decision 027 "Not done" |
+| Answers | charts: save image, data as table and CSV | pass | pass | unchanged |
+| Answers | maths: inline, display, copy, fallback | pass | pass | unchanged |
+| Answers | edit and resend; regenerate replaces | fail | pass | store test `a_turn_replaces_the_tail_in_one_step…`; browser; a failed request loses nothing |
+| Answers | a screen reader hears the answer once | fail | pass by inspection of the live region; not tried with a screen reader | `chatSay` |
+| Documents | Word, PowerPoint, PDF, LaTeX, Markdown, HTML read | pass | pass | Word keeps lists and tables now |
+| Documents | Excel and CSV read | fail | pass | `nafs-kb` parse tests; knowledge sweep |
+| Documents | a document can be attached to one question | fail | pass | `/v1/parse`; browser (a CSV, the right number in the answer) |
+| Documents | answers export to Markdown, HTML, Word, PowerPoint, Excel, LaTeX, PDF | fail | pass, nine formats with round-trip tests | `nafs-kb` export tests; knowledge sweep |
+| Knowledge | drop anywhere; per-document progress and retry | partly | partly: drop anywhere done; progress is per document, retry is "read again" on the row | browser |
+| Knowledge | graph: save image, filter, fit, keyboard | fail | pass | browser |
+| Knowledge | every knowledge route in the live sweep | fail | pass for the routes the page uses, documents in and out included | `scripts/kb_sweep.py` |
+| Settings | explanation, default and reset for every setting | fail | pass | UI sweep (Settings rows, presets, find, put back) |
+| Settings | config files validate against the schema in CI | fail | pass | `.github/workflows/ci.yml` runs `scripts/gen_config_schema.py` |
+| Settings | unknown config keys are reported | fail | pass | config tests; `/v1/system` `config_warnings` |
+| Harness | an agent run can be watched, stopped and inspected in the app | fail | pass | Code page; `/v1/harness/runs`; browser run |

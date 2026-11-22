@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Nafs-Aql Gateway API",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "summary": "Dual-process (System 1 / System 2) chat gateway with verifier-gated deliberation",
     "description": "External API of the Nafs-Aql Rust gateway (crate `nafs-gateway`). Every reply exposes the\nreasoning mode that produced it (`fast` or `slow`), the assurance level, and the controller\ndecision identifier. Streaming uses Server-Sent Events (SSE); chat rooms use WebSocket.\nRequirement IDs (IF-001..IF-010, FR-002, FR-006) refer to the Nafs-Aql Technical Specification.\nVersion 1.1 adds conversation management, the verifier playground, system/backend control, dataset browsing, run cancellation and calibration fitting, as implemented by nafs-gateway 0.1 (Phase 1).\nVersion 1.2 (Phase 2) adds the rubric judge, the audit stream and self-model (Prop. 5), gate modes (fixed, calibrated, budget), recalibration from the ledger with held-out promotion, measured gate parameters (Beta-fit caps, budget curve), verifier-rate measurement, new evaluation systems (nafs_blind, slow_conditioned, slow_b<N>), request bounds enforced with HTTP 400, and same-origin enforcement (HTTP 403 for foreign Origin or Host).\nVersion 1.3 (Phases 3-4) adds human feedback, review and opt-out (Tazkiya), Both-trial preferences, the gates dashboard, drift monitoring, the load-test protocol, McNemar/Bonferroni statistics and report export.\nVersion 1.4 (Phase 5) adds alerts with a drill, lab insights, resumable evaluation runs, retrieval memory (retrieve / retrieved) and the security posture in /v1/system.\n\nVersion 1.5 (Phase 7) adds per-stage latency in usage.stages (queue, prefill, decode and KV-cache reuse for model stages) and GET /v1/perf/stages, the latency breakdown by stage.\n",
     "license": {
@@ -2124,6 +2124,324 @@
           },
           "400": {
             "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/harness/runs": {
+      "post": {
+        "tags": [
+          "harness"
+        ],
+        "operationId": "startCodeAgentRun",
+        "summary": "Start a code-agent run that can be watched and stopped; answers at once with the run's id (the body is that of /v1/harness/code)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeAgentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The run has started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "run_id"
+                  ],
+                  "properties": {
+                    "run_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "harness"
+        ],
+        "operationId": "listCodeAgentRuns",
+        "summary": "The newest code-agent runs, without their files, and whether one is going now",
+        "responses": {
+          "200": {
+            "description": "Runs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "running": {
+                      "type": "boolean"
+                    },
+                    "runs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/harness/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "harness"
+        ],
+        "operationId": "getCodeAgentRun",
+        "summary": "One code-agent run with its status (running, verified, exhausted, stopped, failed, interrupted), the steps so far and, when it has ended, its result",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/harness/runs/{run_id}/stop": {
+      "post": {
+        "tags": [
+          "harness"
+        ],
+        "operationId": "stopCodeAgentRun",
+        "summary": "Stop a run that is going; the model call in progress is ended and no partial edit is applied",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run is stopping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/parse": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "parseDocument",
+        "summary": "Read one file (PDF, Word, PowerPoint, Excel, CSV, LaTeX, HTML, Markdown, text) and return its text as Markdown, without storing it; used to attach a file to one question",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The file's text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "filename": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "chars": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "cut": {
+                      "type": "boolean",
+                      "description": "True when the text was longer than what is returned"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/export": {
+      "post": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "exportDocument",
+        "summary": "Save Markdown as a file (md, txt, html, docx, pptx, xlsx, csv, tex, pdf), made on this machine by a fixed converter; no model is called",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "markdown",
+                  "format"
+                ],
+                "properties": {
+                  "markdown": {
+                    "type": "string",
+                    "description": "At most 2 MB"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "md",
+                      "txt",
+                      "html",
+                      "docx",
+                      "pptx",
+                      "xlsx",
+                      "csv",
+                      "tex",
+                      "pdf"
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "Names the document and the file when the text has no heading of its own"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The file, with its media type and a Content-Disposition that names it",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/export/formats": {
+      "get": {
+        "tags": [
+          "knowledge"
+        ],
+        "operationId": "listExportFormats",
+        "summary": "The formats /v1/export writes, each with its label, extension and media type",
+        "responses": {
+          "200": {
+            "description": "Formats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
@@ -5396,6 +5714,26 @@
           "messages"
         ],
         "properties": {
+          "shadow": {
+            "type": "string",
+            "enum": [
+              "off",
+              "between",
+              "other",
+              "arrival",
+              "both"
+            ],
+            "description": "ShadowPrefill for this request (when a model reads the conversation in idle time); unset uses the service's setting"
+          },
+          "stable_prefix": {
+            "type": "boolean",
+            "description": "Keep the beginning of the prompt the same from turn to turn; unset uses the service's setting"
+          },
+          "rewind_to": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "With a conversation_id, answer from the conversation as it was after its first rewind_to stored messages, and replace what followed with this turn. The stored conversation changes only when the answer exists. Refused for a room's conversation."
+          },
           "conversation_id": {
             "type": "string",
             "format": "uuid"

@@ -398,8 +398,19 @@ impl Store {
     /// back to the point before the message, and continues from there. Returns the number of messages removed. A
     /// room's conversation is shared by several people and is never rewound.
     pub fn rewind_conversation(&self, id: Uuid, keep: usize) -> Result<usize> {
+        self.rewindable(id)?;
         let c = self.db();
-        let in_room: bool = c
+        let tx = c.unchecked_transaction().map_err(st)?;
+        let n = Self::rewind_tx(&tx, id, keep)?;
+        tx.commit().map_err(st)?;
+        Ok(n)
+    }
+
+    /// Whether a conversation may be rewound: it exists and is not a room's. Asked before an answer is generated,
+    /// so that a request that cannot be honoured is refused before any work is done.
+    pub fn rewindable(&self, id: Uuid) -> Result<()> {
+        let in_room: bool = self
+            .db()
             .query_row(
                 "SELECT room_id IS NOT NULL FROM conversations WHERE id=?1",
                 params![id.to_string()],
@@ -413,32 +424,88 @@ impl Store {
                 "a room's conversation cannot be rewound".into(),
             ));
         }
-        let tx = c.unchecked_transaction().map_err(st)?;
+        Ok(())
+    }
+
+    /// The rewind itself. Everything a removed reply left elsewhere goes with it (its routing decision and audit,
+    /// feedback, reviews, preference pairs, its entry in the memory of checked answers), and so does what the
+    /// removed turns left in the recall memory: an edited question must not be recalled in its old wording.
+    fn rewind_tx(tx: &rusqlite::Transaction, id: Uuid, keep: usize) -> Result<usize> {
+        let conv = id.to_string();
         // The first message to go: the one after the `keep` oldest.
-        let first: Option<i64> = tx
+        let first: Option<(i64, String)> = tx
             .query_row(
-                "SELECT id FROM messages WHERE conversation_id=?1 ORDER BY id LIMIT 1 OFFSET ?2",
-                params![id.to_string(), keep as i64],
-                |r| r.get(0),
+                "SELECT id, created_at FROM messages WHERE conversation_id=?1 ORDER BY id LIMIT 1 OFFSET ?2",
+                params![conv, keep as i64],
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()
             .map_err(st)?;
-        let Some(first) = first else {
+        let Some((first, since)) = first else {
             return Ok(0);
         };
+        let replies: Vec<(String, String)> = {
+            let mut s = tx
+                .prepare("SELECT id, json FROM replies WHERE id IN (SELECT reply_id FROM messages WHERE conversation_id=?1 AND id>=?2 AND reply_id IS NOT NULL)")
+                .map_err(st)?;
+            let it = s
+                .query_map(params![conv, first], |r| Ok((r.get(0)?, r.get(1)?)))
+                .map_err(st)?;
+            it.collect::<std::result::Result<Vec<_>, _>>().map_err(st)?
+        };
+        for (rid, json) in &replies {
+            Self::purge_reply_tx(tx, rid, json)?;
+            tx.execute("DELETE FROM replies WHERE id=?1", params![rid])
+                .map_err(st)?;
+        }
+        // Recall entries carry no reply: the turns and windows written since the first removed message go.
         tx.execute(
-            "DELETE FROM replies WHERE id IN (SELECT reply_id FROM messages WHERE conversation_id=?1 AND id>=?2 AND reply_id IS NOT NULL)",
-            params![id.to_string(), first],
+            "DELETE FROM episodes WHERE conversation_id=?1 AND created_at>=?2",
+            params![conv, since],
         )
         .map_err(st)?;
         let n = tx
             .execute(
                 "DELETE FROM messages WHERE conversation_id=?1 AND id>=?2",
-                params![id.to_string(), first],
+                params![conv, first],
             )
             .map_err(st)?;
-        tx.commit().map_err(st)?;
         Ok(n)
+    }
+
+    /// Store one finished turn: the question and its answer, in one transaction. With `rewind`, the conversation
+    /// first goes back to its first `rewind` messages in the same transaction, so that an answer that was never
+    /// produced (the model was down, the person pressed Stop) costs nothing that was stored before.
+    pub fn append_turn(
+        &self,
+        conv: Uuid,
+        rewind: Option<usize>,
+        user: &str,
+        assistant: &str,
+        reply_id: Uuid,
+    ) -> Result<()> {
+        let now = Utc::now().to_rfc3339();
+        let c = self.db();
+        let tx = c.unchecked_transaction().map_err(st)?;
+        if let Some(keep) = rewind {
+            Self::rewind_tx(&tx, conv, keep)?;
+        }
+        tx.execute(
+            "INSERT INTO messages (conversation_id,role,content,reply_id,created_at) VALUES (?1,'user',?2,NULL,?3)",
+            params![conv.to_string(), user, now],
+        )
+        .map_err(st)?;
+        tx.execute(
+            "INSERT INTO messages (conversation_id,role,content,reply_id,created_at) VALUES (?1,'assistant',?2,?3,?4)",
+            params![conv.to_string(), assistant, reply_id.to_string(), now],
+        )
+        .map_err(st)?;
+        tx.execute(
+            "UPDATE conversations SET updated_at=?2 WHERE id=?1",
+            params![conv.to_string(), now],
+        )
+        .map_err(st)?;
+        tx.commit().map_err(st)
     }
 
     pub fn rename_conversation(&self, id: Uuid, title: &str) -> Result<()> {
@@ -670,6 +737,33 @@ impl Store {
         tx.commit().map_err(st)?;
         Ok(report)
     }
+    /// Delete what one reply left outside the `replies` table: its routing decision and audit, feedback, reviews,
+    /// preference pairs and its entry in the memory of checked answers. Returns the memory entries removed.
+    fn purge_reply_tx(tx: &rusqlite::Transaction, rid: &str, json: &str) -> Result<i64> {
+        let v: Value = serde_json::from_str(json).unwrap_or(Value::Null);
+        let did = v["decision"]["decision_id"]
+            .as_str()
+            .or_else(|| v["decision_id"].as_str())
+            .map(str::to_string);
+        if let Some(d) = did {
+            tx.execute("DELETE FROM audits WHERE decision_id=?1", params![d])
+                .map_err(st)?;
+            tx.execute("DELETE FROM decisions WHERE id=?1", params![d])
+                .map_err(st)?;
+        }
+        tx.execute("DELETE FROM feedback WHERE reply_id=?1", params![rid])
+            .map_err(st)?;
+        tx.execute("DELETE FROM reviews WHERE reply_id=?1", params![rid])
+            .map_err(st)?;
+        tx.execute(
+            "DELETE FROM preferences WHERE fast_reply_id=?1 OR slow_reply_id=?1",
+            params![rid],
+        )
+        .map_err(st)?;
+        Ok(tx
+            .execute("DELETE FROM memory_index WHERE reply_id=?1", params![rid])
+            .map_err(st)? as i64)
+    }
     fn purge_tx(
         tx: &rusqlite::Transaction,
         conv: Uuid,
@@ -687,29 +781,7 @@ impl Store {
         };
         let mut report = RoomPurge::default();
         for (rid, json) in &replies {
-            let v: Value = serde_json::from_str(json).unwrap_or(Value::Null);
-            let did = v["decision"]["decision_id"]
-                .as_str()
-                .or_else(|| v["decision_id"].as_str())
-                .map(str::to_string);
-            if let Some(d) = did {
-                tx.execute("DELETE FROM audits WHERE decision_id=?1", params![d])
-                    .map_err(st)?;
-                tx.execute("DELETE FROM decisions WHERE id=?1", params![d])
-                    .map_err(st)?;
-            }
-            tx.execute("DELETE FROM feedback WHERE reply_id=?1", params![rid])
-                .map_err(st)?;
-            tx.execute("DELETE FROM reviews WHERE reply_id=?1", params![rid])
-                .map_err(st)?;
-            tx.execute(
-                "DELETE FROM preferences WHERE fast_reply_id=?1 OR slow_reply_id=?1",
-                params![rid],
-            )
-            .map_err(st)?;
-            report.memory_entries += tx
-                .execute("DELETE FROM memory_index WHERE reply_id=?1", params![rid])
-                .map_err(st)? as i64;
+            report.memory_entries += Self::purge_reply_tx(tx, rid, json)?;
         }
         report.memory_entries += tx
             .execute(
@@ -747,6 +819,15 @@ impl Store {
         self.db().execute("INSERT INTO runs (id,kind,created_at,status,json) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(id) DO UPDATE SET status=?4, json=?5",
             params![id.to_string(), kind, Utc::now().to_rfc3339(), status, json.to_string()]).map_err(st)?;
         Ok(())
+    }
+    /// Keep the newest `keep` runs of one kind and delete the older ones. Returns how many were deleted.
+    pub fn prune_runs(&self, kind: &str, keep: i64) -> Result<usize> {
+        self.db()
+            .execute(
+                "DELETE FROM runs WHERE kind=?1 AND id NOT IN (SELECT id FROM runs WHERE kind=?1 ORDER BY created_at DESC LIMIT ?2)",
+                params![kind, keep.max(0)],
+            )
+            .map_err(st)
     }
     pub fn get_run(&self, id: Uuid) -> Result<Value> {
         let c = self.db();
@@ -1586,6 +1667,73 @@ mod tests {
             Store::open(&d.join("db.sqlite"), &d.join("t.jsonl")).unwrap(),
             d,
         )
+    }
+
+    /// The rewind and the new turn are one step, and what the removed answer left elsewhere goes with it.
+    #[test]
+    fn a_turn_replaces_the_tail_in_one_step_and_takes_what_the_tail_left() {
+        let (s, dir) = tmp_store();
+        let c = s.ensure_conversation(None, "first question", None).unwrap();
+        let (r1, r2, r3) = (Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
+        s.append_turn(c, None, "first question", "first answer", r1)
+            .unwrap();
+        s.append_turn(c, None, "my code is 4417", "noted", r2)
+            .unwrap();
+        let now = Utc::now().to_rfc3339();
+        let count = |sql: &str| -> i64 { s.db().query_row(sql, [], |r| r.get(0)).unwrap() };
+        {
+            let db = s.db();
+            for (rid, did) in [(r1, "d1"), (r2, "d2")] {
+                db.execute(
+                    "INSERT INTO replies (id,conversation_id,created_at,json) VALUES (?1,?2,?3,?4)",
+                    params![
+                        rid.to_string(),
+                        c.to_string(),
+                        now,
+                        json!({"decision": {"decision_id": did}}).to_string()
+                    ],
+                )
+                .unwrap();
+                db.execute(
+                    "INSERT INTO decisions (id,created_at,json) VALUES (?1,?2,'{}')",
+                    params![did, now],
+                )
+                .unwrap();
+                db.execute(
+                    "INSERT INTO memory_index (reply_id,conversation_id,created_at,question,answer) VALUES (?1,?2,?3,'q','a')",
+                    params![rid.to_string(), c.to_string(), now],
+                )
+                .unwrap();
+            }
+            // What the recall memory holds of the second turn (written after it, as the service does).
+            db.execute(
+                "INSERT INTO episodes (id,conversation_id,created_at,kind,text,importance) VALUES ('e2',?1,?2,'turn','my code is 4417',0.5)",
+                params![c.to_string(), now],
+            )
+            .unwrap();
+        }
+        // The second question is edited and answered again.
+        s.append_turn(c, Some(2), "my code is 9", "noted", r3)
+            .unwrap();
+        let h = s.history(c).unwrap();
+        assert_eq!(
+            h.iter().map(|m| m.content.as_str()).collect::<Vec<_>>(),
+            ["first question", "first answer", "my code is 9", "noted"]
+        );
+        assert_eq!(count("SELECT COUNT(*) FROM replies"), 1, "the old reply");
+        assert_eq!(count("SELECT COUNT(*) FROM decisions"), 1);
+        assert_eq!(count("SELECT COUNT(*) FROM memory_index"), 1);
+        assert_eq!(count("SELECT COUNT(*) FROM episodes"), 0, "old wording");
+        // Old runs are pruned by kind, newest kept.
+        for i in 0..5 {
+            s.save_run("agent", Uuid::new_v4(), "completed", &json!({ "n": i }))
+                .unwrap();
+        }
+        s.save_run("eval", Uuid::new_v4(), "completed", &json!({}))
+            .unwrap();
+        assert_eq!(s.prune_runs("agent", 2).unwrap(), 3);
+        assert_eq!(count("SELECT COUNT(*) FROM runs"), 3);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

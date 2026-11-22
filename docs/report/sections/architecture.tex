@@ -165,6 +165,54 @@ palette.}
 \label{fig:ui-welcome}
 \end{figure}
 
+\textbf{Documents in and out, and forms.} A file can be attached to one
+question (PDF, Word, PowerPoint, Excel, CSV, \LaTeX, web page, Markdown, text):
+it is read on the machine by the readers of Section~\ref{sec:knowledge} and
+its text travels with the question, up to a stated budget, beyond which the
+page says that only the beginning fits and points to a knowledge base. An
+answer or a whole chat is saved as Markdown, Word, PDF, PowerPoint, a web
+page, \LaTeX, plain text, Excel or CSV by a deterministic converter in the
+gateway; the model writes Markdown and never the file format, and a
+spreadsheet is offered only when the text holds a table
+(Fig.~\ref{fig:ui-saveas}). Tables sort by a column and copy or save as
+Markdown or CSV; code has line numbers, wrapping and a save button named by
+its language; an answer can be regenerated in place, and an earlier question
+edited and sent again, which rewinds the stored conversation to that point.
+Settings are written as questions a person has (how Auto should answer, what
+to remember, how to look), with three presets, a search box and a way to put
+everything back (Fig.~\ref{fig:ui-settings}); every control has a visible
+label, a hint and, where a value can be wrong, an error beside the field. The
+configuration file is checked the same way at start: an unknown key or a
+value outside its range stops the service with the name of the key, and an
+option that is set but has no effect in the chosen arrangement is reported.
+The Code page (Fig.~\ref{fig:ui-code}) runs the agent of
+Section~\ref{sec:harness} for a described function and its tests, shows each
+step as it ends and can be stopped.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../shared/screenshots/settings.png}
+\caption{Settings: plain rows with a hint each, presets for how Auto answers,
+and a search box.}
+\label{fig:ui-settings}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../shared/screenshots/save_as.png}
+\caption{Saving a chat as a file. The nine formats are made on the machine;
+the two table formats are offered when the text holds a table.}
+\label{fig:ui-saveas}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{../shared/screenshots/code.png}
+\caption{The Code page after a run: the task and its tests, each step with
+the model that took it, and the program that passed.}
+\label{fig:ui-code}
+\end{figure}
+
 \subsection{Model profiles}
 \label{sec:models}
 The reference profile uses two dense Qwen3 checkpoints \cite{qwen2025qwen3},

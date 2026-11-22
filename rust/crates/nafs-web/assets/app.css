@@ -887,7 +887,7 @@ body.fig-lock{overflow:hidden} body.fig-lock::after{content:"";position:fixed;in
 #kbTypes:empty{display:none}
 
 /* Phase 35: the Code page */
-.cg-top{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;align-items:start} @media (max-width:900px){.cg-top{grid-template-columns:1fr}}
+.cg-top{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:16px;align-items:start} @media (max-width:900px){.cg-top{grid-template-columns:minmax(0,1fr)}} .cg-top>*{min-width:0}
 .cg-form{display:flex;flex-direction:column;gap:12px} .cg-form textarea{width:100%;resize:vertical} .cg-form textarea.mono,.cg textarea.mono{font-family:var(--mono);font-size:12.5px}
 .cg-form [aria-invalid=true]{border-color:var(--bad,#C0392B)} .cg-form .rerr:empty{display:none}
 .cg-more{border:1px solid var(--border);border-radius:10px;padding:8px 12px} .cg-more>summary{cursor:pointer;font-size:13px;font-weight:550;color:var(--muted)} .cg-more[open]>summary{margin-bottom:10px}
@@ -903,3 +903,7 @@ body.fig-lock{overflow:hidden} body.fig-lock::after{content:"";position:fixed;in
 .notice.ok{background:var(--ok-bg);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 30%,transparent)}
 .cg-run .notice:not(.ok):not(.bad){background:var(--surface-2);color:var(--text);border-color:var(--border)}
 .cg-form [aria-invalid=true]{border-color:var(--bad)}
+
+/* Phase 35 polish: file chips draw their icon as an outline; a field's hint and error are regular weight under a bold label */
+.composer .afile svg,.msg.user .ufile svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+label.f .hint,label.f .rerr{font-weight:400}

@@ -118,3 +118,43 @@ meanwhile (`--no-read-ahead` turns it off).
 `GET /v1/cache` reports the store. `POST /v1/cache {"prefix_cache_mb": n}` changes its budget and `{"flush": true}`
 drops what it holds. Both are applied by the engine thread between two steps, where no pass over the weights is in
 progress; requests being served keep their own caches. `/metrics` carries the same counters.
+
+## 5. Results
+
+The machine was shared for every run (a second session building and benchmarking another project, a model download,
+a browser; load averages from 6 to over 20). Every comparison was interleaved, in short paired rounds where the
+quantity allowed it; the files in `benchmarks/engine_phase34/` carry the load.
+
+| Question | Answer | Run |
+|---|---|---|
+| What does a request pay to take a kept conversation over and give it back? | Nothing, where it was 84 ms (512 tokens) and 240 ms (2,048 tokens) on the 1.7B model, 116 ms and 457 ms on the 4B model. | `handoff_ab_system1.json`, `handoff_ab.json` |
+| What does that do to the first token of a request that extends a conversation by 8 tokens? | With the first token taken from the last chunk's pass as well: 244 to 184 ms and 329 to 229 ms on the 1.7B model; 602 to 448 ms and 1,075 to 568 ms on the 4B model. The fused pass alone is worth about 30 ms on the 1.7B model and 90 ms on the 4B model. | same |
+| Did the kernels change speed? | No: Q4_K 95 ns a row in the old and the new build. Reading a prompt on four threads was at or above the old build in three of three pairs. | `kbench_old_new.txt`, `prefill_old_new.txt` |
+| Do claimed blocks pay? | On four threads, yes: the 1.7B model wrote 19 % faster (12 of 12 paired rounds) and read 14 % faster (12 of 12); the 4B model wrote 33 % faster (8 of 8) and read 10 % faster (7 of 8). On three threads the 1.7B model was 2 % faster (7 of 12, inside noise) and the 4B model 8 % and 15 %. With one thread spinning beside the engine: 8 % faster writing at either width. | `claim_system1.txt`, `claim_system2.txt` |
+| Does it matter where an idle worker takes work from? | Yes. Taking from the front of a neighbour's share, where the neighbour is reading, was 5 % slower writing and 10 % slower reading than fixed shares on three threads. Taking from the back removed the loss. | `claim_system1_run1.txt` |
+| Does read-ahead pay? | On a model file the system had not cached, the first request of a fresh server took 9.2 s with it and 14.6 s without (three rounds: 9.2, 9.2, 9.8 against 12.9, 14.6, 15.1); a warm request of the same size takes 5 s. | `cold_start_system1.json` |
+| Does the answering model's reading between turns pay? | Quick conversations: the first token of a later turn after 0.71 s instead of 4.25 s (median of 9 turns each way), 41 prompt tokens read instead of 188, the whole turn 9.3 s instead of 11.3 s. Conversations answered by the reasoning model: 2.4 s instead of 18.6 s to the first token (median of 6), the turn 62 s instead of 104 s. | `turn_reuse_fast.json`, `turn_reuse_slow.json` |
+| Does the budget follow a change while serving? | Yes: set to 1 MB, a store of 20 conversations and 718 MB went to the newest one alone; flushed and set back, it was empty at 768 MB; a value that is not a number of megabytes is refused. | session of 2026-11-22 |
+
+What the numbers do not show:
+
+- The between-turns gain needs the pause between turns to be longer than the reading (3 to 5 s for the quick model, 7
+  to 17 s for the reasoning model on a shared machine). One reasoning turn of six arrived before the reading had
+  finished and waited 18.6 s, as before.
+- A fourth decode thread was not compared with three head to head after the change; the default stays three threads
+  to write and four to read.
+- In the gateway's real traffic most reuses are copies, not takes (216 against 19 on the quick model after a morning
+  of test traffic): many short conversations share only the system prompt. Those copies are short. The take matters
+  for the long transcript, where the copy was long.
+- A kept cache is accounted by the most positions it has ever held. A conversation that once reasoned at length keeps
+  that memory until it is evicted.
+
+## 6. Not adopted
+
+| Idea | Why not |
+|---|---|
+| A paged cache with shared prefix pages (the radix tree proper) | Sharing a system prompt between kept conversations would save memory, not time, and a page table costs an indirection on the hottest loop of the engine. The copy that remains is the short one. |
+| Checkpoints at special tokens | Every cached position of a full-attention model is already a place to resume from. The turn token is used for something else: to decide when a kept cache may be taken. |
+| A measured split between two execution paths (q*) | There is one path. |
+| Choosing thread counts from a measured bandwidth at start | Three to write and four to read were measured by hand (Phases 17 and 27) and claimed blocks removed most of the penalty of the wider pool; an automatic choice would need a measurement at every start on a machine whose load changes by the minute. |
+| Changing the replayed form of a reply so that it matches what was generated | The models were trained on the template that drops the reasoning block from earlier turns; reading the conversation in idle time gets the same saving without changing the prompt. |

@@ -32,6 +32,21 @@ fn live() -> &'static Mutex<HashMap<Uuid, Arc<AtomicBool>>> {
     LIVE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Takes a run off the list of runs that are going when its task ends, however it ends: a panic inside the run must
+/// not leave the list occupied, or every later run would be refused until the service restarts.
+struct Going(Uuid);
+impl Drop for Going {
+    fn drop(&mut self) {
+        live()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&self.0);
+    }
+}
+
+/// How many agent runs are kept; older ones are deleted when a new one starts.
+const KEEP_RUNS: i64 = 100;
+
 fn save(s: &AppState, id: Uuid, status: &str, doc: &Value) {
     if let Err(e) = s.store.save_run(KIND, id, status, doc) {
         tracing::warn!(error = %e, run = %id, "the agent run could not be stored");
@@ -72,10 +87,14 @@ pub async fn start(
         "request": { "task": req.task, "files": req.files, "verification": req.verification },
         "steps": [],
     });
+    if let Err(e) = s.store.prune_runs(KIND, KEEP_RUNS) {
+        tracing::warn!(error = %e, "old agent runs could not be removed");
+    }
     save(&s, id, "running", &doc);
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<CodeAgentStep>();
     let s2 = s.clone();
     tokio::spawn(async move {
+        let going = Going(id);
         let run = s2.orch.run_code_agent_watched(req, Some(tx), Some(stop));
         tokio::pin!(run);
         // Steps are stored as they end; the run's own result closes the record.
@@ -92,7 +111,7 @@ pub async fn start(
                 r = &mut run => break r,
             }
         };
-        live().lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
+        drop(going);
         let status = match result {
             Ok(reply) => {
                 doc["status"] = json!(reply.status);

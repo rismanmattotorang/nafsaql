@@ -163,6 +163,7 @@ has('footnotes', h, '<sup class="fn" title="At a pressure of 101.325 kPa."><span
 lacks('footnote definitions leave the text', h, '[^1]:', '[^alt]:');
 t('a footnote title cannot carry markup', !markdown('x[^1]\n\n[^1]: "><img src=x onerror=alert(1)>').includes('<img'));
 lacks('no footnote list without a note', markdown('plain [^1] text'), 'class="footnotes"');
+has('a note nothing points at keeps its words', markdown('Text with no mark.\n\n[^z]: These words must stay.'), 'These words must stay.');
 { let bad = 0; const fn = 'A claim[^a] and code:\n```py\n' + 'y = 2\n'.repeat(8) + '```\n\n[^a]: The note.'; for (let i = 0; i <= fn.length; i++) { try { markdown(fn.slice(0, i), null); } catch { bad++; } } t('footnotes and numbered code render at every prefix', bad === 0, String(bad)); }
 
 console.log(`${pass} passed, ${fail} failed`);

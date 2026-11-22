@@ -8,6 +8,10 @@ only navigates, clicks a conversation and the Inspect button, and scrolls.
 Usage: python3 scripts/capture_screenshots.py [--base http://127.0.0.1:8080] [--only chat,lab] [--kb ID] [--kb-graph ID]
 (--kb and --kb-graph are knowledge-base ids for the knowledge, knowledge_graph and knowledge_chat shots.)
 Needs Google Chrome and the websocket-client package.
+
+Names for --only: chat, rich, charts, charts_dark, welcome, palette, rich_dark, settings, save_as, attach, code, lab,
+muhasaba, performance, tazkiya, system, knowledge, knowledge_graph, knowledge_chat, files, files_memory, files_search,
+settings_speed, rooms. Every run overwrites the pictures it takes, so name the ones you want.
 """
 import base64, json, os, shutil, subprocess, sys, tempfile, time, urllib.error, urllib.request
 
@@ -88,6 +92,9 @@ def scroll_to_heading(tab, text):
 
 def main():
     args = sys.argv[1:]
+    if "-h" in args or "--help" in args:
+        print(__doc__)
+        return
     base = args[args.index("--base") + 1] if "--base" in args else "http://127.0.0.1:8080"
     only = set(args[args.index("--only") + 1].split(",")) if "--only" in args else None
     os.makedirs(OUT, exist_ok=True)
@@ -114,6 +121,17 @@ def main():
             time.sleep(2.5)
 
         want = lambda k: only is None or k in only
+
+        def advanced(on):
+            # Both the stored setting and the live page, so the next page drawn follows it without a reload.
+            tab.js(f"localStorage.setItem('nafs.advanced', '{'true' if on else 'false'}'); document.documentElement.dataset.advanced = '{'1' if on else '0'}'; true")
+
+        def rich(sample_file):
+            sample = open(os.path.join(ROOT, "scripts", sample_file)).read()
+            go("chat")
+            tab.wait_for("!!document.getElementById('inner')", 30)
+            tab.js("""(async () => { const { markdown } = await import('/render.js?v=' + Date.now()); const md = %s;
+              document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
         if want("chat"):
             go("chat")
             tab.wait_for("document.querySelectorAll('.conv').length > 0")
@@ -125,22 +143,14 @@ def main():
         # Phase 31: how a rich answer is drawn (table, formula, diagram, code). The text is a fixed sample run through the
         # real renderer inside the real message markup; nothing is sent to a model.
         if want("rich"):
-            sample = open(os.path.join(ROOT, "scripts", "rich_sample.md")).read()
-            go("chat")
-            tab.wait_for("!!document.getElementById('inner')", 30)
-            tab.js("""(async () => { const { markdown } = await import('/render.js?v=' + Date.now()); const md = %s;
-              document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
+            rich("rich_sample.md")
             time.sleep(1.5)
             tab.shot("rich_answer", 1700)
         # Phase 32: charts drawn with Nivo from a fixed sample (scripts/chart_sample.md), light and dark.
         for want_name, dark in (("charts", False), ("charts_dark", True)):
             if not want(want_name): continue
             if dark: tab.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-color-scheme", "value": "dark"}])
-            sample = open(os.path.join(ROOT, "scripts", "chart_sample.md")).read()
-            go("chat")
-            tab.wait_for("!!document.getElementById('inner')", 30)
-            tab.js("""(async () => { const { markdown } = await import('/render.js?v=' + Date.now()); const md = %s;
-              document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
+            rich("chart_sample.md")
             tab.wait_for("document.querySelectorAll('figure.nvchart .chart-mount svg').length >= 9", 30)
             time.sleep(3.5)
             tab.shot("charts_dark" if dark else "charts", 3400)
@@ -160,14 +170,50 @@ def main():
             tab.js("document.getElementById('palette')?.remove(); true")
         if want("rich_dark"):
             tab.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-color-scheme", "value": "dark"}])
-            sample = open(os.path.join(ROOT, "scripts", "rich_sample.md")).read()
-            go("chat")
-            tab.wait_for("!!document.getElementById('inner')", 30)
-            tab.js("""(async () => { const { markdown } = await import('/render.js?v=' + Date.now()); const md = %s;
-              document.getElementById('inner').innerHTML = '<div class="msg bot"><div class="body"><div class="answer">' + markdown(md, new Set([1])) + '</div></div></div>'; return true; })()""" % json.dumps(sample))
+            rich("rich_sample.md")
             time.sleep(1.5)
             tab.shot("rich_answer_dark", 1700)
             tab.call("Emulation.setEmulatedMedia", features=[{"name": "prefers-color-scheme", "value": "light"}])
+        # Phase 35: Settings from the top (plain rows, answer presets, find), the Save-as dialog with its nine
+        # formats, a question with a file attached, and the Code page showing a finished run.
+        if want("settings"):
+            go("chat")
+            tab.js("document.getElementById('settingsBtn').click(); true")
+            tab.wait_for("!!document.getElementById('stPreset')", 20)
+            time.sleep(1)
+            tab.shot("settings")
+            tab.js("document.getElementById('modalClose')?.click(); true")
+        if want("save_as"):
+            go("chat")
+            tab.wait_for("document.querySelectorAll('.conv').length > 0")
+            tab.js("""(() => { const c = [...document.querySelectorAll('.conv')].find(x => /train leaves|python function|run_length/i.test(x.textContent)) || document.querySelector('.conv'); c && c.click(); return !!c; })()""")
+            tab.wait_for("document.querySelectorAll('#inner .msg.bot').length > 0", 20)
+            tab.js("document.getElementById('tbMenu')?.click(); true")
+            time.sleep(0.4)
+            tab.js("document.getElementById('tbSaveAs')?.click(); true")
+            tab.wait_for("!!document.querySelector('#modal [data-f], #modal .fmt, #modal button')", 20)
+            time.sleep(1)
+            tab.shot("save_as")
+            tab.js("document.getElementById('modalClose')?.click(); true")
+        if want("attach"):
+            go("chat")
+            tab.wait_for("!!document.getElementById('newConv')", 30)
+            tab.js("document.getElementById('newConv').click(); true")
+            time.sleep(0.6)
+            # A small table is handed to the same file input a person would use; nothing is sent to a model.
+            tab.js("""(async () => { const csv = 'month,orders,returns\\nJan,412,18\\nFeb,455,21\\nMar,503,17\\nApr,538,25\\n';
+              const input = document.getElementById('attachFile'); if (!input) return false; const dt = new DataTransfer();
+              dt.items.add(new File([csv], 'orders-2026.csv', {type: 'text/csv'})); input.files = dt.files; input.dispatchEvent(new Event('change', {bubbles: true}));
+              const i = document.getElementById('input'); i.value = 'Which month had the highest return rate?'; i.dispatchEvent(new Event('input', {bubbles: true})); return true; })()""")
+            time.sleep(2.5)
+            tab.shot("attach")
+        if want("code"):
+            go("code")
+            tab.wait_for("document.querySelectorAll('#cgRuns [data-id]').length > 0 || !!document.querySelector('#cgRuns .empty')", 30)
+            tab.js("(() => { const b = [...document.querySelectorAll('#cgRuns [data-id]')].find(x => /Verified|Passed|Checked/i.test(x.textContent)) || document.querySelector('#cgRuns [data-id]'); b && b.click(); return !!b; })()")
+            time.sleep(2.5)
+            tab.shot("code", 1300)
+        advanced(True)
         if want("lab"):
             go("eval")
             tab.wait_for("!!document.querySelector('table.policy-map')", 30)
@@ -194,6 +240,7 @@ def main():
         if want("system"):
             go("system")
             tab.shot("system")
+        advanced(False)
         # Phase 20/21: the Knowledge page, its graph, and a chat answer with numbered sources. They need a base: pass
         # --kb <id> (a base with passages) and, for the graph shot, --kb-graph <id> (a base whose graph is built).
         kb = args[args.index("--kb") + 1] if "--kb" in args else ""
@@ -201,7 +248,8 @@ def main():
         def pick_base(base_id):
             # localStorage belongs to the page's origin, so the app must be loaded once before it can be written.
             go("chat")
-            tab.js(f"localStorage.setItem('nafs.kbCurrent', JSON.stringify({json.dumps(base_id)})); localStorage.setItem('nafs.advanced', 'true')")
+            tab.js(f"localStorage.setItem('nafs.kbCurrent', JSON.stringify({json.dumps(base_id)})); true")
+            advanced(True)
         if want("knowledge") and kb:
             pick_base(kb)
             go("knowledge")
@@ -229,6 +277,7 @@ def main():
             tab.wait_for("document.querySelectorAll('.kb-sources').length > 0", 240)
             time.sleep(2)
             tab.shot("knowledge_chat")
+        advanced(False)
         # Phase 29: the Files page, at a document's overview, at the memory with its change log, and a search the
         # assistant planned. --kb <id> names the base to open; --doc <id> the document in it.
         doc = args[args.index("--doc") + 1] if "--doc" in args else ""
@@ -265,7 +314,7 @@ def main():
             tab.js("document.getElementById('stShadow').closest('section').scrollIntoView({block: 'start'}); true")
             time.sleep(1)
             tab.shot("settings_speed")
-            tab.js("document.getElementById('modal').close(); true")
+            tab.js("document.getElementById('modalClose')?.click(); true")
         if want("rooms"):
             # A throw-away room with three people and two real answers, photographed, then deleted.
             ws_base = base.replace("http", "ws", 1)

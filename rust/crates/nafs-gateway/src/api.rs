@@ -1700,8 +1700,11 @@ async fn system(State(s): State<AppState>) -> Json<Value> {
     let health = s.orch.health().await;
     let active = s.orch.active().name.clone();
     let c = &s.cfg;
+    // The engine can be changed while the service runs, so what it cannot honour is worked out now, not at start.
+    let mut warnings = c.key_warnings.clone();
+    warnings.extend(c.inactive_options_for(&active));
     Json(json!({
-        "version": env!("CARGO_PKG_VERSION"), "config_hash": c.hash, "config_warnings": c.warnings, "profile": c.assistant.profile, "active_backend": active, "auth_enabled": !s.tokens.is_empty(),
+        "version": env!("CARGO_PKG_VERSION"), "config_hash": c.hash, "config_warnings": warnings, "profile": c.assistant.profile, "active_backend": active, "auth_enabled": !s.tokens.is_empty(),
         "security": {"auth_enabled": !s.tokens.is_empty(), "bind": c.server.bind, "loopback_only": crate::security::is_loopback(&c.server.bind),
             "sandbox_isolation": nafs_verify::sandbox::isolation_available(), "retention_days": c.storage.retention_days, "tls": "terminate at a reverse proxy (deploy/tls/)", "same_origin_only": true},
         "uptime_s": s.started.elapsed().as_secs(), "inflight": s.orch.inflight.load(Ordering::Relaxed),

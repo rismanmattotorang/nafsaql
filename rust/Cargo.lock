@@ -2269,7 +2269,7 @@ checksum = "743fb55ba31b18fb1ecef6bdc9aa2743314978ac084044301a7eee33fb99a20d"
 
 [[package]]
 name = "nafs-bench"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "nafs-core",
@@ -2283,7 +2283,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-context"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "regex",
@@ -2293,7 +2293,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "chrono",
@@ -2320,7 +2320,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-eval"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2339,7 +2339,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-gateway"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2373,7 +2373,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-harness"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "futures",
  "serde",
@@ -2382,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-kb"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "ciborium",
@@ -2410,7 +2410,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-memorilla"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "candle-core",
  "candle-nn",
@@ -2422,7 +2422,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-memory"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "nafs-context",
@@ -2435,7 +2435,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-smiley-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "clap",
@@ -2451,7 +2451,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-types"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "serde",
@@ -2462,7 +2462,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-verify"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "futures",
  "jsonschema",
@@ -2478,7 +2478,7 @@ dependencies = [
 
 [[package]]
 name = "nafs-web"
-version = "0.1.0"
+version = "0.2.0"
 
 [[package]]
 name = "new_debug_unreachable"

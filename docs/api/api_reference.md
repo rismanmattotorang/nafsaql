@@ -1,4 +1,4 @@
-# Nafs-Aql API reference (v1.6.0)
+# Nafs-Aql API reference (v1.7.0)
 
 Generated from `api/openapi.yaml` by `scripts/gen_api_reference.py`; do not edit by hand.
 
@@ -427,7 +427,51 @@ Request body: `CodeAgentRequest` (* = required).
 
 Responses: `200`, `400`, `403`.
 
+### `GET /v1/harness/runs`
+
+The newest code-agent runs, without their files, and whether one is going now
+
+Responses: `200`, `403`.
+
+### `POST /v1/harness/runs`
+
+Start a code-agent run that can be watched and stopped; answers at once with the run's id (the body is that of /v1/harness/code)
+
+Request body: `CodeAgentRequest` (* = required).
+
+Responses: `202`, `400`, `403`, `409`.
+
+### `GET /v1/harness/runs/{run_id}`
+
+One code-agent run with its status (running, verified, exhausted, stopped, failed, interrupted), the steps so far and, when it has ended, its result
+
+Parameters: `run_id` (path, required).
+
+Responses: `200`, `403`, `404`.
+
+### `POST /v1/harness/runs/{run_id}/stop`
+
+Stop a run that is going; the model call in progress is ended and no partial edit is applied
+
+Parameters: `run_id` (path, required).
+
+Responses: `200`, `403`, `404`.
+
 ## knowledge
+
+### `POST /v1/export`
+
+Save Markdown as a file (md, txt, html, docx, pptx, xlsx, csv, tex, pdf), made on this machine by a fixed converter; no model is called
+
+Request body: `markdown`*, `format`*, `title` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `GET /v1/export/formats`
+
+The formats /v1/export writes, each with its label, extension and media type
+
+Responses: `200`, `403`.
 
 ### `GET /v1/kb`
 
@@ -624,6 +668,12 @@ Parameters: `kb` (path, required).
 Request body: `query`*, `k`, `mode` (* = required).
 
 Responses: `200`, `400`, `404`, `403`, `503`.
+
+### `POST /v1/parse`
+
+Read one file (PDF, Word, PowerPoint, Excel, CSV, LaTeX, HTML, Markdown, text) and return its text as Markdown, without storing it; used to attach a file to one question
+
+Responses: `200`, `400`, `403`.
 
 ## lab
 

@@ -105,9 +105,64 @@ fn options() -> Options {
         | Options::ENABLE_MATH
 }
 
-/// `\( .. \)` and `\[ .. \]` become `$ .. $` and `$$ .. $$` outside code fences, which is the form the Markdown
-/// reader knows as maths; and the document gets its title as a first heading when it has none.
-fn prepare(markdown: &str, title: &str) -> String {
+/// Apply `f` to the parts of a line that are not inside a code span (text between backticks), and leave the code
+/// spans as they are.
+fn outside_code(line: &str, f: impl Fn(&str) -> String) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut rest = line;
+    while let Some(open) = rest.find('`') {
+        let ticks = rest[open..].chars().take_while(|c| *c == '`').count();
+        let after = open + ticks;
+        // A span ends at a run of the same number of backticks; without one, the backticks are text.
+        let fence = "`".repeat(ticks);
+        let close = rest[after..]
+            .match_indices(&fence)
+            .map(|(i, _)| i)
+            .find(|i| {
+                let end = after + i + ticks;
+                !rest[end..].starts_with('`') && !rest[..after + i].ends_with('`')
+            });
+        match close {
+            Some(i) => {
+                out.push_str(&f(&rest[..open]));
+                out.push_str(&rest[open..after + i + ticks]);
+                rest = &rest[after + i + ticks..];
+            }
+            None => {
+                out.push_str(&f(&rest[..after]));
+                rest = &rest[after..];
+            }
+        }
+    }
+    out.push_str(&f(rest));
+    out
+}
+
+/// `\( .. \)` becomes `$ .. $` where the pair closes on its line.
+fn inline_maths(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(a) = rest.find("\\(") {
+        match rest[a + 2..].find("\\)") {
+            Some(b) => {
+                out.push_str(&rest[..a]);
+                out.push('$');
+                out.push_str(rest[a + 2..a + 2 + b].trim());
+                out.push('$');
+                rest = &rest[a + 2 + b + 2..];
+            }
+            None => break,
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+/// The form the Markdown reader knows as maths: `\( .. \)` becomes `$ .. $`, and `\[ .. \]` becomes `$$ .. $$`
+/// where `\[` opens a line (a display formula on one line or on several). An escaped bracket inside a sentence
+/// (`a\[0\]`) and anything inside code stay as written. With `maths` off only the title is added, as a first
+/// heading when the text has none.
+fn prepare(markdown: &str, title: &str, maths: bool) -> String {
     let mut out = String::with_capacity(markdown.len() + title.len() + 8);
     let title = title.trim();
     let has_heading = markdown
@@ -117,22 +172,41 @@ fn prepare(markdown: &str, title: &str) -> String {
     if !title.is_empty() && !has_heading {
         out.push_str(&format!("# {title}\n\n"));
     }
-    let mut fenced = false;
+    let (mut fenced, mut display) = (false, false);
     for line in markdown.lines() {
         let t = line.trim_start();
         if t.starts_with("```") || t.starts_with("~~~") {
             fenced = !fenced;
         }
-        if fenced {
+        if fenced || !maths {
             out.push_str(line);
+        } else if display {
+            // Inside a display formula opened on an earlier line: it ends at `\]`.
+            match line.find("\\]") {
+                Some(i) => {
+                    display = false;
+                    out.push_str(&line[..i]);
+                    out.push_str("$$");
+                    out.push_str(&outside_code(&line[i + 2..], inline_maths));
+                }
+                None => out.push_str(line),
+            }
+        } else if let Some(body) = t.strip_prefix("\\[") {
+            out.push_str(&line[..line.len() - t.len()]);
+            out.push_str("$$");
+            match body.find("\\]") {
+                Some(i) => {
+                    out.push_str(&body[..i]);
+                    out.push_str("$$");
+                    out.push_str(&outside_code(&body[i + 2..], inline_maths));
+                }
+                None => {
+                    display = true;
+                    out.push_str(body);
+                }
+            }
         } else {
-            out.push_str(
-                &line
-                    .replace("\\[", "$$")
-                    .replace("\\]", "$$")
-                    .replace("\\(", "$")
-                    .replace("\\)", "$"),
-            );
+            out.push_str(&outside_code(line, inline_maths));
         }
         out.push('\n');
     }
@@ -164,7 +238,8 @@ pub fn export(markdown: &str, title: &str, format: Format) -> Result<Vec<u8>, St
             MAX_MARKDOWN / 1_048_576
         ));
     }
-    let md = prepare(markdown, title);
+    // Markdown is saved as it was written; the other writers read maths in the Markdown reader's form.
+    let md = prepare(markdown, title, format != Format::Md);
     // A converter that fails on some input is that export's error, not the server's.
     std::panic::catch_unwind(|| match format {
         Format::Md => Ok(md.clone().into_bytes()),
@@ -207,9 +282,36 @@ fn plain_maths(md: &str) -> String {
         if fenced {
             out.push_str(line);
         } else {
-            out.push_str(&line.replace("$$", ""));
+            out.push_str(&outside_code(&line.replace("$$", ""), bare_inline_maths));
         }
         out.push('\n');
+    }
+    out
+}
+
+/// `$x^2$` without its dollar signs. A pair is a formula by the Markdown reader's rule: no space after the opening
+/// sign, none before the closing one, and no digit after it, so "$5 and $6" stays a pair of prices.
+fn bare_inline_maths(text: &str) -> String {
+    let b = text.as_bytes();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'$' && i + 1 < b.len() && !b[i + 1].is_ascii_whitespace() && b[i + 1] != b'$' {
+            let close = (i + 2..b.len()).find(|&j| {
+                b[j] == b'$'
+                    && !b[j - 1].is_ascii_whitespace()
+                    && !b.get(j + 1).is_some_and(u8::is_ascii_digit)
+            });
+            if let Some(j) = close {
+                out.push_str(&text[i + 1..j]);
+                i = j + 1;
+                continue;
+            }
+        }
+        // `$` is one byte, so stepping by characters from here keeps to character boundaries.
+        let c = text[i..].chars().next().unwrap_or(' ');
+        out.push(c);
+        i += c.len_utf8();
     }
     out
 }
@@ -703,8 +805,92 @@ fn tex_esc(s: &str) -> String {
     out
 }
 
+/// Commands that have no place in a formula and would make the saved file do more than show one: reading and
+/// writing files, defining or redefining commands, changing how characters are read.
+const TEX_NOT_MATHS: [&str; 44] = [
+    "input",
+    "include",
+    "includeonly",
+    "includegraphics",
+    "verbatiminput",
+    "lstinputlisting",
+    "openin",
+    "openout",
+    "closein",
+    "closeout",
+    "read",
+    "readline",
+    "write",
+    "immediate",
+    "newread",
+    "newwrite",
+    "special",
+    "catcode",
+    "lccode",
+    "uccode",
+    "def",
+    "edef",
+    "gdef",
+    "xdef",
+    "let",
+    "futurelet",
+    "csname",
+    "endcsname",
+    "expandafter",
+    "newcommand",
+    "renewcommand",
+    "providecommand",
+    "newenvironment",
+    "renewenvironment",
+    "usepackage",
+    "documentclass",
+    "directlua",
+    "shipout",
+    "output",
+    "everypar",
+    "everymath",
+    "everydisplay",
+    "scantokens",
+    "jobname",
+];
+
+/// A formula for the LaTeX file: as written, except that a command from [`TEX_NOT_MATHS`] is shown as its name and
+/// not run, `^^` (TeX's way to spell any character, a backslash included) is broken up, and `%` cannot comment out
+/// the rest of the line.
+fn tex_maths(t: &str) -> String {
+    let mut out = String::with_capacity(t.len() + 8);
+    let mut chars = t.trim().chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\\' => {
+                let mut name = String::new();
+                while let Some(n) = chars.peek().copied().filter(char::is_ascii_alphabetic) {
+                    name.push(n);
+                    chars.next();
+                }
+                if name.is_empty() {
+                    out.push('\\');
+                    // A control symbol (`\,`, `\{`, `\\`, `\%`): the next character belongs to it.
+                    if let Some(n) = chars.next() {
+                        out.push(n);
+                    }
+                } else if TEX_NOT_MATHS.contains(&name.as_str()) {
+                    out.push_str(&format!("\\mathrm{{{name}}}"));
+                } else {
+                    out.push('\\');
+                    out.push_str(&name);
+                }
+            }
+            '^' if chars.peek() == Some(&'^') => out.push_str("^{}"),
+            '%' => out.push_str("\\%"),
+            _ => out.push(c),
+        }
+    }
+    out
+}
+
 /// A LaTeX article that compiles with a plain `pdflatex` or `tectonic`: sections, lists, tables, code and the
-/// maths as it was written.
+/// maths as it was written (see [`tex_maths`]).
 fn to_tex(md: &str, title: &str) -> String {
     let mut body = String::new();
     let mut first_heading = true;
@@ -781,6 +967,7 @@ fn to_tex(md: &str, title: &str) -> String {
                 if safe_link(&dest_url) && !dest_url.starts_with('#') {
                     let url = dest_url
                         .replace('\\', "")
+                        .replace('^', "%5E")
                         .replace('%', "\\%")
                         .replace('#', "\\#")
                         .replace(['{', '}'], "");
@@ -838,8 +1025,8 @@ fn to_tex(md: &str, title: &str) -> String {
             }
             Event::Code(t) => put(&mut body, &format!("\\texttt{{{}}}", tex_esc(&t))),
             Event::Html(t) | Event::InlineHtml(t) => put(&mut body, &tex_esc(&t)),
-            Event::InlineMath(t) => put(&mut body, &format!("${}$", t.trim())),
-            Event::DisplayMath(t) => put(&mut body, &format!("\\[\n{}\n\\]\n\n", t.trim())),
+            Event::InlineMath(t) => put(&mut body, &format!("${}$", tex_maths(&t))),
+            Event::DisplayMath(t) => put(&mut body, &format!("\\[\n{}\n\\]\n\n", tex_maths(&t))),
             Event::SoftBreak => put(&mut body, "\n"),
             Event::HardBreak => put(&mut body, "\\\\\n"),
             Event::Rule => put(&mut body, "\\bigskip\\hrule\\bigskip\n\n"),
@@ -1000,6 +1187,46 @@ mod tests {
         // Code that tries to close the verbatim block cannot.
         let sly = to_tex("```\n\\end{verbatim}\n\\input{/etc/passwd}\n```\n", "t");
         assert_eq!(sly.matches("\\end{verbatim}").count(), 1, "{sly}");
+    }
+
+    /// Maths delimiters are rewritten only where they are maths: not inside code, not an escaped bracket in a
+    /// sentence, and not at all in the Markdown file, which is saved as written.
+    #[test]
+    fn maths_delimiters_are_rewritten_only_where_they_are_maths() {
+        let md = "# T\n\nThe pattern `\\(\\d+\\)` matches, a\\[0\\] is the first, and \\(x^2\\) is a square.\n\n\\[\n  E = mc^2\n\\]\n\n\\[ a + b \\] then text.\n";
+        let p = prepare(md, "T", true);
+        assert!(p.contains("`\\(\\d+\\)`"), "{p}");
+        assert!(p.contains("a\\[0\\] is the first"), "{p}");
+        assert!(p.contains("and $x^2$ is a square"), "{p}");
+        assert!(p.contains("$$\n  E = mc^2\n$$"), "{p}");
+        assert!(p.contains("$$ a + b $$ then text."), "{p}");
+        // The Markdown file is the text as written.
+        let saved = String::from_utf8(export(md, "T", Format::Md).unwrap()).unwrap();
+        assert_eq!(saved, md);
+        // For the writers that know no maths, a formula loses its signs and a price keeps them.
+        let plain = plain_maths("The area is $x^2$, and it costs $5 or $6. Code: `$a$`.\n");
+        assert_eq!(
+            plain,
+            "The area is x^2, and it costs $5 or $6. Code: `$a$`.\n"
+        );
+    }
+
+    /// A formula is written to the LaTeX file as a formula: a command that reads or writes files or redefines
+    /// things is shown as its name, and no spelling of a backslash gets through.
+    #[test]
+    fn latex_maths_cannot_read_files_or_define_commands() {
+        let md = "Inline $\\input{/etc/passwd} + \\frac{a}{b}$ and\n\n$$\\immediate\\write18{id} \\def\\x{y} ^^5cinput 50% \\alpha$$\n\n**[x](https://a.example/^^5cinput^^7b/etc/passwd^^7d)**\n";
+        let tex = String::from_utf8(export(md, "T", Format::Tex).unwrap()).unwrap();
+        assert!(!tex.contains("\\input"), "{tex}");
+        assert!(!tex.contains("\\immediate"), "{tex}");
+        assert!(!tex.contains("\\write"), "{tex}");
+        assert!(!tex.contains("\\def"), "{tex}");
+        assert!(!tex.contains("^^"), "{tex}");
+        assert!(tex.contains("\\mathrm{input}"), "{tex}");
+        assert!(tex.contains("\\frac{a}{b}"), "{tex}");
+        assert!(tex.contains("\\alpha"), "{tex}");
+        assert!(tex.contains("50\\%"), "{tex}");
+        assert_eq!(tex_maths("a \\, b \\\\ c"), "a \\, b \\\\ c");
     }
 
     #[test]

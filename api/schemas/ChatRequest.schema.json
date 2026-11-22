@@ -210,6 +210,36 @@
           "maximum": 12
         }
       }
+    },
+    "shadow": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "off",
+        "between",
+        "other",
+        "arrival",
+        "both",
+        null
+      ],
+      "description": "ShadowPrefill for this request; unset uses the service setting."
+    },
+    "stable_prefix": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "Keep the beginning of the prompt the same from turn to turn; unset uses the service setting."
+    },
+    "rewind_to": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "With a conversation_id, answer from the conversation as it was after its first rewind_to stored messages and replace what followed with this turn. The stored conversation changes only when the answer exists."
     }
   }
 }

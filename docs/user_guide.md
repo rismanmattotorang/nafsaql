@@ -9,13 +9,17 @@ Nafs-Aql answers in two ways. A quick model answers at once. A thorough model th
   - *Auto* answers quickly, and thinks it through when the question needs it.
   - *Quick* always answers at once.
   - *Thorough* always thinks first. It is slower: a minute or two on this computer.
-- **Add a check:** give the expected answer, Python tests or a JSON format, and the reply is checked against it exactly. An answer that passes is marked *Checked*.
-- **Settings** (the gear at the bottom left, or the sliders icon on a phone):
-  - *Balance between speed and care* decides how readily Auto takes the thorough path.
+- **Add a check:** give the expected answer, Python tests or a JSON format, and the reply is checked against it exactly. An answer that passes is marked *Checked*. A JSON format that is not valid yet is said beside the field as you type.
+- **Attach a file** to a question with the paperclip, by dropping it on the conversation, or by pasting it: PDF, Word, PowerPoint, Excel, CSV, LaTeX, web pages, Markdown and text. Its text is read on this computer and goes beside your question. One question carries about 8,000 characters of attached text; a longer file is cut and the page says so. To ask about the whole of a long document, add it to a knowledge base.
+- **Change your mind.** Point at a message of yours and press the pencil to edit it and send it again: what followed it is replaced. **Regenerate** under an answer writes that answer again in its place.
+- **Save an answer or a chat as a file.** *Save as…* under an answer, or *Save chat as a file…* in the chat's menu (the three dots), offers Markdown, Word, PDF, PowerPoint, a web page, LaTeX, plain text, and Excel or CSV when there is a table. The file is made on this computer. The chat's menu also renames the chat.
+- **Settings** (the gear at the bottom left, or the sliders icon on a phone). Every setting says what it does and how it is when untouched; *Put back* returns one to that, *Put everything back* returns all of them, and the box at the top finds a setting by a word. They are kept in this browser.
+  - *How Auto should answer* is a starting point: *Quicker*, *Balanced* (how this service is set up) or *More careful*.
+  - *Balance between speed and care* decides how readily Auto takes the thorough path. Leave *As this service is set up* ticked unless you want your own.
   - *Thinking time* sets how long a thorough answer may think; *Automatic* uses the measured setting for the topic.
   - *Show the thinking* displays the thorough model's reasoning while it writes.
   - *Reuse earlier checked answers* lets checked answers to similar questions inform the reply; they are shown as sources.
-  - *Appearance* switches between light, dark and the system setting.
+  - *Appearance* switches between light, dark and the computer's own setting.
   - *Access key* is needed only when your administrator has set one up.
 
 ## Reading an answer
@@ -36,7 +40,13 @@ Press **Ctrl/Cmd + K** on any page to jump to a page or do something (new chat, 
 
 ## Tables, formulas, diagrams and code
 
-Answers are drawn the way you would read them. A table can be copied (button above it) and pastes into a spreadsheet. A formula such as $x^2$ is typeset. A diagram (flowchart, sequence or pie) has a **Source** button to see its text and **Save SVG**. Code has a **Copy** button, and long code folds with **Show all lines**. While an answer is still being written, a half-finished formula or diagram shows as plain text and turns into the picture when it is complete.
+Answers are drawn the way you would read them.
+
+- **A table** sorts by a column when you click its heading (again to reverse, a third time to put the rows back); numbers sort as numbers. Above it: *Copy table* (pastes into a spreadsheet), *Copy Markdown* and *Save CSV*.
+- **A formula** such as $x^2$ is typeset; a displayed formula has *Copy LaTeX*.
+- **A diagram** (flowchart, sequence, states or pie) and **a chart** have *Source*, *Save SVG*, *Save PNG* and *Expand*. Expanded, a diagram zooms with + and − (or Ctrl/Cmd and the wheel) and closes with Esc. A chart also shows its data as a table and saves it as CSV.
+- **Code** has *copy*, *wrap* for long lines and *save* (a file with the right ending); from six lines its lines are numbered, and long code folds with **Show all lines**.
+- **A footnote** such as `[^1]` becomes a small number, with the notes listed under the answer. While an answer is still being written, a half-finished formula or diagram shows as plain text and turns into the picture when it is complete.
 
 In **Knowledge**, the graph shows what your documents name: bigger circles are mentioned more, a colour is a group. Point at a circle to light up what it connects to, click it to read the sentences that say so, double-click to open what is around it, drag to move it, scroll to zoom, and use the arrows button for full screen.
 
@@ -69,10 +79,10 @@ Rooms are not removed by the 90-day retention purge: they stay until someone del
 
 Open **Knowledge** in the left bar to give the assistant documents of your own. Everything stays on this machine.
 
-- **Create a knowledge base** with *New*, then drop files on it or choose them: PDF, Word, PowerPoint, LaTeX, web pages, Markdown and text, up to 50 MB each. Each file gets its own row with its stage, a *Cancel*, and, if it is refused, the reason and a *Try again*. A document is *Ready* within seconds and searchable by its words at once; its meaning index follows in the background (the row says *Words only* until then), and a bigger upload never holds a smaller one up. PDFs are read by their layout: columns in reading order, section titles as headings, tables as rows, running headers and page numbers left out. A scanned PDF with no text layer cannot be read. Each passage is also searched sentence by sentence; a document stored before this version gets both the new reading and the sentence search when it is read again (the circular arrow under *Passages*).
+- **Create a knowledge base** with *New*, then drop files anywhere on the page or choose them: PDF, Word, PowerPoint, Excel, CSV, LaTeX, web pages, Markdown and text, up to 50 MB each. A spreadsheet becomes one table per sheet under the sheet's name, with the column headings repeated so a passage from the middle of a long sheet still says what its columns are; a formula is read as its last value. A scanned PDF or a picture cannot be read. Each file gets its own row with its stage, a *Cancel*, and, if it is refused, the reason and a *Try again*. A document is *Ready* within seconds and searchable by its words at once; its meaning index follows in the background (the row says *Words only* until then), and a bigger upload never holds a smaller one up. PDFs are read by their layout: columns in reading order, section titles as headings, tables as rows, running headers and page numbers left out. A scanned PDF with no text layer cannot be read. Each passage is also searched sentence by sentence; a document stored before this version gets both the new reading and the sentence search when it is read again (the circular arrow under *Passages*).
 - **Search** the base by *Meaning and words* (the default), *Meaning* alone, or *Words* alone. Results appear as you type. Each hit shows its document, heading and page, with your words highlighted; click it to open the passage where it sits in the document, or *Ask about this* to start a chat on it. Search runs in memory, so it stays fast while the machine is busy.
 - **Passages** opens a document's passages, each with the heading it sits under; the circular arrow reads a document again (after a parser or chunking change; passages that did not change keep their meaning index), and the cross removes it with its passages.
-- **The knowledge graph** card shows a map of your documents as soon as they are read: the names, acronyms and identifiers they share, linked when passages mention both (drawn from the text, no waiting). Scroll to zoom, drag to move, click a legend entry to show one group. For relations with the sentence that states each, build the full graph with *Build the graph* (it reads every passage with the quick model, so it takes about a minute per passage on a 4-core CPU and runs in the background). Pick a thing to see its relations, each with the sentence that states it; a relation is kept only when that sentence really occurs in the passage. The list of types the graph is read under can be changed through the API (`PUT /v1/kb/{kb}/ontology`).
+- **The knowledge graph** card shows a map of your documents as soon as they are read: the names, acronyms and identifiers they share, linked when passages mention both (drawn from the text, no waiting). Scroll to zoom, drag to move, click a legend entry to show one group or a kind (person, method, system) to show one kind. *Fit* brings everything into view; with the keyboard, the arrow keys move the view, + and − zoom and 0 fits. *Save SVG* and *Save PNG* keep the picture. For relations with the sentence that states each, build the full graph with *Build the graph* (it reads every passage with the quick model, so it takes about a minute per passage on a 4-core CPU and runs in the background). Pick a thing to see its relations, each with the sentence that states it; a relation is kept only when that sentence really occurs in the passage. The list of types the graph is read under can be changed through the API (`PUT /v1/kb/{kb}/ontology`).
 - **Ask about a base** from Chat: pick it in the box under the composer, then choose *Passages* (the answer cites numbered passages), *Passages and graph* (relations are shown above the passages, and a question that needs two steps follows the chain), or *Choose for me*. Every answer says which searches ran and why any was skipped, and lists the passages it used, so a claim can be checked against its source: click a number such as [2] in the answer to read that passage. If nothing in the base matches the question well, the answer says *No strong match*. You can leave the Chat page while an answer is being written; it keeps going and is there when you return.
 - **Is the answer in the documents?** Under an answer from documents you see either *Every sentence of this answer is in the passages* or how many are not, with those sentences listed. The comparison is by words and numbers, with no model: it catches a number or a claim the passages do not contain; it does not prove an answer right.
 - **Follow-up questions** such as "And how fast is it?" are searched together with your previous question, and the answer says so.
@@ -80,11 +90,21 @@ Open **Knowledge** in the left bar to give the assistant documents of your own. 
 - **Memory** modes (experimental, *Advanced* only) use a module trained on the base's documents; they appear once a module has been trained and activated from the *Memory* card. A module that gives the same memory whatever is asked is recognised and not used; the answer then comes from passages and says why.
 
 
+## Code
+
+**Code** in the left bar has a small program written and checked for you. Say what the function should do and give the tests it must pass, one Python `assert` per line. The program is written to `solution.py`, run against your tests in a sandbox that has no network access, and tried again from what failed until the tests pass or the attempts are used up.
+
+- Each step appears as it ends: who wrote it (the quick model first, the careful model after), what it did, whether the tests passed, and what came back. **Stop** ends the run after the step in progress.
+- At the end you get the program, with *copy* and *save*, and what changed from any starting code you gave. A run that did not pass shows the best version and how many of the tests it passes.
+- *Earlier runs* keeps the runs on this computer; *Use these again* puts a run's task and tests back in the form.
+- It is for one function or a small file. One run is served at a time.
+
 ## Speed
 
 **Settings → Speed.** *Get the careful model ready while you read*: after each answer, while you read, the careful
 (reasoning) model reads the conversation, so if your next question needs it, it starts in a couple of seconds instead of
-half a minute; anything you send stops it at once. *Between messages* is the default; *also while drafting* makes every
+half a minute; anything you send stops it at once. The model that just answered reads the conversation too, so your
+next question to the same model starts in under a second instead of several. *Between messages* is the default; *also while drafting* makes every
 quick answer slower on this kind of computer and is off unless you choose it. *Keep the start of a conversation the
 same* puts the sources and notes for a question next to the question, so both models can reuse what they read; it is on
 by default and changed no answers in testing.

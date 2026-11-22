@@ -248,6 +248,20 @@ repeated indentation errors. Pruning old observations before compaction is
 likewise inert here: the model is never shown more than about 930 bytes of
 evidence, and 16 paired runs had identical action sequences.
 
+\textbf{The first step on an empty workspace.} A person describes a function
+and its tests on the Code page and watches the run step by step. The first
+live run showed \Sone\ answering an empty workspace by copying the example
+action of its instructions (``run the checks''), with no file to run. The
+instructions now ask for the whole program when there is no file, the reply
+parser accepts the fences small models actually write (a language tag such as
+\texttt{python3}, a closing fence only at the start of a line), and a request
+to run a file that does not exist is answered with what is missing. On twelve
+functions written from nothing, one step each on \Sone, the first step
+produced a program that passed its hidden tests in 1 of 12 before the change
+and in 12 of 12 after (median 7.9\,s a step); the before arm ran a missing
+file in 9 of 12. This is one model, one set of small tasks and one run per
+arm.
+
 \textbf{Lean.} The protocol is validated end to end with the real binary, but
 Qwen3-4B-Thinking in 4 bits does not yet write valid Lean~4: for $n+0=n$,
 which \texttt{rfl} proves, it abstained after three attempts (826\,s). Every

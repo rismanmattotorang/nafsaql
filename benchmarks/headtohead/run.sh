@@ -6,6 +6,11 @@ set -uo pipefail
 cd "$(dirname "$0")/../.."
 OUT=benchmarks/headtohead
 ROUNDS=${ROUNDS:-3}
+if [ ! -d third_party/semantic-router/src/semantic-router ]; then
+  echo "The Go side needs the reference checkout, removed on 2026-11-22 to save space. Restore it with:" >&2
+  echo "  git clone https://github.com/vllm-project/semantic-router third_party/semantic-router && git -C third_party/semantic-router checkout 029bf54ed" >&2
+  exit 1
+fi
 (cd rust && cargo build --release -p nafs-bench --example h2h 2>&1 | tail -n 1)
 for r in $(seq 1 $ROUNDS); do
   echo "round $r: load $(uptime | sed 's/.*load averages*: //')" | tee $OUT/round_${r}_load.txt

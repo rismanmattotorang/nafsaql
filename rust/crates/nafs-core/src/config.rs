@@ -52,6 +52,9 @@ pub struct Config {
     /// this version does not know (they are ignored), and options the active engine cannot honour.
     #[serde(skip)]
     pub warnings: Vec<String>,
+    /// The part of `warnings` that does not depend on the active engine: unknown keys and unusual values.
+    #[serde(skip)]
+    pub key_warnings: Vec<String>,
 }
 
 /// `[knowledge]` (IF-K02): the SurrealDB connection, the upload limits and the chunker's settings.
@@ -1233,12 +1236,14 @@ impl Config {
                 problems.join("; ")
             )));
         }
-        cfg.warnings = unknown_keys(&raw, &cfg)
+        cfg.key_warnings = unknown_keys(&raw, &cfg)
             .into_iter()
             .map(|k| {
                 format!("{k} is not a setting of this version and is ignored (check the spelling)")
             })
             .collect();
+        cfg.key_warnings.extend(cfg.unusual_values());
+        cfg.warnings = cfg.key_warnings.clone();
         cfg.warnings.extend(cfg.inactive_options());
         let mut h = Sha256::new();
         h.update(raw.as_bytes());
@@ -1285,28 +1290,16 @@ impl Config {
             &self.deliberation.adaptive_exit.exit_rule,
             &["consistency", "posterior"],
         );
-        one_of(
-            "judge.backend",
-            &self.judge.backend,
-            &["system1", "system2"],
-        );
-        one_of(
-            "harness.model",
-            &self.harness.model,
-            &["system1", "system2"],
-        );
+        // The code agent's settings are checked only where they are used: a switched-off feature never stops a start.
+        let h = &self.harness;
+        if h.code_agent_enabled {
+            one_of("harness.model", &h.model, &["system1", "system2"]);
+        }
         one_of(
             "knowledge.fusion",
             &self.knowledge.fusion,
             &["rrf", "convex"],
         );
-        for (name, b) in &self.backends {
-            one_of(
-                &format!("backends.{name}.kind"),
-                &b.kind,
-                &["llama", "vllm", "smiley"],
-            );
-        }
         let mut range = |key: &str, value: f64, lo: f64, hi: f64| {
             if !(lo..=hi).contains(&value) {
                 out.push(format!("{key} = {value}: must be from {lo} to {hi}"));
@@ -1324,28 +1317,30 @@ impl Config {
             0.0,
             1.0,
         );
-        let h = &self.harness;
-        range("harness.max_steps", h.max_steps as f64, 1.0, 12.0);
-        range("harness.wall_clock_s", h.wall_clock_s as f64, 10.0, 7200.0);
-        range(
-            "harness.step_max_tokens",
-            h.step_max_tokens as f64,
-            32.0,
-            8192.0,
-        );
-        range(
-            "harness.compact_at_tokens",
-            h.compact_at_tokens as f64,
-            256.0,
-            1_000_000.0,
-        );
-        range(
-            "harness.cascade_samples",
-            h.cascade_samples as f64,
-            1.0,
-            4.0,
-        );
-        range("knowledge.rag_k", self.knowledge.rag_k as f64, 1.0, 100.0);
+        if h.code_agent_enabled {
+            range("harness.max_steps", h.max_steps as f64, 1.0, 12.0);
+            range("harness.wall_clock_s", h.wall_clock_s as f64, 10.0, 7200.0);
+            range(
+                "harness.step_max_tokens",
+                h.step_max_tokens as f64,
+                32.0,
+                8192.0,
+            );
+            range(
+                "harness.compact_at_tokens",
+                h.compact_at_tokens as f64,
+                256.0,
+                1_000_000.0,
+            );
+            if h.cascade {
+                range(
+                    "harness.cascade_samples",
+                    h.cascade_samples as f64,
+                    1.0,
+                    4.0,
+                );
+            }
+        }
         range(
             "server.max_prompt_tokens",
             self.server.max_prompt_tokens as f64,
@@ -1355,13 +1350,35 @@ impl Config {
         out
     }
 
+    /// Values the program runs with but reads in a way their writer may not expect. These worked before the checks
+    /// existed, so they are said, not refused.
+    pub fn unusual_values(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        for (name, b) in &self.backends {
+            if !["llama", "vllm", "smiley"].contains(&b.kind.as_str()) {
+                out.push(format!("backends.{name}.kind = \"{}\" is not \"llama\", \"vllm\" or \"smiley\": it is served as a plain OpenAI-compatible server, without that engine's extras", b.kind));
+            }
+        }
+        if !["system1", "system2"].contains(&self.judge.backend.as_str()) {
+            out.push(format!(
+                "judge.backend = \"{}\" is not \"system1\" or \"system2\": it is read as \"system2\"",
+                self.judge.backend
+            ));
+        }
+        out
+    }
+
     /// Options that are switched on but that the active engine cannot honour, in words for the person who set them.
     pub fn inactive_options(&self) -> Vec<String> {
+        self.inactive_options_for(&self.backend.active)
+    }
+
+    /// The same for a named engine: the active one can be changed while the service runs.
+    pub fn inactive_options_for(&self, name: &str) -> Vec<String> {
         let mut out = Vec::new();
-        let Some(active) = self.backends.get(&self.backend.active) else {
+        let Some(active) = self.backends.get(name) else {
             return out;
         };
-        let name = &self.backend.active;
         if active.kind != "llama" {
             if self.harness.code_agent_enabled && self.harness.constrain {
                 out.push(format!("harness.constrain is on, but the active engine ({name}) has no constrained sampling: the code agent's replies are parsed as free text"));
@@ -1509,6 +1526,33 @@ mod tests {
             assert!(e.contains(key), "{e}");
         }
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// What was served before the checks existed is still served: another kind of server, a judge named loosely, and
+    /// the settings of a feature that is switched off are said or ignored, never a reason to refuse the file.
+    #[test]
+    fn what_worked_before_the_checks_still_loads() {
+        let mut cfg = Config::load(&shipped("nafs-aql.sample.toml")).unwrap();
+        let first = cfg.backends.keys().next().unwrap().clone();
+        cfg.backends.get_mut(&first).unwrap().kind = "openai".into();
+        cfg.judge.backend = "big".into();
+        cfg.harness.code_agent_enabled = false;
+        cfg.harness.max_steps = 0;
+        cfg.harness.cascade_samples = 0;
+        cfg.knowledge.rag_k = 0;
+        assert!(cfg.problems().is_empty(), "{:?}", cfg.problems());
+        let w = cfg.unusual_values();
+        assert!(w.iter().any(|x| x.contains(".kind = \"openai\"")), "{w:?}");
+        assert!(w.iter().any(|x| x.starts_with("judge.backend")), "{w:?}");
+        // Switched on, the same values are refused; the samples only when the first step uses them.
+        cfg.harness.code_agent_enabled = true;
+        cfg.harness.cascade = false;
+        let p = cfg.problems();
+        assert!(
+            p.iter().any(|x| x.starts_with("harness.max_steps")),
+            "{p:?}"
+        );
+        assert!(!p.iter().any(|x| x.contains("cascade_samples")), "{p:?}");
     }
 
     /// With the engine that has no constrained sampling and one sample a request, the options that need them say so.

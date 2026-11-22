@@ -191,6 +191,92 @@ goes before it. A shadow beside the draft, as in the paper's
 SLO-slack harvest, is built but off: the two models share the cores, and it
 made every draft 75\,\% slower.
 
+\subsection{Hand-offs, the first token and unclaimed work}
+\label{sec:inference:handoff}
+FreeToken \cite{yang2026freetoken} serves Mixture-of-Experts models whose
+experts do not fit the GPU, on a personal machine, by treating the GPU, the
+CPU and the link between them as one platform. None of its mechanisms applies
+to a dense model on four cores: there are no experts, no second device and no
+recurrent state, and its published code places its one context anchor at the
+tool-call opener, off by default and without effect for a full-attention
+model. Its reasoning does apply, and five changes to the engine follow from
+it (Table~\ref{tab:engine34}).
+
+\emph{One residency.} The store of earlier prompts copied a conversation's
+cache out when a request ended and back in when the next began. A request
+that continues a kept conversation now takes that cache over, and gives it
+back by a move. The store decides between taking and copying from the chat
+template: a kept cache is taken when the new prompt holds everything the kept
+one does, or departs from it inside the last turn and goes on to open a new
+turn, which is the shape of a reply that was generated after a reasoning
+block and is replayed without one. A second sample of the same question
+departs inside the last turn and opens none, so it copies, and the first
+sample's cache stays for the next one.
+
+\emph{No hand-off between reading and writing.} The last token of a prompt
+had a pass over the weights of its own, after the chunk before it. It now
+rides in the last chunk, and the first token is sampled from that chunk's
+last row.
+
+\emph{Unclaimed work is anybody's.} Every matrix product was divided into one
+fixed share per thread, and a fork-join waits for its slowest thread; on a
+shared machine one descheduled thread holds the other three. Each thread
+still starts on its own share, in blocks, from the front, and a thread that
+finishes takes blocks from the \emph{back} of another's share; the owner keeps
+its last block. Taking from the front, where the owner is reading, was 5 to
+10\,\% slower than fixed shares on three threads.
+
+\emph{Loading overlaps computing.} A fresh server has the model file mapped
+and none of it in memory; a background thread now advises the system of the
+whole range and touches its pages while the first request is being read.
+
+\emph{Idle time serves the answering model too.} A reply is generated after a
+reasoning block and replayed without one, so the model that answered must
+read its own reply again at the next turn. The between-turns shadow of
+Section~\ref{sec:inference} now runs for the answering model first, then for
+the other. The store's budget can be changed and flushed while serving.
+
+\begin{table}[t]
+\centering
+\caption{Engine changes of the second release, interleaved comparisons on the
+reference machine while it was shared (load averages 6 to over 20). Old and
+new are the same build with one switch changed, except the first two rows
+(two builds).}
+\label{tab:engine34}
+\footnotesize
+\begin{tabular}{@{}p{0.47\columnwidth}rr@{}}
+\toprule
+Quantity & Before & After \\
+\midrule
+Taking over and returning a kept conversation of 2{,}048 tokens, \Sone & 240\,ms & 0 \\
+\quad same, \Stwo & 457\,ms & 0 \\
+First token, conversation extended by 8 tokens, \Sone & 329\,ms & 229\,ms \\
+\quad same, \Stwo & 1{,}075\,ms & 568\,ms \\
+Writing on four threads, \Sone\ (12 of 12 rounds) & 1.00 & 1.19 \\
+Reading on four threads, \Sone\ (12 of 12) & 1.00 & 1.14 \\
+Writing on four threads, \Stwo\ (8 of 8) & 1.00 & 1.33 \\
+Reading on four threads, \Stwo\ (7 of 8) & 1.00 & 1.10 \\
+First request of a fresh server, file not cached & 14.6\,s & 9.2\,s \\
+First token of a later quick turn (median of 9) & 4.25\,s & 0.71\,s \\
+First token of a later reasoning turn (median of 6) & 18.6\,s & 2.4\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The kernels did not change speed (95\,ns a row of 4-bit weights in both
+builds). On three threads, the default for writing, claimed blocks are inside
+noise on \Sone\ (2\,\%, 7 of 12 rounds) and worth 8 to 15\,\% on \Stwo; a
+fourth writing thread was not compared with three after the change, and the
+default stays three to write and four to read. The between-turns gain needs
+the pause between turns to outlast the reading (3 to 5\,s for \Sone, 7 to
+17\,s for \Stwo\ on a shared machine): one reasoning turn of six arrived
+first and waited 18.6\,s, as before. In the gateway's own traffic most reuses
+are still copies, because short conversations share only the system prompt;
+those copies are short, and the take matters where the copy was long. A paged
+cache with shared prefix pages, FreeToken's radix tree proper, was not built:
+it would save memory, not time, at the price of an indirection in the
+engine's hottest loop.
+
 \subsection{Alternative backends}
 \texttt{llama-server} keeps four things the default engine's server does not
 expose: decoding grammars, $n$-choice requests, a raw continuation endpoint

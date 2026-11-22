@@ -701,11 +701,22 @@ pub const TABLE_MAX_COLS: usize = 64;
 /// says which rows it holds, so that a passage cut from the middle of a sheet still says what its columns are.
 const TABLE_GROUP: usize = 40;
 
+/// The most characters of one cell that are kept, and the most cell text of one workbook. A cell that refers to a
+/// shared string costs a few bytes in the file and the whole string in memory, so a small file could otherwise ask
+/// for any amount of it.
+pub const TABLE_MAX_CELL: usize = 2_000;
+const WORKBOOK_MAX_BYTES: usize = 16 << 20;
+
+/// A cell's text, cut to [`TABLE_MAX_CELL`] characters (with an ellipsis when something was cut).
+fn clip_cell(s: &str) -> String {
+    match s.char_indices().nth(TABLE_MAX_CELL) {
+        Some((at, _)) => format!("{}…", &s[..at]),
+        None => s.to_string(),
+    }
+}
+
 fn cell_md(s: &str) -> String {
-    s.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace('|', "\\|")
+    clip_cell(&s.split_whitespace().collect::<Vec<_>>().join(" ")).replace('|', "\\|")
 }
 
 /// Write `rows` (the first is the header) as Markdown tables under `name`.
@@ -766,7 +777,10 @@ fn column_of(cell_ref: &str) -> Option<usize> {
     let mut seen = false;
     for c in cell_ref.chars() {
         if c.is_ascii_alphabetic() {
-            n = n * 26 + (c.to_ascii_uppercase() as usize - 'A' as usize + 1);
+            // A reference with more letters than a column can have is not a column.
+            n = n
+                .checked_mul(26)?
+                .checked_add(c.to_ascii_uppercase() as usize - 'A' as usize + 1)?;
             seen = true;
         } else {
             break;
@@ -862,13 +876,15 @@ fn parse_xlsx(bytes: &[u8]) -> Result<Parsed, String> {
         }
     }
     let mut out = String::new();
+    // Cell text still allowed for the whole workbook; a sheet that uses it up is cut there and says so.
+    let mut budget = WORKBOOK_MAX_BYTES;
     for (i, (name, rid)) in sheets.iter().enumerate() {
         let part = targets
             .get(rid)
             .cloned()
             .unwrap_or_else(|| format!("xl/worksheets/sheet{}.xml", i + 1));
         let Some(xml) = zip.read(&part) else { continue };
-        let (rows, total) = sheet_rows(&xml, &shared);
+        let (rows, total) = sheet_rows(&xml, &shared, &mut budget);
         let name = if name.trim().is_empty() {
             format!("Sheet {}", i + 1)
         } else {
@@ -886,6 +902,12 @@ fn parse_xlsx(bytes: &[u8]) -> Result<Parsed, String> {
                 rows.len()
             ));
         }
+        if budget == 0 {
+            out.push_str(
+                "(The workbook holds more text than is read; what follows was left out.)\n\n",
+            );
+            break;
+        }
     }
     if !zip.within_budget() {
         return Err("the archive expands to more than 200 MB".into());
@@ -901,8 +923,9 @@ fn parse_xlsx(bytes: &[u8]) -> Result<Parsed, String> {
 }
 
 /// The rows of one worksheet part (at most [`TABLE_MAX_ROWS`] of them, each at most [`TABLE_MAX_COLS`] wide), and
-/// how many rows with content the sheet has in all.
-fn sheet_rows(xml: &str, shared: &[String]) -> (Vec<Vec<String>>, usize) {
+/// how many rows with content the sheet has in all. `budget` is the cell text the workbook may still keep: each kept
+/// cell is cut to [`TABLE_MAX_CELL`] characters and counted, and no row is kept once it is spent.
+fn sheet_rows(xml: &str, shared: &[String], budget: &mut usize) -> (Vec<Vec<String>>, usize) {
     let mut r = Reader::from_str(xml);
     let mut rows: Vec<Vec<String>> = Vec::new();
     let mut total = 0usize;
@@ -964,13 +987,17 @@ fn sheet_rows(xml: &str, shared: &[String]) -> (Vec<Vec<String>>, usize) {
                             .trim()
                             .parse::<usize>()
                             .ok()
-                            .and_then(|i| shared.get(i).cloned())
+                            .and_then(|i| shared.get(i))
+                            .map(|s| clip_cell(s))
                             .unwrap_or_default(),
                         "b" => (if value.trim() == "1" { "TRUE" } else { "FALSE" }).to_string(),
-                        _ if value.is_empty() && !formula.is_empty() => format!("={formula}"),
-                        _ => value.clone(),
+                        _ if value.is_empty() && !formula.is_empty() => {
+                            clip_cell(&format!("={formula}"))
+                        }
+                        _ => clip_cell(&value),
                     };
-                    if col < TABLE_MAX_COLS && !text.trim().is_empty() {
+                    if col < TABLE_MAX_COLS && !text.trim().is_empty() && *budget > 0 {
+                        *budget = budget.saturating_sub(text.len());
                         if row.len() <= col {
                             row.resize(col + 1, String::new());
                         }
@@ -979,7 +1006,7 @@ fn sheet_rows(xml: &str, shared: &[String]) -> (Vec<Vec<String>>, usize) {
                 }
                 "row" if row.iter().any(|c| !c.trim().is_empty()) => {
                     total += 1;
-                    if rows.len() < TABLE_MAX_ROWS {
+                    if rows.len() < TABLE_MAX_ROWS && *budget > 0 {
                         rows.push(std::mem::take(&mut row));
                     }
                 }
@@ -1600,6 +1627,30 @@ mod tests {
             .map(|(a, b)| (a.as_str(), b.as_str()))
             .collect();
         zip_of(&refs)
+    }
+
+    /// A cell that refers to a shared string costs a few bytes in the file. One long string referred to by every
+    /// cell of a full sheet must not be held once per cell.
+    #[test]
+    fn a_shared_string_referred_to_everywhere_is_bounded() {
+        let long = "x".repeat(200_000);
+        let mut xml = String::from("<worksheet><sheetData>");
+        for _ in 0..TABLE_MAX_ROWS {
+            xml.push_str("<row>");
+            for _ in 0..TABLE_MAX_COLS {
+                xml.push_str(r#"<c t="s"><v>0</v></c>"#);
+            }
+            xml.push_str("</row>");
+        }
+        xml.push_str("</sheetData></worksheet>");
+        let p = parse(Kind::Xlsx, &xlsx_of(&[("Big", &xml)], &[&long])).unwrap();
+        // 16 MB of cell text at most, written once, plus the header row repeated per group of rows.
+        assert!(p.text.len() < 40 << 20, "{} bytes", p.text.len());
+        assert!(!p.text.contains(&"x".repeat(TABLE_MAX_CELL + 1)));
+        assert!(p.text.contains("holds more text than is read"));
+        // A column reference with far too many letters is not a column, and is not an overflow.
+        assert_eq!(column_of(&"Z".repeat(40)), None);
+        assert_eq!(column_of("AA10"), Some(26));
     }
 
     #[test]

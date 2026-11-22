@@ -711,8 +711,9 @@ export function markdown(src, cites = null) {
     .replace(/\\\[([\s\S]+?)\\\]/g, (_, m) => { blocks.push({ math: m.trim() }); return `\n${BLOCK}${blocks.length - 1}${BLOCK}\n`; });
   // Footnotes: `[^id]: text` lines are taken out and listed after the answer; `[^id]` in the text becomes a small
   // number that carries the note as its description. A mark with no note stays as written.
-  const notes = new Map();
-  s = s.replace(/^[ \t]{0,3}\[\^([^\]\s]{1,40})\]:[ \t]+(.+)$/gm, (_, id, text) => { if (!notes.has(id)) notes.set(id, text.trim()); return ''; });
+  // A note that nothing in the text points at stays where it was written: taking it out would lose its words.
+  const notes = new Map(); const marked = new Set([...s.matchAll(/\[\^([^\]\s]{1,40})\](?!:)/g)].map(m => m[1]));
+  s = s.replace(/^[ \t]{0,3}\[\^([^\]\s]{1,40})\]:[ \t]+(.+)$/gm, (whole, id, text) => { if (!marked.has(id)) return whole; if (!notes.has(id)) notes.set(id, text.trim()); return ''; });
   ctx.notes = notes; ctx.noteOrder = [];
   const lines = s.split('\n'); const out = []; let para = [];
   const flush = () => { if (para.length) { out.push(`<p>${inline(para.join('\n'), ctx).replace(/\n/g, '<br>')}</p>`); para = []; } };

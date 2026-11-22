@@ -1,0 +1,45 @@
+# Nafs-Aql
+
+> Nafs-Aql is an open-source AI assistant that runs on four CPU cores with no GPU and no API key. A small quick model answers; a reasoning model steps in only when the question is worth the wait; where an answer can be checked (maths, code against tests, data against a schema) an exact checker decides, not the model. It answers from your own documents with numbered sources, says which sentences of an answer are not in those sources, and tells you when it is not sure. Nothing leaves the machine. Version 0.2.0 (2026-11-22), a research preview. Apache-2.0. Built by the Dirac R&D Team (https://dirac.id).
+
+Facts for readers of this file:
+
+- Models: Qwen3-1.7B (quick) and Qwen3-4B-Thinking (reasoning), 4-bit GGUF, on the project's own Rust CPU engine, Smiley Core. llama.cpp and vLLM are alternative backends.
+- Reference machine for every number: one shared 4-core Intel i3-8100, 32 GB, no GPU. Comparisons use tens of items and interleaved runs; they show direction, not release-grade statistics.
+- Labels on answers: Checked (an exact check passed), Cross-checked (independent attempts agree; not a proof), Not checked, and "Not sure" when nothing earned acceptance.
+- Quick start: `git clone https://github.com/rismanmattotorang/nafsaql.git && cd nafsaql`, then `make models`, then `make up`; open http://127.0.0.1:8080; `make down` stops it. Needs Rust 1.96+, Python 3.10+, about 4 GB of disk.
+- Stated limits: small models; slow for long answers; a reworded question finds its passage in the first eight only about a quarter of the time; the support check cannot catch a wrong number taken from the right passage; scanned PDFs cannot be read; no accounts; the release-scale evaluation has not been done.
+- No deployments, customers or certifications are claimed.
+
+## Site
+
+- [Product](index.html): what it is, measured proof with conditions, what is new in 0.2.0, limits, quick start
+- [How it works](how-it-works.html): models and gate, checkers, knowledge, memory, context filesystem, engine, code agent
+- [Use cases](use-cases.html): sixteen researched cases, each with the evidence of the need and the limit
+- [Evidence](evidence.html): every headline number with method and the stored run behind it; what did not work
+- [Docs](docs.html): requirements, install, run, stop, and a map of the documentation
+
+## Documentation (on GitHub)
+
+- [README](https://github.com/rismanmattotorang/nafsaql/blob/main/README.md): the short version
+- [User guide](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/user_guide.md): the app page by page
+- [Features and measured results](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/features_and_results.md): everything built, with evidence, and what was not adopted
+- [Serving and operations](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/serving_and_operations.md): serving profiles, configuration, security
+- [Operator runbook](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/operations/operator_runbook.md): running it in production-like settings
+- [API reference](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/api/api_reference.md): every endpoint of the gateway
+- [Paper (PDF)](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/report/nafs_aql_report.pdf): the formal model and its proofs, the architecture, every measurement
+- [Specification (PDF)](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/spec/nafs_aql_spec.pdf): requirements, interfaces, traceability
+- [Documentation index](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/index.md): specifications, research notes, decisions
+
+## Release 0.2.0
+
+- [Decision 026](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/026-freetoken-engine-phase34.md): engine changes after the FreeToken paper (arXiv 2608.16157), with measurements
+- [Decision 027](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/027-product-quality-phase35.md): settings, answers, documents in and out, the knowledge graph, the Code page, configuration checks
+- [FreeToken assessment](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/research/freetoken_assessment.md): what applies to a CPU engine serving dense models, results, and what was not adopted
+
+## Optional
+
+- [Status](https://github.com/rismanmattotorang/nafsaql/blob/main/docs/roadmap/STATUS.md): what is done and what is not
+- [Assumptions](https://github.com/rismanmattotorang/nafsaql/blob/main/ASSUMPTIONS.md): every judgement call and its impact if wrong
+- [Benchmarks](https://github.com/rismanmattotorang/nafsaql/tree/main/benchmarks): the stored runs
+- [Licence](https://github.com/rismanmattotorang/nafsaql/blob/main/LICENSE): Apache License 2.0

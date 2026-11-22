@@ -374,16 +374,17 @@ pub fn parse_action(reply: &str) -> Action {
     }
     // A run block that names no file of the workspace (pytest, a shell command): say what a run block can do,
     // instead of "no action found", which sent the model looking for a formatting mistake it had not made.
-    if run.is_some() {
-        return Action::Disallowed(
-            "A run block runs one Python file of the workspace, written as: python name.py. It cannot run pytest or other commands. The tests run by themselves after every edit, so there is no need to run them.",
-        );
-    }
+    // `SUBMIT` beside a run block that cannot be run is still a submission: the unusable block is not an action.
     if reply
         .lines()
         .any(|l| l.trim().trim_matches('*').eq_ignore_ascii_case("SUBMIT"))
     {
         return Action::Submit;
+    }
+    if run.is_some() {
+        return Action::Disallowed(
+            "A run block runs one Python file of the workspace, written as: python name.py. It cannot run pytest or other commands. The tests run by themselves after every edit, so there is no need to run them.",
+        );
     }
     Action::None
 }

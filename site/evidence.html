@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evidence · Nafs-Aql</title>
+<meta name="description" content="Benchmarks and method for Nafs-Aql: every headline number with what was measured, on what machine, how, and the stored run behind it, plus the list of what did not work.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Nafs-Aql">
+<meta property="og:title" content="Evidence and method">
+<meta property="og:description" content="Benchmarks and method for Nafs-Aql: every headline number with what was measured, on what machine, how, and the stored run behind it, plus the list of what did not work.">
+<meta property="og:image" content="assets/img/chat.png">
+<meta property="og:image:alt" content="The Nafs-Aql chat page showing an answer with a numbered source and the passages it was answered from.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="index.html" aria-label="Nafs-Aql home"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="14" fill="#1F3A5F"/><circle cx="25" cy="32" r="11" fill="none" stroke="#5FD0D4" stroke-width="5"/><circle cx="39" cy="32" r="11" fill="none" stroke="#F2B544" stroke-width="5"/></svg><span>Nafs-Aql</span></a>
+    <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="index.html">Product</a></li>
+        <li><a href="how-it-works.html">How it works</a></li>
+        <li><a href="use-cases.html">Use cases</a></li>
+        <li><a href="evidence.html" aria-current="page">Evidence</a></li>
+        <li><a href="docs.html">Docs</a></li>
+        <li><a class="nav-gh" href="https://github.com/rismanmattotorang/nafsaql">GitHub</a></li>
+      </ul>
+    </nav>
+    <button class="icon-btn theme-toggle" type="button" aria-label="Switch theme">
+      <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+</header>
+<main id="main">
+<section class="page-hero" aria-labelledby="page-title">
+  <div class="wrap">
+    <span class="eyebrow">Evidence</span>
+    <h1 id="page-title">Every number, how it was measured, and where the run is stored.</h1>
+    <p class="lead">Benchmarks and method for the claims on this site, followed by the things that were tried and did not work.</p>
+    <ul class="toc" aria-label="On this page">
+      <li><a href="#method">Method</a></li>
+      <li><a href="#headline">Headline numbers</a></li>
+      <li><a href="#release">The 0.2.0 engine</a></li>
+      <li><a href="#checkers">Checker quality</a></li>
+      <li><a href="#compare">How it compares</a></li>
+      <li><a href="#did-not-work">Did not work</a></li>
+      <li><a href="#open">Open and not done</a></li>
+    </ul>
+  </div>
+</section>
+
+<section class="section section-tight" aria-labelledby="first-title">
+  <div class="wrap">
+    <div class="callout warn">
+      <h2 id="first-title">Read this first</h2>
+      <p>All numbers come from one Intel Core i3-8100 (4 cores, AVX2, 32 GB, no GPU) that was shared with other workloads during most runs, with tens of items per comparison. <strong>They show direction, not release-grade statistics.</strong> Absolute speeds are lower bounds. The project's own release gates ask for 700 to 6,200 paired items, which this machine cannot produce.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="method" aria-labelledby="method-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Method</span>
+      <h2 id="method-title">How a number gets onto this page.</h2>
+    </div>
+    <div class="grid g3">
+      <article class="card">
+        <h3>Interleaved A/B</h3>
+        <p>The two arms of a comparison alternate inside one run, so a change in the machine's load hits both. A sequential run once showed a 30&nbsp;% gain that vanished when the runs were interleaved.</p>
+      </article>
+      <article class="card">
+        <h3>Paired rounds</h3>
+        <p>Where the quantity allows it, short paired rounds are compared one against one, and the count is reported: "12 of 12 paired rounds", "faster in 10 of 12 pairs".</p>
+      </article>
+      <article class="card">
+        <h3>A shared machine, labelled</h3>
+        <p>The reference machine runs other work. Runs record the load average, and results are marked "shared machine". A gain has to survive the noise to be adopted.</p>
+      </article>
+      <article class="card">
+        <h3>Exact checkers decide "right"</h3>
+        <p>Where a task has a checker, an answer counts as right only when the checker passes it. The checkers' own error rates are measured and published below.</p>
+      </article>
+      <article class="card">
+        <h3>Stored runs</h3>
+        <p>Each figure comes from a run kept in <a href="https://github.com/rismanmattotorang/nafsaql/tree/main/benchmarks">benchmarks/</a> or a document in the repository. The table below links each one.</p>
+      </article>
+      <article class="card">
+        <h3>Negative results stay</h3>
+        <p>A change becomes a default only on a measured gain. What was built and did not pay is kept in the repository, switched off, with its measurement.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight" id="headline" aria-labelledby="headline-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Headline numbers</span>
+      <h2 id="headline-title">What was measured, on what, and how.</h2>
+    </div>
+
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Routing and checking results">
+      <table class="data">
+        <caption>Routing and checking</caption>
+        <thead><tr><th scope="col">Result</th><th scope="col">What was measured</th><th scope="col">How</th><th scope="col">Source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">36&nbsp;% of the cost</td><td>The gate with the exact checker visible, against always using the reasoning model. Same accuracy: 6 of 6 each.</td><td>Lab run on 6 mixed tasks</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/features_and_results.md">features and results</a></td></tr>
+          <tr><td class="n">−52&nbsp;% tokens, −44&nbsp;% time</td><td>Reasoning that stops when the exact checker is satisfied. 11 of 11 correct in both arms. Measured on the llama.cpp backend; the default engine does not run this option.</td><td>Paired run, 12 GSM8K items</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/features_and_results.md">features and results</a></td></tr>
+          <tr><td class="n">131 s against 303 s</td><td>Twelve checked prompts through the whole gateway, Smiley Core against llama.cpp. 9 of 9 checked on both.</td><td>Faster in 10 of 12 pairs, p = 0.02; shared host</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/backend_ab.json">backend_ab.json</a>, <a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/smiley_ab.json">smiley_ab.json</a></td></tr>
+          <tr><td class="n">12 of 12</td><td>First step of the code agent on 12 small Python tasks that start with no file: the program is written and passes its tests. 1 of 12 before a prompt fix. Median 7.9 s.</td><td>One step per task, quick model, before and after</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/harness_phase35/first_step_after.json">first_step_after.json</a>, <a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/harness_phase35/first_step_before.json">first_step_before.json</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Knowledge and memory results" style="margin-top:28px">
+      <table class="data">
+        <caption>Knowledge and memory</caption>
+        <thead><tr><th scope="col">Result</th><th scope="col">What was measured</th><th scope="col">How</th><th scope="col">Source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">18 of 20</td><td>Held-out questions answered right by the quick model with passages, against 2 of 20 with none.</td><td>Paired on one set of 20 questions; shared machine</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/kb_modes_ab.json">kb_modes_ab.json</a></td></tr>
+          <tr><td class="n">38 of 44</td><td>Answers made up without passages that the support check flags. 41 of 42 right answers from passages have every sentence supported. A wrong number taken from the right passage is not caught: 3 of 5 passed.</td><td>50 questions; words and numbers compared, no model; AUC 0.90</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/kb_phase26/support.json">support.json</a></td></tr>
+          <tr><td class="n">0.15 s</td><td>A search of 847 passages by words and meaning together (152 ms; it was 740 ms through the store). The search itself takes 0.2 ms; the rest is reading the question.</td><td>40 questions interleaved; load 6 to 8</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/kb_phase25/eval_store_latency.json">eval_store_latency.json</a>, <a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/kb_phase25/eval_latency_prefix.json">eval_latency_prefix.json</a></td></tr>
+          <tr><td class="n">10 times as often</td><td>A follow-up question finds its passage first when it is searched with the question before it: 0.250 of follow-ups against 0.025. The rule fires on 1 of 256 self-contained questions.</td><td>40 follow-up questions</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/kb_phase26/retrieval.json">retrieval.json</a></td></tr>
+          <tr><td class="n">166 of 173</td><td>Section titles found by the PDF layout reader, against 11 by the converter it replaced. 15.5 ms a page against 24.0 ms.</td><td>Shared machine; loads stated with the runs</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/tree/main/benchmarks/kb_phase28">benchmarks/kb_phase28</a></td></tr>
+          <tr><td class="n">14 of 14</td><td>Live checks of the memory: a fact is recalled from another conversation by words and by meaning, not read by impersonal or private requests, and gone when forgotten. 0.13 to 0.58 s when read.</td><td>Live check against the running service</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/kb_phase26/recall_check.json">recall_check.json</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Engine results before 0.2.0" style="margin-top:28px">
+      <table class="data">
+        <caption>Engine, before 0.2.0</caption>
+        <thead><tr><th scope="col">Result</th><th scope="col">What was measured</th><th scope="col">How</th><th scope="col">Source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">+23&nbsp;%</td><td>Prompt reading with four cores while tokens are written with three: 49.7 to 61.0 tokens a second on the quick model and 18.5 to 22.7 on the reasoning model. Time to the last token −16&nbsp;%.</td><td>7 of 8 and 6 of 6 interleaved pairs; load 4 to 8</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase27/prefill_threads.json">prefill_threads.json</a>, <a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase27/prefill_threads_system2.json">prefill_threads_system2.json</a></td></tr>
+          <tr><td class="n">36.6 s to 2.0 s</td><td>The switch to the reasoning model, to its first token, when it has read the conversation between turns and the prompt keeps a stable beginning. Either change alone did not help.</td><td>Four-turn sessions, three rounds; quiet machine, load 2 to 7</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/tree/main/benchmarks/engine_phase30">benchmarks/engine_phase30</a></td></tr>
+          <tr><td class="n">5.8 s to 0.1 s</td><td>Prompt reading when an agent prompt follows a chat prompt, with the store of earlier conversations (quick model; 14.1 s to 0.2 s on the reasoning model). Answers byte-identical with the store on and off.</td><td>Before and after</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/switch_cost.json">switch_cost.json</a></td></tr>
+          <tr><td class="n">14.2 / 20.2 / 24.9</td><td>Tokens a second at 1, 2 and 4 users on Smiley Core, each user's text identical to what they would get alone. llama.cpp: 14.4 / 14.4 / 32.4, so it is ahead at four users.</td><td>Each engine alone, 2 rounds, long answers</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/concurrency_ab.json">concurrency_ab.json</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="release" aria-labelledby="release-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Release 0.2.0</span>
+      <h2 id="release-title">The engine work, before and after.</h2>
+      <p>The machine was shared for every run, with load averages from 6 to over 20. Every comparison was interleaved, in short paired rounds where the quantity allowed it.</p>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <ul class="bars">
+          <li>
+            <div class="bar-label">First token, later turn of a quick conversation <span>median of 9 turns each way</span></div>
+            <div class="bar-row"><span>Before</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">4.25 s</span></div>
+            <div class="bar-row"><span>0.2.0</span><span class="bar-track"><span class="bar-fill after" style="width:16.7%"></span></span><span class="bar-val">0.71 s</span></div>
+          </li>
+          <li>
+            <div class="bar-label">First token, later turn answered by the reasoning model <span>median of 6 turns</span></div>
+            <div class="bar-row"><span>Before</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">18.6 s</span></div>
+            <div class="bar-row"><span>0.2.0</span><span class="bar-track"><span class="bar-fill after" style="width:12.9%"></span></span><span class="bar-val">2.4 s</span></div>
+          </li>
+          <li>
+            <div class="bar-label">First request of a fresh server, model file not cached <span>three rounds</span></div>
+            <div class="bar-row"><span>Before</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">14.6 s</span></div>
+            <div class="bar-row"><span>0.2.0</span><span class="bar-track"><span class="bar-fill after" style="width:63%"></span></span><span class="bar-val">9.2 s</span></div>
+          </li>
+          <li>
+            <div class="bar-label">First token, 8 tokens added to a 2,048-token conversation, 4B model <span>medians, arms interleaved</span></div>
+            <div class="bar-row"><span>Before</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">1,075 ms</span></div>
+            <div class="bar-row"><span>0.2.0</span><span class="bar-track"><span class="bar-fill after" style="width:52.8%"></span></span><span class="bar-val">568 ms</span></div>
+          </li>
+          <li>
+            <div class="bar-label">The same on the 1.7B model <span>medians, arms interleaved</span></div>
+            <div class="bar-row"><span>Before</span><span class="bar-track"><span class="bar-fill" style="width:100%"></span></span><span class="bar-val">329 ms</span></div>
+            <div class="bar-row"><span>0.2.0</span><span class="bar-track"><span class="bar-fill after" style="width:69.6%"></span></span><span class="bar-val">229 ms</span></div>
+          </li>
+        </ul>
+        <p class="small muted" style="margin-top:20px">Each pair is drawn against its own "before"; bars are not comparable across rows. Lower is better.</p>
+      </div>
+      <div>
+        <div class="table-wrap" tabindex="0" role="region" aria-label="0.2.0 engine measurements and their files">
+          <table class="data" style="min-width:520px">
+            <thead><tr><th scope="col">Question</th><th scope="col">Answer</th><th scope="col">Run</th></tr></thead>
+            <tbody>
+              <tr><td>What does a request pay to take a kept conversation over and give it back?</td><td>Nothing, where it was 84 ms (512 tokens) and 240 ms (2,048 tokens) on the 1.7B model, 116 ms and 457 ms on the 4B model.</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase34/handoff_ab_system1.json">handoff_ab_system1.json</a>, <a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase34/handoff_ab.json">handoff_ab.json</a></td></tr>
+              <tr><td>Do claimed blocks of work pay?</td><td>On four threads: the 1.7B model wrote 19&nbsp;% faster and read 14&nbsp;% faster (12 of 12 paired rounds each); the 4B model 33&nbsp;% (8 of 8) and 10&nbsp;% (7 of 8). On three threads: 2&nbsp;% on the 1.7B model, inside noise; 8&nbsp;% and 15&nbsp;% on the 4B model.</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase34/claim_system1.txt">claim_system1.txt</a>, <a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase34/claim_system2.txt">claim_system2.txt</a></td></tr>
+              <tr><td>Does read-ahead pay?</td><td>9.2 s against 14.6 s for the first request (9.2, 9.2, 9.8 against 12.9, 14.6, 15.1). A warm request of the same size takes 5 s.</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase34/cold_start_system1.json">cold_start_system1.json</a></td></tr>
+              <tr><td>Does reading between turns pay?</td><td>Quick: 0.71 s against 4.25 s, 41 prompt tokens read instead of 188, the whole turn 9.3 s against 11.3 s. Reasoning: 2.4 s against 18.6 s, the turn 62 s against 104 s.</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase34/turn_reuse_fast.json">turn_reuse_fast.json</a>, <a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/engine_phase34/turn_reuse_slow.json">turn_reuse_slow.json</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="callout warn" style="margin-top:28px">
+      <h3>What these numbers do not show</h3>
+      <ul>
+        <li>The between-turns gain needs the pause to be longer than the reading: 3 to 5 s for the quick model, 7 to 17 s for the reasoning model on a shared machine. One reasoning turn of six arrived early and waited 18.6 s, as before.</li>
+        <li>A fourth writing thread was not compared with three head to head after the change. The default stays three threads to write and four to read.</li>
+        <li>In the gateway's real traffic most reuses are short copies, not takes (216 against 19 on the quick model after a morning of test traffic). The take matters for the long transcript.</li>
+        <li>Taking work from the front of a neighbour's share was 5&nbsp;% slower writing and 10&nbsp;% slower reading than fixed shares on three threads. Taking from the back removed the loss.</li>
+      </ul>
+      <p>Source: <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/research/freetoken_assessment.md">FreeToken assessment, section 5</a>; decisions <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/026-freetoken-engine-phase34.md">026</a> and <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/027-product-quality-phase35.md">027</a>.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight" id="checkers" aria-labelledby="checkers-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Checker quality</span>
+      <h2 id="checkers-title">How often a checker is wrong.</h2>
+      <p>Measured with a mutation harness: correct answers a checker must accept, and altered ones it must reject.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Checker quality">
+      <table class="data">
+        <thead><tr><th scope="col">Checker</th><th scope="col">Correct / altered</th><th scope="col">True-accept rate</th><th scope="col">False-accept rate (95&nbsp;% upper bound)</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Maths (numeric and SymPy)</th><td class="n">2,000 / 2,800</td><td class="n">1.000</td><td class="n">0.000 (≤ 0.001)</td></tr>
+          <tr><th scope="row">JSON Schema</th><td class="n">24 / 53</td><td class="n">1.000</td><td class="n">0.000 (≤ 0.067)</td></tr>
+          <tr><th scope="row">Code tests, EvalPlus</th><td class="n">364 / 754</td><td class="n">0.995</td><td class="n">0.109 (≤ 0.133)</td></tr>
+          <tr><th scope="row">Rubric judge (reasoning model)</th><td class="n">23 / 22</td><td class="n">1.000</td><td class="n">0.045 (≤ 0.23)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">The code figure is an upper bound inflated by behaviourally equivalent altered programs that also pass the far larger EvalPlus suites. Source: <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/features_and_results.md">features and measured results</a>.</p>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="compare" aria-labelledby="compare-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it compares</span>
+      <h2 id="compare-title">Read from source, and measured on the same machine.</h2>
+      <p>Two open projects were read in full and their own benchmarks run beside ours: vLLM Semantic Router, which routes requests across models, and DeepSeek Harness, a coding agent loop.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Comparison with Semantic Router and DeepSeek Harness">
+      <table class="data">
+        <thead><tr><th scope="col"></th><th scope="col">Semantic Router</th><th scope="col">DeepSeek Harness</th><th scope="col">Nafs-Aql</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Who decides an answer is right</th><td>Model confidence or self-rating</td><td>The model says it is done</td><td>An exact checker (maths, tests, schema, proof)</td></tr>
+          <tr><th scope="row">Needs</th><td>Envoy or Kubernetes, 0.3B+ classifiers, often a GPU</td><td>A hosted model</td><td>4 CPU cores, no GPU, nothing leaves the machine</td></tr>
+          <tr><th scope="row">Cost of its per-request signal (2 KB prompt)</th><td class="n">198 µs</td><td>n/a</td><td class="n">2.2 µs</td></tr>
+          <tr><th scope="row">Cutting a long text to a budget (16K tokens)</th><td class="n">50 ms</td><td>n/a</td><td class="n">9 ms</td></tr>
+          <tr><th scope="row">Vector dot product (1,024 floats, AVX2)</th><td class="n">135 ns</td><td>n/a</td><td class="n">199 ns</td></tr>
+          <tr><th scope="row">Agent harness overhead (100 turns, 800 reads)</th><td>n/a</td><td>Budget 900 ms</td><td class="n">1.75 ms</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note"><strong>Where they are ahead.</strong> Their dot product is faster than ours. They also have Envoy and Kubernetes integration, around twenty signal types with trained jailbreak and PII classifiers, a dashboard, byte-exact prompt replay, subagents at scale and browser control, and we have chosen not to follow. Measured on a shared, loaded 4-core machine with interleaved runs. Reproduce with <code>ROUNDS=5 benchmarks/headtohead/run.sh</code>. Full note: <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/research/semantic_router_deepseek_h2h.md">head to head</a>.</p>
+  </div>
+</section>
+
+<section class="section section-tight" id="did-not-work" aria-labelledby="dnw-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Did not work</span>
+      <h2 id="dnw-title">Tried, measured, and left off.</h2>
+      <p>A negative result is a result. These are kept in the repository with their measurements.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Ideas that were tried and not adopted">
+      <table class="data">
+        <thead><tr><th scope="col">Idea</th><th scope="col">What was measured</th><th scope="col">Verdict</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Speculative decoding</th><td>EAGLE-3 heads: 1.04× and 0.99× decode at about 50&nbsp;% acceptance. A draft model and n-gram drafts: 6.5 against 7.3 tokens a second. n-gram self-speculation: best 1.12×, worst 0.84×.</td><td>Verifying drafts costs real compute on four cores. Not adopted.</td></tr>
+          <tr><th scope="row">1-bit weights</th><td>Qwen3-1.7B at 0.98 bits per weight answers 0 of 12 exact-answer prompts, against 9 for the dense model.</td><td>Off until trained factors exist.</td></tr>
+          <tr><th scope="row">Concurrent hedging on the reasoning model</th><td>Batched decoding gains fall from 2.7× to 1.5× between a short context and 1,600 tokens. On 8 hard code items: 4 of 8 hedged against 4 of 8 and 3 of 8 sequential, no faster on failing items.</td><td>Implemented, off by default.</td></tr>
+          <tr><th scope="row">A larger embedding model</th><td>A 4B embedder improves search by meaning alone (reworded questions first 0.25 to 0.45) but not the combined search that ships: best pooled score over 69 questions 0.804 for the 0.6B model against 0.787, at about four times the embedding time.</td><td>The 0.6B embedder stays. See <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/017-embedder-and-headtohead.md">decision 017</a>.</td></tr>
+          <tr><th scope="row">Score-based fusion</th><td>Convex-combination fusion: pooled 0.387 against 0.388 for rank fusion.</td><td>No gain. Rank fusion stays.</td></tr>
+          <tr><th scope="row">A graph arm in everyday search</th><td>Graph mode answered 15 of 20 questions against 18 of 20 for passages alone, at 1.28× the time. A PageRank arm in the default search left the first 8 passages unchanged.</td><td>Not in the default search. Graph relations are an option you choose.</td></tr>
+          <tr><th scope="row">Guessing a question's difficulty before answering</th><td>AUC for a wrong draft 0.615 and 0.573 from the question alone, against 0.682 from the draft's own features, over 810 labelled drafts.</td><td>Not adopted.</td></tr>
+          <tr><th scope="row">Cache-blocking the engine's prompt reading</th><td>Within ±3&nbsp;%.</td><td>Not adopted.</td></tr>
+          <tr><th scope="row">A summaries-first knowledge prompt</th><td>Quoted questions 0.857 against 0.964 at the same prompt size; gains only with 25 to 70&nbsp;% more text.</td><td>Whole passages stay in the prompt.</td></tr>
+          <tr><th scope="row">Guessing which document a question is about</th><td>The rule picked the right document 5 times in 11 and lowered the ranking score.</td><td>Search scopes only to a document named by its exact title.</td></tr>
+          <tr><th scope="row">Warming the careful model while the quick one drafts</th><td>Every draft 75&nbsp;% slower (19.0 s to 33.3 s) to save 46 s on the quarter of questions that escalate.</td><td>Off unless you choose it.</td></tr>
+          <tr><th scope="row">A shorter knowledge prompt</th><td>Answers 20 to 26&nbsp;% sooner, but 39 of 50 right against 42.</td><td>Built, left off: it cost 3 right answers in 50.</td></tr>
+          <tr><th scope="row">The quick model as the judge</th><td>False-accept rate 0.27 against 0.045 for the reasoning model.</td><td>A judge that accepts a quarter of wrong answers is not a checker.</td></tr>
+          <tr><th scope="row">A larger quick model (Qwen3.5-2B)</th><td>+17 points accuracy (95&nbsp;% interval +7 to +30, n = 30), but 3.7× slower.</td><td>The adoption rule allows at most 1.3×. Revisit on a faster host.</td></tr>
+          <tr><th scope="row">Engine flags (flash attention, quantised cache, thread polling)</th><td>No difference once runs were interleaved.</td><td>A sequential run had shown a fake 30&nbsp;% gain.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">Sources: <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/README.md">README, Status</a>; <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/features_and_results.md">features and measured results</a>; decisions <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/018-knowledge-index-phase25.md">018</a>, <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/019-routing-knowledge-memory-phase26.md">019</a>, <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/020-speed-phase27.md">020</a>, <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/022-context-filesystem-phase29.md">022</a> and <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/023-shadow-prefill-phase30.md">023</a>.</p>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="open" aria-labelledby="open-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Open and not done</span>
+      <h2 id="open-title">What the evidence does not cover yet.</h2>
+    </div>
+    <div class="grid g2">
+      <ul class="limits">
+        <li><strong>Reworded questions.</strong> A question worded differently from the document finds its passage first 12&nbsp;% of the time and in the first eight 24&nbsp;% of the time. The remedies need larger models than this release ships.</li>
+        <li><strong>Release-scale evaluation.</strong> Not done. It needs a faster machine.</li>
+        <li><strong>The learned gate.</strong> It waits for its ledger: 1,294 of the 2,900 checked answers it asks for.</li>
+        <li><strong>Distillation and memory tokens.</strong> The first distillation cycle and the pre-training of the memory-token module need a faster machine.</li>
+      </ul>
+      <ul class="limits">
+        <li><strong>Formal proofs.</strong> The Lean checker is exact, but the reasoning model cannot yet write valid Lean 4, so Lean tasks end in a labelled abstention.</li>
+        <li><strong>Recall over a long history.</strong> The memory passes its live checks; its quality over a long history has not been measured.</li>
+        <li><strong>No public benchmark was run for parsing or retrieval.</strong> No "state of the art" claim is made. What is claimed is each measured change against the setting it replaced.</li>
+        <li><strong>Not done in 0.2.0:</strong> more diagram kinds, a search-and-replace edit format for long files, versions of a regenerated answer, scanned PDFs and pictures, server-side settings per person.</li>
+      </ul>
+    </div>
+
+    <div class="grid g2" style="margin-top:48px">
+      <div>
+        <h3 style="margin-bottom:12px">Reproduce</h3>
+        <pre class="code"><code>make test                               # Rust tests
+scripts/live_sweep.sh                   # every live suite, about 45 min
+ROUNDS=5 benchmarks/headtohead/run.sh   # the comparison above</code></pre>
+        <p class="small muted">Contributions follow the same rule: back a performance claim with an interleaved comparison.</p>
+      </div>
+      <div>
+        <h3 style="margin-bottom:12px">Cite</h3>
+        <pre class="code"><code>@techreport{nafsaql2026,
+  title       = {Nafs-Aql: A Verifier-Gated Dual-Process
+                 Architecture on Small Qwen Models for
+                 CPU-Only Deployment},
+  author      = {{Dirac R\&amp;D Team}},
+  institution = {Dirac},
+  year        = {2026},
+  url         = {https://github.com/rismanmattotorang/nafsaql}
+}</code></pre>
+        <p class="small muted">The <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/report/nafs_aql_report.pdf">paper</a> has the formal model and its proofs, the architecture, and every measurement.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="Nafs-Aql home"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="14" fill="#1F3A5F"/><circle cx="25" cy="32" r="11" fill="none" stroke="#5FD0D4" stroke-width="5"/><circle cx="39" cy="32" r="11" fill="none" stroke="#F2B544" stroke-width="5"/></svg><span>Nafs-Aql</span></a>
+        <p>An AI assistant that runs on four CPU cores, answers from your own documents, and tells you when it is not sure.</p>
+      </div>
+      <div>
+        <h2>Site</h2>
+        <ul>
+          <li><a href="index.html">Product</a></li>
+          <li><a href="how-it-works.html">How it works</a></li>
+          <li><a href="use-cases.html">Use cases</a></li>
+          <li><a href="evidence.html">Evidence</a></li>
+          <li><a href="docs.html">Docs</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql">GitHub</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/report/nafs_aql_report.pdf">The paper (PDF)</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/LICENSE">Licence: Apache-2.0</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/NOTICE">Notices</a></li>
+          <li><a href="llms.txt">llms.txt</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Dirac</h2>
+        <ul>
+          <li><a href="https://dirac.id">dirac.id</a></li>
+        </ul>
+        <p style="margin-top:10px">Built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+      </div>
+    </div>
+    <div class="footer-legal">
+      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
+      <p>This site sets no cookies and loads nothing from third parties. It is hosted on GitHub Pages, which logs visitors' IP addresses.</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

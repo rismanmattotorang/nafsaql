@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works · Nafs-Aql</title>
+<meta name="description" content="The architecture of Nafs-Aql: two models and a gate, exact checkers, knowledge with citations and a support check, inspectable memory, a context filesystem, the Smiley Core engine and the code agent.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Nafs-Aql">
+<meta property="og:title" content="How Nafs-Aql works">
+<meta property="og:description" content="The architecture of Nafs-Aql: two models and a gate, exact checkers, knowledge with citations and a support check, inspectable memory, a context filesystem, the Smiley Core engine and the code agent.">
+<meta property="og:image" content="assets/img/chat.png">
+<meta property="og:image:alt" content="The Nafs-Aql chat page showing an answer with a numbered source and the passages it was answered from.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="index.html" aria-label="Nafs-Aql home"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="14" fill="#1F3A5F"/><circle cx="25" cy="32" r="11" fill="none" stroke="#5FD0D4" stroke-width="5"/><circle cx="39" cy="32" r="11" fill="none" stroke="#F2B544" stroke-width="5"/></svg><span>Nafs-Aql</span></a>
+    <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="index.html">Product</a></li>
+        <li><a href="how-it-works.html" aria-current="page">How it works</a></li>
+        <li><a href="use-cases.html">Use cases</a></li>
+        <li><a href="evidence.html">Evidence</a></li>
+        <li><a href="docs.html">Docs</a></li>
+        <li><a class="nav-gh" href="https://github.com/rismanmattotorang/nafsaql">GitHub</a></li>
+      </ul>
+    </nav>
+    <button class="icon-btn theme-toggle" type="button" aria-label="Switch theme">
+      <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+</header>
+<main id="main">
+<section class="page-hero" aria-labelledby="page-title">
+  <div class="wrap">
+    <span class="eyebrow">How it works</span>
+    <h1 id="page-title">Two models, a gate, and checkers that have the last word.</h1>
+    <p class="lead">Each part below says what it does, what was measured, and where it stops. Numbers are from the reference machine: one shared 4-core Intel i3-8100, 32 GB, no GPU.</p>
+    <ul class="toc" aria-label="On this page">
+      <li><a href="#models">Models and gate</a></li>
+      <li><a href="#checkers">Checkers</a></li>
+      <li><a href="#knowledge">Knowledge</a></li>
+      <li><a href="#memory">Memory</a></li>
+      <li><a href="#files">Context filesystem</a></li>
+      <li><a href="#engine">Engine</a></li>
+      <li><a href="#code">Code agent</a></li>
+      <li><a href="#more">Answers, rooms, lab</a></li>
+    </ul>
+  </div>
+</section>
+
+<section class="section section-tight" id="models" aria-labelledby="models-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">01 · Models and gate</span>
+      <h2 id="models-title">A quick model first. A reasoning model when it is worth the wait.</h2>
+      <p>The quick model is Qwen3-1.7B. The reasoning model is Qwen3-4B-Thinking. Both run as 4-bit GGUF files (Q4_K_M) on the CPU.</p>
+    </div>
+    <figure class="diagram">
+  <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: how an answer is made. Scroll sideways on a small screen.">
+    <svg viewBox="0 0 960 420" role="img" aria-labelledby="flow-t flow-d">
+      <title id="flow-t">How an answer is made</title>
+      <desc id="flow-d">Your question goes to the quick model, which answers at once, using passages and the graph from your documents when a library is selected. A checker and the gate look at the draft. If it passes, the answer is returned with its label. If it fails, or the gate is unsure, the reasoning model thinks it through and a checker or judge decides again. If nothing earned acceptance, the assistant says it is not sure.</desc>
+      <defs>
+        <marker id="flow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="d-head" d="M0 0 10 5 0 10z"/></marker>
+      </defs>
+
+      <rect class="d-box" x="16" y="44" width="150" height="76" rx="12"/>
+      <text class="d-t" x="91" y="87" text-anchor="middle">Your question</text>
+
+      <rect class="d-fast" x="226" y="44" width="180" height="76" rx="12"/>
+      <text class="d-t" x="316" y="77" text-anchor="middle">Quick model</text>
+      <text class="d-s" x="316" y="98" text-anchor="middle">answers at once</text>
+
+      <rect class="d-check" x="466" y="44" width="170" height="76" rx="12"/>
+      <text class="d-t" x="551" y="77" text-anchor="middle">Checker and gate</text>
+      <text class="d-s" x="551" y="98" text-anchor="middle">check, then decide</text>
+
+      <rect class="d-ok" x="770" y="44" width="174" height="76" rx="12"/>
+      <text class="d-t" x="857" y="77" text-anchor="middle">Answer</text>
+      <text class="d-s" x="857" y="98" text-anchor="middle">says how it was checked</text>
+
+      <rect class="d-box" x="226" y="214" width="180" height="76" rx="12"/>
+      <text class="d-t" x="316" y="247" text-anchor="middle">Your documents</text>
+      <text class="d-s" x="316" y="268" text-anchor="middle">passages and graph</text>
+
+      <rect class="d-slow" x="466" y="214" width="170" height="76" rx="12"/>
+      <text class="d-t" x="551" y="247" text-anchor="middle">Reasoning model</text>
+      <text class="d-s" x="551" y="268" text-anchor="middle">thinks it through</text>
+
+      <rect class="d-check" x="770" y="214" width="174" height="76" rx="12"/>
+      <text class="d-t" x="857" y="247" text-anchor="middle">Checker or judge</text>
+      <text class="d-s" x="857" y="268" text-anchor="middle">decides again</text>
+
+      <rect class="d-bad" x="770" y="344" width="174" height="60" rx="12"/>
+      <text class="d-t" x="857" y="379" text-anchor="middle">Says it is not sure</text>
+
+      <path class="d-line" d="M166 82H224" marker-end="url(#flow-a)"/>
+      <path class="d-line" d="M406 82H464" marker-end="url(#flow-a)"/>
+      <path class="d-line" d="M636 82H768" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="702" y="72" text-anchor="middle">passes</text>
+
+      <path class="d-dash" d="M316 214V122" marker-end="url(#flow-a)"/>
+
+      <path class="d-line" d="M551 120V212" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="563" y="163">fails, or the</text>
+      <text class="d-l" x="563" y="180">gate is unsure</text>
+
+      <path class="d-line" d="M636 252H768" marker-end="url(#flow-a)"/>
+      <path class="d-line" d="M857 214V122" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="869" y="172">passes</text>
+
+      <path class="d-line" d="M857 290V342" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="845" y="321" text-anchor="end">nothing earned acceptance</text>
+    </svg>
+  </div>
+  <ol class="steps">
+    <li><strong>The quick model answers at once.</strong> If a library is selected, it answers from passages of your documents.</li>
+    <li><strong>A checker decides where one exists:</strong> maths, code against tests, data against a schema. If the draft passes, you get the answer, labelled <em>Checked</em>.</li>
+    <li><strong>If it fails, or the gate judges the wait worth it,</strong> the reasoning model thinks the question through, and a checker or a judge decides again.</li>
+    <li><strong>If nothing earned acceptance,</strong> the assistant says it is not sure, and why.</li>
+  </ol>
+</figure>
+    <div class="grid g3" style="margin-top:44px">
+      <article class="card">
+        <h3>Three modes</h3>
+        <p><span class="badge fast">Quick</span> always answers at once. <span class="badge slow">Thorough</span> always thinks first. <strong>Auto</strong> answers quickly and thinks it through when the question needs it. A <em>Why?</em> link on each answer explains the path it took in one sentence.</p>
+      </article>
+      <article class="card">
+        <h3>The gate</h3>
+        <p>A threshold rule derived from a decision-theoretic model: escalate when the expected loss of a wrong answer exceeds the cost of thinking. An early check stops an unconfident draft after 32 tokens rather than letting it finish.</p>
+      </article>
+      <article class="card">
+        <h3>What it saves</h3>
+        <p>With the exact checker visible, the gate reached the same accuracy as always deliberating (6 of 6 each) at <strong>36&nbsp;% of the cost</strong>, in a lab run on 6 mixed tasks.</p>
+      </article>
+    </div>
+    <div class="callout warn" style="margin-top:28px">
+      <h3>Where it stops</h3>
+      <p>The gate's learned, calibrated mode is not in use. It is promoted only on held-out evidence, and its ledger holds 1,294 of the 2,900 checked answers the rule asks for. Guessing a question's difficulty before answering it was measured and did not work.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="checkers" aria-labelledby="checkers-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">02 · Checkers</span>
+      <h2 id="checkers-title">Where an answer can be checked, the model does not get a vote.</h2>
+      <p>A checker's verdict is final. Agreement between samples is a hint, never proof. Each checker's own error rates were measured with a mutation harness: correct answers it must accept, and altered ones it must reject.</p>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Checker quality table">
+      <table class="data">
+        <thead>
+          <tr><th scope="col">Checker</th><th scope="col">What it does</th><th scope="col">Correct / altered answers</th><th scope="col">Accepts right answers</th><th scope="col">Accepts wrong answers (95&nbsp;% upper bound)</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Maths</th><td>Numeric comparison and SymPy</td><td class="n">2,000 / 2,800</td><td class="n">1.000</td><td class="n">0.000 (≤ 0.001)</td></tr>
+          <tr><th scope="row">Data format</th><td>JSON Schema</td><td class="n">24 / 53</td><td class="n">1.000</td><td class="n">0.000 (≤ 0.067)</td></tr>
+          <tr><th scope="row">Code</th><td>Tests run in an operating-system sandbox with no network (EvalPlus suites)</td><td class="n">364 / 754</td><td class="n">0.995</td><td class="n">0.109 (≤ 0.133)</td></tr>
+          <tr><th scope="row">Rubric judge</th><td>The reasoning model reviews an answer that has no exact check</td><td class="n">23 / 22</td><td class="n">1.000</td><td class="n">0.045 (≤ 0.23)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">The code figure is an upper bound inflated by altered programs that behave the same as the original and also pass the larger EvalPlus suites. Source: <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/features_and_results.md">features and measured results</a>.</p>
+
+    <div class="grid g2" style="margin-top:36px">
+      <article class="card">
+        <h3>The label on every answer</h3>
+        <p><span class="badge ok">Checked</span> An exact check passed: tests, the expected answer, or the required format.</p>
+        <p><span class="badge cross">Cross-checked</span> Independent attempts agree, or a review found it sound. A good sign, not a proof.</p>
+        <p><span class="badge none">Not checked</span> An open question has no exact check.</p>
+        <p><span class="badge unsure">Not sure</span> No answer passed the checks in the time allowed. A note explains why.</p>
+      </article>
+      <article class="card">
+        <h3>Where it stops</h3>
+        <p>You can add a check to a question yourself: the expected answer, Python tests or a JSON format.</p>
+        <p>Formal proofs are checked by Lean 4 when a toolchain is configured, and the Lean checker is exact. But the reasoning model cannot yet write valid Lean 4, so Lean tasks end in a labelled abstention.</p>
+        <p>Using the quick model as the judge was measured and rejected: it accepted 0.27 of wrong answers against 0.045.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight" id="knowledge" aria-labelledby="knowledge-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">03 · Knowledge</span>
+      <h2 id="knowledge-title">Your documents, read by layout, searched by words and meaning.</h2>
+      <p>Everything stays on the machine. A file is searchable by its words seconds after upload, and by meaning soon after.</p>
+    </div>
+    <figure class="diagram">
+      <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: from a file to a cited answer. Scroll sideways on a small screen.">
+        <svg viewBox="0 0 960 290" role="img" aria-labelledby="kb-t kb-d">
+          <title id="kb-t">From a file to a cited answer</title>
+          <desc id="kb-d">When a file is added, a layout reader turns it into passages with sentence windows, which go into two indexes, one for words and one for meaning, and a graph is drawn from the text. When you ask, the question is searched in both indexes, the results are fused, a prompt is built from numbered passages and graph relations, the answer cites them, and a support check compares the answer with the passages without a model.</desc>
+          <defs>
+            <marker id="kb-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="d-head" d="M0 0 10 5 0 10z"/></marker>
+          </defs>
+          <text class="d-h" x="16" y="22">WHEN A FILE IS ADDED</text>
+          <rect class="d-box" x="16" y="36" width="150" height="68" rx="12"/>
+          <text class="d-t" x="91" y="65" text-anchor="middle">Your files</text>
+          <text class="d-s" x="91" y="85" text-anchor="middle">PDF, Word, Excel…</text>
+          <rect class="d-box" x="206" y="36" width="170" height="68" rx="12"/>
+          <text class="d-t" x="291" y="65" text-anchor="middle">Layout reader</text>
+          <text class="d-s" x="291" y="85" text-anchor="middle">headings, tables, order</text>
+          <rect class="d-box" x="416" y="36" width="170" height="68" rx="12"/>
+          <text class="d-t" x="501" y="65" text-anchor="middle">Passages</text>
+          <text class="d-s" x="501" y="85" text-anchor="middle">with sentence windows</text>
+          <rect class="d-fast" x="626" y="36" width="150" height="68" rx="12"/>
+          <text class="d-t" x="701" y="65" text-anchor="middle">Two indexes</text>
+          <text class="d-s" x="701" y="85" text-anchor="middle">words and meaning</text>
+          <rect class="d-slow" x="816" y="36" width="128" height="68" rx="12"/>
+          <text class="d-t" x="880" y="65" text-anchor="middle">Graph</text>
+          <text class="d-s" x="880" y="85" text-anchor="middle">from the text</text>
+          <path class="d-line" d="M166 70H204" marker-end="url(#kb-a)"/>
+          <path class="d-line" d="M376 70H414" marker-end="url(#kb-a)"/>
+          <path class="d-line" d="M586 70H624" marker-end="url(#kb-a)"/>
+          <path class="d-line" d="M776 70H814" marker-end="url(#kb-a)"/>
+
+          <path class="d-dash" d="M701 104V140H301V204" marker-end="url(#kb-a)"/>
+          <path class="d-dash" d="M880 104V158H506V204" marker-end="url(#kb-a)"/>
+
+          <text class="d-h" x="16" y="190">WHEN YOU ASK</text>
+          <rect class="d-box" x="16" y="206" width="160" height="68" rx="12"/>
+          <text class="d-t" x="96" y="235" text-anchor="middle">Your question</text>
+          <text class="d-s" x="96" y="255" text-anchor="middle">in plain language</text>
+          <rect class="d-fast" x="216" y="206" width="170" height="68" rx="12"/>
+          <text class="d-t" x="301" y="235" text-anchor="middle">Search</text>
+          <text class="d-s" x="301" y="255" text-anchor="middle">both indexes, fused</text>
+          <rect class="d-box" x="426" y="206" width="160" height="68" rx="12"/>
+          <text class="d-t" x="506" y="235" text-anchor="middle">Prompt</text>
+          <text class="d-s" x="506" y="255" text-anchor="middle">numbered passages</text>
+          <rect class="d-ok" x="626" y="206" width="150" height="68" rx="12"/>
+          <text class="d-t" x="701" y="235" text-anchor="middle">Answer</text>
+          <text class="d-s" x="701" y="255" text-anchor="middle">cites [1] [2]</text>
+          <rect class="d-check" x="816" y="206" width="128" height="68" rx="12"/>
+          <text class="d-t" x="880" y="235" text-anchor="middle">Support check</text>
+          <text class="d-s" x="880" y="255" text-anchor="middle">no model</text>
+          <path class="d-line" d="M176 240H214" marker-end="url(#kb-a)"/>
+          <path class="d-line" d="M386 240H424" marker-end="url(#kb-a)"/>
+          <path class="d-line" d="M586 240H624" marker-end="url(#kb-a)"/>
+          <path class="d-line" d="M776 240H814" marker-end="url(#kb-a)"/>
+        </svg>
+      </div>
+      <figcaption>The indexes feed the search. Graph relations join the prompt when you choose <em>Passages and graph</em>. The support check lists the sentences of the answer that are not in the passages.</figcaption>
+    </figure>
+
+    <div class="grid g2" style="margin-top:44px">
+      <article class="card">
+        <h3>Parsing</h3>
+        <p>PDF, Word, PowerPoint, Excel, CSV, LaTeX, web pages, Markdown and text, up to 50 MB each. PDFs are read by their layout: columns in reading order, section titles as headings, tables as rows, running headers and page numbers dropped. No model and no extra download.</p>
+        <p>In the measurement that adopted it, the layout reader found <strong>166 of 173 section titles, against 11 before</strong>, at 15.5 ms a page against 24.0 ms.</p>
+        <p>A spreadsheet becomes one table per sheet, with the column headings repeated every 40 rows so a passage from the middle still says what its columns are.</p>
+      </article>
+      <article class="card">
+        <h3>Search by words and meaning</h3>
+        <p>Search runs from an index in memory, beside the store that keeps the files. A words search went from 177 ms to 0.086 ms and a combined search from 740 ms to <strong>152 ms</strong> on an 847-passage library. Most of what remains is reading the question.</p>
+        <p>The two result lists are fused by rank. Each passage is also searched by its sentences. A typing slip is matched to the nearest word your documents contain, and a follow-up such as "and how fast is it?" is searched together with the question before it.</p>
+      </article>
+      <article class="card">
+        <h3>Graph</h3>
+        <p>A graph of every library is drawn from its text with no model call: 1,306 terms and 5,975 links in under 1 ms in the measured sweep. An optional deeper pass reads each passage with the quick model to add relations. It took 17 to 28 s a passage in that sweep, and runs in the background.</p>
+        <p>A relation is kept only with the sentence that states it, found in the passage word for word.</p>
+      </article>
+      <article class="card">
+        <h3>Citations and the support check</h3>
+        <p>With passages the quick model answered <strong>18 of 20</strong> held-out questions, against 2 of 20 without.</p>
+        <p>Every answer says which of its sentences are in its passages, by words and numbers. In the study, 41 of 42 right answers had every sentence supported, and 38 of 44 answers made up without passages were flagged.</p>
+      </article>
+    </div>
+    <div class="callout warn" style="margin-top:28px">
+      <h3>Where it stops</h3>
+      <ul>
+        <li>A question worded differently from the document finds its passage first 12&nbsp;% of the time, and in the first eight 24&nbsp;% of the time. This is open.</li>
+        <li>The support check does not prove an answer right. A wrong number taken from the right passage is not caught: 3 of 5 such answers passed.</li>
+        <li>A scanned PDF or a picture cannot be read.</li>
+        <li>A graph arm in everyday search, score-based fusion, a larger embedding model, a reranker and model-written query expansion were measured and not adopted.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="memory" aria-labelledby="memory-title">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <span class="eyebrow">04 · Memory</span>
+        <h2 id="memory-title">It remembers, and shows what it remembers.</h2>
+        <p style="margin-top:18px">The assistant keeps a short note of each finished turn of your saved chats, in the same local database as the chats. Something you said in one chat can be found in another.</p>
+        <p>What you say about yourself ("call me …", "I prefer …", "my manager is …", "remember that …") becomes a memory file. You can read, edit and delete every file. Every change is logged with its reason and can be undone.</p>
+      </div>
+      <div class="card">
+        <h3>The rules it follows</h3>
+        <ul>
+          <li><strong>It looks only when asked.</strong> Notes are read when a question is about you or points back: <em>my</em>, <em>we</em>, <em>last time</em>, <em>you said</em>, <em>remember</em>. A general question is answered without them.</li>
+          <li><strong>It says when it used them.</strong> The notes are shown under the answer.</li>
+          <li><strong>It never remembers</strong> private chats, shared rooms or the lab.</li>
+          <li><strong>Forgetting is real.</strong> Deleting a chat deletes its notes.</li>
+        </ul>
+        <p><strong>Measured:</strong> 14 of 14 live checks pass. A fact is found from another chat by its words or its meaning, and is gone when you forget it. Reading the notes costs 0.13 to 0.58 s when it happens, and nothing otherwise.</p>
+        <p><strong>Where it stops:</strong> recall quality over a long history has not been measured. The experimental memory-token module is not used: the trained module gave the same memory whatever was asked, and the gateway recognises that and answers from passages instead.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight" id="files" aria-labelledby="files-title">
+  <div class="wrap">
+    <div class="split split-rev">
+      <figure class="shot">
+        <div class="frame">
+          <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>127.0.0.1:8080</span></div>
+          <img src="assets/img/files.png" width="1440" height="900" loading="lazy" alt="The Files page. A document from a knowledge base is open at its overview, with its nafs address, its abstract and a list of its sections. A search box can search this folder or everywhere, and the document's passages are listed on the left.">
+        </div>
+        <figcaption>A document opens at its overview: first paragraph, sections, key terms. <em>Summary</em> is one line; <em>Full</em> is the whole text.</figcaption>
+      </figure>
+      <div>
+        <span class="eyebrow">05 · Context filesystem</span>
+        <h2 id="files-title">One tree, an address for everything.</h2>
+        <p style="margin-top:18px">Documents, memories, skills and saved chats are named in one tree: <code>nafs://kb/…</code>, <code>nafs://memory/…</code>, <code>nafs://skills/…</code>, <code>nafs://sessions/…</code>. There is no second store: each item stays where it already lives.</p>
+        <ul>
+          <li><strong>Summaries without a model.</strong> A document's one-line summary and its overview are made from its title, first sentence, headings, captions and distinctive terms.</li>
+          <li><strong>Search one folder, or everywhere.</strong> A search can stay inside one library, one document or your memory.</li>
+          <li><strong>Compile a library</strong> into a wiki, a map of its terms or a report, with no model call.</li>
+        </ul>
+        <p class="small muted">The design follows OpenViking and is re-implemented in Rust. Two ideas were measured and left out: a summaries-first prompt lost answers at the same prompt size, and a rule that guesses which document a question is about picked the right one 5 times in 11.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="engine" aria-labelledby="engine-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">06 · Engine</span>
+      <h2 id="engine-title">Smiley Core: a Rust inference engine for four cores.</h2>
+      <p>The default backend is the project's own CPU engine. llama.cpp is one command away (<code>make up-llama</code>) and serves several people at once better. vLLM's CPU backend in Docker is the third profile.</p>
+    </div>
+    <div class="grid g3">
+      <article class="card">
+        <h3>Against llama.cpp</h3>
+        <p>Engine alone: 14.3 against 12.6 tokens a second on the quick model and 7.4 against 6.6 on the reasoning model. Through the whole gateway, twelve checked prompts took <strong>131 s against 303 s</strong>, 9 of 9 checked on both, faster in 10 of 12 pairs.</p>
+      </article>
+      <article class="card">
+        <h3>Threads</h3>
+        <p>The engine runs within 60 to 95&nbsp;% of the machine's memory bandwidth, so more parallelism was not the gain. It reads prompts with four cores and writes tokens with three: prompt reading <strong>+23&nbsp;%</strong> on both models, and an answer from documents arrives 16&nbsp;% sooner.</p>
+      </article>
+      <article class="card">
+        <h3>A store of earlier conversations</h3>
+        <p>Finished conversations keep their cached state. Switching between kinds of request fell from 5.8 s and 14.1 s of prompt reading to 0.1 s and 0.2 s on the two models, with byte-identical answers.</p>
+      </article>
+    </div>
+
+    <h3 style="margin:56px 0 10px;font-size:1.45rem">Between turns, the models read ahead</h3>
+    <p class="muted measure">While you read an answer, the model that answered reads the conversation as the next turn will show it, and then the other model does. The next question finds its prompt already read. Anything you send stops the reading at once. This follows the ShadowPrefill paper (Qiu et al., arXiv 2611.13176) and, in 0.2.0, ideas from FreeToken (Yang et al., arXiv 2608.16157).</p>
+    <figure class="diagram" style="margin-top:26px">
+      <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: what the two models do between turns. Scroll sideways on a small screen.">
+        <svg viewBox="0 0 960 250" role="img" aria-labelledby="turn-t turn-d">
+          <title id="turn-t">What the two models do between turns</title>
+          <desc id="turn-d">During turn one the quick model writes the answer. While you read it, the quick model reads the conversation, then the reasoning model reads it. When your next question arrives, the first token comes after 0.71 seconds from the quick model, where it was 4.25 seconds, or after 2.4 seconds from the reasoning model, where it was 18.6 seconds.</desc>
+          <defs>
+            <marker id="turn-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="d-head" d="M0 0 10 5 0 10z"/></marker>
+          </defs>
+          <text class="d-t" x="16" y="80">Quick model</text>
+          <text class="d-t" x="16" y="150">Reasoning model</text>
+
+          <rect class="d-fast" x="180" y="54" width="190" height="42" rx="9"/>
+          <text class="d-s" x="275" y="80" text-anchor="middle">writes the answer</text>
+          <rect class="d-fast" x="384" y="54" width="150" height="42" rx="9"/>
+          <text class="d-s" x="459" y="80" text-anchor="middle">reads the conversation</text>
+          <rect class="d-slow" x="548" y="124" width="150" height="42" rx="9"/>
+          <text class="d-s" x="623" y="150" text-anchor="middle">reads the conversation</text>
+
+          <path class="d-dash" d="M716 30V186"/>
+          <text class="d-l" x="716" y="20" text-anchor="middle">your next question</text>
+
+          <text class="d-t" x="732" y="72">first token after 0.71 s</text>
+          <text class="d-s" x="732" y="91">it was 4.25 s</text>
+          <text class="d-t" x="732" y="142">first token after 2.4 s</text>
+          <text class="d-s" x="732" y="161">it was 18.6 s</text>
+
+          <path class="d-line" d="M180 196H942" marker-end="url(#turn-a)"/>
+          <text class="d-l" x="275" y="222" text-anchor="middle">turn 1</text>
+          <text class="d-l" x="541" y="222" text-anchor="middle">you read the answer</text>
+          <text class="d-l" x="830" y="222" text-anchor="middle">turn 2</text>
+        </svg>
+      </div>
+      <figcaption>Medians of 9 later turns (quick) and 6 later turns (reasoning), arms interleaved, on the shared reference machine. The gain needs the pause to be longer than the reading: 3 to 5 s for the quick model, 7 to 17 s for the reasoning model. One reasoning turn of six arrived early and waited 18.6 s, as before.</figcaption>
+    </figure>
+
+    <h3 style="margin:56px 0 18px;font-size:1.45rem">The 0.2.0 engine work</h3>
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Engine changes in 0.2.0">
+      <table class="data">
+        <thead><tr><th scope="col">Change</th><th scope="col">What it removes</th><th scope="col">Measured</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">A continued conversation takes its cache</th><td>The copy out at the end of a request and back in at the start of the next</td><td>Hand-off 84 ms to 0 at 512 tokens and 240 ms to 0 at 2,048 tokens on the 1.7B model; 116 ms and 457 ms to 0 on the 4B model</td></tr>
+          <tr><th scope="row">First token from the last prompt chunk</th><td>One pass over the weights per request</td><td>About 30 ms on the 1.7B model and 90 ms on the 4B model. With the change above, a request that extends a 2,048-token conversation by 8 tokens: 329 to 229 ms and 1,075 to 568 ms</td></tr>
+          <tr><th scope="row">Idle threads take unclaimed blocks</th><td>Waiting for the slowest worker on a shared machine</td><td>Four threads: the 1.7B model wrote 19&nbsp;% faster and read 14&nbsp;% faster (12 of 12 paired rounds each); the 4B model 33&nbsp;% (8 of 8) and 10&nbsp;% (7 of 8). Three threads: inside noise on the 1.7B model, 8&nbsp;% and 15&nbsp;% on the 4B model</td></tr>
+          <tr><th scope="row">The model file is read ahead at start</th><td>Page-by-page loading during the first request</td><td>First request on a model file the system had not cached: 9.2 s against 14.6 s (three rounds). A warm request of the same size takes 5 s</td></tr>
+          <tr><th scope="row">The answering model reads between turns</th><td>Re-reading the previous turn in its replayed form</td><td>First token 4.25 s to 0.71 s (quick), 18.6 s to 2.4 s (reasoning)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">The default stays three threads to write and four to read; a fourth writing thread was not compared with three head to head after the change. FreeToken's own mechanisms are for Mixture-of-Experts models on a GPU. What was taken is the reasoning behind them. Source: <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/research/freetoken_assessment.md">FreeToken assessment</a> and <a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/decisions/026-freetoken-engine-phase34.md">decision 026</a>.</p>
+    <div class="callout warn" style="margin-top:28px">
+      <h3>Where it stops</h3>
+      <p>Speculative decoding, 1-bit weights (0 of 12 exact-answer prompts against 9 for the dense model), cache-blocking and concurrent hedging were measured and are off. Warming the careful model while the quick one drafts made every quick answer 75&nbsp;% slower, so it is off unless you choose it.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight" id="code" aria-labelledby="code-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">07 · Code agent</span>
+      <h2 id="code-title">A small program, written and run against your tests.</h2>
+      <p>Say what the function should do and give the tests it must pass, one Python <code>assert</code> per line. The run ends when the tests pass or the attempts are used up.</p>
+    </div>
+    <figure class="diagram">
+      <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: the code agent's loop. Scroll sideways on a small screen.">
+        <svg viewBox="0 0 960 236" role="img" aria-labelledby="agent-t agent-d">
+          <title id="agent-t">The code agent's loop</title>
+          <desc id="agent-d">A task and its tests go to the quick model, which writes solution.py. A compile check refuses an edit that does not compile. The program is then run against the tests in a sandbox with no network. If the tests pass, the checked program is returned. If the compile check or the tests fail, the model tries again from what failed, and the careful model takes over after the quick one.</desc>
+          <defs>
+            <marker id="agent-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="d-head" d="M0 0 10 5 0 10z"/></marker>
+          </defs>
+          <rect class="d-box" x="16" y="36" width="160" height="72" rx="12"/>
+          <text class="d-t" x="96" y="67" text-anchor="middle">Task and tests</text>
+          <text class="d-s" x="96" y="88" text-anchor="middle">one assert per line</text>
+          <rect class="d-fast" x="216" y="36" width="170" height="72" rx="12"/>
+          <text class="d-t" x="301" y="67" text-anchor="middle">Model writes</text>
+          <text class="d-s" x="301" y="88" text-anchor="middle">solution.py</text>
+          <rect class="d-check" x="426" y="36" width="160" height="72" rx="12"/>
+          <text class="d-t" x="506" y="67" text-anchor="middle">Compile check</text>
+          <text class="d-s" x="506" y="88" text-anchor="middle">before any test run</text>
+          <rect class="d-check" x="626" y="36" width="140" height="72" rx="12"/>
+          <text class="d-t" x="696" y="67" text-anchor="middle">Sandbox run</text>
+          <text class="d-s" x="696" y="88" text-anchor="middle">tests, no network</text>
+          <rect class="d-ok" x="806" y="36" width="138" height="72" rx="12"/>
+          <text class="d-t" x="875" y="67" text-anchor="middle">Checked program</text>
+          <text class="d-s" x="875" y="88" text-anchor="middle">all tests pass</text>
+          <path class="d-line" d="M176 72H214" marker-end="url(#agent-a)"/>
+          <path class="d-line" d="M386 72H424" marker-end="url(#agent-a)"/>
+          <path class="d-line" d="M586 72H624" marker-end="url(#agent-a)"/>
+          <path class="d-line" d="M766 72H804" marker-end="url(#agent-a)"/>
+          <path class="d-line" d="M506 108V168"/>
+          <path class="d-line" d="M696 108V168H301V110" marker-end="url(#agent-a)"/>
+          <text class="d-l" x="501" y="190" text-anchor="middle">fails: try again from what failed</text>
+          <text class="d-s" x="501" y="210" text-anchor="middle">the quick model goes first, the careful model after</text>
+        </svg>
+      </div>
+    </figure>
+    <div class="split" style="margin-top:44px">
+      <div>
+        <h3>What was measured</h3>
+        <p>On 12 tasks that start with no file, the quick model's first step used to try to run the example file from its own instructions 11 times, and one task passed on that step. After a prompt fix, <strong>12 of 12 first steps write the program and all 12 pass</strong>, with a median of 7.9 s.</p>
+        <p>An edit that does not compile is refused before any test run, at a cost of 37 ms. The loop rolls back to the best version, and ends a run as stuck when the same failure repeats.</p>
+        <p><strong>Where it stops:</strong> it is for one function or a small file. One run is served at a time. Large changes across many files are out of scope.</p>
+      </div>
+      <figure class="shot">
+        <div class="frame">
+          <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>127.0.0.1:8080</span></div>
+          <img src="assets/img/code.png" width="1440" height="1300" loading="lazy" alt="The Code page. A task asks for a function median(xs) with two assert tests. Below, a run reports that all the tests pass in 2 steps and 2 minutes 35 seconds: in step 1 the quick model ran a file, in step 2 the careful model wrote the program. The checked program is shown with line numbers.">
+        </div>
+        <figcaption><strong>This run was recorded before the prompt fix.</strong> Its first step was wasted and the careful model took 2 min 27 s. It is the behaviour the fix above removed.</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section section-tight section-alt" id="more" aria-labelledby="more-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">08 · Also in the box</span>
+      <h2 id="more-title">Answers drawn as you read them, shared rooms, and a lab.</h2>
+    </div>
+    <div class="grid g2">
+      <figure class="shot">
+        <div class="frame">
+          <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>127.0.0.1:8080</span></div>
+          <img src="assets/img/rich_answer.png" width="1440" height="1080" loading="lazy" alt="A sample answer in the chat page with typeset formulas for the gate, two code blocks in Python and Rust with wrap, save and copy buttons, and the start of a sequence diagram with Source, Save SVG, Save PNG and Expand buttons.">
+        </div>
+        <figcaption><strong>Formulas, code and diagrams.</strong> A sample answer. Unfinished formulas and diagrams stay plain text until they close.</figcaption>
+      </figure>
+      <figure class="shot">
+        <div class="frame-plain">
+          <img src="assets/img/charts.png" width="792" height="878" loading="lazy" alt="Two charts drawn in an answer, a radar chart and a heat map, each with Source, Copy source, Save CSV, Save SVG, Save PNG and Expand buttons.">
+        </div>
+        <figcaption><strong>Charts.</strong> Bar, line, pie, donut, radar, scatter, heat map, treemap, funnel and sankey. The values in this picture are sample data from a test answer, not measurements.</figcaption>
+      </figure>
+    </div>
+    <div class="grid g3" style="margin-top:36px">
+      <article class="card">
+        <h3>Rooms</h3>
+        <p>A room is a shared chat. Everyone connected sees each question and the answer as it is written. A room can be exported, and deleted for good with everything made from it. There are no accounts: anyone who can reach the service can read any room.</p>
+      </article>
+      <article class="card">
+        <h3>Documents out</h3>
+        <p>The model writes Markdown; a converter in the gateway makes the file. Raw HTML is shown as text, and a cell that a spreadsheet would run as a formula is stored as text.</p>
+      </article>
+      <article class="card">
+        <h3>A lab in the browser</h3>
+        <p>In Advanced mode: paired experiments with confidence intervals and exact tests, where each second of an answer went, a drift monitor, and release gates computed from stored runs, never typed in by hand.</p>
+      </article>
+    </div>
+    <p class="table-note"><strong>The name.</strong> Nafs-Aql joins two classical terms, <em>nafs</em> (the impulse that acts first) and <em>ʿaql</em> (the reason that restrains and corrects it), as a naming analogy for a quick answer and a considered one. Nothing in how the assistant works depends on the analogy.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="evidence.html">See the evidence</a>
+      <a class="btn btn-ghost" href="docs.html">Read the docs</a>
+    </div>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="Nafs-Aql home"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="14" fill="#1F3A5F"/><circle cx="25" cy="32" r="11" fill="none" stroke="#5FD0D4" stroke-width="5"/><circle cx="39" cy="32" r="11" fill="none" stroke="#F2B544" stroke-width="5"/></svg><span>Nafs-Aql</span></a>
+        <p>An AI assistant that runs on four CPU cores, answers from your own documents, and tells you when it is not sure.</p>
+      </div>
+      <div>
+        <h2>Site</h2>
+        <ul>
+          <li><a href="index.html">Product</a></li>
+          <li><a href="how-it-works.html">How it works</a></li>
+          <li><a href="use-cases.html">Use cases</a></li>
+          <li><a href="evidence.html">Evidence</a></li>
+          <li><a href="docs.html">Docs</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql">GitHub</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/report/nafs_aql_report.pdf">The paper (PDF)</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/LICENSE">Licence: Apache-2.0</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/NOTICE">Notices</a></li>
+          <li><a href="llms.txt">llms.txt</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Dirac</h2>
+        <ul>
+          <li><a href="https://dirac.id">dirac.id</a></li>
+        </ul>
+        <p style="margin-top:10px">Built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+      </div>
+    </div>
+    <div class="footer-legal">
+      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
+      <p>This site sets no cookies and loads nothing from third parties. It is hosted on GitHub Pages, which logs visitors' IP addresses.</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nafs-Aql: a checked AI assistant on four CPU cores</title>
+<meta name="description" content="An open-source AI assistant that runs on four CPU cores with no GPU and no API key, answers from your own documents with sources, and tells you when it is not sure.">
+<meta name="color-scheme" content="light dark">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Nafs-Aql">
+<meta property="og:title" content="Fast when it can. Careful when it must.">
+<meta property="og:description" content="An open-source AI assistant that runs on four CPU cores with no GPU and no API key, answers from your own documents with sources, and tells you when it is not sure.">
+<meta property="og:image" content="assets/img/chat.png">
+<meta property="og:image:alt" content="The Nafs-Aql chat page showing an answer with a numbered source and the passages it was answered from.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="brand" href="index.html" aria-label="Nafs-Aql home"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="14" fill="#1F3A5F"/><circle cx="25" cy="32" r="11" fill="none" stroke="#5FD0D4" stroke-width="5"/><circle cx="39" cy="32" r="11" fill="none" stroke="#F2B544" stroke-width="5"/></svg><span>Nafs-Aql</span></a>
+    <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Menu">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <nav class="site-nav" id="site-nav" aria-label="Main">
+      <ul>
+        <li><a href="index.html" aria-current="page">Product</a></li>
+        <li><a href="how-it-works.html">How it works</a></li>
+        <li><a href="use-cases.html">Use cases</a></li>
+        <li><a href="evidence.html">Evidence</a></li>
+        <li><a href="docs.html">Docs</a></li>
+        <li><a class="nav-gh" href="https://github.com/rismanmattotorang/nafsaql">GitHub</a></li>
+      </ul>
+    </nav>
+    <button class="icon-btn theme-toggle" type="button" aria-label="Switch theme">
+      <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+</header>
+<main id="main">
+<section class="hero" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <p class="hero-meta">
+          <span class="tag tag-accent">Version 0.2.0</span>
+          <span class="tag">Research preview</span>
+          <span class="tag">Apache-2.0</span>
+          <span class="tag">Runs on CPU</span>
+        </p>
+        <h1 id="hero-title">Fast when it can. Careful when it must.</h1>
+        <p class="lead">Nafs-Aql is an AI assistant that runs on four CPU cores, answers from your own documents, and tells you when it is not sure. No GPU. No API key. Nothing leaves your machine.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="docs.html#get-started">Get started</a>
+          <a class="btn btn-ghost" href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/report/nafs_aql_report.pdf">Read the paper</a>
+        </div>
+      </div>
+      <div class="terminal" data-copy>
+        <div class="terminal-bar"><i></i><i></i><i></i><span>Three commands</span></div>
+<pre><code><span class="p">$ </span><span data-cmd>git clone https://github.com/rismanmattotorang/nafsaql.git &amp;&amp; cd nafsaql</span>
+<span class="p">$ </span><span data-cmd>make models</span>
+<span class="p">$ </span><span data-cmd>make up</span></code></pre>
+        <p class="terminal-foot">Then open <code>http://127.0.0.1:8080</code>. You need Rust 1.96+, Python 3.10+ and about 4 GB of disk.</p>
+      </div>
+    </div>
+
+    <figure class="shot hero-shot">
+      <div class="frame">
+        <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>127.0.0.1:8080</span></div>
+        <img src="assets/img/chat.png" width="1440" height="900" alt="The Nafs-Aql chat page. A question about the project's own paper has a quick answer with a numbered source, a line saying every sentence of the answer is in the passages, and the list of four passages it was answered from.">
+      </div>
+      <figcaption><strong>A real answer on the reference machine.</strong> The number opens the passage it came from. The line under the answer says what was compared, and that this does not prove the answer right.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="problem-title">
+  <div class="wrap">
+    <h2 id="problem-title" class="eyebrow">The problem</h2>
+    <p class="problem">Small models are fast and wrong too often. <span>Large models are careful and need a GPU or someone else's servers.</span> Neither tells you which of its answers to trust.</p>
+  </div>
+</section>
+
+<section class="section section-alt" aria-labelledby="product-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The product</span>
+      <h2 id="product-title">Two models, exact checkers, and a label on every answer.</h2>
+      <p>A small model answers at once. A reasoning model steps in only when the question is worth the wait. Where an answer can be checked, a checker decides, not the model.</p>
+    </div>
+    <div class="grid g3">
+      <article class="card">
+        <span class="num">01</span>
+        <h3>Checked, or "Not sure"</h3>
+        <p>Maths, code against tests and data against a schema are decided by a checker. Every answer is labelled <strong>Checked</strong>, <strong>Cross-checked</strong> or <strong>Not checked</strong>. When nothing earns acceptance, it says it is not sure.</p>
+      </article>
+      <article class="card">
+        <span class="num">02</span>
+        <h3>Your documents, with sources</h3>
+        <p>Drop in PDF, Word, PowerPoint, Excel, LaTeX, web pages or notes. Every claim points at the passage that states it, and the answer says which of its sentences are <strong>not</strong> in those passages.</p>
+      </article>
+      <article class="card">
+        <span class="num">03</span>
+        <h3>Memory you can read</h3>
+        <p>What you say about yourself becomes a memory file you can read, edit and delete. Every change is logged and can be undone. Private chats and rooms are never remembered.</p>
+      </article>
+      <article class="card">
+        <span class="num">04</span>
+        <h3>Everything in one place</h3>
+        <p>Documents, memories, skills and saved chats live in one tree with an address for each (<code>nafs://…</code>). Every folder and document has a summary made without a model.</p>
+      </article>
+      <article class="card">
+        <span class="num">05</span>
+        <h3>The careful model is ready</h3>
+        <p>While you read an answer, the reasoning model reads the conversation. In four-turn test sessions on a quiet machine it then started in <strong>2.0 s instead of 36.6 s</strong>. Sending a message stops it at once.</p>
+      </article>
+      <article class="card">
+        <span class="num">06</span>
+        <h3>Four CPU cores</h3>
+        <p>No GPU. No API key. Nothing leaves your machine. The reference machine is one shared 4-core Intel i3-8100 with 32 GB of memory.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section band" aria-labelledby="proof-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Proof</span>
+      <h2 id="proof-title">Measured, with the conditions attached.</h2>
+      <p>One shared 4-core Intel i3-8100, 32 GB, no GPU. Every figure comes from a stored run in the repository.</p>
+    </div>
+    <ul class="stats">
+      <li>
+        <span class="stat-n">36&nbsp;%</span>
+        <span class="stat-what">of the cost of always reasoning, at the same accuracy</span>
+        <span class="stat-cond">Gate with the exact checker visible against always deliberating. 6 of 6 right in each arm, 6 mixed tasks.</span>
+      </li>
+      <li>
+        <span class="stat-n">18<small>of 20</small></span>
+        <span class="stat-what">held-out questions answered with passages</span>
+        <span class="stat-cond">Against 2 of 20 with no passages. Same 20 questions, quick model, paired.</span>
+      </li>
+      <li>
+        <span class="stat-n">38<small>of 44</small></span>
+        <span class="stat-what">made-up answers flagged by the check against the passages</span>
+        <span class="stat-cond">It flags 1 of 42 right answers. It cannot catch a wrong number taken from the right passage.</span>
+      </li>
+      <li>
+        <span class="stat-n">0.71<small>s</small></span>
+        <span class="stat-what">to the first token of a later turn in a quick conversation</span>
+        <span class="stat-cond">New in 0.2.0. It was 4.25 s. Median of 9 later turns each way, arms interleaved.</span>
+      </li>
+      <li>
+        <span class="stat-n">2.4<small>s</small></span>
+        <span class="stat-what">to the first token of a later turn answered by the reasoning model</span>
+        <span class="stat-cond">New in 0.2.0. It was 18.6 s. Median of 6 turns. One of the six arrived before the reading had finished and waited 18.6 s.</span>
+      </li>
+      <li>
+        <span class="stat-n">12<small>of 12</small></span>
+        <span class="stat-what">small Python tasks pass their tests on the code agent's first step</span>
+        <span class="stat-cond">New in 0.2.0. It was 1 of 12 before a prompt fix. Tasks that start with no file; median 7.9 s.</span>
+      </li>
+    </ul>
+    <p class="band-foot">The machine was shared with other work during most runs and comparisons use tens of items. The numbers show direction, not release-grade statistics. <a href="evidence.html">Method, sources and what did not work</a>.</p>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="how-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">How it works</span>
+      <h2 id="how-title">A checker decides where one exists.</h2>
+      <p>The gate escalates only when the error it expects to save is worth the waiting time. Where a checker exists its verdict is final. Agreement between samples is a hint, never proof.</p>
+    </div>
+    <figure class="diagram">
+  <div class="diagram-scroll" tabindex="0" role="group" aria-label="Diagram: how an answer is made. Scroll sideways on a small screen.">
+    <svg viewBox="0 0 960 420" role="img" aria-labelledby="flow-t flow-d">
+      <title id="flow-t">How an answer is made</title>
+      <desc id="flow-d">Your question goes to the quick model, which answers at once, using passages and the graph from your documents when a library is selected. A checker and the gate look at the draft. If it passes, the answer is returned with its label. If it fails, or the gate is unsure, the reasoning model thinks it through and a checker or judge decides again. If nothing earned acceptance, the assistant says it is not sure.</desc>
+      <defs>
+        <marker id="flow-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="d-head" d="M0 0 10 5 0 10z"/></marker>
+      </defs>
+
+      <rect class="d-box" x="16" y="44" width="150" height="76" rx="12"/>
+      <text class="d-t" x="91" y="87" text-anchor="middle">Your question</text>
+
+      <rect class="d-fast" x="226" y="44" width="180" height="76" rx="12"/>
+      <text class="d-t" x="316" y="77" text-anchor="middle">Quick model</text>
+      <text class="d-s" x="316" y="98" text-anchor="middle">answers at once</text>
+
+      <rect class="d-check" x="466" y="44" width="170" height="76" rx="12"/>
+      <text class="d-t" x="551" y="77" text-anchor="middle">Checker and gate</text>
+      <text class="d-s" x="551" y="98" text-anchor="middle">check, then decide</text>
+
+      <rect class="d-ok" x="770" y="44" width="174" height="76" rx="12"/>
+      <text class="d-t" x="857" y="77" text-anchor="middle">Answer</text>
+      <text class="d-s" x="857" y="98" text-anchor="middle">says how it was checked</text>
+
+      <rect class="d-box" x="226" y="214" width="180" height="76" rx="12"/>
+      <text class="d-t" x="316" y="247" text-anchor="middle">Your documents</text>
+      <text class="d-s" x="316" y="268" text-anchor="middle">passages and graph</text>
+
+      <rect class="d-slow" x="466" y="214" width="170" height="76" rx="12"/>
+      <text class="d-t" x="551" y="247" text-anchor="middle">Reasoning model</text>
+      <text class="d-s" x="551" y="268" text-anchor="middle">thinks it through</text>
+
+      <rect class="d-check" x="770" y="214" width="174" height="76" rx="12"/>
+      <text class="d-t" x="857" y="247" text-anchor="middle">Checker or judge</text>
+      <text class="d-s" x="857" y="268" text-anchor="middle">decides again</text>
+
+      <rect class="d-bad" x="770" y="344" width="174" height="60" rx="12"/>
+      <text class="d-t" x="857" y="379" text-anchor="middle">Says it is not sure</text>
+
+      <path class="d-line" d="M166 82H224" marker-end="url(#flow-a)"/>
+      <path class="d-line" d="M406 82H464" marker-end="url(#flow-a)"/>
+      <path class="d-line" d="M636 82H768" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="702" y="72" text-anchor="middle">passes</text>
+
+      <path class="d-dash" d="M316 214V122" marker-end="url(#flow-a)"/>
+
+      <path class="d-line" d="M551 120V212" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="563" y="163">fails, or the</text>
+      <text class="d-l" x="563" y="180">gate is unsure</text>
+
+      <path class="d-line" d="M636 252H768" marker-end="url(#flow-a)"/>
+      <path class="d-line" d="M857 214V122" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="869" y="172">passes</text>
+
+      <path class="d-line" d="M857 290V342" marker-end="url(#flow-a)"/>
+      <text class="d-l" x="845" y="321" text-anchor="end">nothing earned acceptance</text>
+    </svg>
+  </div>
+  <ol class="steps">
+    <li><strong>The quick model answers at once.</strong> If a library is selected, it answers from passages of your documents.</li>
+    <li><strong>A checker decides where one exists:</strong> maths, code against tests, data against a schema. If the draft passes, you get the answer, labelled <em>Checked</em>.</li>
+    <li><strong>If it fails, or the gate judges the wait worth it,</strong> the reasoning model thinks the question through, and a checker or a judge decides again.</li>
+    <li><strong>If nothing earned acceptance,</strong> the assistant says it is not sure, and why.</li>
+  </ol>
+</figure>
+    <p style="margin-top:28px"><a class="card-link" href="how-it-works.html">The whole architecture, part by part</a></p>
+  </div>
+</section>
+
+<section class="section section-alt" aria-labelledby="see-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Ask your documents</span>
+      <h2 id="see-title">Answers you can trace to a page.</h2>
+    </div>
+    <div class="stack">
+      <div class="split">
+        <div>
+          <h3>Numbered sources, and what ran</h3>
+          <p>Every answer from documents lists the passages it used and says which searches ran. Click a number to read the passage. If nothing in the library matches well, the answer says <strong>No strong match</strong>.</p>
+          <p>Under the answer you see either that every sentence is in the passages, or which sentences are not. The comparison uses words and numbers, with no model.</p>
+        </div>
+        <figure class="shot">
+          <div class="frame">
+            <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>127.0.0.1:8080</span></div>
+            <img src="assets/img/knowledge_chat.png" width="1440" height="900" loading="lazy" alt="A chat answer from a knowledge base. Under it: searched by words, meaning and the knowledge graph in 575 ms, 11 relations used, and four numbered passages with their match scores. A side panel shows how the question is being routed.">
+          </div>
+          <figcaption>With Advanced mode on, a side panel shows how each question was routed.</figcaption>
+        </figure>
+      </div>
+      <div class="split split-rev">
+        <figure class="shot">
+          <div class="frame">
+            <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>127.0.0.1:8080</span></div>
+            <img src="assets/img/knowledge_graph.png" width="1440" height="900" loading="lazy" alt="The Knowledge page with a graph of a nine-document knowledge base: 2,683 things, 1,096 relations and 1,715 groups, drawn as coloured circles joined by lines, with a legend of groups underneath.">
+          </div>
+        </figure>
+        <div>
+          <h3>A map of what your documents name</h3>
+          <p>The graph is drawn from the text the moment a file is read, with no model call. A deeper pass adds relations, and keeps one only when the sentence that states it occurs in the passage word for word.</p>
+          <p>Click a thing to read the sentences about it. Save the picture as SVG or PNG.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="uc-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Use cases</span>
+      <h2 id="uc-title">For work that cannot leave the building.</h2>
+      <p>Sixteen researched cases where local, CPU-only and private is the requirement, each with the evidence for the need and the limit you should know first.</p>
+    </div>
+    <div class="grid g2">
+      <article class="card">
+        <h3>Regulated professions</h3>
+        <p>Law, healthcare administration, finance and audit, tax and accounting, human resources, compliance. Cited answers from the files you load, in a deployment you control.</p>
+        <a class="card-link" href="use-cases.html#regulated">Six cases</a>
+      </article>
+      <article class="card">
+        <h3>Public sector, education and research</h3>
+        <p>Staff questions from regulations, maths and programming practice with checked answers, unpublished manuscripts, sensitive source documents.</p>
+        <a class="card-link" href="use-cases.html#public">Four cases</a>
+      </article>
+      <article class="card">
+        <h3>Industry and engineering</h3>
+        <p>Manuals at the machine, private source code, the contracts and price lists of a small business on the PC it already owns.</p>
+        <a class="card-link" href="use-cases.html#industry">Three cases</a>
+      </article>
+      <article class="card">
+        <h3>Constrained environments</h3>
+        <p>Air-gapped networks, data-residency rules, and places with no reliable internet.</p>
+        <a class="card-link" href="use-cases.html#constrained">Three cases</a>
+      </article>
+    </div>
+    <p class="table-note">The evidence on that page describes the need. It is not a result of any Nafs-Aql deployment, and none is claimed.</p>
+  </div>
+</section>
+
+<section class="section section-alt" aria-labelledby="new-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">New in 0.2.0</span>
+      <h2 id="new-title">A faster engine, and documents in and out.</h2>
+      <p>Released 2026-11-22. Engine numbers were measured on the reference machine while it was shared, with every comparison interleaved.</p>
+    </div>
+    <div class="grid g3">
+      <article class="card">
+        <h3>Both models get ready between turns</h3>
+        <p>The model that answered now reads the conversation too. First token of a later turn: <strong>4.25 s to 0.71 s</strong> for quick answers and <strong>18.6 s to 2.4 s</strong> for reasoning answers (medians of 9 and 6 turns). The gain needs a pause longer than the reading.</p>
+      </article>
+      <article class="card">
+        <h3>A continued conversation costs no copy</h3>
+        <p>A request takes its cached state instead of copying it. Hand-off at 2,048 tokens: <strong>240 ms to 0</strong> on the 1.7B model and <strong>457 ms to 0</strong> on the 4B model. With the first token taken from the last prompt chunk: 329 to 229 ms and 1,075 to 568 ms.</p>
+      </article>
+      <article class="card">
+        <h3>Idle threads take unclaimed work</h3>
+        <p>On four threads the 1.7B model wrote 19&nbsp;% faster and read prompts 14&nbsp;% faster; the 4B model 33&nbsp;% and 10&nbsp;%. On three threads the 1.7B model was inside noise. A cold first request: <strong>14.6 s to 9.2 s</strong> with read-ahead.</p>
+      </article>
+      <article class="card">
+        <h3>Documents in, documents out</h3>
+        <p>Read PDF, Word, PowerPoint, Excel, CSV, LaTeX, HTML, Markdown and text, into a knowledge base or attached to one question. Save an answer or a chat as Markdown, Word, PDF, PowerPoint, a web page, LaTeX, plain text, Excel or CSV, made on the machine.</p>
+      </article>
+      <article class="card">
+        <h3>A Code page</h3>
+        <p>Describe a small Python function and its tests. It is written and run in a sandbox with no network, step by step, and can be stopped. First step passed on <strong>12 of 12</strong> from-scratch tasks after a prompt fix (1 of 12 before), median 7.9 s.</p>
+      </article>
+      <article class="card">
+        <h3>Answers and settings</h3>
+        <p>Tables sort and export. Code has line numbers, wrap and save. Charts, diagrams and formulas save as SVG or PNG. Settings are in plain language with presets, search and "put back". Configuration is validated at start-up.</p>
+      </article>
+    </div>
+    <figure class="shot" style="margin-top:44px">
+      <div class="frame">
+        <div class="frame-bar" aria-hidden="true"><i></i><i></i><i></i><span>127.0.0.1:8080</span></div>
+        <img src="assets/img/save_as.png" width="1440" height="900" loading="lazy" alt="The Save this chat as a file dialog with nine formats: Markdown, Word, PDF, PowerPoint, Web page, LaTeX and Plain text are available; Excel and CSV are greyed out with the note that there is no table in the text.">
+      </div>
+      <figcaption><strong>Save as.</strong> The file is made on the computer from the text. Excel and CSV are offered when the answer has a table.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="limits-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Honest limits</span>
+      <h2 id="limits-title">What it does not do.</h2>
+      <p>A research preview, built in the open. These limits are stated in the project's own documents, and here before you find them.</p>
+    </div>
+    <div class="grid g2">
+      <div>
+        <ul class="limits">
+          <li><strong>It is slow for long answers.</strong> A thorough answer takes a minute or two on the reference machine. Four fifths of an answer from documents is the model reading the passages, at 50 to 60 tokens a second.</li>
+          <li><strong>The models are small.</strong> Open-ended legal or medical reasoning, synthesis across many long documents, large changes across many files and numerical reasoning with no checker all need a person's review.</li>
+          <li><strong>Reworded questions are an open problem.</strong> A question worded differently from the document finds its passage in the first eight only about a quarter of the time. The remedies need larger models than this release ships.</li>
+          <li><strong>The support check is not a proof.</strong> It misses a wrong number taken from the right passage: 3 of 5 such answers passed.</li>
+        </ul>
+      </div>
+      <div>
+        <ul class="limits">
+          <li><strong>The statistics are small.</strong> One shared machine, tens of items per comparison. The release-scale evaluation, the first distillation cycle and the memory-token pre-training need a faster machine.</li>
+          <li><strong>The learned gate is not on.</strong> It waits for its ledger: 1,294 of the 2,900 checked answers it asks for.</li>
+          <li><strong>Scanned PDFs and pictures cannot be read.</strong> That needs a recognition model.</li>
+          <li><strong>There are no accounts.</strong> Anyone who can reach the service can read any shared room. Settings stay in the browser. Access keys protect the service as a whole.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="margin:52px 0 8px">What did not work, and is published</h3>
+    <p class="muted measure" style="margin-bottom:18px">Each of these was built or measured, and left off. The measurements are on the <a href="evidence.html#did-not-work">evidence page</a>.</p>
+    <ul class="pill-list">
+      <li>Speculative decoding</li>
+      <li>1-bit weights</li>
+      <li>Concurrent hedging</li>
+      <li>A larger embedding model</li>
+      <li>Score-based fusion</li>
+      <li>A graph arm in everyday search</li>
+      <li>Guessing difficulty before answering</li>
+      <li>Cache-blocking prompt reading</li>
+      <li>A summaries-first knowledge prompt</li>
+      <li>Guessing which document a question is about</li>
+      <li>Warming the careful model during the draft</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section section-alt closing" id="quick-start" aria-labelledby="qs-title">
+  <div class="wrap">
+    <div class="split">
+      <div>
+        <span class="eyebrow">Quick start</span>
+        <h2 id="qs-title">Running in three commands.</h2>
+        <p>You need Rust 1.96+, Python 3.10+ and about 4 GB of disk. Open <code>http://127.0.0.1:8080</code> when it is up. <code>make down</code> stops everything.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="docs.html#get-started">Requirements and next steps</a>
+          <a class="btn btn-ghost" href="https://github.com/rismanmattotorang/nafsaql">View on GitHub</a>
+        </div>
+      </div>
+      <div class="terminal" data-copy>
+        <div class="terminal-bar"><i></i><i></i><i></i><span>Terminal</span></div>
+<pre><code><span class="c"># 1. Get the code</span>
+<span class="p">$ </span><span data-cmd>git clone https://github.com/rismanmattotorang/nafsaql.git &amp;&amp; cd nafsaql</span>
+
+<span class="c"># 2. Download the two models</span>
+<span class="p">$ </span><span data-cmd>make models</span>
+
+<span class="c"># 3. Build and start</span>
+<span class="p">$ </span><span data-cmd>make up</span></code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a class="brand" href="index.html" aria-label="Nafs-Aql home"><svg viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="14" fill="#1F3A5F"/><circle cx="25" cy="32" r="11" fill="none" stroke="#5FD0D4" stroke-width="5"/><circle cx="39" cy="32" r="11" fill="none" stroke="#F2B544" stroke-width="5"/></svg><span>Nafs-Aql</span></a>
+        <p>An AI assistant that runs on four CPU cores, answers from your own documents, and tells you when it is not sure.</p>
+      </div>
+      <div>
+        <h2>Site</h2>
+        <ul>
+          <li><a href="index.html">Product</a></li>
+          <li><a href="how-it-works.html">How it works</a></li>
+          <li><a href="use-cases.html">Use cases</a></li>
+          <li><a href="evidence.html">Evidence</a></li>
+          <li><a href="docs.html">Docs</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Project</h2>
+        <ul>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql">GitHub</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/docs/report/nafs_aql_report.pdf">The paper (PDF)</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/LICENSE">Licence: Apache-2.0</a></li>
+          <li><a href="https://github.com/rismanmattotorang/nafsaql/blob/main/NOTICE">Notices</a></li>
+          <li><a href="llms.txt">llms.txt</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2>Dirac</h2>
+        <ul>
+          <li><a href="https://dirac.id">dirac.id</a></li>
+        </ul>
+        <p style="margin-top:10px">Built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+      </div>
+    </div>
+    <div class="footer-legal">
+      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
+      <p>This site sets no cookies and loads nothing from third parties. It is hosted on GitHub Pages, which logs visitors' IP addresses.</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

@@ -1,7 +1,7 @@
 {
- "measured_at": "2026-11-14T03:32:18Z",
+ "measured_at": "2026-11-22T11:24:27Z",
  "base": "http://127.0.0.1:8080",
- "passed": 74,
+ "passed": 102,
  "failed": 0,
  "results": [
   {
@@ -12,17 +12,17 @@
   {
    "check": "GET /metrics",
    "pass": true,
-   "detail": "200 text/plain 2287 B"
+   "detail": "200 text/plain 0 B"
   },
   {
    "check": "GET /openapi.json",
    "pass": true,
-   "detail": "200 application/json 210816 B"
+   "detail": "200 application/json 220686 B"
   },
   {
    "check": "GET /v1/alerts",
    "pass": true,
-   "detail": "200 application/json 1010 B"
+   "detail": "200 application/json 1064 B"
   },
   {
    "check": "GET /v1/audits",
@@ -42,12 +42,12 @@
   {
    "check": "GET /v1/conversations",
    "pass": true,
-   "detail": "200 application/json 24122 B"
+   "detail": "200 application/json 20619 B"
   },
   {
    "check": "GET /v1/drift",
    "pass": true,
-   "detail": "200 application/json 13411 B"
+   "detail": "200 application/json 13082 B"
   },
   {
    "check": "GET /v1/eval/datasets",
@@ -58,6 +58,11 @@
    "check": "GET /v1/eval/runs",
    "pass": true,
    "detail": "200 application/json 44186 B"
+  },
+  {
+   "check": "GET /v1/export/formats",
+   "pass": true,
+   "detail": "200 application/json 417 B"
   },
   {
    "check": "GET /v1/fs/ls",
@@ -82,12 +87,12 @@
   {
    "check": "GET /v1/gate",
    "pass": true,
-   "detail": "200 application/json 2203 B"
+   "detail": "200 application/json 6917 B"
   },
   {
    "check": "GET /v1/gate/labels",
    "pass": true,
-   "detail": "200 application/json 310 B"
+   "detail": "200 application/json 791 B"
   },
   {
    "check": "GET /v1/gate/params",
@@ -97,12 +102,17 @@
   {
    "check": "GET /v1/gates",
    "pass": true,
-   "detail": "200 application/json 4330 B"
+   "detail": "200 application/json 4312 B"
   },
   {
    "check": "GET /v1/harness",
    "pass": true,
    "detail": "200 application/json 1513 B"
+  },
+  {
+   "check": "GET /v1/harness/runs",
+   "pass": true,
+   "detail": "200 application/json 292 B"
   },
   {
    "check": "GET /v1/kb",
@@ -112,7 +122,7 @@
   {
    "check": "GET /v1/kb/status",
    "pass": true,
-   "detail": "200 application/json 633 B"
+   "detail": "200 application/json 646 B"
   },
   {
    "check": "GET /v1/lab/insights",
@@ -122,7 +132,7 @@
   {
    "check": "GET /v1/memory",
    "pass": true,
-   "detail": "200 application/json 21745 B"
+   "detail": "200 application/json 3963 B"
   },
   {
    "check": "GET /v1/memory/diff",
@@ -132,7 +142,7 @@
   {
    "check": "GET /v1/perf/stages",
    "pass": true,
-   "detail": "200 application/json 1492 B"
+   "detail": "200 application/json 1700 B"
   },
   {
    "check": "GET /v1/preferences",
@@ -147,27 +157,27 @@
   {
    "check": "GET /v1/self-model",
    "pass": true,
-   "detail": "200 application/json 2389 B"
+   "detail": "200 application/json 7152 B"
   },
   {
    "check": "GET /v1/system",
    "pass": true,
-   "detail": "200 application/json 7180 B"
+   "detail": "200 application/json 12315 B"
   },
   {
    "check": "GET /v1/system/activity",
    "pass": true,
-   "detail": "200 application/json 36007 B"
+   "detail": "200 application/json 35669 B"
   },
   {
    "check": "GET /v1/tazkiya",
    "pass": true,
-   "detail": "200 application/json 1245 B"
+   "detail": "200 application/json 1244 B"
   },
   {
    "check": "GET /v1/tazkiya/review",
    "pass": true,
-   "detail": "200 application/json 36033 B"
+   "detail": "200 application/json 29179 B"
   },
   {
    "check": "GET /v1/verifiers",
@@ -182,7 +192,7 @@
   {
    "check": "chat: verified math reply",
    "pass": true,
-   "detail": "fast verified 4.2s"
+   "detail": "fast verified 5.3s"
   },
   {
    "check": "chat: stage timings recorded (NFR-030)",
@@ -192,7 +202,7 @@
   {
    "check": "chat: unverified math stages add up to the wall time",
    "pass": true,
-   "detail": "counted 7253 ms of 7255 ms; 0 sample_after stage(s)"
+   "detail": "counted 3949 ms of 10271 ms; 0 sample_after stage(s)"
   },
   {
    "check": "rooms: create normalises the name (201)",
@@ -252,7 +262,7 @@
   {
    "check": "perf: latency breakdown (P7-T01)",
    "pass": true,
-   "detail": "1039 replies"
+   "detail": "286 replies"
   },
   {
    "check": "system: switching to a stopped backend is refused",
@@ -266,6 +276,21 @@
   },
   {
    "check": "ui: #rooms uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #knowledge uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #code uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #files uses plain language",
    "pass": true,
    "detail": "[]"
   },
@@ -340,6 +365,106 @@
    "detail": "[]"
   },
   {
+   "check": "ui: #knowledge renders without errors",
+   "pass": true,
+   "detail": "Knowledge \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #knowledge (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #code renders without errors",
+   "pass": true,
+   "detail": "Code \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #code (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: #files renders without errors",
+   "pass": true,
+   "detail": "Files \u00b7 Nafs-Aql"
+  },
+  {
+   "check": "ui: #files (Advanced) uses plain language",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: every control on #chat has a name",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: every control on #rooms has a name",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: every control on #knowledge has a name",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: every control on #code has a name",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: every control on #files has a name",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: every control on #system has a name",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: Settings opens from its link with every setting explained",
+   "pass": true,
+   "detail": "{'open': True, 'rows': 12, 'hints': 0, 'form': False, 'reset': True}"
+  },
+  {
+   "check": "ui: the dialog is not a form (Enter in a text box does not close it)",
+   "pass": true,
+   "detail": "{'open': True, 'rows': 12, 'hints': 0, 'form': False, 'reset': True}"
+  },
+  {
+   "check": "ui: every control in Settings has a name",
+   "pass": true,
+   "detail": "[]"
+  },
+  {
+   "check": "ui: finding a setting narrows the list and says when nothing matches",
+   "pass": true,
+   "detail": "[2, True]"
+  },
+  {
+   "check": "ui: segmented controls say which button is chosen",
+   "pass": true,
+   "detail": "0"
+  },
+  {
+   "check": "ui: the Code form says what is missing beside each field and puts the cursor there",
+   "pass": true,
+   "detail": "['Describe the task in a sentence or two.', 'Give at least one test, so the result can be checked.', '', 'Line 1 is not an assert. Write each test like: assert f(2) == 4', 'cgTask']"
+  },
+  {
+   "check": "ui: a table in an answer sorts by a column, numbers as numbers, from the keyboard too",
+   "pass": true,
+   "detail": "{'asc': 'bca', 'sort': 'ascending', 'tab': 0, 'wrapped': True, 'gutter': True, 'bar': True}"
+  },
+  {
+   "check": "ui: code wraps and is numbered; the table's actions are always visible",
+   "pass": true,
+   "detail": "{'asc': 'bca', 'sort': 'ascending', 'tab': 0, 'wrapped': True, 'gutter': True, 'bar': True}"
+  },
+  {
    "check": "ui: #chat fits a 375 px screen (no sideways scroll)",
    "pass": true,
    "detail": "0 px over"
@@ -371,6 +496,21 @@
   },
   {
    "check": "ui: #system fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #knowledge fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #code fits a 375 px screen (no sideways scroll)",
+   "pass": true,
+   "detail": "0 px over"
+  },
+  {
+   "check": "ui: #files fits a 375 px screen (no sideways scroll)",
    "pass": true,
    "detail": "0 px over"
   }

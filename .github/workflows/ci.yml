@@ -52,4 +52,7 @@ jobs:
       - run: python -c "import yaml; yaml.safe_load(open('config/vllm_launch.yaml'))"
       - run: python -c "import tomllib; tomllib.load(open('config/nafs-aql.toml','rb')); tomllib.load(open('config/nafs-aql.sample.toml','rb'))"
       - run: node --check rust/crates/nafs-web/assets/app.js
+      - run: python scripts/gen_config_schema.py   # the three shipped configurations must pass the generated schema
+      - run: python scripts/site_check.py          # the website: links, assets, one h1, nothing loaded from another host
+      - run: node scripts/render_test.mjs          # the answer renderer
       - run: python scripts/gen_tables.py

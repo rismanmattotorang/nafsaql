@@ -12,8 +12,9 @@ Built by the [Dirac](https://dirac.id) R&D Team.
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Runs on CPU](https://img.shields.io/badge/runs%20on-CPU-teal.svg)](docs/features_and_results.md)
 [![Rust](https://img.shields.io/badge/built%20with-Rust-b7410e.svg)](rust/)
+[![Release](https://img.shields.io/badge/release-0.2.0-0f766e.svg)](docs/release/RELEASE-0.2.0.md)
 
-[The problem](#the-problem) · [The product](#the-product) · [Proof](#proof) · [Quick start](#quick-start) · [How it works](#how-it-works) · [Docs](docs/index.md)
+[**Website**](https://rismanmattotorang.github.io/nafsaql/) · [Quick start](#quick-start) · [The product](#the-product) · [Proof](#proof) · [How it works](#how-it-works) · [Use cases](#who-it-is-for) · [Paper](docs/report/nafs_aql_report.pdf) · [Docs](docs/index.md)
 
 <br>
 
@@ -32,15 +33,19 @@ Neither tells you which of its answers to trust.
 
 **01 — Checked, or "Not sure".** A small model answers at once. A reasoning model steps in only when the question is worth the wait. Where an answer can be checked (maths, code against tests, data against a schema), a checker decides, not the model. Every answer is labelled *Checked*, *Cross-checked* or *Not checked*.
 
-**02 — Your documents, with sources.** Drop in PDF, Word, PowerPoint, LaTeX, web pages or notes. Ask in plain language. Every claim points at the passage that states it, the answer says which of its sentences are *not* in those passages, and a map shows what your documents talk about.
+**02 — Your documents, with sources.** Drop in PDF, Word, PowerPoint, Excel, CSV, LaTeX, web pages or notes, into a library or beside one question. Ask in plain language. Every claim points at the passage that states it, the answer says which of its sentences are *not* in those passages, and a map shows what your documents talk about.
 
 **03 — It remembers, and shows what it remembers.** Tell it something in one chat and ask in another. What you say about yourself ("call me …", "I prefer …", "my manager is …", "remember that …") becomes a memory file you can read, edit and delete, every change is logged and can be undone, and your preferences apply to every answer. Private chats and rooms are never remembered.
 
 **04 — Everything in one place.** Documents, memories, skills and saved chats live in one tree with an address for each (`nafs://…`). Every folder and document has a one-line summary and an overview made without a model, a search can stay inside one folder, and a library can be compiled into a wiki, a map of its terms or a report.
 
-**05 — The careful model is ready when you need it.** While you read an answer, the reasoning model reads the conversation, so when your next question needs it, it starts in about 2 seconds instead of 37. Sending a message stops it at once; Settings → Speed turns it off.
+**05 — Both models are ready when you ask.** While you read an answer, the models read the conversation, so the next answer starts sooner: 0.7 s instead of 4.3 s to the first word of a quick answer, 2.4 s instead of 18.6 s for a reasoned one, and about 2 s instead of 37 s when the careful model takes over a chat the quick one was answering. Sending a message stops the reading at once; Settings → Speed turns it off.
 
-**06 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
+**06 — Answers you can use.** Tables sort and export, code has line numbers and a save button, charts, diagrams and formulas save as pictures, and an answer or a whole chat is saved as Word, PDF, PowerPoint, Excel, CSV, LaTeX, a web page, Markdown or plain text, made on your machine. Ask again in place, or edit an earlier question and send it again.
+
+**07 — Code that passed its tests.** Describe a small Python function and the tests it must pass. It is written, run in a sandbox with no network, and shown step by step; the run ends when the tests pass, and you can stop it.
+
+**08 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
 
 ## Proof
 
@@ -55,6 +60,8 @@ Measured on one shared 4-core Intel i3-8100. Every figure comes from a stored ru
 | **+23 %** | faster reading of a prompt, by reading with all four cores and writing with three; an answer from documents arrives 16 % sooner |
 | **10×** | as often does a follow-up question ("and how fast is it?") find its passage first, when it is read with the question before it |
 | **14 of 14** | live checks of the memory pass: a fact is found from another chat by its words or its meaning, and is gone when you forget it |
+| **0.7 s** | to the first word of a later turn in a quick conversation, where it was 4.3 s; 2.4 s where it was 18.6 s when the reasoning model answers (median of 9 and of 6 turns) |
+| **12 of 12** | small Python functions pass their tests on the code agent's first step, where 1 of 12 did before a change to its instructions (median 7.9 s a step) |
 
 The rest, including what did not work, is in [features and measured results](docs/features_and_results.md).
 
@@ -92,6 +99,17 @@ flowchart LR
 
 The gate escalates only when the error it expects to save is worth the waiting time. Where a checker exists its verdict is final; agreement between samples is a hint, never proof.
 
+## New in 0.2.0
+
+- **A faster engine, from five ideas.** The reasoning of FreeToken (arXiv 2608.16157) applied to a dense model on a CPU: a continued conversation takes its kept state without a copy (457 ms saved at 2,048 tokens on the reasoning model), the first word comes with the last piece of the prompt (1,075 ms to 568 ms), idle threads take work nobody has started (19 to 33 % faster on four threads), the model file is read while the first request is (14.6 s to 9.2 s), and both models read the conversation between turns. [Assessment and results](docs/research/freetoken_assessment.md).
+- **Documents in and out.** Excel and CSV join the readers; a file can be attached to one question; answers and chats are saved in nine formats.
+- **A product pass over every form.** Settings in plain language with presets and a search box; labels, hints and errors on every control; a configuration file that names a misspelt key at start instead of ignoring it.
+- **A Code page**, and an agent whose first step now writes the program. [What changed and why](docs/decisions/027-product-quality-phase35.md) · [Release notes](docs/release/RELEASE-0.2.0.md).
+
+## Who it is for
+
+People whose documents cannot leave the building, and who need to know which answers were checked: a law firm's matter file, a hospital's policies, an audit team's control library, a school's maths and programming practice, a plant with no outside network, a newsroom's source documents. The [website](https://rismanmattotorang.github.io/nafsaql/use-cases.html) sets out sixteen such cases, each with the evidence for the need and the limit to know first. No deployment is claimed for any of them.
+
 ## Ask your documents
 
 <table>
@@ -112,6 +130,14 @@ The gate escalates only when the error it expects to save is worth the waiting t
 <td width="50%"><img src="docs/shared/screenshots/palette.png" alt="The command palette"><br><sub><b>Jump anywhere.</b> Ctrl/Cmd+K lists pages and actions; type to narrow, Enter to choose.</sub></td>
 </tr>
 <tr>
+<td width="50%"><img src="docs/shared/screenshots/attach.png" alt="A CSV file attached to a question"><br><sub><b>A file beside one question.</b> PDF, Word, PowerPoint, Excel, CSV and more are read on your machine; the chip says how much of the file fits.</sub></td>
+<td width="50%"><img src="docs/shared/screenshots/save_as.png" alt="The Save as dialog with nine formats"><br><sub><b>Take the answer with you.</b> Nine formats, written on your machine; the table formats appear when the text has a table.</sub></td>
+</tr>
+<tr>
+<td width="50%"><img src="docs/shared/screenshots/code.png" alt="The Code page after a run"><br><sub><b>Code that passed its tests.</b> Each step shows which model took it and what the tests said.</sub></td>
+<td width="50%"><img src="docs/shared/screenshots/settings.png" alt="Settings"><br><sub><b>Settings you can read.</b> Three presets, a hint under every row, a search box, and one button to put everything back.</sub></td>
+</tr>
+<tr>
 <td colspan="2"><img src="docs/shared/screenshots/rich_answer.png" alt="An answer with a table, a callout, a flowchart and formulas" width="100%"><br><sub><b>Answers drawn as you read them.</b> Tables, formulas, diagrams and code are rendered, with copy buttons; unfinished ones stay plain text until they close. The same sample in the <a href="docs/shared/screenshots/rich_answer_dark.png">dark theme</a>. A real streamed answer, a phone-width page and both themes were checked.</sub></td>
 </tr>
 <tr>
@@ -126,7 +152,7 @@ PDFs are read by their layout, not line by line: two-column papers come out in r
 
 ## Status
 
-A research preview, built in the open, running end to end on a CPU today. Current release: **0.1.0** ([notes](docs/release/RELEASE-0.1.0.md)).
+A research preview, built in the open, running end to end on a CPU today. Current release: **0.2.0** ([notes](docs/release/RELEASE-0.2.0.md)); before it, [0.1.0](docs/release/RELEASE-0.1.0.md).
 
 - **Open:** questions worded differently from the document are found in the first eight passages only a quarter of the time. The remedies need larger models than this release ships.
 - **Not done:** the release-scale evaluation, the first distillation cycle and the pre-training of the memory-token module need a faster machine. The learned gate waits for its ledger: 1,294 of the 2,900 checked answers it asks for.
@@ -138,10 +164,12 @@ Current state: [docs/roadmap/STATUS.md](docs/roadmap/STATUS.md).
 
 | | |
 |---|---|
+| [Website](https://rismanmattotorang.github.io/nafsaql/) | the product, how it works, sixteen use cases, the evidence |
 | [User guide](docs/user_guide.md) | the app, rooms, the lab, your documents |
 | [Paper](docs/report/nafs_aql_report.pdf) | the formal model and its proofs, the architecture, every measurement |
 | [Features and measured results](docs/features_and_results.md) | everything built, with evidence, and how it compares |
 | [Answer rendering](docs/decisions/024-rich-answers-and-graph-phase31.md) | tables, maths, diagrams and code, and the knowledge graph |
+| [Engine: FreeToken's ideas on a CPU](docs/research/freetoken_assessment.md) · [Product pass](docs/decisions/027-product-quality-phase35.md) | what 0.2.0 changed, with its measurements |
 | [Context filesystem](docs/spec/context_fs_spec.md) · [ShadowPrefill](docs/spec/shadow_prefill_spec.md) | one place for documents, memory, skills and chats; keeping the careful model warm |
 | [Serving](docs/serving_and_operations.md) · [Runbook](docs/operations/operator_runbook.md) · [API](docs/api/api_reference.md) | running it |
 | [All documents](docs/index.md) | specifications, research notes, decisions |

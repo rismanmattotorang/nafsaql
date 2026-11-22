@@ -7,6 +7,10 @@ try:
 except ImportError:  # Python < 3.11
     import tomli as tomllib
 from jsonschema import Draft202012Validator
+
+if "-h" in sys.argv[1:] or "--help" in sys.argv[1:]:
+    print(__doc__ or "Writes api/schemas/Config.schema.json from the sample configuration and checks the three configuration files against it. Takes no options.")
+    sys.exit(0)
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 REQUIRED_SECTIONS = ["schema_version", "server", "assistant", "backend", "backends", "gate", "deliberation", "storage"]
 def schema_of(v, path=""):

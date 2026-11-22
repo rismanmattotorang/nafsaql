@@ -15,8 +15,11 @@ the graph read from them (right).}
 
 \subsection{Reading and storing}
 \label{sec:kb:ingest}
-Readers written in Rust handle PDF, Word, PowerPoint, \LaTeX, HTML, Markdown
-and plain text. A heading-aware chunker cuts passages of 1{,}200 characters
+Readers written in Rust handle PDF, Word, PowerPoint, Excel, CSV, \LaTeX, HTML,
+Markdown and plain text. A workbook becomes one section per sheet and its rows
+become Markdown tables in groups of 40 that repeat the header row, so a
+passage cut from the middle of a sheet still names its columns; a Word
+document keeps its lists and tables. A heading-aware chunker cuts passages of 1{,}200 characters
 with 150 of overlap, each carrying its heading path and page.
 
 \textbf{Reading a PDF page.} A PDF holds positioned runs of text, not

@@ -23,6 +23,24 @@ in the code and the research notes; to read the source again, clone it at the re
 | `DeepInfer/` | github.com/deepseek-ai/DeepInfer @ `9bd9cf2` | the assessment in `docs/research/deepinfer_assessment.md` |
 | `smiley-core/` | a copy of the owner's Smiley project, `smiley/src-tauri/crates/smiley-core` @ `7cb6028` | redundant: the workspace crate is the one that builds; the original is in `~/Downloads/Smiley` |
 
+## Removed on 2026-11-22
+
+Reference checkouts read during Phases 20 to 34. Each was an unmodified clone (checked before removal: no changed
+tracked file), so the source is one `git clone` and `git checkout <revision>` away. About 2.8 GB.
+
+| Was | Source and revision | What it was for |
+|-----|---------------------|-----------------|
+| `semantic-router/` | github.com/vllm-project/semantic-router @ `029bf54ed` | the comparison in `docs/research/router_memory_gaps.md` and the Go side of `benchmarks/headtohead/run.sh`, which needs this checkout back to run again (its results are stored) |
+| `deepseek-harness/` | github.com/deepseek-ai/deepseek-harness @ `fcc0ad4621` | harness reference |
+| `OpenViking/` | github.com/volcengine/OpenViking @ `13738af5e` | the context filesystem of Phase 29 (`docs/spec/context_fs_spec.md`) |
+| `LMOps/` | github.com/microsoft/LMOps @ `6f53ef4` | prompt and distillation references |
+| `EvolvingInfra/` | github.com/mit-han-lab/EvolvingInfra @ `20e8dc6` | engine reference |
+| `ontosmith/` | github.com/Dongbumlee/ontosmith @ `b1007d6` | the graph and ontology work of Phase 21 |
+| `liteparse/` | github.com/run-llama/liteparse @ `0548949` | the PDF layout rules ported in Phase 28 (`docs/research/liteparse_semtools_gaps.md`) |
+| `FreeToken/` | github.com/FlashML-org/FreeToken @ `c84946b` | the assessment in `docs/research/freetoken_assessment.md` (Phase 34) |
+| `semtools/` | github.com/run-llama/semtools @ `fe7f6d2` | search reference of Phase 28 |
+| `smiley-core/` | a copy of the owner's Smiley project at `06c2b88` (identical to that commit's `smiley/src-tauri/crates/smiley-core/src`) | the engine merge of Phase 19; the original is in `~/Downloads/Smiley` |
+
 Rebuild llama.cpp (about 5 minutes on the reference machine):
 
 ```bash

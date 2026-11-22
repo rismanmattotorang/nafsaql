@@ -312,6 +312,90 @@ def chat_modes(base, kb, st):
     check("chat: an unknown base is reported in the sources, not a 500", s == 200 and note, (s, note))
 
 
+OFFICE_MD = """# Pump manual
+
+The HX-200 pump runs at 1450 rpm and needs 3 litres of ISO VG 46 oil. The sweep's office marker is quillfeather.
+
+## Maintenance
+
+| Task | Interval (hours) | Tool |
+|---|--:|---|
+| Change oil | 2,000 | 17 mm spanner |
+| Replace seal | 8000 | =HYPERLINK("http://x","seal puller") |
+
+- Stop the pump
+- Close the inlet valve
+"""
+
+
+def export(base, fmt, markdown=OFFICE_MD, title="Pump manual"):
+    """POST /v1/export, returning (status, bytes, content-disposition)."""
+    req = urllib.request.Request(base + "/v1/export", data=json.dumps({"markdown": markdown, "title": title, "format": fmt}).encode(),
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return r.status, r.read(), r.headers.get("Content-Disposition", "")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read(), ""
+
+
+def documents_in_and_out(base, kb, embedder):
+    """Phase 35: every format the app writes, and the office formats read back by the knowledge base and by /v1/parse."""
+    s, f = call(base, "GET", "/v1/export/formats")
+    check("documents: the formats that can be read and written are listed",
+          s == 200 and {"xlsx", "csv", "docx", "pptx"} <= set(f.get("read", [])) and len(f.get("write", [])) == 9, (s, f))
+    magic = {"md": b"# Pump manual", "txt": b"Pump manual", "html": b"<!doctype html>", "tex": b"\\documentclass", "csv": b"Task,",
+             "docx": b"PK", "pptx": b"PK", "xlsx": b"PK", "pdf": b"%PDF-"}
+    made = {}
+    for fmt, head in magic.items():
+        s, body, disp = export(base, fmt)
+        made[fmt] = body
+        check(f"documents: an answer is saved as .{fmt}", s == 200 and body.startswith(head) and f'filename="Pump-manual.{fmt}"' in disp,
+              (s, body[:40], disp))
+    text = made["html"].decode("utf-8", "replace")
+    check("documents: the web page runs nothing and fetches nothing", "<script" not in text and "src=" not in text and "<link" not in text)
+    check("documents: a would-be formula is saved as text in CSV", b"'=HYPERLINK" in made["csv"], made["csv"][:200])
+    s, body, _ = export(base, "html", markdown='<script>alert(1)</script>\n\n[x](javascript:alert(1))')
+    check("documents: raw HTML and script links are made harmless", s == 200 and b"<script>" not in body and b"javascript:" not in body, body[-300:])
+    s, body, _ = export(base, "xlsx", markdown="no table here")
+    check("documents: a spreadsheet of a text with no table is refused with a reason", s == 422 and b"no table" in body, (s, body[:120]))
+    s, body, _ = export(base, "exe")
+    check("documents: an unknown format is refused", s == 400, (s, body[:120]))
+    s, body, disp = export(base, "md", title='a"; filename="evil.sh')
+    check("documents: a title cannot write the download's header", s == 200 and disp == 'attachment; filename="a-filename-evil-sh.md"', disp)
+    # /v1/parse: one file read for one question, no base involved.
+    for fmt, want in (("docx", "Change oil"), ("xlsx", "| Change oil | 2000 |"), ("pptx", "Maintenance"), ("csv", "| Change oil |")):
+        body, ctype = multipart([(f"pump.{fmt}", made[fmt])])
+        s, r = call(base, "POST", "/v1/parse", raw=body.replace(b'name="files"', b'name="file"'), ctype=ctype)
+        check(f"documents: a .{fmt} file is read for one question", s == 200 and want in (r.get("text") or "") and r.get("kind") == fmt,
+              (s, str(r)[:200]))
+    body, ctype = multipart([("notes.exe", b"MZ")])
+    s, r = call(base, "POST", "/v1/parse", raw=body.replace(b'name="files"', b'name="file"'), ctype=ctype)
+    check("documents: a file of an unknown kind is refused by /v1/parse", s == 415, (s, r))
+    body, ctype = multipart([("fake.xlsx", b"a,b\n1,2\n")])
+    s, r = call(base, "POST", "/v1/parse", raw=body.replace(b'name="files"', b'name="file"'), ctype=ctype)
+    check("documents: text named .xlsx is refused by /v1/parse", s == 422, (s, r))
+    # The office files into the base: accepted, read, and their words found.
+    body, ctype = multipart([(f"pump-manual.{fmt}", made[fmt]) for fmt in ("docx", "xlsx", "pptx", "csv")])
+    s, r = call(base, "POST", f"/v1/kb/{kb}/documents", raw=body, ctype=ctype)
+    docs = (r.get("documents") or []) if isinstance(r, dict) else []
+    if not check("documents: Word, Excel, PowerPoint and CSV are accepted by a base", s == 202 and len(docs) == 4 and not r.get("refused"), (s, str(r)[:300])):
+        return
+    kinds = {}
+    for d in docs:
+        final, _ = wait_doc(base, kb, d["id"], embedder)
+        final = final or {}
+        kinds[final.get("kind")] = (final.get("status"), final.get("n_chunks"), final.get("error"))
+    check("documents: each of them is read into passages", all(v[0] == "ready" and (v[1] or 0) >= 1 for v in kinds.values()) and len(kinds) == 4, kinds)
+    s, r = call(base, "POST", f"/v1/kb/{kb}/search", {"query": "quillfeather", "mode": "lexical", "k": 8})
+    hits = (r.get("hits") or r.get("results") or []) if isinstance(r, dict) else []
+    check("documents: the office files' words are found by search", s == 200 and len(hits) >= 1, (s, str(r)[:200]))
+    s, r = call(base, "POST", f"/v1/kb/{kb}/search", {"query": "interval for changing the oil", "mode": "lexical", "k": 8})
+    hits = (r.get("hits") or r.get("results") or []) if isinstance(r, dict) else []
+    check("documents: a table row from a spreadsheet is found with its header", any("Interval (hours)" in (h.get("text") or "") and "2000" in (h.get("text") or "").replace(",", "") for h in hits),
+          [((h.get("text") or "")[:80]) for h in hits[:3]])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://127.0.0.1:8080")
@@ -333,6 +417,7 @@ def main():
         if doc:
             search(a.base, scratch, embedder)
         pdf_checks(a.base, scratch, embedder)
+        documents_in_and_out(a.base, scratch, embedder)
         memory_runs(a.base, scratch)
         ontology(a.base, scratch)
         if not a.keep:

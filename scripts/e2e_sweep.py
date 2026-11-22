@@ -207,7 +207,7 @@ if "--no-ui" not in args:
         def jargon():
             text = call("Runtime.evaluate", expression=READ, returnByValue=True)["result"].get("value", "")
             return sorted({m.group(0) for m in JARGON.finditer(text)})
-        for route in ["chat", "rooms"]:
+        for route in ["chat", "rooms", "knowledge", "code", "files"]:
             settle(f"{BASE}/?e2e=p{route}#/{route}", 4)
             if route == "chat":
                 call("Runtime.evaluate", expression="localStorage.setItem('nafs.advanced', 'false')")
@@ -215,16 +215,58 @@ if "--no-ui" not in args:
             hits = jargon()
             check(f"ui: #{route} uses plain language", not hits, hits[:6])
         call("Runtime.evaluate", expression="localStorage.setItem('nafs.advanced', 'true')")
-        for route in ["chat", "eval", "gate", "tazkiya", "rooms", "bench", "system"]:
+        for route in ["chat", "eval", "gate", "tazkiya", "rooms", "bench", "system", "knowledge", "code", "files"]:
             errors.clear()
             settle(f"{BASE}/?e2e={route}#/{route}", 6)
             title = call("Runtime.evaluate", expression="document.title", returnByValue=True)["result"].get("value", "")
             check(f"ui: #{route} renders without errors", not errors and "Nafs-Aql" in title, errors[:2] or title)
             hits = jargon()
             check(f"ui: #{route} (Advanced) uses plain language", not hits, hits[:6])
+        # Phase 35: the controls themselves. Every control a person can reach has a name a screen reader can say; the
+        # segmented controls say which button is chosen; forms say what is wrong beside the field; the answer
+        # renderer's tables sort and its code wraps.
+        ev = lambda expr: call("Runtime.evaluate", expression=expr, returnByValue=True, awaitPromise=True)["result"].get("value")
+        NAMELESS = ("(() => { const name = (e) => (e.getAttribute('aria-label') || '').trim() || (e.getAttribute('aria-labelledby') || '').split(' ').map(i => document.getElementById(i)?.textContent || '').join(' ').trim()"
+                    " || (e.id && document.querySelector('label[for=\"' + e.id + '\"]')?.textContent.trim()) || e.closest('label')?.textContent.trim() || (e.getAttribute('title') || '').trim()"
+                    " || (e.tagName === 'BUTTON' || e.tagName === 'A' || e.tagName === 'SUMMARY' || e.getAttribute('role') === 'button' ? e.textContent.trim() : '') || (e.getAttribute('placeholder') || '').trim();"
+                    " return [...document.querySelectorAll('#app button, #app input:not([type=hidden]), #app select, #app textarea, #app a[href], #app [role=button], dialog[open] button, dialog[open] input, dialog[open] select')]"
+                    ".filter(e => e.offsetParent !== null && !e.closest('[hidden]')).filter(e => !name(e)).map(e => e.outerHTML.slice(0, 90)); })()")
+        for route in ["chat", "rooms", "knowledge", "code", "files", "system"]:
+            settle(f"{BASE}/?e2e=n{route}#/{route}", 5)
+            bad = ev(NAMELESS) or []
+            check(f"ui: every control on #{route} has a name", not bad, bad[:3])
+        settle(f"{BASE}/?e2e=set#/settings", 4)
+        st = ev("(() => ({ open: document.querySelector('#modal').open, rows: document.querySelectorAll('#modalContent .set-row').length,"
+                " hints: [...document.querySelectorAll('#modalContent .set-row')].filter(r => !r.querySelector('.hint, p')).length,"
+                " form: !!document.querySelector('#modal form[method=dialog]'), reset: !!document.querySelector('#stResetAll') }))()") or {}
+        check("ui: Settings opens from its link with every setting explained", st.get("open") and st.get("rows", 0) >= 10 and st.get("hints") == 0 and st.get("reset"), st)
+        check("ui: the dialog is not a form (Enter in a text box does not close it)", st.get("form") is False, st)
+        bad = ev(NAMELESS) or []
+        check("ui: every control in Settings has a name", not bad, bad[:3])
+        found = ev("(() => { const f = document.querySelector('#stFind'); f.value = 'thinking'; f.dispatchEvent(new Event('input')); const shown = [...document.querySelectorAll('#modalContent .set-row')].filter(r => !r.hidden).length;"
+                   " f.value = 'zzzz'; f.dispatchEvent(new Event('input')); const none = !document.querySelector('#stNone').hidden; f.value = ''; f.dispatchEvent(new Event('input')); return [shown, none]; })()") or [0, False]
+        check("ui: finding a setting narrows the list and says when nothing matches", 1 <= found[0] <= 4 and found[1], found)
+        ev("document.querySelector('#modal').close()")
+        segs = ev("(() => [...document.querySelectorAll('.seg > button')].filter(b => !['true','false'].includes(b.getAttribute('aria-pressed'))).length)()")
+        check("ui: segmented controls say which button is chosen", segs == 0, segs)
+        settle(f"{BASE}/?e2e=code#/code", 4)
+        errs = ev("(async () => { document.querySelector('#cgForm').requestSubmit(); await new Promise(r => setTimeout(r, 150)); const a = [document.querySelector('#cgTaskErr').textContent, document.querySelector('#cgTestsErr').textContent];"
+                  " document.querySelector('#cgTask').value = 'Write a function double(x) that returns twice x.'; document.querySelector('#cgTests').value = 'double(2) == 4'; document.querySelector('#cgTask').dispatchEvent(new Event('input')); document.querySelector('#cgTests').dispatchEvent(new Event('input'));"
+                  " await new Promise(r => setTimeout(r, 100)); return a.concat([document.querySelector('#cgTaskErr').textContent, document.querySelector('#cgTestsErr').textContent, document.activeElement?.id]); })()") or []
+        check("ui: the Code form says what is missing beside each field and puts the cursor there",
+              len(errs) == 5 and errs[0] and errs[1] and errs[2] == "" and "assert" in errs[3] and errs[4] in ("cgTask", "cgTests"), errs)
+        settle(f"{BASE}/?e2e=render#/chat", 4)
+        rd = ev("(async () => { const m = await import('/render.js'); const host = document.querySelector('#inner'); host.innerHTML = '<div class=\"msg assistant\"><div class=\"answer\" id=\"e2eA\"></div></div>';"
+                " document.querySelector('#e2eA').innerHTML = m.markdown('| n | v |\\n|---|--:|\\n| a | 1,200 |\\n| b | 95 |\\n| c | 800 |\\n\\n```py\\n' + 'x = 1\\n'.repeat(7) + '```\\n'); await new Promise(r => setTimeout(r, 300));"
+                " const th = document.querySelectorAll('#e2eA thead th')[1]; th.click(); const asc = [...document.querySelectorAll('#e2eA tbody tr')].map(r => r.cells[0].textContent).join('');"
+                " const pre = document.querySelector('#e2eA pre.code'); pre.querySelector('[data-act=wrap]').click();"
+                " return { asc, sort: th.getAttribute('aria-sort'), tab: th.tabIndex, wrapped: pre.classList.contains('wrapped'), gutter: !!pre.querySelector('.gutter'),"
+                " bar: [...document.querySelectorAll('#e2eA .tbl-bar button')].every(b => getComputedStyle(b).opacity === '1') }; })()") or {}
+        check("ui: a table in an answer sorts by a column, numbers as numbers, from the keyboard too", rd.get("asc") == "bca" and rd.get("sort") == "ascending" and rd.get("tab") == 0, rd)
+        check("ui: code wraps and is numbered; the table's actions are always visible", rd.get("wrapped") and rd.get("gutter") and rd.get("bar"), rd)
         # The same pages on a phone-sized screen: nothing may force the page to scroll sideways.
         call("Emulation.setDeviceMetricsOverride", width=375, height=812, deviceScaleFactor=2, mobile=True)
-        for route in ["chat", "eval", "gate", "tazkiya", "rooms", "bench", "system"]:
+        for route in ["chat", "eval", "gate", "tazkiya", "rooms", "bench", "system", "knowledge", "code", "files"]:
             call("Page.navigate", url=f"{BASE}/?e2e=m{route}#/{route}")
             t = time.time()
             while time.time() - t < 4:
