@@ -752,6 +752,10 @@ pub fn python_at_least_39(preferred: &str) -> String {
             .map(|o| o.status.success())
             .unwrap_or(false)
     };
+    // Resolved to a full path: the Linux sandbox starts the interpreter by path inside its own mount namespace, where
+    // a bare `python3` is not found (seen on the Ubuntu CI runner).
+    let preferred = nafs_verify::sandbox::resolve_python(preferred);
+    let preferred = preferred.as_str();
     let mut candidates: Vec<String> = vec![preferred.to_string()];
     for c in [
         "/usr/local/bin/python3",
