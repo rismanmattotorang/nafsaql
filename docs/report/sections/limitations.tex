@@ -23,6 +23,15 @@ why tests are hidden and the code verifier's false-accept rate is measured by
 mutation. The 4B model does not write valid Lean~4 proofs, so Lean tasks
 abstain; Mathlib is not installed.
 
+\textbf{The reasoning cache covers a narrow band.} It was measured on twelve
+problems and sixty-four variants written for the purpose, not on a public
+benchmark; it recognises a question changed in both words and numbers only a
+third of the time, its guard words were chosen while looking at those
+variants, and it caches maths alone by default. A value written in words, a
+number that is only context, and a step that needs judgement in plain language
+all send the question to the models. A wrong entry that has earned trust is
+stopped only when a checked answer contradicts it.
+
 \textbf{Shared weights.} The fast and slow paths come from one model family
 and make correlated errors; the collision term of
 Proposition~\ref{prop:collision} is not small a priori, and the judge shares

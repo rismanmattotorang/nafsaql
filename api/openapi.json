@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Nafs-Aql Gateway API",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "summary": "Dual-process (System 1 / System 2) chat gateway with verifier-gated deliberation",
     "description": "External API of the Nafs-Aql Rust gateway (crate `nafs-gateway`). Every reply exposes the\nreasoning mode that produced it (`fast` or `slow`), the assurance level, and the controller\ndecision identifier. Streaming uses Server-Sent Events (SSE); chat rooms use WebSocket.\nRequirement IDs (IF-001..IF-010, FR-002, FR-006) refer to the Nafs-Aql Technical Specification.\nVersion 1.1 adds conversation management, the verifier playground, system/backend control, dataset browsing, run cancellation and calibration fitting, as implemented by nafs-gateway 0.1 (Phase 1).\nVersion 1.2 (Phase 2) adds the rubric judge, the audit stream and self-model (Prop. 5), gate modes (fixed, calibrated, budget), recalibration from the ledger with held-out promotion, measured gate parameters (Beta-fit caps, budget curve), verifier-rate measurement, new evaluation systems (nafs_blind, slow_conditioned, slow_b<N>), request bounds enforced with HTTP 400, and same-origin enforcement (HTTP 403 for foreign Origin or Host).\nVersion 1.3 (Phases 3-4) adds human feedback, review and opt-out (Tazkiya), Both-trial preferences, the gates dashboard, drift monitoring, the load-test protocol, McNemar/Bonferroni statistics and report export.\nVersion 1.4 (Phase 5) adds alerts with a drill, lab insights, resumable evaluation runs, retrieval memory (retrieve / retrieved) and the security posture in /v1/system.\n\nVersion 1.5 (Phase 7) adds per-stage latency in usage.stages (queue, prefill, decode and KV-cache reuse for model stages) and GET /v1/perf/stages, the latency breakdown by stage.\n",
     "license": {
@@ -68,6 +68,10 @@
     {
       "name": "phase7",
       "description": "CPU inference performance and latency attribution (Phase 7)"
+    },
+    {
+      "name": "arc",
+      "description": "Reasoning cache (Phase 38, after CPU-ARC): System 2's answers kept as code that runs again on CPU"
     },
     {
       "name": "harness",
@@ -2127,6 +2131,316 @@
           },
           "403": {
             "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/arc": {
+      "get": {
+        "tags": [
+          "arc"
+        ],
+        "operationId": "getReasoningCache",
+        "summary": "The reasoning cache's settings, counts by status (trusted, candidate, quarantined), entries and build queue",
+        "responses": {
+          "200": {
+            "description": "The cache",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/arc/build": {
+      "post": {
+        "tags": [
+          "arc"
+        ],
+        "operationId": "buildReasoningCacheEntry",
+        "summary": "Queue (or, with wait, run now) a build of one entry from a question and System 2's answer, or from a stored reply",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "question": {
+                    "type": "string"
+                  },
+                  "answer": {
+                    "type": "string",
+                    "description": "The answer to build from (System 2's reply text)"
+                  },
+                  "reasoning": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string",
+                    "description": "A reference answer the code must reproduce"
+                  },
+                  "domain": {
+                    "type": "string"
+                  },
+                  "reply_id": {
+                    "type": "string",
+                    "description": "Build from a stored reply (its question, answer and reasoning) instead"
+                  },
+                  "wait": {
+                    "type": "boolean",
+                    "description": "Build now and return the report and the entry (minutes on the reference machine)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Queued, or the build report and the entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/arc/try": {
+      "post": {
+        "tags": [
+          "arc"
+        ],
+        "operationId": "tryReasoningCache",
+        "summary": "Answer a question from the cache alone (trust ignored, no fallback to the models)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "question"
+                ],
+                "properties": {
+                  "question": {
+                    "type": "string"
+                  },
+                  "floor": {
+                    "type": "number",
+                    "description": "One meaning-tier similarity floor for every entry, in place of their learned ones (measurement)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "hit false with why; or hit true with entry, status, tier (template, shape, meaning), similarity, params, answer, summary, narration, run_ms, ms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/arc/compile": {
+      "post": {
+        "tags": [
+          "arc"
+        ],
+        "operationId": "compileReasoningCache",
+        "summary": "Compile trusted entries (all with all=true) into one standard-library Python module that answers template matches with no model",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "all": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where the module was written, its size and the number of entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/v1/arc/{id}": {
+      "get": {
+        "tags": [
+          "arc"
+        ],
+        "operationId": "getReasoningCacheEntry",
+        "summary": "One entry with its template, parameters, code, narration, statistics and similarity floor",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "arc"
+        ],
+        "operationId": "deleteReasoningCacheEntry",
+        "summary": "Delete one entry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/arc/{id}/status": {
+      "post": {
+        "tags": [
+          "arc"
+        ],
+        "operationId": "setReasoningCacheEntryStatus",
+        "summary": "Set an entry's status after review (trusted answers, candidate runs beside the models, quarantined never runs)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "trusted",
+                      "candidate",
+                      "quarantined"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The entry's summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -5906,6 +6220,10 @@
             "type": "boolean",
             "description": "FR-095: draw the always-drawn agreement samples of an unverified maths draft together with the draft in one batch instead of after it. Default from configuration."
           },
+          "arc": {
+            "type": "boolean",
+            "description": "Phase 38: try the reasoning cache before the models; false turns it off for this request. Default from [arc]."
+          },
           "knowledge": {
             "type": "object",
             "description": "FR-K20: answer from a knowledge base (Phase 20).",
@@ -6330,9 +6648,10 @@
               "uncertified_bin",
               "unknown_escalate",
               "unknown_keep",
-              "unsupported_by_sources"
+              "unsupported_by_sources",
+              "reasoning_cache"
             ],
-            "description": "Phase 22: uncertified_bin (FR-R1) escalates a draft whose e1 bin has no certified error bound within max_risk; unknown_* (FR-R2) records the on_unknown policy applied to a draft with no log-probabilities."
+            "description": "reasoning_cache (Phase 38): a trusted entry of the reasoning cache answered and no model was asked. Phase 22: uncertified_bin (FR-R1) escalates a draft whose e1 bin has no certified error bound within max_risk; unknown_* (FR-R2) records the on_unknown policy applied to a draft with no log-probabilities."
           },
           "audit": {
             "type": "boolean",
@@ -7187,9 +7506,10 @@
           "L",
           "M",
           "T",
-          "X"
+          "X",
+          "C"
         ],
-        "description": "Automaton states: draft, flagged, deliberate, accepted, abstain"
+        "description": "Automaton states: draft, flagged, deliberate, accepted, abstain, and C for an answer from the reasoning cache (Phase 38)"
       },
       "ConversationSummary": {
         "type": "object",

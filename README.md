@@ -45,7 +45,9 @@ Neither tells you which of its answers to trust.
 
 **07 — Code that passed its tests.** Describe a small Python function and the tests it must pass. It is written, run in a sandbox with no network, and shown step by step; the run ends when the tests pass, and you can stop it.
 
-**08 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
+**08 — Worked out once, reused.** When the careful model works a maths problem out, its working is turned into a small program while the machine is idle. The same problem asked again with other numbers is answered by running that program in about a tenth of a second, with no model; in other words, after the quick model checks it is the same question. A stored method answers only after it has agreed with the models on real questions, and you can read, stop or delete every one. After NVIDIA's CPU-ARC; [how it works](docs/research/reasoning_cache.md).
+
+**09 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
 
 ## Proof
 
@@ -61,6 +63,7 @@ Measured on one shared 4-core Intel i3-8100. Every figure comes from a stored ru
 | **10×** | as often does a follow-up question ("and how fast is it?") find its passage first, when it is read with the question before it |
 | **14 of 14** | live checks of the memory pass: a fact is found from another chat by its words or its meaning, and is gone when you forget it |
 | **0.7 s** | to the first word of a later turn in a quick conversation, where it was 4.3 s; 2.4 s where it was 18.6 s when the reasoning model answers (median of 9 and of 6 turns) |
+| **0.1 s** | to answer a maths problem asked again with other numbers, from working kept as code (24 of 24 right, no model); 20.8 s on the usual path and 85.5 s from the reasoning model. Near-miss questions such as an area asked where a perimeter was kept: 0 of 14 answered |
 | **12 of 12** | small Python functions pass their tests on the code agent's first step, where 1 of 12 did before a change to its instructions (median 7.9 s a step) |
 
 The rest, including what did not work, is in [features and measured results](docs/features_and_results.md).
@@ -98,6 +101,10 @@ flowchart LR
 ```
 
 The gate escalates only when the error it expects to save is worth the waiting time. Where a checker exists its verdict is final; agreement between samples is a hint, never proof.
+
+## New since 0.2.0: a reasoning cache
+
+The careful model's checked maths answers become parameterised Python programs ("semantic functions" that call one another by description), built while the machine is idle and checked in the sandbox. A later question is matched by its template, by its shape with the numbers masked, or by meaning; on the last, the quick model first confirms it is the same question and then reads the values. The program runs on the CPU in about 0.1 s; a miss, an error or a failed check goes to the models as before. Entries answer only after agreeing with the models twice, and the whole cache compiles into one Python file that answers template matches with no model. Measured on 12 problems and 64 variants: 12 of 12 built (7.2x the time of the original answer), re-numbered questions 24 of 24 right in 95 ms, reworded 13 of 14, near misses answered 0 of 14. [Assessment](docs/research/reasoning_cache.md) · [Specification](docs/spec/reasoning_cache_spec.md) · [Decision 028](docs/decisions/028-reasoning-cache-phase38.md).
 
 ## New in 0.2.0
 
@@ -154,7 +161,7 @@ PDFs are read by their layout, not line by line: two-column papers come out in r
 
 A research preview, built in the open, running end to end on a CPU today. Current release: **0.2.0** ([notes](docs/release/RELEASE-0.2.0.md)); before it, [0.1.0](docs/release/RELEASE-0.1.0.md).
 
-- **Open:** questions worded differently from the document are found in the first eight passages only a quarter of the time. The remedies need larger models than this release ships.
+- **Open:** questions worded differently from the document are found in the first eight passages only a quarter of the time. A problem that is both reworded and re-numbered is recognised by the reasoning cache only 4 times in 12; the rest go to the models. The remedies need larger models than this release ships.
 - **Not done:** the release-scale evaluation, the first distillation cycle and the pre-training of the memory-token module need a faster machine. The learned gate waits for its ledger: 1,294 of the 2,900 checked answers it asks for.
 - **Did not work, and published:** speculative decoding, 1-bit weights, concurrent hedging, a larger embedding model, score-based fusion, a graph arm in everyday search, guessing a question's difficulty before answering it, cache-blocking the engine's prompt reading, a summaries-first knowledge prompt (it lost answers at the same size), guessing which document a question is about, warming the careful model while the quick one drafts (every quick answer 75 % slower). A shorter knowledge prompt is 20 to 26 % faster and is left off: it cost 3 right answers in 50.
 
@@ -169,6 +176,7 @@ Current state: [docs/roadmap/STATUS.md](docs/roadmap/STATUS.md).
 | [Paper](docs/report/nafs_aql_report.pdf) | the formal model and its proofs, the architecture, every measurement |
 | [Features and measured results](docs/features_and_results.md) | everything built, with evidence, and how it compares |
 | [Answer rendering](docs/decisions/024-rich-answers-and-graph-phase31.md) | tables, maths, diagrams and code, and the knowledge graph |
+| [Reasoning cache, after CPU-ARC](docs/research/reasoning_cache.md) · [Specification](docs/spec/reasoning_cache_spec.md) | answers worked out once, kept as code and run again |
 | [Engine: FreeToken's ideas on a CPU](docs/research/freetoken_assessment.md) · [Product pass](docs/decisions/027-product-quality-phase35.md) | what 0.2.0 changed, with its measurements |
 | [Context filesystem](docs/spec/context_fs_spec.md) · [ShadowPrefill](docs/spec/shadow_prefill_spec.md) | one place for documents, memory, skills and chats; keeping the careful model warm |
 | [Serving](docs/serving_and_operations.md) · [Runbook](docs/operations/operator_runbook.md) · [API](docs/api/api_reference.md) | running it |

@@ -48,3 +48,6 @@ tools/surrealdb/
 
 # Source papers used as knowledge-base fixtures (59 MB of third-party PDFs; not part of the repository).
 papers/
+
+# Phase 38: the reasoning cache (entries, build queue, compiled module) is runtime data
+data/arc/

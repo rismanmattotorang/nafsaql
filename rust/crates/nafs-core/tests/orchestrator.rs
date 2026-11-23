@@ -429,6 +429,8 @@ async fn setup_with(
     cfg.storage.trace_path = dir.path("trace.jsonl");
     cfg.gate.calibration_file = dir.path("cal.json");
     cfg.gate.params_file = dir.path("params.json");
+    // Phase 38: the reasoning cache keeps its entries and queue in its own directory, never in the source tree.
+    cfg.arc.dir = dir.path("arc");
     // The adaptive reasoning exit (P7-T08) is exercised by its own test; the others use the standard path.
     cfg.deliberation.adaptive_exit.enabled = false;
     tweak(&mut cfg);

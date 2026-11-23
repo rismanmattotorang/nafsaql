@@ -694,6 +694,10 @@ fn blocks_of(lines: &[Line], toc: bool) -> Vec<Block> {
                             // indent: "G1. Answer ..." with its second line under the text).
                             || l.x0 > p.x0 + 0.8 * l.size && b.kind == Kind::Para && b.lines.len() > 1 && !l.centred()
                             || (p.x1 < p.region_x1 - 2.0 * p.size && ends_sentence(&p.text))
+                            // A centred line (a heading in small capitals, "I. INTRODUCTION") never runs on into a
+                            // line that is not: at a column's foot LaTeX can shrink the space below it under the gap
+                            // rule (found when the paper's abstract grew by two lines).
+                            || (b.lines.len() == 1 && p.centred() && !l.centred())
                     } else {
                         !continues
                     }

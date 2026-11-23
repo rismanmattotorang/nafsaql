@@ -1,0 +1,70 @@
+\subsection{Does the reasoning cache answer the same problem, and only it?}
+\label{sec:eval:arc}
+Twelve grade-school and competition-style problems (change from a purchase,
+divisor counts, distance, simple interest, perimeter, sums of odd numbers,
+work rate, discount, a removed number, committees, least common multiples,
+reading time) each come with an oracle that gives the right answer to any
+values. System~2 answered each with the cache off and the oracle's answer as
+reference, then built an entry from its own reply. Sixty-four variants test
+the entries: 14 in other words with the same numbers, 24 with the same words
+and other numbers, 12 with both, and 14 \emph{near misses} on the same topic,
+usually with the same numbers, that need other reasoning (the area where the
+perimeter was kept, the even numbers where the odd ones were, an extra
+2-dollar eraser). Each question went to the cache alone, with no fall-back,
+and a hit is right when its answer equals the oracle's.
+
+\begin{table}[t]
+\centering
+\caption{The reasoning cache on 12 problems and 64 variants (reference
+machine). ``Answered'' counts hits; a miss goes to the models.}
+\label{tab:arc}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Questions & Answered & Right & How found \\
+\midrule
+Original (12) & 12 & 12 & template \\
+Other numbers (24) & 24 & 24 & template, 95\,ms \\
+Other words (14) & 13 & 13 & meaning \\
+Both (12) & 4 & 4 & meaning \\
+Near misses (14), before the checks & 6 & 0 & meaning \\
+Near misses (14), after the checks & 0 & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\emph{Building.} All twelve entries were built, seven in one round of the
+builder and five in two; every first round that failed was refused by a check
+(an ambiguous input description, a missing root, a function without
+narration, and once a program that returned 2 for a least common multiple of
+36). A build took 461\,s on average, 7.2 times the 64\,s of the answer it was
+built from; CPU-ARC reports 12 to 84 times in dollars with a frontier builder.
+
+\emph{Matching} (Table~\ref{tab:arc}). Every question with the stored wording
+and other numbers was matched by its template and answered right in a median
+of 95\,ms, with no model. Thirteen of fourteen rewordings were answered right;
+the one miss writes ``Five numbers'' in words, which the value guard refuses
+by design. Only four of twelve questions changed in both words and numbers
+were recognised: the rest score below a meaning similarity of 0.80. The first
+run exposed the weak point of the meaning tier: it finds the same \emph{topic},
+and six of fourteen near misses were answered, all wrongly (the sum of
+divisors as their number, compound interest as simple), although System~1's
+extraction was asked to say whether the question was the same. Asked directly
+whether two questions ask for the same quantity, System~1 judged 21 of 23
+meaning-tier matches right; with that question and the contrast words, the
+rerun answered no near miss, and the 53 answers it gave were all right. The
+contrast-word list was written while looking at these items, so its share of
+that result is optimistic; the direct question was measured unchanged. With
+the checks, a floor of 0.80 lost nothing; 0.85 is the default.
+
+\emph{Time.} Through the chat endpoint, with the entry trusted and the arms
+interleaved, a question with other numbers was answered from the cache in
+0.1\,s, against 20.8\,s on the usual path and 85.5\,s from
+System~2 (medians of six questions each). A reworded one took 6.9 to 10.9\,s from the
+cache (three short System~1 calls), against medians of 18.1\,s on the usual
+path and 81.9\,s from System~2; on two of six, System~1 judged the rewording a
+different question and the request went to the models, which answered it.
+Every answer in every arm was right. With these times the cost of a build is
+repaid after about six re-numbered questions that would otherwise have
+gone to System~2, or about 23 that the usual path would have answered.
+
+\emph{Compilation.} The twelve entries compile into one standard-library file of 28\,KB. Run as a new process on every question, it answered the 36 that match a stored template, all right, in a median of 78\,ms with no model, and refused the other 40; on all 76 its answer agreed with the runtime's. Two faults of the compiler were found on built entries and fixed with tests: inputs a callee reads from its caller's scope were not passed on (found while developing it, on the first entry), and a local variable named like a function was renamed with it (found by the module's own check, which left that entry out with the reason instead of answering wrongly).

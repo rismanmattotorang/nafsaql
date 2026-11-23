@@ -74,7 +74,9 @@ pub struct Orchestrator {
     /// User and evaluation requests currently inside `handle` (the audit worker runs only at zero).
     pub inflight: Arc<AtomicUsize>,
     /// Knowledge-base retrieval (Phase 20), set by the gateway when `[knowledge]` is on.
-    knowledge: RwLock<Option<Arc<dyn crate::knowledge::Knowledge>>>,
+    pub(crate) knowledge: RwLock<Option<Arc<dyn crate::knowledge::Knowledge>>>,
+    /// Reasoning cache (Phase 38); `None` when `[arc]` is off.
+    pub arc: Option<Arc<crate::arc::ArcStore>>,
     /// ShadowPrefill (Phase 30): the between-turns shadow in flight, stopped when the next request arrives.
     shadow_job: std::sync::Mutex<Option<tokio::task::AbortHandle>>,
 }
@@ -393,7 +395,15 @@ impl Orchestrator {
             cfg.deliberation.parallel.p_prior.clone(),
             cfg.deliberation.parallel.prior_weight,
         );
+        let arc = cfg.arc.enabled.then(|| {
+            let mut limits = hub.limits.clone();
+            limits.wall_clock_s = cfg.arc.run_timeout_s.max(1);
+            limits.cpu_time_s = cfg.arc.run_timeout_s.max(1);
+            limits.sympy_python = None;
+            Arc::new(crate::arc::ArcStore::open(&cfg.arc.dir, limits))
+        });
         Self {
+            arc,
             cfg,
             store,
             hub,
@@ -1305,6 +1315,60 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             domain: dom,
             backend: pair.name.clone(),
         });
+        // Phase 38: the reasoning cache, before any model. A trusted entry answers here; a candidate runs beside the
+        // models and is compared with their answer at the end.
+        let mut arc_shadow: Option<(crate::arc::Hit, crate::arc::Outcome)> = None;
+        let arc_any = self.arc.is_some() && crate::arc::serve::eligible(&cfg, &req, &verification);
+        let arc_ok = arc_any
+            && crate::arc::serve::eligible_for_meaning(
+                &cfg,
+                dom,
+                question_of(&user.content),
+                !history.is_empty(),
+            );
+        if arc_any {
+            let ta = Instant::now();
+            let tried = self
+                .arc_try_at(
+                    question_of(&user.content),
+                    true,
+                    Some(cancel.clone()),
+                    None,
+                    arc_ok,
+                )
+                .await;
+            let note = tried.note();
+            match tried {
+                crate::arc::serve::ArcTry::Serve(hit, o) => {
+                    if let Some(reply) = self
+                        .arc_reply(
+                            &req,
+                            &user.content,
+                            conv,
+                            ephemeral,
+                            &request_id,
+                            dom,
+                            t0,
+                            stages.clone(),
+                            &hit,
+                            &o,
+                            &em,
+                        )
+                        .await
+                    {
+                        return Ok(reply);
+                    }
+                }
+                crate::arc::serve::ArcTry::Shadow(hit, o) => arc_shadow = Some((hit, o)),
+                crate::arc::serve::ArcTry::Miss(_) => {}
+            }
+            stages.push(StageTiming {
+                stage: "arc".into(),
+                ms: ta.elapsed().as_millis() as u64,
+                note: Some(note),
+                ..Default::default()
+            });
+        }
 
         let gs = self.gate_state();
         let lambda = req.lambda.unwrap_or(cfg.gate.lambda_default);
@@ -2672,6 +2736,37 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             sources: sources.clone(),
         };
 
+        // Phase 38: a candidate entry that ran beside the models is judged by their answer (or the reference); a System 2
+        // answer that no entry covers goes to the build queue.
+        if let Some((hit, o)) = arc_shadow.take() {
+            self.arc_compare(
+                &hit,
+                &o,
+                dom,
+                &final_text,
+                assurance,
+                mode,
+                verification.reference_answer.as_deref(),
+            )
+            .await;
+        } else if arc_ok
+            && mode == ReasoningMode::Slow
+            // A private request, the Lab and a room (shared by its members) are never kept, as for the memory: an
+            // entry holds its question and is visible to everyone on the server.
+            && !ephemeral
+            && !req.lab
+            && conv.is_some_and(|c| !self.store.in_room(c))
+        {
+            self.arc_admit(
+                question_of(&user.content),
+                &final_text,
+                reply.reasoning.as_deref().unwrap_or(""),
+                verification.reference_answer.as_deref(),
+                dom,
+                assurance,
+                reply.reply_id,
+            );
+        }
         // Persist (FR-013, FR-060, IF-010).
         // The answer exists and has been streamed: a storage error is logged, not allowed to discard it.
         if let (false, Some(c)) = (ephemeral, conv) {

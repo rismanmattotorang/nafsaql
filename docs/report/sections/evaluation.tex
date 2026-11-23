@@ -510,6 +510,8 @@ of it one embedding call; when it does not, the step costs nothing. This is a
 check of function, not of recall quality over a long history: no set of real
 multi-session conversations with known answers was available.
 
+\input{sections/arc_eval.tex}
+
 \subsection{What did not pay}
 \label{sec:eval:negative}
 Table~\ref{tab:negative} lists what was built or measured and not adopted.
@@ -557,18 +559,22 @@ Cutting the passages of a prompt at the largest drop in similarity & 3.90 to 3.7
 
 \subsection{Validation}
 \label{sec:eval:validation}
-The workspace has 539 Rust tests, including the ported upstream suites of the
-patch parser and the Lean rules, bit-identity tests of the batched engine and
-parity tests of the memory module; formatting, lints and dependency audits
-are clean. Live sweeps on the final build pass: the API contract, 26 of 26
+The workspace has 597 Rust tests, including the ported upstream suites of the
+patch parser and the Lean rules, bit-identity tests of the batched engine,
+parity tests of the memory module, and the reasoning cache's own tests (the
+runtime, the guards and the compiled module run in the sandbox); formatting
+and lints are clean. Live sweeps on the final build pass: the API contract
+(every stored reply, decision and trace valid against its schema), 26 of 26
 security probes (sandbox escape, injection, authentication, limits) with no
-open high-severity finding, 33 of 33 knowledge-security checks, 74 of 74
-end-to-end checks of every endpoint and page, 10 of 10 chat-room checks, 55
-knowledge checks, 14 of 14 checks of the conversation memory, 53 of 53 checks
-of the agent harness and all nine acceptance tests (the first token of a
-quick reply after 0.14\,s; a verified deliberate answer after 53\,s against
-a target of 240\,s). The acceptance latencies depend on what else the machine
-is doing: an earlier sweep the same day, under a load average of 30 to 40
-from other workloads, missed both targets (2.6\,s and 420\,s) with correct
-answers. The security suite earlier found one high-severity issue, since
-fixed: sandboxed code could signal other processes.
+open high-severity finding, 33 of 33 knowledge-security checks, 103 of 103
+end-to-end checks of every endpoint and page, 10 of 10 chat-room checks, 81
+knowledge checks (one skipped), 53 of 53 checks of the agent harness, and
+eight of nine acceptance tests (a verified deliberate answer after 47\,s
+against a target of 240\,s). The ninth, a quick reply to a greeting, was
+escalated because the calibrated gate has no certified bound for open
+questions (Section~\ref{sec:limits}); it predates the cache. The contract
+suite found that the first cached answers recorded a one-state trace; they
+now record that the cache answered and then that the answer was accepted. The
+security suite earlier found one high-severity issue, since fixed: sandboxed
+code could signal other processes.
+

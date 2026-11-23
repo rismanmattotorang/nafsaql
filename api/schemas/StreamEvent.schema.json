@@ -75,7 +75,8 @@
                 "L",
                 "M",
                 "T",
-                "X"
+                "X",
+                "C"
               ],
               "description": "Automaton states: draft, flagged, deliberate, accepted, abstain"
             },
@@ -281,7 +282,8 @@
                 "uncertified_bin",
                 "unknown_escalate",
                 "unknown_keep",
-                "unsupported_by_sources"
+                "unsupported_by_sources",
+                "reasoning_cache"
               ]
             },
             "audit": {
@@ -508,7 +510,8 @@
                 "L",
                 "M",
                 "T",
-                "X"
+                "X",
+                "C"
               ],
               "description": "Automaton states: draft, flagged, deliberate, accepted, abstain"
             },
@@ -665,7 +668,8 @@
                   "L",
                   "M",
                   "T",
-                  "X"
+                  "X",
+                  "C"
                 ],
                 "description": "Automaton states: draft, flagged, deliberate, accepted, abstain"
               }
@@ -813,7 +817,8 @@
                     "uncertified_bin",
                     "unknown_escalate",
                     "unknown_keep",
-                    "unsupported_by_sources"
+                    "unsupported_by_sources",
+                    "reasoning_cache"
                   ]
                 },
                 "audit": {

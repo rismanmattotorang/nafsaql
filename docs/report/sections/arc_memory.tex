@@ -1,0 +1,79 @@
+\subsection{A cache of reasoning, kept as code}
+\label{sec:mem:arc}
+The memories above give a model something to read; none spares it the
+thinking. A KV prefix is reused only up to the first token that differs, and
+a stored answer to ``how many divisors does 196 have'' is wrong for 144. After
+CPU-ARC \cite{belcak2026cpuarc}, the reasoning cache keeps what System~2
+worked out as \emph{code} whose inputs are the question's values, so that a
+later question that is the same problem in other words or with other numbers
+is answered by running the code. The roles of the paper map onto the pair:
+System~2 is both the source and the builder, System~1 reads values out of a
+question, and the exact verifiers take the place of judge models.
+
+\emph{Entries.} An entry holds the question it was built from, a template
+with one placeholder per input (\texttt{\{n\}}), the inputs (name, type,
+description, original value) and \emph{semantic functions}: Python functions
+that read their inputs with \texttt{load(ctx, "<description>", type)}, call
+one another with \texttt{do(ctx, "<what to do>", payloads)}, record each step
+with \texttt{narrate}, and return a dictionary with natural-language keys.
+Names never connect functions; descriptions do. Unlike CPU-ARC's, the
+functions call no model: every value a step needs is read before the code
+runs, so the code is deterministic and runs in the verifier sandbox with no
+network. The embedder links each \texttt{do()} description to a function when
+the entry is registered; at run time descriptions match exactly, then through
+that table, then by word overlap of at least 0.5.
+
+\emph{Building.} When System~2 has answered a maths question with an answer
+that was checked or agreed, the question joins a queue that is worked through
+only while no request is in flight (a request that arrives stops the build and
+requeues it). System~2 receives its own question, the end of its reasoning,
+its answer and the four existing function descriptions closest to the
+question, and writes three sections: the template, the inputs and the code.
+Each failed check is fed back for up to three rounds: the template filled
+with the values must be the question (when only the words differ, the template
+is rebuilt from the question's own words by replacing each value written
+exactly once); the code must pass a static check (standard-library imports
+only, no file, \texttt{eval} or \texttt{print}), have exactly one root
+function and narrate in every function; the root on the original values must
+give the expected answer; the code must still run when each numeric input is
+changed (it computes, it does not recall); and the question must find the new
+entry with its own values.
+
+\emph{Answering.} The cache is tried before the System~1 draft. An entry is
+found in three ways, in order: its template as a pattern, whose captures are the
+values; the question's shape with its numbers masked, the numbers then taken
+by position; and the meaning vector of the question. The first two match only the whole of
+a stored, self-contained question, so they run for any question; the third is
+kept to maths questions that do not lean on the previous turn (after MeanCache
+\cite{gill2025meancache}). On the meaning tier two checks come first, because the vector finds the same topic, not only the same
+problem: a short list of word pairs that turn one question into another
+(area and perimeter, odd and even, simple and compound interest) refuses the
+match without a model, and System~1 is asked in one word whether the new
+question asks for the same quantity as the entry's; then it reads the values
+as JSON. Two guards apply to every tier: each value must be written in the
+question, and each number in the question must be used by some value, so a
+question that adds a 2-dollar eraser is not the cached problem. The code then
+runs in the sandbox; any error or failed conversion is a miss, and a miss goes
+to the models as before.
+
+\emph{Trust.} A new entry is a \emph{candidate}: it runs beside the models,
+which still answer, and its result is compared with theirs (with a reference
+answer when the request has one; an unchecked quick answer is no evidence).
+After two agreements and no disagreement it is \emph{trusted} and answers on
+its own, labelled as cross-checked, or verified when the request's reference
+confirms it. A disagreement on a checked answer found by the template or the
+shape stops the entry. Each entry also learns its own similarity floor for the
+meaning tier, lowered to the lowest similarity at which it agreed and kept
+above the highest at which it disagreed (a simplified vCache
+\cite{schroeder2026vcache}; trust before serving follows Krites
+\cite{singh2026krites}). Past 500 entries the least used one that no other
+entry calls is removed \cite{kulkarni2026eviction}.
+
+\emph{Compilation.} A mature cache is written into one standard-library
+module (CPU-ARC's static resolution): \texttt{load(ctx, d)} becomes a named
+parameter, \texttt{do()} a direct call with the inputs a callee was not given
+forwarded from its caller, and \texttt{load(result, d)} a key of the callee's
+returned dictionary. The module carries each entry's template, so it answers a
+question that matches one with no model at all, and it checks itself: an entry
+whose compiled form does not give its expected answer is left out, with the
+reason.

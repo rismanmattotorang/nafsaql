@@ -184,6 +184,28 @@ at_arrival = false                     # while the quick model drafts, the reaso
 arrival_duty = 0.25                    # share of time an arrival shadow may compute (0.05 to 1)
 stable_prefix = true                   # keep what changes with each question out of the system prompt, so each turn's prompt begins with the last
 
+[arc]                                  # Phase 38: reasoning cache (after CPU-ARC, arXiv 2611.09891) - System 2's answers kept as code System 1 can run again
+enabled = true
+serve = true                           # answer from trusted entries (off: entries are built and compared, never served)
+build = true                           # build entries from System 2's answers while no request is in flight
+dir = "data/arc"                       # cache.json, the build queue and the compiled module (POST /v1/arc/compile)
+domains = ["math"]                     # kinds of question that are cached
+admit = ["verified", "consensus"]      # assurance a System 2 answer needs before it is built into an entry
+trust_after = 2                        # agreements with the models' own answers before an entry is served (0: at once)
+min_similarity = 0.80                  # lowest meaning-vector similarity an entry can ever be used at
+serve_similarity = 0.85                # similarity needed until an entry has agreed at a lower one (each entry learns its floor); 0.80 lost nothing with the guards on the Phase 38 set
+link_similarity = 0.80                 # similarity at which a do() description reuses another entry's function
+model_extraction = true                # System 1 reads the values when the template and the shape do not match
+same_check = true                      # on the meaning tier, System 1 is first asked whether it is the same question (refused 5 of 6 near misses)
+build_rounds = 3                       # builder rounds per entry; each failed check is fed back
+build_thinking_budget = 1024
+build_max_tokens = 3072
+build_reasoning_chars = 2500           # how much of System 2's reasoning (its end) the builder reads
+poll_s = 20
+queue_cap = 64
+max_entries = 500                      # past it the least used entry goes (entries others call are kept)
+run_timeout_s = 10                     # seconds one run of an entry may take in the sandbox
+
 [recall]                               # memory of earlier conversations: notes of finished turns, read back when a question says "my", "last time", "you said"
 enabled = true
 limit = 3                              # most notes in one prompt

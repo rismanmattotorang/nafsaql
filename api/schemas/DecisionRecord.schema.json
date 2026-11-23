@@ -144,7 +144,8 @@
         "uncertified_bin",
         "unknown_escalate",
         "unknown_keep",
-        "unsupported_by_sources"
+        "unsupported_by_sources",
+        "reasoning_cache"
       ]
     },
     "audit": {

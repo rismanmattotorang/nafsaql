@@ -138,6 +138,18 @@
       </table>
     </div>
 
+    <div class="table-wrap" tabindex="0" role="region" aria-label="Reasoning cache results" style="margin-top:28px">
+      <table class="data">
+        <caption>Reasoning cache, after CPU-ARC (new since 0.2.0)</caption>
+        <thead><tr><th scope="col">Result</th><th scope="col">What was measured</th><th scope="col">How</th><th scope="col">Source</th></tr></thead>
+        <tbody>
+          <tr><td class="n">12 of 12</td><td>Maths problems the reasoning model answered (checked) and then turned into programs; 7 in one builder round, 5 in two, each first round refused by a check. 461 s per build, 7.2 times the original answer.</td><td>12 seed problems with an independent oracle</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/arc_phase38/results.json">results.json</a></td></tr>
+          <tr><td class="n">24 of 24</td><td>Questions with the stored wording and other numbers, answered right by the template with no model, median 95 ms; in chat 0.1 s against 20.8 s on the usual path and 85.5 s from the reasoning model.</td><td>Cache alone, oracle answers; chat timings interleaved</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/arc_phase38/results.json">results.json</a></td></tr>
+          <tr><td class="n">13 of 14 · 4 of 12</td><td>Reworded questions answered right; reworded and re-numbered questions answered right (the rest fall below a meaning similarity of 0.80 and go to the models).</td><td>Meaning floor 0.80; the quick model checks and reads values</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/arc_phase38/results.json">results.json</a></td></tr>
+          <tr><td class="n">6 → 0 of 14</td><td>Near misses (another question on the same topic and numbers) answered wrongly, before and after a contrast-word guard and a direct question to the quick model. The word list was written while looking at these items.</td><td>Same 14 items, before and after</td><td><a class="src" href="https://github.com/rismanmattotorang/nafsaql/blob/main/benchmarks/arc_phase38/results.json">results.json</a></td></tr>
+        </tbody>
+      </table>
+    </div>
     <div class="table-wrap" tabindex="0" role="region" aria-label="Engine results before 0.2.0" style="margin-top:28px">
       <table class="data">
         <caption>Engine, before 0.2.0</caption>

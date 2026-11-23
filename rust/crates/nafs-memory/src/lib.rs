@@ -557,6 +557,44 @@ impl Store {
         tx.commit().map_err(st)
     }
 
+    /// Phase 38: a stored reply with the question it answered (the user message just before it in its conversation),
+    /// for building a reasoning-cache entry from it.
+    pub fn reply_with_question(&self, id: &str) -> Result<Value> {
+        let c = self.db();
+        let (json, conv): (String, Option<String>) = c
+            .query_row(
+                "SELECT json, conversation_id FROM replies WHERE id=?1",
+                params![id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(st)?
+            .ok_or_else(|| NafsError::NotFound(format!("reply {id}")))?;
+        let reply: Value = serde_json::from_str(&json).map_err(st)?;
+        let question: Option<String> = match conv {
+            Some(cv) => c
+                .query_row(
+                    "SELECT content FROM messages WHERE conversation_id=?1 AND role='user' AND id < (SELECT id FROM messages WHERE reply_id=?2) ORDER BY id DESC LIMIT 1",
+                    params![cv, id],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(st)?,
+            None => None,
+        };
+        let question = question.ok_or_else(|| {
+            NafsError::BadRequest(format!(
+                "reply {id} has no stored question (it was private)"
+            ))
+        })?;
+        Ok(serde_json::json!({
+            "question": question,
+            "answer": reply["message"]["content"],
+            "reasoning": reply["reasoning"],
+            "domain": reply["domain"],
+        }))
+    }
+
     pub fn get_decision(&self, id: Uuid) -> Result<DecisionRecord> {
         let c = self.db();
         let j: String = c

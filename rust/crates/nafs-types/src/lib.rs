@@ -31,6 +31,8 @@ pub enum TraceState {
     M,
     T,
     X,
+    /// Phase 38: answered from the reasoning cache (a stored program ran; no model answered).
+    C,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash, Default)]
@@ -266,6 +268,10 @@ pub struct ChatRequest {
     /// after it; default from configuration.
     #[serde(default)]
     pub fuse_samples: Option<bool>,
+    /// Phase 38: try the reasoning cache before the models (`false` turns it off for this request; default from
+    /// `[arc]`).
+    #[serde(default)]
+    pub arc: Option<bool>,
     /// In-process lab traffic (evaluation and load-test runs). Never read from HTTP; such replies are stored
     /// as ephemeral and kept out of the operational alerts (OR-004), which describe the live service.
     #[serde(skip)]
@@ -389,6 +395,8 @@ pub enum GateRule {
     /// Phase 26: the quick answer from documents states what its passages do not (`[knowledge]
     /// support_escalate_below`), so the reasoning model answers from the same passages.
     UnsupportedBySources,
+    /// Phase 38: answered by running a trusted entry of the reasoning cache; no model was asked to answer.
+    ReasoningCache,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

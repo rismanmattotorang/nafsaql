@@ -1,4 +1,4 @@
-# Nafs-Aql API reference (v1.7.0)
+# Nafs-Aql API reference (v1.8.0)
 
 Generated from `api/openapi.yaml` by `scripts/gen_api_reference.py`; do not edit by hand.
 
@@ -14,6 +14,64 @@ Version 1.4 (Phase 5) adds alerts with a drill, lab insights, resumable evaluati
 Version 1.5 (Phase 7) adds per-stage latency in usage.stages (queue, prefill, decode and KV-cache reuse for model stages) and GET /v1/perf/stages, the latency breakdown by stage.
 
 Authentication: send `Authorization: Bearer <token>` when the gateway runs with `NAFS_AUTH_TOKENS`. Browser requests must be same-origin (cross-origin requests get 403).
+
+## arc
+
+### `GET /v1/arc`
+
+The reasoning cache's settings, counts by status (trusted, candidate, quarantined), entries and build queue
+
+Responses: `200`, `403`.
+
+### `POST /v1/arc/build`
+
+Queue (or, with wait, run now) a build of one entry from a question and System 2's answer, or from a stored reply
+
+Request body: `question`, `answer`, `reasoning`, `expected`, `domain`, `reply_id`, `wait` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/arc/compile`
+
+Compile trusted entries (all with all=true) into one standard-library Python module that answers template matches with no model
+
+Request body: `all` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `POST /v1/arc/try`
+
+Answer a question from the cache alone (trust ignored, no fallback to the models)
+
+Request body: `question`*, `floor` (* = required).
+
+Responses: `200`, `400`, `403`.
+
+### `DELETE /v1/arc/{id}`
+
+Delete one entry
+
+Parameters: `id` (path, required).
+
+Responses: `200`, `403`, `404`.
+
+### `GET /v1/arc/{id}`
+
+One entry with its template, parameters, code, narration, statistics and similarity floor
+
+Parameters: `id` (path, required).
+
+Responses: `200`, `403`, `404`.
+
+### `POST /v1/arc/{id}/status`
+
+Set an entry's status after review (trusted answers, candidate runs beside the models, quarantined never runs)
+
+Parameters: `id` (path, required).
+
+Request body: `status`* (* = required).
+
+Responses: `200`, `403`, `404`.
 
 ## bench
 
@@ -955,7 +1013,7 @@ Responses: `202`, `404`, `403`.
 - `EvalRunRequest`
 - `EvalRun`
 - `SelfModel`
-- `TraceState`: Automaton states: draft, flagged, deliberate, accepted, abstain
+- `TraceState`: Automaton states: draft, flagged, deliberate, accepted, abstain, and C for an answer from the reasoning cache (Phase 38)
 - `ConversationSummary`
 - `Dataset`
 - `Calibration`

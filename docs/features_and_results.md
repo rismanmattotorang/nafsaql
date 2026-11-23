@@ -178,6 +178,24 @@ computation, 34 MB a passage), a trained pruner, int8 or truncated vectors (the 
 PageRank-ordered graph extraction, a 4-bit embedding model. **Where the time is:** four fifths of an answer from
 documents is the model reading the passages, at 50 to 60 tokens a second.
 
+## Phase 38: a reasoning cache, after CPU-ARC (2026-11-23)
+
+System 2's checked maths answers become parameterised Python semantic functions, built while the machine is idle and
+checked in the sandbox; a later question is found by template, shape or meaning and answered by running the code.
+Measured on 12 problems and 64 variants (`benchmarks/arc_phase38/`):
+
+| | Result |
+|---|---|
+| Entries built | 12 of 12 (7 in one round, 5 in two); 461 s each, 7.2x the original answer |
+| Same words, other numbers | 24 of 24 right, template, 95 ms, no model; in chat 0.1 s against 20.8 s (usual path) and 85.5 s (System 2) |
+| Other words | 13 of 14 right; 6.9 to 10.9 s from the cache |
+| Both changed | 4 of 12 right; the rest go to the models |
+| Near misses answered | 6 of 14 (all wrong) before the contrast words and the direct System 1 question; 0 of 14 after |
+| Compiled module | 12 entries in one 28 KB standard-library file; 36 of 36 template-matching questions answered right with no model (78 ms per run as a new process); same answer as the runtime on 76 of 76 |
+
+Details: [assessment](research/reasoning_cache.md), [specification](spec/reasoning_cache_spec.md),
+[decision 028](decisions/028-reasoning-cache-phase38.md).
+
 ## The numbers at a glance (moved from the README, Phase 25)
 
 Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so absolute speeds are lower bounds. Every figure comes from a stored run in [`benchmarks/`](../benchmarks/).

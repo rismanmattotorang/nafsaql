@@ -96,3 +96,22 @@ pinned ontology. Memorilla \cite{memorilla2026} compresses a document
 collection into a few vectors that a frozen decoder reads as input tokens.
 Prompt injection through retrieved text is a first-class threat
 \cite{greshake2023injection,perez2022ignore}.
+
+\subsection{Caching reasoning}
+Semantic caches return a stored response for a similar query
+\cite{bang2023gptcache}; vCache learns a similarity threshold per entry under
+a stated error rate \cite{schroeder2026vcache}, Krites checks near misses in
+the background before it promotes them \cite{singh2026krites}, and MeanCache
+keeps follow-up questions out \cite{gill2025meancache}. A response is wrong for
+the same question with other numbers, so a second line of work caches the
+\emph{method}: programs written by a strong model and used by a weak one
+\cite{cai2024latm,wang2024trove}, programs as the reasoning itself
+\cite{gao2023pal,chen2023pot}, plan templates adapted by a small model
+\cite{zhang2025apc}, thought templates \cite{yang2024bot}, and Program-of-Thoughts
+programs whose variables a small model extracts \cite{chen2026cachespec}.
+CPU-ARC \cite{belcak2026cpuarc} builds caches of parameterised semantic
+functions from a frontier model's traces, matches them by embedding, and
+compiles a mature cache into a standalone module; it reports frontier accuracy
+at 16 to 291 times less cost per call. Our cache follows it with one model
+pair on four cores, and adds a model-free template and shape lookup, value and
+contrast guards, and trust earned by agreement with live answers.

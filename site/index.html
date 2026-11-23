@@ -161,6 +161,11 @@
         <span class="stat-cond">New in 0.2.0. It was 18.6 s. Median of 6 turns. One of the six arrived before the reading had finished and waited 18.6 s.</span>
       </li>
       <li>
+        <span class="stat-n">0.1<small>s</small></span>
+        <span class="stat-what">to answer a maths problem asked again with other numbers</span>
+        <span class="stat-cond">New since 0.2.0, the reasoning cache. 24 of 24 right with no model; near misses answered 0 of 14. 12 problems, 64 variants.</span>
+      </li>
+      <li>
         <span class="stat-n">12<small>of 12</small></span>
         <span class="stat-what">small Python tasks pass their tests on the code agent's first step</span>
         <span class="stat-cond">New in 0.2.0. It was 1 of 12 before a prompt fix. Tasks that start with no file; median 7.9 s.</span>
@@ -314,6 +319,30 @@
       </article>
     </div>
     <p class="table-note">The evidence on that page describes the need. It is not a result of any Nafs-Aql deployment, and none is claimed.</p>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="arc-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">New since 0.2.0</span>
+      <h2 id="arc-title">Worked out once, run again.</h2>
+      <p>After NVIDIA's CPU-ARC (arXiv 2611.09891). The careful model's checked maths answers become small programs while the machine is idle; the same problem asked again is answered by running the program on the CPU. Measured on 12 problems and 64 variants on the reference machine.</p>
+    </div>
+    <div class="grid g3">
+      <article class="card">
+        <h3>Other numbers: no model at all</h3>
+        <p>A question with the stored wording and new numbers is read by its template and answered by the program: <strong>24 of 24 right, 0.1 s</strong>, against 20.8 s on the usual path and 85.5 s from the reasoning model.</p>
+      </article>
+      <article class="card">
+        <h3>Other words: the quick model checks first</h3>
+        <p>A reworded question is found by meaning; the quick model confirms it is the same question and reads its values. <strong>13 of 14</strong> right. A near miss, such as an area asked where a perimeter was kept, is refused: <strong>0 of 14</strong> answered.</p>
+      </article>
+      <article class="card">
+        <h3>Trust is earned, and readable</h3>
+        <p>A program answers only after agreeing with the models twice; one that disagrees with a checked answer is stopped. Every step is narrated, every program can be read, stopped or deleted, and the cache exports as one Python file.</p>
+      </article>
+    </div>
   </div>
 </section>
 

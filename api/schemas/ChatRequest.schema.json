@@ -171,6 +171,10 @@
       "type": "boolean",
       "description": "FR-095: draw agreement samples together with the draft"
     },
+    "arc": {
+      "type": "boolean",
+      "description": "Phase 38: try the reasoning cache before the models (false turns it off for this request)"
+    },
     "hedge_after_failure": {
       "type": "boolean",
       "description": "FR-094: first attempt alone, widen only after it fails"

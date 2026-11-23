@@ -46,6 +46,9 @@ pub struct Config {
     /// Knowledge Base (Phase 20, FR-K*): documents in SurrealDB, searched and used in chat.
     #[serde(default)]
     pub knowledge: KnowledgeCfg,
+    /// Reasoning cache (Phase 38, after CPU-ARC): System 2's answers kept as code that System 1 can run again.
+    #[serde(default)]
+    pub arc: ArcCfg,
     #[serde(skip)]
     pub hash: String,
     /// Phase 35: things in the file that are not wrong enough to refuse it but that the person should know: keys
@@ -577,6 +580,77 @@ impl Default for ShadowCfg {
             at_arrival: false,
             arrival_duty: 0.25,
             stable_prefix: true,
+        }
+    }
+}
+
+/// The reasoning cache (Phase 38, after CPU-ARC, arXiv 2611.09891): an answer System 2 reasoned out is turned, while
+/// the machine is idle, into Python functions with the question's values as parameters. A later question that is the
+/// same problem in other words or with other numbers is answered by running that code on CPU, after System 1 (or the
+/// stored template) has read the new values out of it. A miss, an error or a failed check falls through to the models.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ArcCfg {
+    pub enabled: bool,
+    /// Answer from trusted entries. Off: entries are still built and compared, never served.
+    pub serve: bool,
+    /// Build entries from System 2's answers while no request is in flight.
+    pub build: bool,
+    /// Where `cache.json`, the build queue and the compiled module are kept.
+    pub dir: String,
+    /// Kinds of question that are cached ("math", "structured", "factual", "code", "open").
+    pub domains: Vec<String>,
+    /// Assurance a System 2 answer needs before it is built into an entry ("verified", "consensus", "unverified").
+    pub admit: Vec<String>,
+    /// Agreements with the models' own answers on live traffic before an entry is served (0: serve once built).
+    pub trust_after: u32,
+    /// Lowest meaning-vector similarity at which an entry can ever be used.
+    pub min_similarity: f64,
+    /// Similarity an entry needs before it has agreed at a lower one (each entry learns its own floor).
+    pub serve_similarity: f64,
+    /// Similarity at which a `do()` description reuses another entry's function.
+    pub link_similarity: f64,
+    /// Let System 1 read the values when the template and the shape do not match.
+    pub model_extraction: bool,
+    /// On the meaning tier, ask System 1 first whether the question asks for the same quantity as the entry's.
+    pub same_check: bool,
+    /// Builder rounds per entry (each failed check is fed back).
+    pub build_rounds: u32,
+    pub build_thinking_budget: u32,
+    pub build_max_tokens: u32,
+    /// How much of System 2's reasoning (its end) the builder reads.
+    pub build_reasoning_chars: usize,
+    /// Seconds between looks at the build queue.
+    pub poll_s: u64,
+    pub queue_cap: usize,
+    /// Entries kept; past it the least used one goes.
+    pub max_entries: usize,
+    /// Seconds one run of an entry may take in the sandbox.
+    pub run_timeout_s: u64,
+}
+impl Default for ArcCfg {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            serve: true,
+            build: true,
+            dir: "data/arc".into(),
+            domains: vec!["math".into()],
+            admit: vec!["verified".into(), "consensus".into()],
+            trust_after: 2,
+            min_similarity: 0.80,
+            serve_similarity: 0.85,
+            link_similarity: 0.80,
+            model_extraction: true,
+            same_check: true,
+            build_rounds: 3,
+            build_thinking_budget: 1024,
+            build_max_tokens: 3072,
+            build_reasoning_chars: 2500,
+            poll_s: 20,
+            queue_cap: 64,
+            max_entries: 500,
+            run_timeout_s: 10,
         }
     }
 }

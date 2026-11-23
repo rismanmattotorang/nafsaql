@@ -1965,7 +1965,7 @@ The fast path (\Sone) drafts; \Gw\ routes to the \kb{} and \Sone\ answers. \Stwo
         assert!(
             p.text.to_lowercase().contains("speculative"),
             "{}",
-            &p.text[..500.min(p.text.len())]
+            p.text.chars().take(500).collect::<String>()
         );
         assert_eq!(p.page_at(0), Some(1));
         assert_eq!(p.page_at(p.page_starts[2]), Some(3));
@@ -1986,7 +1986,7 @@ The fast path (\Sone) drafts; \Gw\ routes to the \kb{} and \Sone\ answers. \Stwo
         assert!(
             p.text.contains("## I. INTRODUCTION"),
             "{}",
-            &p.text[..2000.min(p.text.len())]
+            p.text.chars().take(2000).collect::<String>()
         );
         assert!(p.text.contains("## II. RELATED WORK"));
         assert!(p
@@ -1998,7 +1998,7 @@ The fast path (\Sone) drafts; \Gw\ routes to the \kb{} and \Sone\ answers. \Stwo
             p.text
                 .contains("there is a fast, automatic mode and a slow, effortful one"),
             "{}",
-            &p.text[..3000.min(p.text.len())]
+            p.text.chars().take(3000).collect::<String>()
         );
         let converter = parse_pdf_with(&bytes, PdfLayout::Converter).unwrap();
         let headings = |t: &str| t.lines().filter(|l| l.starts_with('#')).count();

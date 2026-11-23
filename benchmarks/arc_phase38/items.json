@@ -1,0 +1,153 @@
+{
+  "about": "Phase 38 reasoning-cache item set. Each seed is solved by System 2 and built into an entry; the variants test the cache. 'oracle' is a Python expression over the values 'v' that gives the right answer independently of the cache. Kinds: phrasal (other words, same numbers), parametric (same words, other numbers), combined (both), near_miss (same topic and numbers, a different question that needs other reasoning; the cache must miss or still be right).",
+  "items": [
+    {
+      "id": "change",
+      "seed": {"q": "A store sells pencils at 3 dollars each and notebooks at 7 dollars each. Maria buys 4 pencils and 5 notebooks and pays with a 100 dollar bill. How much change does she receive?", "v": {"pp": 3, "np": 7, "p": 4, "n": 5, "paid": 100}},
+      "oracle": "v['paid'] - v['p']*v['pp'] - v['n']*v['np']",
+      "variants": [
+        {"kind": "phrasal", "q": "Pencils cost 3 dollars apiece and notebooks cost 7 dollars apiece. If Maria purchases 4 pencils and 5 notebooks and hands over a 100 dollar bill, how much money does she get back?", "v": {"pp": 3, "np": 7, "p": 4, "n": 5, "paid": 100}},
+        {"kind": "phrasal", "q": "Maria pays for 4 pencils at 3 dollars each and 5 notebooks at 7 dollars each using a 100 dollar bill. What change should she get?", "v": {"pp": 3, "np": 7, "p": 4, "n": 5, "paid": 100}},
+        {"kind": "parametric", "q": "A store sells pencils at 2 dollars each and notebooks at 9 dollars each. Maria buys 6 pencils and 3 notebooks and pays with a 50 dollar bill. How much change does she receive?", "v": {"pp": 2, "np": 9, "p": 6, "n": 3, "paid": 50}},
+        {"kind": "parametric", "q": "A store sells pencils at 4 dollars each and notebooks at 11 dollars each. Maria buys 10 pencils and 7 notebooks and pays with a 200 dollar bill. How much change does she receive?", "v": {"pp": 4, "np": 11, "p": 10, "n": 7, "paid": 200}},
+        {"kind": "combined", "q": "Pencils cost 5 dollars apiece and notebooks cost 8 dollars apiece. If Maria purchases 3 pencils and 6 notebooks and hands over a 100 dollar bill, how much money does she get back?", "v": {"pp": 5, "np": 8, "p": 3, "n": 6, "paid": 100}},
+        {"kind": "near_miss", "q": "A store sells pencils at 3 dollars each and notebooks at 7 dollars each. Maria buys 4 pencils and 5 notebooks and pays with a 100 dollar bill. How much does she spend on notebooks?", "answer": 35},
+        {"kind": "near_miss", "q": "A store sells pencils at 3 dollars each and notebooks at 7 dollars each. Maria buys 4 pencils and 5 notebooks and also a 2 dollar eraser, and pays with a 100 dollar bill. How much change does she receive?", "answer": 51}
+      ]
+    },
+    {
+      "id": "divisors",
+      "seed": {"q": "How many positive whole-number divisors does 196 have?", "v": {"n": 196}},
+      "oracle": "sum(1 for d in range(1, v['n']+1) if v['n'] % d == 0)",
+      "variants": [
+        {"kind": "phrasal", "q": "Find how many positive integers evenly divide 196.", "v": {"n": 196}},
+        {"kind": "phrasal", "q": "What is the number of positive divisors of 196?", "v": {"n": 196}},
+        {"kind": "parametric", "q": "How many positive whole-number divisors does 144 have?", "v": {"n": 144}},
+        {"kind": "parametric", "q": "How many positive whole-number divisors does 360 have?", "v": {"n": 360}},
+        {"kind": "combined", "q": "Find how many positive integers evenly divide 1000.", "v": {"n": 1000}},
+        {"kind": "near_miss", "q": "What is the sum of the positive whole-number divisors of 196?", "answer": 399},
+        {"kind": "near_miss", "q": "How many distinct prime factors does 196 have?", "answer": 2}
+      ]
+    },
+    {
+      "id": "train",
+      "seed": {"q": "A train travels at 60 km per hour for 3 hours and then at 80 km per hour for 2 hours. How many kilometres does it travel in total?", "v": {"s1": 60, "t1": 3, "s2": 80, "t2": 2}},
+      "oracle": "v['s1']*v['t1'] + v['s2']*v['t2']",
+      "variants": [
+        {"kind": "phrasal", "q": "For 3 hours a train moves at 60 km per hour, and for the next 2 hours at 80 km per hour. What total distance in kilometres does it cover?", "v": {"s1": 60, "t1": 3, "s2": 80, "t2": 2}},
+        {"kind": "parametric", "q": "A train travels at 90 km per hour for 4 hours and then at 70 km per hour for 5 hours. How many kilometres does it travel in total?", "v": {"s1": 90, "t1": 4, "s2": 70, "t2": 5}},
+        {"kind": "parametric", "q": "A train travels at 45 km per hour for 2 hours and then at 120 km per hour for 3 hours. How many kilometres does it travel in total?", "v": {"s1": 45, "t1": 2, "s2": 120, "t2": 3}},
+        {"kind": "combined", "q": "For 6 hours a train moves at 55 km per hour, and for the next 1 hours at 100 km per hour. What total distance in kilometres does it cover?", "v": {"s1": 55, "t1": 6, "s2": 100, "t2": 1}},
+        {"kind": "near_miss", "q": "A train travels at 60 km per hour for 3 hours and then at 80 km per hour for 2 hours. What is its average speed in km per hour over the whole trip?", "answer": 68}
+      ]
+    },
+    {
+      "id": "interest",
+      "seed": {"q": "What is the simple interest earned on 2000 dollars at 5 percent per year for 3 years?", "v": {"p": 2000, "r": 5, "t": 3}},
+      "oracle": "v['p']*v['r']*v['t']/100",
+      "variants": [
+        {"kind": "phrasal", "q": "How much simple interest do 2000 dollars earn over 3 years at a yearly rate of 5 percent?", "v": {"p": 2000, "r": 5, "t": 3}},
+        {"kind": "parametric", "q": "What is the simple interest earned on 1500 dollars at 4 percent per year for 6 years?", "v": {"p": 1500, "r": 4, "t": 6}},
+        {"kind": "parametric", "q": "What is the simple interest earned on 12000 dollars at 3 percent per year for 2 years?", "v": {"p": 12000, "r": 3, "t": 2}},
+        {"kind": "combined", "q": "How much simple interest do 800 dollars earn over 5 years at a yearly rate of 7 percent?", "v": {"p": 800, "r": 7, "t": 5}},
+        {"kind": "near_miss", "q": "What is the compound interest earned on 2000 dollars at 5 percent per year compounded yearly for 3 years?", "answer": 315.25}
+      ]
+    },
+    {
+      "id": "perimeter",
+      "seed": {"q": "A rectangle is 12 cm long and 7 cm wide. What is its perimeter in centimetres?", "v": {"l": 12, "w": 7}},
+      "oracle": "2*(v['l']+v['w'])",
+      "variants": [
+        {"kind": "phrasal", "q": "What is the perimeter, in centimetres, of a rectangle whose length is 12 cm and whose width is 7 cm?", "v": {"l": 12, "w": 7}},
+        {"kind": "parametric", "q": "A rectangle is 25 cm long and 9 cm wide. What is its perimeter in centimetres?", "v": {"l": 25, "w": 9}},
+        {"kind": "parametric", "q": "A rectangle is 8 cm long and 3 cm wide. What is its perimeter in centimetres?", "v": {"l": 8, "w": 3}},
+        {"kind": "combined", "q": "What is the perimeter, in centimetres, of a rectangle whose length is 40 cm and whose width is 15 cm?", "v": {"l": 40, "w": 15}},
+        {"kind": "near_miss", "q": "A rectangle is 12 cm long and 7 cm wide. What is its area in square centimetres?", "answer": 84}
+      ]
+    },
+    {
+      "id": "odd_sum",
+      "seed": {"q": "What is the sum of the first 50 positive odd integers?", "v": {"n": 50}},
+      "oracle": "v['n']**2",
+      "variants": [
+        {"kind": "phrasal", "q": "Add up the first 50 odd positive whole numbers. What do you get?", "v": {"n": 50}},
+        {"kind": "parametric", "q": "What is the sum of the first 37 positive odd integers?", "v": {"n": 37}},
+        {"kind": "parametric", "q": "What is the sum of the first 120 positive odd integers?", "v": {"n": 120}},
+        {"kind": "combined", "q": "Add up the first 75 odd positive whole numbers. What do you get?", "v": {"n": 75}},
+        {"kind": "near_miss", "q": "What is the sum of the first 50 positive even integers?", "answer": 2550}
+      ]
+    },
+    {
+      "id": "workers",
+      "seed": {"q": "If 6 workers can build a wall in 10 days, how many days would 4 workers take to build the same wall working at the same rate?", "v": {"w1": 6, "d1": 10, "w2": 4}},
+      "oracle": "v['w1']*v['d1']/v['w2']",
+      "variants": [
+        {"kind": "phrasal", "q": "A wall takes 6 workers 10 days to build. Working at the same rate, how many days would 4 workers need for the same wall?", "v": {"w1": 6, "d1": 10, "w2": 4}},
+        {"kind": "parametric", "q": "If 8 workers can build a wall in 15 days, how many days would 12 workers take to build the same wall working at the same rate?", "v": {"w1": 8, "d1": 15, "w2": 12}},
+        {"kind": "parametric", "q": "If 5 workers can build a wall in 12 days, how many days would 3 workers take to build the same wall working at the same rate?", "v": {"w1": 5, "d1": 12, "w2": 3}},
+        {"kind": "combined", "q": "A wall takes 9 workers 4 days to build. Working at the same rate, how many days would 6 workers need for the same wall?", "v": {"w1": 9, "d1": 4, "w2": 6}},
+        {"kind": "near_miss", "q": "If 6 workers can build a wall in 10 days, how many worker-days of work does the wall take?", "answer": 60}
+      ]
+    },
+    {
+      "id": "discount",
+      "seed": {"q": "A jacket costs 80 dollars and is on sale for 25 percent off. What is the sale price in dollars?", "v": {"price": 80, "off": 25}},
+      "oracle": "v['price']*(100-v['off'])/100",
+      "variants": [
+        {"kind": "phrasal", "q": "With 25 percent taken off its 80 dollar price, how many dollars does the jacket cost now?", "v": {"price": 80, "off": 25}},
+        {"kind": "parametric", "q": "A jacket costs 120 dollars and is on sale for 15 percent off. What is the sale price in dollars?", "v": {"price": 120, "off": 15}},
+        {"kind": "parametric", "q": "A jacket costs 64 dollars and is on sale for 50 percent off. What is the sale price in dollars?", "v": {"price": 64, "off": 50}},
+        {"kind": "combined", "q": "With 40 percent taken off its 95 dollar price, how many dollars does the jacket cost now?", "v": {"price": 95, "off": 40}},
+        {"kind": "near_miss", "q": "A jacket costs 80 dollars and is on sale for 25 percent off. How many dollars are saved?", "answer": 20}
+      ]
+    },
+    {
+      "id": "removed",
+      "seed": {"q": "The average of 5 numbers is 18. When one of the numbers is removed, the average of the remaining numbers is 16. What number was removed?", "v": {"n": 5, "a": 18, "b": 16}},
+      "oracle": "v['n']*v['a'] - (v['n']-1)*v['b']",
+      "variants": [
+        {"kind": "phrasal", "q": "Five numbers have a mean of 18. Taking one of them away leaves numbers whose mean is 16. Which number was taken away?", "v": {"n": 5, "a": 18, "b": 16}},
+        {"kind": "parametric", "q": "The average of 8 numbers is 21. When one of the numbers is removed, the average of the remaining numbers is 19. What number was removed?", "v": {"n": 8, "a": 21, "b": 19}},
+        {"kind": "parametric", "q": "The average of 6 numbers is 30. When one of the numbers is removed, the average of the remaining numbers is 33. What number was removed?", "v": {"n": 6, "a": 30, "b": 33}},
+        {"kind": "combined", "q": "Ten numbers have a mean of 12. Taking one of them away leaves numbers whose mean is 11. Which number was taken away?", "v": {"n": 10, "a": 12, "b": 11}},
+        {"kind": "near_miss", "q": "The average of 5 numbers is 18. When the number 16 is added, what is the average of the 6 numbers?", "answer": 17.666667}
+      ]
+    },
+    {
+      "id": "committee",
+      "seed": {"q": "In how many ways can a committee of 3 people be chosen from a group of 8 people?", "v": {"k": 3, "n": 8}},
+      "oracle": "__import__('math').comb(v['n'], v['k'])",
+      "variants": [
+        {"kind": "phrasal", "q": "From 8 people, how many different 3-person committees can be formed?", "v": {"k": 3, "n": 8}},
+        {"kind": "parametric", "q": "In how many ways can a committee of 4 people be chosen from a group of 10 people?", "v": {"k": 4, "n": 10}},
+        {"kind": "parametric", "q": "In how many ways can a committee of 2 people be chosen from a group of 15 people?", "v": {"k": 2, "n": 15}},
+        {"kind": "combined", "q": "From 12 people, how many different 5-person committees can be formed?", "v": {"k": 5, "n": 12}},
+        {"kind": "near_miss", "q": "In how many ways can a president, a vice president and a secretary be chosen from a group of 8 people?", "answer": 336}
+      ]
+    },
+    {
+      "id": "lcm",
+      "seed": {"q": "What is the least common multiple of 12 and 18?", "v": {"a": 12, "b": 18}},
+      "oracle": "v['a']*v['b']//__import__('math').gcd(v['a'], v['b'])",
+      "variants": [
+        {"kind": "phrasal", "q": "Find the smallest positive number that is a multiple of both 12 and 18.", "v": {"a": 12, "b": 18}},
+        {"kind": "parametric", "q": "What is the least common multiple of 14 and 35?", "v": {"a": 14, "b": 35}},
+        {"kind": "parametric", "q": "What is the least common multiple of 9 and 40?", "v": {"a": 9, "b": 40}},
+        {"kind": "combined", "q": "Find the smallest positive number that is a multiple of both 21 and 6.", "v": {"a": 21, "b": 6}},
+        {"kind": "near_miss", "q": "What is the greatest common divisor of 12 and 18?", "answer": 6}
+      ]
+    },
+    {
+      "id": "reading",
+      "seed": {"q": "Tom reads 24 pages per hour. How many hours will it take him to read a 180-page book?", "v": {"rate": 24, "pages": 180}},
+      "oracle": "v['pages']/v['rate']",
+      "variants": [
+        {"kind": "phrasal", "q": "Reading at 24 pages each hour, how long in hours does Tom need to finish a book of 180 pages?", "v": {"rate": 24, "pages": 180}},
+        {"kind": "parametric", "q": "Tom reads 30 pages per hour. How many hours will it take him to read a 450-page book?", "v": {"rate": 30, "pages": 450}},
+        {"kind": "parametric", "q": "Tom reads 16 pages per hour. How many hours will it take him to read a 200-page book?", "v": {"rate": 16, "pages": 200}},
+        {"kind": "combined", "q": "Reading at 40 pages each hour, how long in hours does Tom need to finish a book of 300 pages?", "v": {"rate": 40, "pages": 300}},
+        {"kind": "near_miss", "q": "Tom reads 24 pages per hour. How many pages of a 180-page book are left after he reads for 5 hours?", "answer": 60}
+      ]
+    }
+  ]
+}

@@ -602,6 +602,78 @@
       },
       "additionalProperties": false
     },
+    "arc": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "serve": {
+          "type": "boolean"
+        },
+        "build": {
+          "type": "boolean"
+        },
+        "dir": {
+          "type": "string"
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "admit": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "trust_after": {
+          "type": "integer"
+        },
+        "min_similarity": {
+          "type": "number"
+        },
+        "serve_similarity": {
+          "type": "number"
+        },
+        "link_similarity": {
+          "type": "number"
+        },
+        "model_extraction": {
+          "type": "boolean"
+        },
+        "build_rounds": {
+          "type": "integer"
+        },
+        "build_thinking_budget": {
+          "type": "integer"
+        },
+        "build_max_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "build_reasoning_chars": {
+          "type": "integer"
+        },
+        "poll_s": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "queue_cap": {
+          "type": "integer"
+        },
+        "max_entries": {
+          "type": "integer"
+        },
+        "run_timeout_s": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
     "recall": {
       "type": "object",
       "properties": {

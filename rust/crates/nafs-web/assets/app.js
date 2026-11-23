@@ -46,6 +46,7 @@ const STATIONS = {
   M: { en: 'Thinking', tip: 'The thorough model reasons within a budget, without seeing the draft.' },
   T: { en: 'Accepted', tip: 'The answer is accepted with a stated assurance.' },
   X: { en: 'Abstain', tip: 'Judgement withheld: no candidate earned acceptance within the budget.' },
+  C: { en: 'Reused', tip: 'A method worked out earlier ran again with this question\'s values; no model had to think.' },
 };
 // The answer's journey as steps (OpenUI Steps): visited steps are ticked, the live step pulses with its stage label.
 function journeyHTML(seq, visited, cur, label, elapsedMs) {
@@ -60,7 +61,7 @@ function toolcardsHTML(t, live) {
   const cards = [];
   const d = t.decision;
   if (d && !live && d.rule !== 'forced_override') {
-    const esc1 = d.escalate; cards.push(`<details class="toolcard ${esc1 ? 'info' : 'fast'}"><summary><span class="tc-ico">${esc1 ? icon.brain : icon.bolt}</span><span class="tc-name">Routing</span><span class="tc-st">${esc1 ? '<b>thought longer</b>' : 'kept the <b>quick</b> answer'}</span><span class="tc-dur">risk ${pct(d.e1_hat, 0)} → ${pct(d.e2_hat, 0)}</span><span class="tc-chev">▶</span></summary>
+    const esc1 = d.escalate; cards.push(`<details class="toolcard ${esc1 ? 'info' : 'fast'}"><summary><span class="tc-ico">${esc1 ? icon.brain : icon.bolt}</span><span class="tc-name">Routing</span><span class="tc-st">${d.rule === 'reasoning_cache' ? 'answered from a <b>stored method</b>' : esc1 ? '<b>thought longer</b>' : 'kept the <b>quick</b> answer'}</span><span class="tc-dur">${d.rule === 'reasoning_cache' ? 'no model' : `risk ${pct(d.e1_hat, 0)} → ${pct(d.e2_hat, 0)}`}</span><span class="tc-chev">▶</span></summary>
       <div class="tc-body">${esc(plain(d.explanation))}<div class="tiny faint" style="margin-top:4px">Thinks longer when the drop in the chance of a wrong answer (${pct(d.e1_hat, 0)} to ${pct(d.e2_hat, 0)}) is worth about ${r4(d.delta_c)} s more at speed weight ${num(d.lambda, 2)}.</div></div></details>`);
   }
   for (const v of t.verifs) { const r = v.result; const ok = r.passed;
@@ -90,6 +91,9 @@ function kbSourcesHTML(sources) {
       ? `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.search}<span>${+sup.supported} of ${plural(+sup.claims, 'sentence')} ${+sup.claims === 1 ? 'is' : 'are'} in the passages; ${miss.length} ${miss.length === 1 ? 'is' : 'are'} not. Check ${miss.length === 1 ? 'it' : 'them'} against the sources.</span></summary><ul class="kb-facts">${miss.map(m => `<li>${esc(m.text)}<div class="tiny muted">${esc(m.reason ? m.reason[0].toUpperCase() + m.reason.slice(1) : '')}.</div></li>`).join('')}</ul></details>`
       : `<div class="sources">${icon.check}<span>Every sentence of this answer is in the passages (${plural(+sup.claims, 'sentence')} compared word by word; this does not prove the answer right).</span></div>`;
   }
+  // Phase 38: the answer came from the reasoning cache (code built from an earlier careful answer).
+  const arc = sources.find(x => x.arc)?.arc;
+  if (arc) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.bolt}<span>Worked out from a stored method: the same problem was thought through before, so its working ran again with this question's values${advanced() ? ` · ${fmtMs(+arc.ms || 0)}` : ''}</span></summary><ul class="kb-facts"><li>Built from: ${esc(arc.built_from || '')}</li>${arc.params ? Object.entries(arc.params).map(([k, v]) => `<li><b>${esc(k)}</b>: ${esc(String(v))}</li>`).join('') : ''}<li class="faint">Steps: ${esc((arc.functions || []).join(' · '))}</li>${advanced() ? `<li class="faint"><a href="#/cache">Open the reasoning cache</a> (entry ${esc(arc.entry)}, found by its ${esc(arc.tier)})</li>` : ''}</ul></details>`;
   const rec = sources.find(x => x.recall)?.recall || [];
   if (rec.length) out += `<details class="kb-sources kb-factbox"><summary class="kb-sh">${icon.book}<span>Used ${plural(rec.length, 'note')} from earlier conversations</span></summary><ul class="kb-facts">${rec.map(n => `<li><span class="faint">${esc(String(n.created_at || '').slice(0, 10))}</span><div class="kb-ptext">${esc(n.text || '')}</div></li>`).join('')}</ul><div class="tiny faint">Read or delete what is remembered in Settings, under Memory.</div></details>`;
   if (hits.length) out += `<div class="kb-sources"><div class="kb-sh">${icon.book}<span>Answered from <b>${esc(hits[0].kb_name || 'your knowledge base')}</b>: ${plural(hits.length, 'passage')}</span></div>${hits.map(x => `<details class="kb-src" data-n="${+x.n || 0}"><summary><span class="kb-n">${+x.n || 0}</span><span class="kb-st">${esc(x.doc_title)}${x.heading && x.heading !== x.doc_title ? ` <span class="faint">› ${esc(x.heading)}</span>` : ''}${+x.page ? ` <span class="faint">· page ${+x.page}</span>` : ''}</span>${advanced() && typeof x.vector_score === 'number' ? `<span class="tiny faint">${pct(x.vector_score, 0)} match</span>` : ''}</summary><div class="kb-ptext">${esc(String(x.text || '').replace(/^#{1,6} /gm, ''))}</div></details>`).join('')}</div>`;
@@ -611,7 +615,7 @@ let routeGen = 0, routeSeen = false;
 function palette() {
   if ($('#palette')) return;
   const go = (hash) => () => { location.hash = hash; };
-  const pages = [['Chat', '#/chat'], ['Rooms', '#/rooms'], ['Knowledge', '#/knowledge'], ['Code', '#/code'], ['Files', '#/files'], ['Quality', '#/gate', 1], ['Learning', '#/tazkiya', 1], ['Experiments', '#/eval', 1], ['Speed', '#/bench', 1], ['Status', '#/system', 1]]
+  const pages = [['Chat', '#/chat'], ['Rooms', '#/rooms'], ['Knowledge', '#/knowledge'], ['Code', '#/code'], ['Files', '#/files'], ['Quality', '#/gate', 1], ['Learning', '#/tazkiya', 1], ['Reasoning cache', '#/cache', 1], ['Experiments', '#/eval', 1], ['Speed', '#/bench', 1], ['Status', '#/system', 1]]
     .filter(x => !x[2] || advanced()).map(([t, hash]) => ({ t, k: 'Go to', fn: go(hash) }));
   const acts = [
     { t: 'New chat', k: 'Do', fn: () => { location.hash = '#/chat'; setTimeout(() => $('#newConv')?.click(), 60); } },
@@ -904,11 +908,12 @@ const assureBadge = (a) => { if (a === 'unverified' && !advanced()) return ''; c
 // The server marks each thorough attempt in the reasoning stream ("[attempt 2]"); people see a plain divider.
 const plainReasoning = (t) => t.replace(/^\[attempt (\d+)\]\n?/gm, (m, n) => n === '1' ? '' : '\n— trying again —\n').replace(/\[previous candidate rejected\]\n?/g, '');
 // What the user sees while an answer is being made (the stations are Advanced-mode detail).
-const LIVE_LABEL = { A: 'Answering…', L: 'Double-checking…', M: 'Thinking it through…', T: 'Finishing…', X: 'Finishing…' };
+const LIVE_LABEL = { A: 'Answering…', L: 'Double-checking…', M: 'Thinking it through…', T: 'Finishing…', X: 'Finishing…', C: 'Reusing a method…' };
 // One sentence on why this answer took the path it did, for the "Why?" popover.
 function whyText(r) {
   const parts = [];
   const rescue = (r.usage?.stages || []).find(st => st.stage === 'rescue');
+  if (r.decision?.rule === 'reasoning_cache') { parts.push('This is a problem that was thought through carefully before, with other numbers or words, so the stored working was run again instead of asking a model.'); if (r.assurance === 'verified') parts.push('The answer was then checked exactly and passed.'); return parts.join(' '); }
   if (r.decision?.rule === 'forced_override') parts.push(r.reasoning_mode === 'slow' ? 'You asked for a thorough answer, so it was thought through first.' : 'You asked for a quick answer, so it was written at once.');
   else if (r.reasoning_mode === 'slow') parts.push(r.decision?.features?.draft_verified === false ? 'The quick answer failed its check, so the question was thought through again more carefully.' : 'This question looked hard enough to deserve more thought, so a careful answer was written.');
   else if (rescue?.note && /one passed/.test(rescue.note)) parts.push('The first quick answer failed its check, but one of the extra quick tries passed it, so no deeper thinking was needed.');
@@ -1000,7 +1005,8 @@ class Turn {
       r?.degraded ? `<span class="badge b-degraded" title="Careful answers were unavailable, so this is a quick answer">${icon.alert}Quick only</span>` : '',
       `<span class="time">${r ? (adv ? `${fmtMs(r.usage.ttft_ms)} to first token · ${fmtMs(r.usage.wall_ms)} total` : fmtMs(r.usage.wall_ms)) : live ? `<span class="spin"></span> ${adv ? '' : esc(LIVE_LABEL[this.cur] || 'Answering…') + ' '}${fmtMs(performance.now() - this.t0)}` : ''}</span>`].join('');
     const order = ['A', 'L', 'M', 'T']; const final = r ? r.trace_state : null;
-    const seq = (final === 'X' ? ['A', 'L', 'M', 'X'] : this.escalated || this.states.includes('L') ? order : ['A', 'T']);
+    const fromCache = (r?.states || this.states).includes('C');
+    const seq = fromCache ? ['C', 'T'] : (final === 'X' ? ['A', 'L', 'M', 'X'] : this.escalated || this.states.includes('L') ? order : ['A', 'T']);
     el.querySelector('.journey').hidden = !adv; if (adv) el.querySelector('.journey').innerHTML = journeyHTML(seq, this.states, live ? this.cur : null, live ? this.label : null, live ? performance.now() - this.t0 : null);
     const d0 = this.decision; const dx = d0 ? plain(d0.explanation) : ''; el.querySelector('.why').innerHTML = adv && d0 && !live ? `<span title="${esc(dx)}">${d0.escalate ? icon.brain : icon.bolt} ${esc(d0.rule === 'forced_override' ? 'You chose the mode.' : dx.length > 150 ? dx.slice(0, 150) + '…' : dx)}</span>` : '';
     const folds = el.querySelector('.folds'); let html = '';
@@ -1008,7 +1014,7 @@ class Turn {
     if (draft && adv) html += `<details class="fold draft"><summary>Quick draft · ${r?.draft_conditioned ? 'shown to the thorough model (test mode)' : 'replaced'}${this.decision ? ' — ' + esc(plain(this.decision.explanation).slice(0, 90)) : ''}</summary><div class="fb">${esc(draft)}</div></details>`;
     const reasoning = r ? r.reasoning : this.reason;
     if (reasoning) { const ntok = r ? r.usage.reasoning_tokens : reasoning.length / 4 | 0; const wasOpen = folds.querySelector('.reason')?.open;
-      html += `<details class="fold reason" ${wasOpen ?? (live) ? 'open' : ''}><summary>${icon.brain} ${adv ? `Reasoning · ${r ? ntok + ' tokens' : '~' + ntok + ' tokens so far'}${r?.usage?.thinking_budget ? ` (budget ${r.usage.thinking_budget})` : ''}` : live ? 'Thinking…' : 'Show thinking'}</summary><div class="fb">${esc(adv ? reasoning : plainReasoning(reasoning))}</div></details>`; }
+      html += `<details class="fold reason" ${wasOpen ?? (live) ? 'open' : ''}><summary>${icon.brain} ${r?.decision?.rule === 'reasoning_cache' ? 'Show the working' : adv ? `Reasoning · ${r ? ntok + ' tokens' : '~' + ntok + ' tokens so far'}${r?.usage?.thinking_budget ? ` (budget ${r.usage.thinking_budget})` : ''}` : live ? 'Thinking…' : 'Show thinking'}</summary><div class="fb">${esc(adv ? reasoning : plainReasoning(reasoning))}</div></details>`; }
     if (folds.innerHTML !== html) { const fb = folds.querySelector('.reason .fb'); const atBottom = fb && fb.scrollTop + fb.clientHeight >= fb.scrollHeight - 20; folds.innerHTML = html; const nfb = folds.querySelector('.reason .fb'); if (nfb && (atBottom || live)) nfb.scrollTop = nfb.scrollHeight; }
     { const tools = el.querySelector('.tools'); const open = new Set($$('.toolcard[open]', tools).map((x, i) => i)); const html = adv ? toolcardsHTML(this, live) : ''; if (tools.dataset.h !== html) { tools.dataset.h = html; tools.innerHTML = html; $$('.toolcard', tools).forEach((x, i) => { if (open.has(i)) x.open = true; }); } }
     const text = r ? r.message.content : this.answerText();
@@ -1123,7 +1129,7 @@ function inspectorHTML(t) {
     return `<div class="gauge"><div class="lbl"><span>gain from thinking ${num(gain, 3)}</span><span>cost of the wait ${num(cost, 3)}</span></div>
       <div class="bar"><i style="width:${gain / m * 100}%;background:${d.escalate ? 'var(--slow)' : 'var(--fast)'}"></i><span class="thr" style="left:${cost / m * 100}%" title="Thinks longer when the gain passes this line"></span></div></div>`; })() : '';
   const bar = (label, v, color) => `<div class="gauge"><div class="lbl"><span>${label}</span><span>${v == null ? '–' : pct(v, 0)}</span></div><div class="bar"><i style="width:${Math.min(100, (v || 0) * 100)}%;background:${color}"></i></div></div>`;
-  return `<div class="sec"><h3>Routing</h3>${d ? `<div class="row" style="margin-bottom:6px">${d.escalate ? `<span class="badge b-slow">${icon.brain}Thought longer</span>` : `<span class="badge b-fast">${icon.bolt}Kept the quick answer</span>`}</div>
+  return `<div class="sec"><h3>Routing</h3>${d ? `<div class="row" style="margin-bottom:6px">${d.rule === 'reasoning_cache' ? `<span class="badge b-fast">${icon.bolt}Answered from a stored method</span>` : d.escalate ? `<span class="badge b-slow">${icon.brain}Thought longer</span>` : `<span class="badge b-fast">${icon.bolt}Kept the quick answer</span>`}</div>
       <p class="small" style="margin:6px 0 10px">${esc(plain(d.explanation))}</p>${f.draft_tokens ? bar('Chance the quick answer is wrong', d.e1_hat, 'var(--crimson)') : '<p class="tiny faint">No quick draft for this question.</p>'}${bar('Chance after thinking', d.e2_hat, 'var(--teal)')}${gainBar}
       <p class="tiny faint">Prediction version: ${esc(d.calibration_version || '–')}.</p>` : '<p class="muted small">Deciding…</p>'}</div>
     <div class="sec"><h3>Signals</h3><dl class="kv small"><dt>Topic</dt><dd>${esc(f.domain || t.domain || '–')}</dd><dt title="Average log-probability of the draft's tokens">Draft confidence</dt><dd>${num(f.mean_logprob, 3)}</dd><dt>Least sure token</dt><dd>${num(f.min_logprob, 2)}</dd><dt>Least sure stretch</dt><dd>${num(f.low_window_logprob, 3)}</dd>
@@ -2667,6 +2673,44 @@ routes.tazkiya = { title: 'Learning', sub: 'checked answers teach the quick mode
         <div class="q">${esc(x.question || '(question not stored)')}</div><div class="answer small">${md(x.answer)}</div></div>`).join('') : '<div class="empty small">Nothing to review. Agreed answers from real chats appear here.</div>'}</div>`;
     $$('#tzReview [data-ok]').forEach(b => b.onclick = async () => { const id = b.closest('.review').dataset.id; try { await api.post(`/v1/tazkiya/review/${id}`, { approved: b.dataset.ok === '1', reviewer: store.get('user', 'operator') }); toast(b.dataset.ok === '1' ? 'Approved for learning' : 'Rejected'); load(); } catch (e) { toastErr(e); } });
   };
+  await load(); const t = setInterval(() => { if (alive() && !document.hidden) load().catch(() => {}); }, 30000); return () => clearInterval(t);
+} };
+
+// ============================== reasoning cache (Phase 38) ==============================
+const ARC_ST = { trusted: ['b-verified', 'answers'], candidate: ['b-consensus', 'on trial'], quarantined: ['b-abstained', 'stopped'] };
+routes.cache = { title: 'Reasoning cache', sub: 'careful answers kept as working that runs again', adv: true, async render(view, alive) {
+  view.innerHTML = `<div class="page grid" style="gap:16px">
+    ${pageIntro({ ico: 'bolt', title: 'Answers worked out once, reused', lead: 'When the thorough model works a problem out, its working is turned into a small program while the computer is idle. The same problem asked again with other numbers is answered by running that program in a fraction of a second; asked in other words, the quick model first checks it is the same question and reads its values, which takes a few seconds. No model has to think it through again. A stored method answers only after it has agreed with the models on real questions; one that disagrees with a checked answer is stopped.', steps: ['A careful answer is kept', 'It becomes a small program', 'It agrees with the models', 'It answers on its own'] })}
+    <div class="grid g2"><div class="card" id="arcSum"><div class="card-b"><span class="spin"></span></div></div>
+    <div class="card"><div class="card-h"><h3>Try a question</h3><span class="hint">The stored methods alone; no model answers here.</span></div><div class="card-b">
+      <label class="f">Question<textarea id="arcQ" rows="3" placeholder="How many positive whole-number divisors does 360 have?"></textarea></label>
+      <div class="row" style="margin-top:8px"><button class="btn sm" id="arcTry" type="button">${icon.bolt}Try</button><button class="btn sm ghost" id="arcCompile" type="button" title="Write every trusted method into one Python file that runs with no model">Export as one Python file</button><span id="arcOut" class="small"></span></div><div id="arcRes"></div></div></div></div>
+    <div class="card" id="arcList"></div></div>`;
+  const load = async () => {
+    const r = await api.get('/v1/arc'); if (!alive()) return;
+    if (!r.enabled) { $('#arcSum').innerHTML = '<div class="card-b empty small">The reasoning cache is off. Turn it on with <code>[arc] enabled = true</code> in the configuration.</div>'; $('#arcList').innerHTML = ''; return; }
+    const c = r.counts;
+    $('#arcSum').innerHTML = `<div class="card-h"><h3>What is stored</h3></div><div class="card-b"><dl class="kv small"><dt>Methods that answer</dt><dd><b>${c.trusted}</b></dd><dt>On trial</dt><dd>${c.candidate} <span class="faint">(each needs ${plural(r.trust_after, 'agreement')} with the models)</span></dd><dt>Stopped</dt><dd>${c.quarantined}</dd><dt>Steps (functions)</dt><dd>${r.functions}</dd><dt>Times used</dt><dd>${r.hits} found · ${r.served} answered</dd><dt>Waiting to be built</dt><dd>${r.queue.length}</dd><dt>Kinds of question</dt><dd>${esc(r.domains.join(', '))}</dd></dl></div>`;
+    $('#arcList').innerHTML = `<div class="card-h"><h3>Stored methods</h3><span class="hint">Click one to read its working, change its state or delete it.</span></div><div class="card-b" style="padding:0">${r.entries.length ? `<table class="t"><tr><th>Question it was built from</th><th>State</th><th>Found</th><th>Agreed</th><th>Disagreed</th><th>Steps</th></tr>${r.entries.map(e => { const [b, l] = ARC_ST[e.status] || ['', e.status]; return `<tr class="click" tabindex="0" data-id="${esc(e.id)}"><td>${esc(e.question)}<div class="tiny faint mono">${esc(e.template)}</div></td><td><span class="badge ${b}">${l}</span></td><td>${e.stats.hits || 0}</td><td>${e.stats.agreements || 0}</td><td>${e.stats.disagreements || 0}</td><td>${e.functions.length}${e.reused ? ` <span class="faint">(${e.reused} reused)</span>` : ''}</td></tr>`; }).join('')}</table>` : '<div class="empty small">Nothing stored yet. Careful answers that passed a check are turned into methods while the computer is idle.</div>'}</div>`;
+    $$('#arcList tr[data-id]').forEach(tr => tr.onclick = () => openEntry(tr.dataset.id));
+  };
+  const openEntry = async (id) => {
+    let e; try { e = await api.get(`/v1/arc/${id}`); } catch (err) { toastErr(err); return; }
+    modal(`<h3 style="margin-top:0">Stored method</h3><p class="small">${esc(e.question)}</p><p class="tiny faint mono">${esc(e.template)}</p>
+      <table class="t small"><tr><th>Value</th><th>Type</th><th>In the original</th></tr>${e.params.map(p => `<tr><td>${esc(p.description)}</td><td>${esc(p.type)}</td><td>${esc(p.value)}</td></tr>`).join('')}</table>
+      <h4>Working on the original question</h4><div class="codebox">${esc((e.narration || []).join('\n'))}</div>
+      <details><summary class="small">The program (${plural(e.functions.length, 'step')})</summary><div class="codebox mono tiny">${esc(e.code)}</div></details>
+      <p class="tiny faint">Needs similarity ${num(e.floor, 2)} when found by meaning · built in ${plural(e.build?.rounds || 1, 'round')} · ${esc((e.created_at || '').slice(0, 16))}</p>
+      <div class="row"><button class="btn sm" data-st="trusted" type="button">Let it answer</button><button class="btn sm ghost" data-st="candidate" type="button">Put on trial</button><button class="btn sm ghost" data-st="quarantined" type="button">Stop it</button><span class="sp"></span><button class="btn sm danger" id="arcDel" type="button">Delete</button></div>`);
+    $$('#modal [data-st]').forEach(b => b.onclick = async () => { try { await api.post(`/v1/arc/${id}/status`, { status: b.dataset.st }); toast('Saved'); $('#modal').close(); load(); } catch (err) { toastErr(err); } });
+    $('#arcDel').onclick = async () => { if (!await confirmDialog({ title: 'Delete this method?', body: '<p>The stored working is removed; the same question will be thought through by the models again. This cannot be undone.</p>', ok: 'Delete' })) return; try { await api.del(`/v1/arc/${id}`); toast('Deleted'); $('#modal').close(); load(); } catch (err) { toastErr(err); } };
+  };
+  $('#arcTry').onclick = async () => { const q = $('#arcQ').value.trim(); if (!q) return; $('#arcOut').innerHTML = '<span class="spin"></span>';
+    try { const r = await api.post('/v1/arc/try', { question: q }); if (!alive()) return;
+      $('#arcOut').textContent = r.hit ? `Answered in ${fmtMs(r.ms)}` : 'Not answered from the cache';
+      $('#arcRes').innerHTML = r.hit ? `<div class="answer small" style="margin-top:8px"><b>${esc(String(r.answer))}</b>${r.summary ? ' · ' + esc(r.summary) : ''}</div><div class="codebox tiny">${esc((r.narration || []).join('\n'))}</div><p class="tiny faint">Found by its ${esc(r.tier)}${r.tier === 'meaning' ? ` (similarity ${num(r.similarity, 2)})` : ''} · state: ${esc((ARC_ST[r.status] || [0, r.status])[1])}</p>` : `<p class="small muted">${esc(plain(r.why || ''))}</p>`; }
+    catch (err) { $('#arcOut').textContent = humanError(err); } };
+  $('#arcCompile').onclick = async () => { try { const r = await api.post('/v1/arc/compile', { all: false }); toast(`Wrote ${r.path} (${plural(r.entries, 'method')})`, { ms: 8000 }); } catch (err) { toastErr(err); } };
   await load(); const t = setInterval(() => { if (alive() && !document.hidden) load().catch(() => {}); }, 30000); return () => clearInterval(t);
 } };
 

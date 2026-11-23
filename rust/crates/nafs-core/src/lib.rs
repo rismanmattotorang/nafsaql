@@ -1,4 +1,5 @@
 //! nafs-core: the request automaton (A -> L -> M -> T/X), the Aql Gate and the backends.
+pub mod arc;
 pub mod backend;
 pub mod calibration;
 pub mod config;

@@ -185,6 +185,15 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/eval/runs/{id}/calibrate", post(calibrate))
         .route("/v1/eval/runs/{id}/resume", post(resume_eval))
         .route("/v1/verify", post(verify_adhoc))
+        .route("/v1/arc", get(crate::arc::list))
+        .route("/v1/arc/build", post(crate::arc::build))
+        .route("/v1/arc/try", post(crate::arc::try_question))
+        .route("/v1/arc/compile", post(crate::arc::compile))
+        .route(
+            "/v1/arc/{id}",
+            get(crate::arc::get).delete(crate::arc::delete),
+        )
+        .route("/v1/arc/{id}/status", post(crate::arc::set_status))
         .route("/v1/harness", get(harness_info))
         .route("/v1/harness/code", post(code_agent))
         .route(
@@ -1828,6 +1837,19 @@ pub fn spawn_background(s: AppState) {
                         );
                     }
                 }
+            }
+        });
+    }
+    // Phase 38: the reasoning cache builder, while no request is in flight (a request that arrives stops a build).
+    if s.cfg.arc.enabled && s.cfg.arc.build {
+        let s2 = s.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(s2.cfg.arc.poll_s.max(1))).await;
+                if s2.orch.inflight.load(Ordering::SeqCst) > 0 {
+                    continue;
+                }
+                let _ = s2.orch.run_one_arc_build(false).await;
             }
         });
     }
