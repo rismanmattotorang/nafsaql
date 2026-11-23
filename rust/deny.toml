@@ -19,6 +19,11 @@ ignore = [
     # parsing runs in the gateway's ingestion worker on a document the operator chose to upload, and a parse failure
     # fails that document alone (SR-K02). Replace when pdf_oxide moves to a maintained parser.
     { id = "RUSTSEC-2026-0192", reason = "font parser under pdf_oxide; revisit when pdf_oxide changes parser" },
+    # `chrono`: an unmaintained notice (no vulnerability, no fixed release), published after 0.2.0. Every crate uses it
+    # for timestamps (`Utc::now`, RFC 3339 text written by us and read back), and the database, the KB store and the
+    # HTTP stack pull it in too. Replacing it is a project-wide change for its own phase. Accepted by the owner
+    # 2026-11-24; re-check when a maintained successor or a fixed release appears.
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice; timestamps only; accepted by the owner, replace in its own phase" },
 ]
 
 [licenses]
