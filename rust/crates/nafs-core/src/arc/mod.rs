@@ -21,8 +21,8 @@
 
 use crate::backend::{Backend, CancelFlag, GenRequest};
 use crate::config::ArcCfg;
-use chrono::Utc;
 use nafs_types::Message;
+use nafs_types::{now_utc, Rfc3339Ext};
 use nafs_verify::extract::{extract_final_answer, latex_to_plain};
 use nafs_verify::plain_numeric;
 use nafs_verify::sandbox::SandboxLimits;
@@ -209,7 +209,7 @@ pub struct ArcStore {
 }
 
 fn now() -> String {
-    Utc::now().to_rfc3339()
+    now_utc().to_rfc3339()
 }
 
 // ---------------------------------------------------------------- text shape (no model)

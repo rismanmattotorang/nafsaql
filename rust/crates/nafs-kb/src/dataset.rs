@@ -14,6 +14,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+use nafs_types::Rfc3339Ext;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -268,7 +269,7 @@ pub async fn build(kb: &Kb, base: &str, opts: DatasetOpts) -> Result<DatasetInfo
         dims,
         documents,
         rows,
-        created_at: chrono::Utc::now().to_rfc3339(),
+        created_at: nafs_types::now_utc().to_rfc3339(),
     })
 }
 

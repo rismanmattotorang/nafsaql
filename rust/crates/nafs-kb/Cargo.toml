@@ -11,13 +11,14 @@ homepage.workspace = true
 publish = false
 
 [dependencies]
+nafs-types = { path = "../nafs-types" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
+time = { workspace = true }
 sha2 = { workspace = true }
 regex = { workspace = true }
 tracing = { workspace = true }

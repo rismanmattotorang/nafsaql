@@ -1,9 +1,57 @@
 //! nafs-types: shared types and wire contracts (IF-005) for Nafs-Aql.
 //! The JSON shapes mirror `api/openapi.yaml` and `api/schemas/*.schema.json`.
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+pub use time::OffsetDateTime;
 use uuid::Uuid;
+
+/// Every timestamp this project writes, after Phase 38 (chrono replaced: RUSTSEC-2026-0543, chrono unmaintained,
+/// no fixed version; the advisory's own two recommended alternatives are `jiff`, still pre-1.0 with no 1.0 date as of
+/// this writing, and `time`, the mature 0.3 branch this project already needed nothing beyond: a UTC instant, RFC
+/// 3339 text, and plain day/hour/minute arithmetic, none of which needs `jiff`'s timezone database).
+///
+/// `to_rfc3339()` keeps the method-call shape chrono's `DateTime<Utc>` had, so most call sites are an import and a
+/// type-name change. Formatting always uses whatever sub-second precision the instant actually carries (`time`'s own
+/// RFC 3339 writer; the same shape chrono's default produced), so a comparison between a value written before this
+/// change and one written after sorts the same way its text always did: by the whole-second part first. Parsing
+/// accepts any RFC 3339 text — any fractional width, `Z` or a numeric offset — so timestamps the previous engine
+/// wrote still read back.
+pub trait Rfc3339Ext {
+    fn to_rfc3339(&self) -> String;
+}
+impl Rfc3339Ext for OffsetDateTime {
+    fn to_rfc3339(&self) -> String {
+        self.format(&time::format_description::well_known::Rfc3339)
+            .expect("an OffsetDateTime always formats as RFC 3339")
+    }
+}
+
+/// The current instant, in UTC. Replaces `chrono::Utc::now()`.
+pub fn now_utc() -> OffsetDateTime {
+    OffsetDateTime::now_utc()
+}
+
+/// RFC 3339 text (any fractional width, `Z` or a numeric offset) as a UTC instant. Replaces
+/// `chrono::DateTime::parse_from_rfc3339(s).map(|t| t.with_timezone(&Utc))`.
+pub fn parse_rfc3339(s: &str) -> std::result::Result<OffsetDateTime, time::error::Parse> {
+    OffsetDateTime::parse(s, &time::format_description::well_known::Rfc3339)
+        .map(|t| t.to_offset(time::UtcOffset::UTC))
+}
+
+/// `#[serde(with = "nafs_types::rfc3339")]` on an `OffsetDateTime` field: the same RFC 3339 text on the wire and in
+/// storage that chrono's own `Serialize`/`Deserialize` impl for `DateTime<Utc>` produced and accepted.
+pub mod rfc3339 {
+    use super::{OffsetDateTime, Rfc3339Ext};
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(t: &OffsetDateTime, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_str(&t.to_rfc3339())
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<OffsetDateTime, D::Error> {
+        let s = String::deserialize(d)?;
+        super::parse_rfc3339(&s).map_err(serde::de::Error::custom)
+    }
+}
 
 /// Path that produced a reply (IF-003).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -403,7 +451,8 @@ pub enum GateRule {
 pub struct DecisionRecord {
     pub decision_id: Uuid,
     pub request_id: String,
-    pub timestamp: DateTime<Utc>,
+    #[serde(with = "rfc3339")]
+    pub timestamp: OffsetDateTime,
     pub config_hash: String,
     pub model_profile: String,
     pub backend: String,
@@ -528,7 +577,8 @@ pub struct TraceRecord {
     pub request_id: String,
     pub decision_id: Uuid,
     pub conversation_id: Option<Uuid>,
-    pub timestamp: DateTime<Utc>,
+    #[serde(with = "rfc3339")]
+    pub timestamp: OffsetDateTime,
     pub config_hash: String,
     pub model_profile: String,
     pub backend: String,

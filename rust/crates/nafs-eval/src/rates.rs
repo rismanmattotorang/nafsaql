@@ -3,6 +3,7 @@
 use crate::load_tasks;
 use nafs_core::orchestrator::Orchestrator;
 use nafs_types::Rates;
+use nafs_types::Rfc3339Ext;
 use nafs_types::RwLockExt;
 use nafs_verify::mutation::{self, clopper_pearson};
 use serde_json::{json, Value};
@@ -116,8 +117,8 @@ pub async fn measure(
         cases.extend(mutation::schema_cases(&schema));
     }
     let total = cases.len();
-    let started = chrono::Utc::now();
-    let snap = |done: usize, stage: &str| json!({"status": "running", "stage": stage, "progress": {"done": done, "total": total}, "started_at": started, "request": req});
+    let started = nafs_types::now_utc();
+    let snap = |done: usize, stage: &str| json!({"status": "running", "stage": stage, "progress": {"done": done, "total": total}, "started_at": started.to_rfc3339(), "request": req});
     progress(&snap(0, "exact verifiers"));
     let mut last = std::time::Instant::now();
     let mut out = mutation::run(&orch.hub, cases, req.concurrency.clamp(1, 8), |d, _| {
@@ -147,7 +148,7 @@ pub async fn measure(
                 break;
             }
             progress(
-                &json!({"status": "running", "stage": "judge", "progress": {"done": i, "total": set.len()}, "started_at": started, "request": req}),
+                &json!({"status": "running", "stage": "judge", "progress": {"done": i, "total": set.len()}, "started_at": started.to_rfc3339(), "request": req}),
             );
             let (q, a, ok) = (
                 c["question"].as_str().unwrap_or(""),
@@ -184,7 +185,7 @@ pub async fn measure(
                 n_mutants: nw as u32,
                 n_correct: nc as u32,
                 phi_upper95: Some(phi_hi),
-                measured_at: Some(chrono::Utc::now().to_rfc3339()),
+                measured_at: Some(nafs_types::now_utc().to_rfc3339()),
             },
         );
     }
@@ -198,7 +199,7 @@ pub async fn measure(
     std::fs::write(path, serde_json::to_string_pretty(&rates)?)?;
     out["rates"] = json!(rates);
     out["status"] = json!("done");
-    out["started_at"] = json!(started);
+    out["started_at"] = json!(started.to_rfc3339());
     out["progress"] = json!({"done": total, "total": total});
     out["request"] = json!(req);
     out["er003"] = json!(out["verifiers"].as_object().map(|m| m.iter().map(|(k, v)| (k.clone(), json!({

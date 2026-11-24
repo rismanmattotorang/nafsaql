@@ -5,13 +5,13 @@ use crate::backend::{Backend, BackendHealth, CancelFlag, GenOutput, GenRequest, 
 use crate::calibration::Calibration;
 use crate::config::{Caps, Config};
 use crate::{domain, gate, parallel};
-use chrono::Utc;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use nafs_harness::patch;
 use nafs_harness::scoring::Verdict;
 use nafs_harness::search::{siblings_note, CandidateTree, Outcome};
 use nafs_memory::{assemble_prompt, Store};
+use nafs_types::now_utc;
 use nafs_types::RwLockExt;
 use nafs_types::*;
 use nafs_verify::{answer_similarity, extract_json, SandboxLimits, VerifierHub};
@@ -1228,7 +1228,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
                 };
                 match self
                     .store
-                    .recall(&user.content, qv.as_deref(), conv, &opts, Utc::now())
+                    .recall(&user.content, qv.as_deref(), conv, &opts, now_utc())
                 {
                     Ok(items) if !items.is_empty() => {
                         system.push_str("\n\n");
@@ -1848,7 +1848,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         let decision = DecisionRecord {
             decision_id: Uuid::new_v4(),
             request_id: request_id.clone(),
-            timestamp: Utc::now(),
+            timestamp: now_utc(),
             config_hash: cfg.hash.clone(),
             model_profile: cfg.assistant.profile.clone(),
             backend: pair.name.clone(),
@@ -2856,7 +2856,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
         {
             match self
                 .store
-                .remember_turn(c, &user.content, &final_text, Utc::now())
+                .remember_turn(c, &user.content, &final_text, now_utc())
             {
                 Ok(ids) if !ids.is_empty() => {
                     let _ = self.store.trim_episodes(cfg.recall.max_episodes);
@@ -2921,7 +2921,7 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
             request_id,
             decision_id: decision.decision_id,
             conversation_id: conv,
-            timestamp: Utc::now(),
+            timestamp: now_utc(),
             config_hash: cfg.hash.clone(),
             model_profile: cfg.assistant.profile.clone(),
             backend: pair.name.clone(),

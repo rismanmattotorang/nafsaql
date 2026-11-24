@@ -3,6 +3,7 @@
 //! passes. Pooled statistics combine items across stored evaluation runs, pairing items only within
 //! the run that produced them.
 use nafs_eval::{gated, ItemResult};
+use nafs_types::Rfc3339Ext;
 use nafs_verify::mutation::clopper_pearson;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -611,7 +612,7 @@ pub fn evaluate(e: &Evidence) -> Value {
         vec![ni1, reg, sch],
     );
 
-    json!({"gates": [g0, g1, g2, g3, g4, g5, g6], "evaluated_at": chrono::Utc::now().to_rfc3339(),
+    json!({"gates": [g0, g1, g2, g3, g4, g5, g6], "evaluated_at": nafs_types::now_utc().to_rfc3339(),
         "note": "Pending means the stored evidence is not yet enough to decide; pass and fail follow the roadmap's go/no-go criteria."})
 }
 

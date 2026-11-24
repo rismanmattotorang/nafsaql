@@ -14,6 +14,13 @@ use serde_json::{json, Value};
 use crate::chunk::Chunk;
 use crate::KbError;
 
+/// SurrealDB's own datetime text style (fixed microseconds, `Z`): what a `datetime` field decoded from CBOR
+/// `[seconds, nanoseconds]` is turned back into, matching what this project wrote before Phase 38 (chrono's
+/// `to_rfc3339_opts(SecondsFormat::Micros, true)`).
+const DATETIME_MICROS_Z: &[time::format_description::FormatItem<'static>] = time::macros::format_description!(
+    "[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:6]Z"
+);
+
 /// Connection settings (`[knowledge]`, IF-K02).
 #[derive(Debug, Clone)]
 pub struct StoreConfig {
@@ -1724,6 +1731,7 @@ fn first_string(v: Option<Value>) -> Option<String> {
 /// CBOR <-> JSON for SurrealDB's RPC (its CBOR tags: 0 and 12 datetime, 6 NONE, 7 table, 8 record id, 9 and 37 UUID,
 /// 10 decimal, 13 and 14 duration).
 mod cbor {
+    use super::DATETIME_MICROS_Z;
     use ciborium::value::{Integer, Value as C};
     use serde_json::{Map, Number, Value as J};
 
@@ -1819,8 +1827,11 @@ mod cbor {
                     .collect();
                 let secs = n.first().copied().unwrap_or(0) as i64;
                 let nanos = n.get(1).copied().unwrap_or(0) as u32;
-                chrono::DateTime::from_timestamp(secs, nanos)
-                    .map(|d| J::String(d.to_rfc3339_opts(chrono::SecondsFormat::Micros, true)))
+                time::OffsetDateTime::from_unix_timestamp(secs)
+                    .and_then(|d| d.replace_nanosecond(nanos))
+                    .ok()
+                    .and_then(|d| d.format(DATETIME_MICROS_Z).ok())
+                    .map(J::String)
                     .unwrap_or(J::Null)
             }
             (37, C::Bytes(b)) if b.len() == 16 => {

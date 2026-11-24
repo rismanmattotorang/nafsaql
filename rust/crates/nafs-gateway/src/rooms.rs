@@ -28,7 +28,7 @@ use axum::Json;
 use futures::{SinkExt, StreamExt};
 use nafs_core::orchestrator::Emitter;
 use nafs_types::LockExt;
-use nafs_types::{ChatRequest, Message, NafsError, ReasoningMode, StreamEvent};
+use nafs_types::{ChatRequest, Message, NafsError, ReasoningMode, Rfc3339Ext, StreamEvent};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -524,7 +524,7 @@ async fn room_session(s: AppState, room: nafs_memory::Room, wanted: String, sock
             id: msg_id.clone(),
             user: user.clone(),
             content: content.clone(),
-            ts: chrono::Utc::now().to_rfc3339(),
+            ts: nafs_types::now_utc().to_rfc3339(),
         });
         h.send_queue();
         let opts = frame["payload"].clone();

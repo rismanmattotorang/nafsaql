@@ -3,8 +3,12 @@
 //! every labelled sample is scored by a model that did not see it (k-fold cross-validation), so the
 //! reported ECE is a held-out estimate. The fit also stores the escalation-threshold quantiles that the
 //! budget mode (FR-014) turns into lambda*.
-use nafs_types::GateFeatures;
+use nafs_types::{GateFeatures, Rfc3339Ext};
 use serde::{Deserialize, Serialize};
+
+/// `version` names a fit by when it ran: `fit-YYYYMMDD-HHMMSS`.
+const FIT_STAMP: &[time::format_description::FormatItem<'static>] =
+    time::macros::format_description!("[year][month][day]-[hour][minute][second]");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Calibration {
@@ -317,8 +321,13 @@ impl Calibration {
         let weights = logistic(&feats, ys);
         let isotonic = isotonic_fit(&oof, ys);
         let mut cal = Self {
-            version: format!("fit-{}", chrono::Utc::now().format("%Y%m%d-%H%M%S")),
-            fitted_at: chrono::Utc::now().to_rfc3339(),
+            version: format!(
+                "fit-{}",
+                nafs_types::now_utc()
+                    .format(&FIT_STAMP)
+                    .expect("a valid instant always formats")
+            ),
+            fitted_at: nafs_types::now_utc().to_rfc3339(),
             n,
             ece: ece(&held, ys, 5),
             risk_bins: risk_bins(&held, ys, risk_bin_count(n), 0.05),

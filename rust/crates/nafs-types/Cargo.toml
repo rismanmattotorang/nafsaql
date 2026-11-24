@@ -14,5 +14,5 @@ publish = false
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
-chrono = { workspace = true }
+time = { workspace = true }
 thiserror = { workspace = true }

@@ -2,10 +2,11 @@
 //! repeated fact updates its file instead of adding a near-duplicate; every write is a diff row that can be undone.
 //! Extraction from a conversation is by rule here; a model pass, when on, produces the same `Candidate`s.
 
-use chrono::{DateTime, NaiveDate, Utc};
+use nafs_types::{OffsetDateTime, Rfc3339Ext};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
+use time::Date;
 
 use crate::uri::{slug, Uri, MEMORY_KINDS};
 
@@ -18,7 +19,8 @@ pub struct MemoryFile {
     pub key: String,
     pub title: String,
     pub body: String,
-    pub updated: DateTime<Utc>,
+    #[serde(with = "nafs_types::rfc3339")]
+    pub updated: OffsetDateTime,
     /// The sessions (or "manual") a file was written from.
     #[serde(default)]
     pub sources: Vec<String>,
@@ -53,7 +55,7 @@ impl MemoryFile {
         uri_kind: &str,
         uri_key: &str,
         text: &str,
-        now: DateTime<Utc>,
+        now: OffsetDateTime,
     ) -> Result<MemoryFile, String> {
         if !MEMORY_KINDS.contains(&uri_kind) {
             return Err(format!("unknown memory kind \"{uri_kind}\""));
@@ -151,7 +153,7 @@ pub struct Candidate {
     pub body: String,
     /// For an event: its date, when the text names one.
     #[serde(default)]
-    pub date: Option<NaiveDate>,
+    pub date: Option<Date>,
 }
 
 impl Candidate {
@@ -372,6 +374,13 @@ fn sentences(text: &str) -> Vec<String> {
     out
 }
 
+/// A calendar date from a year, a month (1-12) and a day, or `None` when any part is out of range. Replaces
+/// `chrono::NaiveDate::from_ymd_opt`.
+fn ymd(year: i32, month_no: u32, day: u32) -> Option<Date> {
+    let m = time::Month::try_from(u8::try_from(month_no).ok()?).ok()?;
+    Date::from_calendar_date(year, m, u8::try_from(day).ok()?).ok()
+}
+
 fn month(m: &str) -> Option<u32> {
     let m = m.to_ascii_lowercase();
     [
@@ -383,7 +392,7 @@ fn month(m: &str) -> Option<u32> {
 }
 
 /// A date named in the text: ISO (`2026-10-01`) or `3 November 2026` / `November 3, 2026`.
-pub fn find_date(text: &str) -> Option<NaiveDate> {
+pub fn find_date(text: &str) -> Option<Date> {
     static ISO: OnceLock<Regex> = OnceLock::new();
     static DMY: OnceLock<Regex> = OnceLock::new();
     static MDY: OnceLock<Regex> = OnceLock::new();
@@ -394,16 +403,16 @@ pub fn find_date(text: &str) -> Option<NaiveDate> {
         Regex::new(r"(?i)\b([a-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})\b").expect("valid")
     });
     if let Some(c) = iso.captures(text) {
-        return NaiveDate::from_ymd_opt(c[1].parse().ok()?, c[2].parse().ok()?, c[3].parse().ok()?);
+        return ymd(c[1].parse().ok()?, c[2].parse().ok()?, c[3].parse().ok()?);
     }
     if let Some(c) = dmy.captures(text) {
         if let Some(m) = month(&c[2]) {
-            return NaiveDate::from_ymd_opt(c[3].parse().ok()?, m, c[1].parse().ok()?);
+            return ymd(c[3].parse().ok()?, m, c[1].parse().ok()?);
         }
     }
     if let Some(c) = mdy.captures(text) {
         if let Some(m) = month(&c[1]) {
-            return NaiveDate::from_ymd_opt(c[3].parse().ok()?, m, c[2].parse().ok()?);
+            return ymd(c[3].parse().ok()?, m, c[2].parse().ok()?);
         }
     }
     None
@@ -591,8 +600,8 @@ pub fn extract(user_message: &str) -> Vec<Candidate> {
 mod tests {
     use super::*;
 
-    fn now() -> DateTime<Utc> {
-        "2026-11-13T07:00:00Z".parse().unwrap()
+    fn now() -> OffsetDateTime {
+        nafs_types::parse_rfc3339("2026-11-13T07:00:00Z").unwrap()
     }
 
     #[test]
@@ -610,7 +619,7 @@ mod tests {
         assert_eq!(got[0].body, "name: Ris");
         assert_eq!(got[1].key(), "answers-in-indonesian");
         assert_eq!(got[3].key(), "my-manager");
-        assert_eq!(got[4].date, NaiveDate::from_ymd_opt(2026, 11, 3));
+        assert_eq!(got[4].date, ymd(2026, 11, 3));
         assert!(got[4].key().starts_with("2026-11-03-"));
         assert!(extract("What is my manager's name? Is it Dewi?").is_empty());
         assert!(extract("My manager is who?").is_empty());

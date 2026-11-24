@@ -303,7 +303,7 @@ impl Orchestrator {
         let decision = DecisionRecord {
             decision_id: Uuid::new_v4(),
             request_id: request_id.to_string(),
-            timestamp: Utc::now(),
+            timestamp: nafs_types::now_utc(),
             config_hash: cfg.hash.clone(),
             model_profile: cfg.assistant.profile.clone(),
             backend: pair.name.clone(),
@@ -387,7 +387,7 @@ impl Orchestrator {
             request_id: request_id.to_string(),
             decision_id: decision.decision_id,
             conversation_id: conv,
-            timestamp: Utc::now(),
+            timestamp: nafs_types::now_utc(),
             config_hash: cfg.hash.clone(),
             model_profile: cfg.assistant.profile.clone(),
             backend: pair.name.clone(),

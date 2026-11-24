@@ -856,7 +856,7 @@ async fn find_in(s: &AppState, query: &str, scope: &Uri, k: usize) -> ApiResult<
         }
     }
     if want(Space::Memory) {
-        let now = chrono::Utc::now();
+        let now = nafs_types::now_utc();
         let mut list: Vec<(f64, Value)> = s
             .store
             .memory_files(
@@ -871,7 +871,7 @@ async fn find_in(s: &AppState, query: &str, scope: &Uri, k: usize) -> ApiResult<
             .map(|f| {
                 let mut sc = overlap(an, query, &format!("{}\n{}", f.title, f.body));
                 if f.kind == "events" {
-                    sc *= event_decay((now - f.updated).num_seconds() as f64 / 86_400.0);
+                    sc *= event_decay((now - f.updated).whole_seconds() as f64 / 86_400.0);
                 }
                 (
                     sc,
@@ -1138,7 +1138,7 @@ async fn write(
             if nafs_context::uri::slug(key) != *key {
                 return Err(bad("a memory key is lower-case letters, digits and dashes"));
             }
-            let f = MemoryFile::from_markdown(kind, key, &body, chrono::Utc::now()).map_err(bad)?;
+            let f = MemoryFile::from_markdown(kind, key, &body, nafs_types::now_utc()).map_err(bad)?;
             let d = s.store.write_memory_file(&f)?;
             Ok(Json(json!({"uri": u.to_string(), "diff": d})))
         }

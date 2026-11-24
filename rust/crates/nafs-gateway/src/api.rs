@@ -14,7 +14,7 @@ use nafs_memory::Store;
 use nafs_types::{
     ChatRequest, CodeAgentReply, CodeAgentRequest, NafsError, StreamEvent, VerificationInputs,
 };
-use nafs_types::{LockExt, RwLockExt};
+use nafs_types::{LockExt, Rfc3339Ext, RwLockExt};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{BTreeMap, HashMap};
@@ -721,7 +721,7 @@ async fn forget_memory(State(s): State<AppState>) -> ApiResult<Json<Value>> {
 }
 /// Merge notes that say the same thing.
 async fn tidy_memory(State(s): State<AppState>) -> ApiResult<Json<Value>> {
-    let merged = s.store.consolidate_episodes(chrono::Utc::now())?;
+    let merged = s.store.consolidate_episodes(nafs_types::now_utc())?;
     Ok(Json(
         json!({"merged": merged, "count": s.store.episode_count()?}),
     ))
@@ -894,14 +894,14 @@ async fn start_protocol(
         .into());
     }
     let id = Uuid::new_v4();
-    let base = json!({"run_id": id, "kind": "protocol", "status": "running", "request": req, "created_at": chrono::Utc::now()});
+    let base = json!({"run_id": id, "kind": "protocol", "status": "running", "request": req, "created_at": nafs_types::now_utc().to_rfc3339()});
     s.store.save_run("bench", id, "running", &base)?;
     let (mut guard, cancel) = RunGuard::start(&s, "bench", "protocol", id);
     let progress = progress_saver(&s, "bench", "protocol", id, Duration::from_millis(1500));
     tokio::spawn(async move {
         let mut v = nafs_bench::protocol(guard.s.orch.clone(), req, cancel, progress).await;
         v["run_id"] = json!(id);
-        v["created_at"] = json!(chrono::Utc::now());
+        v["created_at"] = json!(nafs_types::now_utc().to_rfc3339());
         let st = v["status"].as_str().unwrap_or("done").to_string();
         let _ = guard.s.store.save_run("bench", id, &st, &v);
         guard.finish();
@@ -1169,7 +1169,7 @@ impl Drop for RunGuard {
         self.s.cancels.locked().remove(&self.id);
         if !self.finished {
             tracing::error!(run = %self.id, kind = self.kind, "background run stopped without a result");
-            let v = json!({"run_id": self.id, "kind": self.kind, "status": "failed", "error": "the run stopped unexpectedly", "finished_at": chrono::Utc::now()});
+            let v = json!({"run_id": self.id, "kind": self.kind, "status": "failed", "error": "the run stopped unexpectedly", "finished_at": nafs_types::now_utc().to_rfc3339()});
             let _ = self.s.store.save_run(self.table, self.id, "failed", &v);
         }
     }
@@ -1231,7 +1231,7 @@ async fn start_bench(
         .into());
     }
     let id = Uuid::new_v4();
-    let base = json!({"run_id": id, "kind": "bench", "status": "running", "request": req, "created_at": chrono::Utc::now()});
+    let base = json!({"run_id": id, "kind": "bench", "status": "running", "request": req, "created_at": nafs_types::now_utc().to_rfc3339()});
     s.store.save_run("bench", id, "running", &base)?;
     let (mut guard, cancel) = RunGuard::start(&s, "bench", "bench", id);
     let progress = progress_saver(&s, "bench", "bench", id, Duration::from_millis(800));
@@ -1246,7 +1246,7 @@ async fn start_bench(
         v["run_id"] = json!(id);
         v["kind"] = json!("bench");
         v["status"] = json!(status);
-        v["finished_at"] = json!(chrono::Utc::now());
+        v["finished_at"] = json!(nafs_types::now_utc().to_rfc3339());
         let _ = guard.s.store.save_run("bench", id, status, &v);
         guard.finish();
     });
@@ -1345,7 +1345,7 @@ async fn start_eval(
         })
     })?;
     let id = Uuid::new_v4();
-    let base = json!({"run_id": id, "kind": "eval", "status": "running", "request": req, "created_at": chrono::Utc::now(), "progress": {"done": 0, "total": 0}});
+    let base = json!({"run_id": id, "kind": "eval", "status": "running", "request": req, "created_at": nafs_types::now_utc().to_rfc3339(), "progress": {"done": 0, "total": 0}});
     s.store.save_run("eval", id, "running", &base)?;
     spawn_eval(&s, id, req, vec![]);
     Ok((StatusCode::ACCEPTED, Json(base)))
@@ -1373,7 +1373,7 @@ fn spawn_eval(
             Ok(mut v) => {
                 v["run_id"] = json!(id);
                 v["kind"] = json!("eval");
-                v["finished_at"] = json!(chrono::Utc::now());
+                v["finished_at"] = json!(nafs_types::now_utc().to_rfc3339());
                 v
             }
             Err(e) => {
@@ -1450,7 +1450,7 @@ async fn start_rates(
     Json(req): Json<nafs_eval::rates::RatesRequest>,
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     let id = Uuid::new_v4();
-    let base = json!({"run_id": id, "kind": "rates", "status": "running", "request": req, "created_at": chrono::Utc::now(), "progress": {"done": 0, "total": 0}});
+    let base = json!({"run_id": id, "kind": "rates", "status": "running", "request": req, "created_at": nafs_types::now_utc().to_rfc3339(), "progress": {"done": 0, "total": 0}});
     s.store.save_run("rates", id, "running", &base)?;
     let (mut guard, cancel) = RunGuard::start(&s, "rates", "rates", id);
     let progress = progress_saver(&s, "rates", "rates", id, Duration::ZERO);
@@ -1462,7 +1462,7 @@ async fn start_rates(
         );
         v["run_id"] = json!(id);
         v["kind"] = json!("rates");
-        v["finished_at"] = json!(chrono::Utc::now());
+        v["finished_at"] = json!(nafs_types::now_utc().to_rfc3339());
         let _ = guard
             .s
             .store

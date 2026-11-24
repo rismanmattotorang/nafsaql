@@ -19,11 +19,14 @@ ignore = [
     # parsing runs in the gateway's ingestion worker on a document the operator chose to upload, and a parse failure
     # fails that document alone (SR-K02). Replace when pdf_oxide moves to a maintained parser.
     { id = "RUSTSEC-2026-0192", reason = "font parser under pdf_oxide; revisit when pdf_oxide changes parser" },
-    # `chrono`: an unmaintained notice (no vulnerability, no fixed release), published after 0.2.0. Every crate uses it
-    # for timestamps (`Utc::now`, RFC 3339 text written by us and read back), and the database, the KB store and the
-    # HTTP stack pull it in too. Replacing it is a project-wide change for its own phase. Accepted by the owner
-    # 2026-11-24; re-check when a maintained successor or a fixed release appears.
-    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice; timestamps only; accepted by the owner, replace in its own phase" },
+    # `chrono`: an unmaintained notice (no vulnerability, no fixed release), published after 0.2.0, accepted by the
+    # owner on 2026-11-24. Phase 38 (the same day) replaced chrono with `time` 0.3 in every one of this project's own
+    # crates (`Utc::now`, RFC 3339 text and the two `DateTime<Utc>` wire-contract fields all moved; verified against
+    # the operator's real stored decisions, replies and trace lines, all ~24,500 of them parsing and round-tripping
+    # unchanged). The one remaining instance is transitive, through `pdf_oxide` (our PDF reader, which already has the
+    # `ttf-parser` exception above): `cargo tree -i chrono` shows no path except pdf_oxide -> nafs-kb. Revisit when
+    # pdf_oxide drops it or a maintained chrono successor is adopted upstream.
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained notice; only reached transitively via pdf_oxide now; our own crates use time 0.3 (Phase 38)" },
 ]
 
 [licenses]

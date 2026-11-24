@@ -1,7 +1,7 @@
 //! nafs-bench: closed-loop load generation for the performance console (FR-052, ER-007).
 use nafs_core::orchestrator::{Emitter, Orchestrator};
 use nafs_types::LockExt;
-use nafs_types::{ChatRequest, Message, ReasoningMode, StreamEvent};
+use nafs_types::{ChatRequest, Message, ReasoningMode, Rfc3339Ext, StreamEvent};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -310,7 +310,7 @@ pub async fn protocol(
     cancel: Arc<AtomicBool>,
     progress: impl Fn(&Value) + Send + Sync + Clone + 'static,
 ) -> Value {
-    let started = chrono::Utc::now().to_rfc3339();
+    let started = nafs_types::now_utc().to_rfc3339();
     let mut levels: Vec<Value> = vec![];
     for (i, &c) in req.levels.iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {

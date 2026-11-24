@@ -8,8 +8,7 @@
 //! Two rules belong to the caller. A request marked `ephemeral` never calls `remember_turn`. A conversation
 //! with `training_opt_out` is still remembered: this is the person's own memory, not research use.
 use crate::{polarity_conflict, st, Store};
-use chrono::{DateTime, Utc};
-use nafs_types::{NafsError, Result};
+use nafs_types::{now_utc, NafsError, OffsetDateTime, Result, Rfc3339Ext};
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -507,7 +506,7 @@ impl Store {
         conv: Uuid,
         question: &str,
         answer: &str,
-        now: DateTime<Utc>,
+        now: OffsetDateTime,
     ) -> Result<Vec<Uuid>> {
         let question = question.trim();
         let answer = strip_think(answer);
@@ -578,7 +577,7 @@ impl Store {
                 "INSERT INTO episodes (id, conversation_id, created_at, kind, text, importance) VALUES (?1,NULL,?2,'note',?3,1.0)",
                 params![
                     id.to_string(),
-                    Utc::now().to_rfc3339(),
+                    now_utc().to_rfc3339(),
                     clip_chars(text, EPISODE_MAX_CHARS)
                 ],
             )
@@ -658,7 +657,7 @@ impl Store {
         query_vector: Option<&[f32]>,
         exclude_conv: Option<Uuid>,
         opts: &RecallOpts,
-        now: DateTime<Utc>,
+        now: OffsetDateTime,
     ) -> Result<Vec<Recalled>> {
         if opts.limit == 0 {
             return Ok(vec![]);
@@ -737,8 +736,8 @@ impl Store {
             .filter(|(_, rel)| *rel >= threshold)
             .map(|(i, rel)| {
                 let e = &eps[i];
-                let age_days = DateTime::parse_from_rfc3339(&e.created_at)
-                    .map(|t| (now - t.with_timezone(&Utc)).num_seconds() as f64 / 86_400.0)
+                let age_days = nafs_types::parse_rfc3339(&e.created_at)
+                    .map(|t| (now - t).whole_seconds() as f64 / 86_400.0)
                     .unwrap_or(0.0)
                     .max(0.0);
                 let decay =
@@ -893,7 +892,7 @@ impl Store {
     /// changed, so it is embedded again). Only episodes of the same conversation are linked, and notes only with
     /// notes, so that deleting a conversation still removes exactly what it said. Returns the number of episodes
     /// merged away. `now` becomes the merged episode's last access time when a member had been accessed.
-    pub fn consolidate_episodes(&self, now: DateTime<Utc>) -> Result<usize> {
+    pub fn consolidate_episodes(&self, now: OffsetDateTime) -> Result<usize> {
         let mut eps = self.load_episodes(&format!(
             "WHERE kind IN ('turn','note') ORDER BY created_at DESC, rowid DESC LIMIT {CONSOLIDATE_MAX}"
         ))?;
@@ -992,7 +991,10 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
+    use time::Duration;
+
+    const YMD: &[time::format_description::FormatItem<'static>] =
+        time::macros::format_description!("[year]-[month]-[day]");
 
     fn tmp_store() -> (Store, std::path::PathBuf) {
         let d = std::env::temp_dir().join(format!("nafs-recall-{}", Uuid::new_v4()));
@@ -1006,7 +1008,7 @@ mod tests {
         RecallOpts::default()
     }
     /// A few unrelated turns, so that term weights are not those of a one-document memory.
-    fn filler(st: &Store, now: DateTime<Utc>) {
+    fn filler(st: &Store, now: OffsetDateTime) {
         for (q, a) in [
             (
                 "How long should bread dough rest before baking?",
@@ -1031,7 +1033,7 @@ mod tests {
     #[test]
     fn a_fact_told_in_one_conversation_is_recalled_from_another_and_not_from_the_same_one() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         filler(&st, now);
         let a = Uuid::new_v4();
         let ids = st
@@ -1070,7 +1072,7 @@ mod tests {
         assert!(block.starts_with("Notes from earlier conversations"));
         assert!(block.contains(&format!(
             "\n\n[earlier, {}]\nQ: My dog",
-            now.format("%Y-%m-%d")
+            now.format(YMD).unwrap()
         )));
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1078,7 +1080,7 @@ mod tests {
     #[test]
     fn greetings_and_refusals_and_tiny_turns_are_not_stored() {
         let (st, dir) = tmp_store();
-        let (conv, now) = (Uuid::new_v4(), Utc::now());
+        let (conv, now) = (Uuid::new_v4(), now_utc());
         let long = "Hello! It is good to see you again. How can I help you today?";
         for q in [
             "Hi!",
@@ -1128,7 +1130,7 @@ mod tests {
     #[test]
     fn every_third_stored_turn_also_stores_a_window_of_the_last_five() {
         let (st, dir) = tmp_store();
-        let (conv, now) = (Uuid::new_v4(), Utc::now());
+        let (conv, now) = (Uuid::new_v4(), now_utc());
         let mut stored = Vec::new();
         for i in 1..=6 {
             stored.push(
@@ -1228,7 +1230,7 @@ mod tests {
     #[test]
     fn trimming_removes_the_never_recalled_oldest_first_and_keeps_notes() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         let conv = st.ensure_conversation(None, "t", None).unwrap();
         assert!(!st.in_room(conv));
         let note = st
@@ -1279,7 +1281,7 @@ mod tests {
         assert_eq!(numeric_bindings(&t("it costs 12.5 euros"))[0].1, "12.5");
 
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         filler(&st, now);
         let q = "The budget for the kitchen renovation project this coming year is";
         let a = "Noted, I will keep the kitchen renovation budget in mind for later planning.";
@@ -1321,7 +1323,7 @@ mod tests {
         assert_eq!(elbow_threshold(&[0.30, 0.10], 0.25), 0.25);
 
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         filler(&st, now);
         let strong = st
             .remember_turn(
@@ -1359,7 +1361,7 @@ mod tests {
     #[test]
     fn an_older_item_ranks_below_a_newer_equal_one() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         filler(&st, now);
         let a = "Noted, the standup time is saved.";
         let old = st
@@ -1396,7 +1398,7 @@ mod tests {
     #[test]
     fn vectors_change_the_ranking_when_the_words_do_not_match() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         let car = st
             .remember_turn(
                 Uuid::new_v4(),
@@ -1472,7 +1474,7 @@ mod tests {
     #[test]
     fn an_opposite_question_is_not_recalled() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         filler(&st, now);
         st.remember_turn(
             Uuid::new_v4(),
@@ -1509,7 +1511,7 @@ mod tests {
     #[test]
     fn a_window_and_a_turn_inside_it_are_not_both_returned() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         filler(&st, now);
         let conv = Uuid::new_v4();
         for (q, a) in [
@@ -1557,7 +1559,7 @@ mod tests {
     #[test]
     fn deleting_a_conversation_removes_its_episodes_and_keeps_the_others() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         let gone = st.ensure_conversation(None, "to delete", None).unwrap();
         let stays = st.ensure_conversation(None, "to keep", None).unwrap();
         for i in 1..=3 {
@@ -1619,7 +1621,7 @@ mod tests {
     #[test]
     fn consolidation_merges_near_identical_turns_and_leaves_different_numbers_apart() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         let conv = Uuid::new_v4();
         let first = st
             .remember_turn(
@@ -1692,7 +1694,7 @@ mod tests {
     #[test]
     fn forgetting_removes_one_episode_or_all_of_them() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         let turn = st
             .remember_turn(
                 Uuid::new_v4(),
@@ -1734,7 +1736,7 @@ mod tests {
     #[test]
     fn the_budget_keeps_the_first_item_clipped_and_stops_before_overflow() {
         let (st, dir) = tmp_store();
-        let now = Utc::now();
+        let now = now_utc();
         filler(&st, now);
         let a = "Noted, the cat's feeding time is saved for later.";
         for hour in [6, 7, 8] {

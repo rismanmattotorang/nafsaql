@@ -3,13 +3,14 @@
 //! sessions (`nafs://sessions/{id}`). The formats and merge rules are `nafs_context`'s; this module stores them.
 
 use crate::{st, Store};
-use chrono::{DateTime, Utc};
 use nafs_context::memory::{self, Candidate, MemoryFile, Op};
 use nafs_context::skill::Skill;
+use nafs_types::{now_utc, Rfc3339Ext};
 use nafs_types::{NafsError, Result};
 use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
+use time::Duration;
 use uuid::Uuid;
 
 pub(crate) const SCHEMA: &str = r#"
@@ -90,9 +91,7 @@ fn file_from_row(r: &rusqlite::Row) -> rusqlite::Result<MemoryFile> {
         key: r.get(1)?,
         title: r.get(2)?,
         body: r.get(3)?,
-        updated: DateTime::parse_from_rfc3339(&updated)
-            .map(|d| d.with_timezone(&Utc))
-            .unwrap_or_else(|_| Utc::now()),
+        updated: nafs_types::parse_rfc3339(&updated).unwrap_or_else(|_| now_utc()),
         sources: serde_json::from_str(&sources).unwrap_or_default(),
     })
 }
@@ -177,7 +176,7 @@ impl Store {
         reason: &str,
     ) -> Result<DiffRow> {
         let id = Uuid::new_v4().to_string();
-        let at = Utc::now().to_rfc3339();
+        let at = now_utc().to_rfc3339();
         let src = |m: Option<&MemoryFile>| {
             m.map(|m| serde_json::to_string(&m.sources).unwrap_or_default())
         };
@@ -326,7 +325,7 @@ impl Store {
                 .map(|e| e.title.clone())
                 .unwrap_or_else(|| c0.title.clone()),
             body,
-            updated: Utc::now(),
+            updated: now_utc(),
             sources,
         };
         let row = if op == Op::Skip {
@@ -419,7 +418,7 @@ impl Store {
                         key,
                         before_title.unwrap_or_else(|| d.title.clone()),
                         b,
-                        Utc::now().to_rfc3339(),
+                        now_utc().to_rfc3339(),
                         before_sources.unwrap_or_else(|| "[]".into())
                     ],
                 )
@@ -456,7 +455,7 @@ impl Store {
         chosen.extend(files.iter().filter(|f| f.kind == "preferences"));
         if let Some(q) = question {
             let qw = words(q);
-            let now = Utc::now();
+            let now = now_utc();
             let mut rest: Vec<(f64, &MemoryFile)> = files
                 .iter()
                 .filter(|f| !matches!(f.kind.as_str(), "profile" | "preferences"))
@@ -465,7 +464,7 @@ impl Store {
                     let share = qw.iter().filter(|w| fw.contains(*w)).count() as f64
                         / qw.len().max(1) as f64;
                     let decay = if f.kind == "events" {
-                        memory::event_decay((now - f.updated).num_seconds() as f64 / 86_400.0)
+                        memory::event_decay((now - f.updated).whole_seconds() as f64 / 86_400.0)
                     } else {
                         1.0
                     };
@@ -583,7 +582,7 @@ impl Store {
     /// Conversations to save as files on their own (`[context] commit_idle_minutes`): not a room's, quiet for at least
     /// `idle_minutes`, and changed since they were last saved. At most `limit`.
     pub fn conversations_to_commit(&self, idle_minutes: u64, limit: usize) -> Result<Vec<Uuid>> {
-        let before = (Utc::now() - chrono::Duration::minutes(idle_minutes as i64)).to_rfc3339();
+        let before = (now_utc() - Duration::minutes(idle_minutes as i64)).to_rfc3339();
         let c = self.db();
         let mut q = c
             .prepare(
@@ -637,7 +636,7 @@ impl Store {
                     serde_json::to_string(&s.tags).unwrap_or_default(),
                     serde_json::to_string(&s.tools).unwrap_or_default(),
                     s.body,
-                    Utc::now().to_rfc3339()
+                    now_utc().to_rfc3339()
                 ],
             )
             .map_err(st)?;
@@ -790,7 +789,7 @@ impl Store {
                 "INSERT INTO ctx_session (conversation_id, title, committed_at, last_message_id, messages, transcript, extracted) \
                  VALUES (?1,?2,?3,?4,?5,?6,?7) ON CONFLICT(conversation_id) DO UPDATE SET title=?2, committed_at=?3, \
                  last_message_id=?4, messages=?5, transcript=?6, extracted=?7",
-                params![id, title, Utc::now().to_rfc3339(), last, msgs.len() as i64, transcript, extracted],
+                params![id, title, now_utc().to_rfc3339(), last, msgs.len() as i64, transcript, extracted],
             )
             .map_err(st)?;
         Ok(CommitReport {
@@ -878,7 +877,7 @@ mod tests {
             key: "wifi".into(),
             title: title.into(),
             body: body.into(),
-            updated: Utc::now(),
+            updated: now_utc(),
             sources: vec![format!("nafs://sessions/{title}")],
         };
         s.write_memory_file(&mk("One", "X")).unwrap();
@@ -927,7 +926,7 @@ mod tests {
             kind: "events".into(),
             title: "launch".into(),
             body: body.into(),
-            date: chrono::NaiveDate::from_ymd_opt(2026, 11, 3),
+            date: time::Date::from_calendar_date(2026, time::Month::November, 3).ok(),
         };
         s.remember_candidate(&e("We launched the beta."), None)
             .unwrap();
@@ -981,7 +980,7 @@ mod tests {
     #[test]
     fn hand_written_files_skills_and_events() {
         let (s, _d) = store();
-        let f = MemoryFile::from_markdown("notes", "wifi", "# Wifi\nOn the fridge.", Utc::now())
+        let f = MemoryFile::from_markdown("notes", "wifi", "# Wifi\nOn the fridge.", now_utc())
             .unwrap();
         assert_eq!(s.write_memory_file(&f).unwrap().op, "add");
         assert_eq!(s.memory_files(Some("notes")).unwrap().len(), 1);
@@ -991,7 +990,7 @@ mod tests {
             kind: "events".into(),
             title: "launch".into(),
             body: body.into(),
-            date: chrono::NaiveDate::from_ymd_opt(2026, 11, 3),
+            date: time::Date::from_calendar_date(2026, time::Month::November, 3).ok(),
         };
         s.remember_candidate(&e("We launched the beta."), None)
             .unwrap();

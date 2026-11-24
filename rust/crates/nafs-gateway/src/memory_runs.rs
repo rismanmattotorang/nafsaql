@@ -11,8 +11,13 @@ use axum::extract::{Path as UrlPath, State};
 use axum::http::StatusCode;
 use axum::Json;
 use nafs_kb::KbError;
+use nafs_types::Rfc3339Ext;
 use serde::Deserialize;
 use serde_json::{json, Value};
+
+/// A run directory's name when its id is not taken: `YYYYMMDD-HHMMSS`, `-n` appended on a collision.
+const RUN_ID_STAMP: &[time::format_description::FormatItem<'static>] =
+    time::macros::format_description!("[year][month][day]-[hour][minute][second]");
 
 use crate::api::AppState;
 use crate::kb::KbApiError;
@@ -386,12 +391,15 @@ pub async fn start(
             }
         }
         std::fs::create_dir_all(dir.join("runs")).map_err(|e| KbError::Io(e.to_string()))?;
-        let now = chrono::Utc::now();
+        let now = nafs_types::now_utc();
+        let stamp = now
+            .format(RUN_ID_STAMP)
+            .expect("a fixed format always succeeds");
         let mut taken = None;
         for n in 0..1000 {
             let id = match n {
-                0 => now.format("%Y%m%d-%H%M%S").to_string(),
-                _ => format!("{}-{n}", now.format("%Y%m%d-%H%M%S")),
+                0 => stamp.clone(),
+                _ => format!("{stamp}-{n}"),
             };
             let p = dir.join("runs").join(&id);
             if std::fs::create_dir(&p).is_ok() {
@@ -408,7 +416,7 @@ pub async fn start(
         .clamp(1, 64);
     let mut run = json!({ "id": id, "kb": kb, "kind": b.kind, "epochs": b.epochs.clamp(1, 20), "max_examples": b.max_examples, "lr": lr,
         "accumulation": accumulation,
-        "init": init, "created_at": chrono::Utc::now().to_rfc3339(), "state": "building", "pid": 0,
+        "init": init, "created_at": nafs_types::now_utc().to_rfc3339(), "state": "building", "pid": 0,
         // The gateway building the dataset: without it a run interrupted by a restart would stay "building" and block
         // every later run for this base.
         "owner": std::process::id() });

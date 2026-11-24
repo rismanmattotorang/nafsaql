@@ -1,5 +1,5 @@
 //! nafs-memory: the Context Manager (FR-003, FR-060, IF-010).
-use chrono::Utc;
+use nafs_types::{now_utc, Rfc3339Ext};
 use nafs_types::{ChatReply, DecisionRecord, Message, NafsError, Result, TraceRecord};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use std::io::Write;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, PoisonError};
+use time::Duration;
 use uuid::Uuid;
 
 pub mod files;
@@ -275,7 +276,7 @@ impl Store {
         title_hint: &str,
         room_id: Option<Uuid>,
     ) -> Result<Uuid> {
-        let now = Utc::now().to_rfc3339();
+        let now = now_utc().to_rfc3339();
         let c = self.db();
         if let Some(id) = id {
             let exists: Option<String> = c
@@ -309,7 +310,7 @@ impl Store {
         content: &str,
         reply_id: Option<Uuid>,
     ) -> Result<()> {
-        let now = Utc::now().to_rfc3339();
+        let now = now_utc().to_rfc3339();
         let c = self.db();
         let tx = c.unchecked_transaction().map_err(st)?;
         tx.execute("INSERT INTO messages (conversation_id,role,content,reply_id,created_at) VALUES (?1,?2,?3,?4,?5)",
@@ -484,7 +485,7 @@ impl Store {
         assistant: &str,
         reply_id: Uuid,
     ) -> Result<()> {
-        let now = Utc::now().to_rfc3339();
+        let now = now_utc().to_rfc3339();
         let c = self.db();
         let tx = c.unchecked_transaction().map_err(st)?;
         if let Some(keep) = rewind {
@@ -541,7 +542,7 @@ impl Store {
         let tag: i64 = if lab { 2 } else { ephemeral as i64 };
         let json = serde_json::to_string(reply).map_err(st)?;
         let decision = serde_json::to_string(&reply.decision).map_err(st)?;
-        let now = Utc::now().to_rfc3339();
+        let now = now_utc().to_rfc3339();
         let c = self.db();
         let tx = c.unchecked_transaction().map_err(st)?;
         tx.execute("INSERT OR REPLACE INTO replies (id,conversation_id,created_at,domain,mode,assurance,escalated,wall_ms,ttft_ms,rule,backend,audit,ephemeral,json) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
@@ -639,7 +640,7 @@ impl Store {
         }
         let id = Uuid::new_v4();
         let conv = Uuid::new_v4();
-        let now = Utc::now().to_rfc3339();
+        let now = now_utc().to_rfc3339();
         let mut c = self.db();
         let names: Vec<String> = {
             let mut s = c.prepare("SELECT name FROM rooms").map_err(st)?;
@@ -855,7 +856,7 @@ impl Store {
 
     pub fn save_run(&self, kind: &str, id: Uuid, status: &str, json: &Value) -> Result<()> {
         self.db().execute("INSERT INTO runs (id,kind,created_at,status,json) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(id) DO UPDATE SET status=?4, json=?5",
-            params![id.to_string(), kind, Utc::now().to_rfc3339(), status, json.to_string()]).map_err(st)?;
+            params![id.to_string(), kind, now_utc().to_rfc3339(), status, json.to_string()]).map_err(st)?;
         Ok(())
     }
     /// Keep the newest `keep` runs of one kind and delete the older ones. Returns how many were deleted.
@@ -911,7 +912,7 @@ impl Store {
         let id = Uuid::new_v4();
         self.db().execute(
             "INSERT INTO audits (id,decision_id,created_at,status,domain,request_json,kept_answer,kept_assurance,e1_hat,features_json) VALUES (?1,?2,?3,'pending',?4,?5,?6,?7,?8,?9)",
-            params![id.to_string(), decision_id.to_string(), Utc::now().to_rfc3339(), domain, request.to_string(), kept_answer, kept_assurance, e1_hat as f64, features.to_string()],
+            params![id.to_string(), decision_id.to_string(), now_utc().to_rfc3339(), domain, request.to_string(), kept_answer, kept_assurance, e1_hat as f64, features.to_string()],
         ).map_err(st)?;
         Ok(id)
     }
@@ -945,7 +946,7 @@ impl Store {
     ) -> Result<()> {
         self.db().execute(
             "UPDATE audits SET status=?2, slow_answer=?3, kept_correct=?4, slow_correct=?5, agreement=?6, judge_v=?7, wall_ms=?8, completed_at=?9, error=?10 WHERE id=?1",
-            params![id.to_string(), status, slow_answer, kept_correct, slow_correct, agreement.map(|x| x as f64), judge_v.map(|x| x as f64), wall_ms as i64, Utc::now().to_rfc3339(), error],
+            params![id.to_string(), status, slow_answer, kept_correct, slow_correct, agreement.map(|x| x as f64), judge_v.map(|x| x as f64), wall_ms as i64, now_utc().to_rfc3339(), error],
         ).map_err(st)?;
         Ok(())
     }
@@ -1220,7 +1221,7 @@ impl Store {
         hours: i64,
         include_lab: bool,
     ) -> Result<Vec<(String, u64, Vec<nafs_types::StageTiming>)>> {
-        let cutoff = (Utc::now() - chrono::Duration::hours(hours)).to_rfc3339();
+        let cutoff = (now_utc() - Duration::hours(hours)).to_rfc3339();
         let c = self.db();
         let mut s = c
             .prepare("SELECT mode, wall_ms, json FROM replies WHERE created_at >= ?1 AND (?2 OR ephemeral < 2) ORDER BY created_at DESC LIMIT 5000")
@@ -1248,7 +1249,7 @@ impl Store {
 
     /// Live replies (lab traffic excluded) created in the last `minutes`: (mode, wall_ms, escalated, verifier passed, verifier exact).
     pub fn recent_window(&self, minutes: i64) -> Result<Vec<RecentRow>> {
-        let cutoff = (Utc::now() - chrono::Duration::minutes(minutes)).to_rfc3339();
+        let cutoff = (now_utc() - Duration::minutes(minutes)).to_rfc3339();
         let c = self.db();
         let mut s = c
             .prepare("SELECT mode, wall_ms, escalated, json FROM replies WHERE created_at >= ?1 AND ephemeral < 2")
@@ -1292,7 +1293,7 @@ impl Store {
     ) -> Result<()> {
         self.db().execute(
             "INSERT OR REPLACE INTO memory_index (reply_id, conversation_id, created_at, domain, question, answer, verifier) VALUES (?1,?2,?3,?4,?5,?6,?7)",
-            params![reply_id.to_string(), conv.to_string(), Utc::now().to_rfc3339(), domain, question, answer, verifier],
+            params![reply_id.to_string(), conv.to_string(), now_utc().to_rfc3339(), domain, question, answer, verifier],
         ).map_err(st)?;
         Ok(())
     }
@@ -1389,7 +1390,7 @@ impl Store {
         let id = Uuid::new_v4();
         c.execute(
             "INSERT INTO preferences (id,created_at,domain,prompt,fast_reply_id,slow_reply_id,preferred,fast_wall_ms,slow_wall_ms,note) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-            params![id.to_string(), Utc::now().to_rfc3339(), domain, prompt, fast_reply.to_string(), slow_reply.to_string(), preferred, fw, sw, clip(note)],
+            params![id.to_string(), now_utc().to_rfc3339(), domain, prompt, fast_reply.to_string(), slow_reply.to_string(), preferred, fw, sw, clip(note)],
         ).map_err(st)?;
         Ok(id)
     }
@@ -1471,7 +1472,7 @@ impl Store {
             "INSERT INTO feedback (reply_id, created_at, rating, note) VALUES (?1, ?2, ?3, ?4)",
             params![
                 reply_id.to_string(),
-                Utc::now().to_rfc3339(),
+                now_utc().to_rfc3339(),
                 rating.signum(),
                 clip(note)
             ],
@@ -1502,7 +1503,7 @@ impl Store {
         }
         c.execute(
             "INSERT INTO reviews (reply_id, decision, reviewer, note, created_at) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(reply_id) DO UPDATE SET decision=?2, reviewer=?3, note=?4, created_at=?5",
-            params![reply_id.to_string(), if approved { "approved" } else { "rejected" }, reviewer, clip(note), Utc::now().to_rfc3339()],
+            params![reply_id.to_string(), if approved { "approved" } else { "rejected" }, reviewer, clip(note), now_utc().to_rfc3339()],
         ).map_err(st)?;
         Ok(())
     }
@@ -1600,8 +1601,7 @@ impl Store {
     /// plus evaluation replies older than that. Returns the number of conversations removed.
     pub fn purge_older_than(&self, days: u32) -> Result<usize> {
         // Clamped so that an absurd value cannot overflow the date arithmetic.
-        let cutoff =
-            (Utc::now() - chrono::Duration::days(i64::from(days.min(36_500)))).to_rfc3339();
+        let cutoff = (now_utc() - Duration::days(i64::from(days.min(36_500)))).to_rfc3339();
         let mut conn = self.db();
         let c = conn.transaction().map_err(st)?;
         // The recall memory of a conversation is deleted with it; notes belong to no conversation and stay.
@@ -1717,7 +1717,7 @@ mod tests {
             .unwrap();
         s.append_turn(c, None, "my code is 4417", "noted", r2)
             .unwrap();
-        let now = Utc::now().to_rfc3339();
+        let now = now_utc().to_rfc3339();
         let count = |sql: &str| -> i64 { s.db().query_row(sql, [], |r| r.get(0)).unwrap() };
         {
             let db = s.db();
@@ -1810,7 +1810,7 @@ mod tests {
             .unwrap();
         st.conn.lock().unwrap().execute(
             "INSERT INTO replies (id,conversation_id,created_at,domain,mode,assurance,escalated,wall_ms,rule,backend,audit,ephemeral,json) VALUES (?1,?2,?3,'open',?4,?5,0,1,'fixed','llama',0,0,'{}')",
-            params![id.to_string(), conv.to_string(), Utc::now().to_rfc3339(), mode, assurance]).unwrap();
+            params![id.to_string(), conv.to_string(), now_utc().to_rfc3339(), mode, assurance]).unwrap();
         st.append_message(conv, "assistant", "Patience is steadfastness.", Some(id))
             .unwrap();
         id

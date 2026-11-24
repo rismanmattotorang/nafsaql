@@ -17,7 +17,7 @@ nafs-verify = { path = "../nafs-verify" }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-chrono = { workspace = true }
+time = { workspace = true }
 fastrand = { workspace = true }
 reqwest = { workspace = true }
 clap = { workspace = true }

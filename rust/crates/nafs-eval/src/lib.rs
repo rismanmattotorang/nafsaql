@@ -17,7 +17,9 @@
 use nafs_core::calibration::{ece, reliability};
 use nafs_core::config::Caps;
 use nafs_core::orchestrator::{DerivedParams, Emitter, Orchestrator};
-use nafs_types::{ChatRequest, Domain, GateFeatures, Message, ReasoningMode, VerificationInputs};
+use nafs_types::{
+    ChatRequest, Domain, GateFeatures, Message, ReasoningMode, Rfc3339Ext, VerificationInputs,
+};
 use nafs_verify::mutation::clopper_pearson;
 use nafs_verify::normalize_answer;
 use serde::{Deserialize, Serialize};
@@ -441,7 +443,7 @@ pub async fn run_with_prior(
         .skip(off)
         .take(req.max_items.unwrap_or(20))
         .collect();
-    let started = chrono::Utc::now();
+    let started = nafs_types::now_utc();
     let done: std::collections::HashSet<(String, String)> = prior
         .iter()
         .filter(|i| i.error.is_none())
@@ -541,7 +543,7 @@ pub fn report(
     req: &EvalRunRequest,
     results: &[ItemResult],
     total: usize,
-    started: chrono::DateTime<chrono::Utc>,
+    started: nafs_types::OffsetDateTime,
     status: &str,
     orch: &Orchestrator,
     full: bool,
@@ -795,7 +797,7 @@ pub fn report(
     };
     let budget_curve = budget_curve(req, results, orch);
     let frontier = frontier(&systems);
-    json!({"status": status, "request": req, "started_at": started, "progress": {"done": results.len(), "total": total},
+    json!({"status": status, "request": req, "started_at": started.to_rfc3339(), "progress": {"done": results.len(), "total": total},
         "systems": systems, "paired": paired, "routing": routing, "calibration": calibration, "coupling": coupling, "budget_curve": budget_curve, "frontier": frontier,
         "calibration_in_use": orch.calibration().version, "items": results})
 }
@@ -883,8 +885,9 @@ pub fn rebuild(run: &Value, orch: &Orchestrator) -> Option<Value> {
     let items: Vec<ItemResult> = serde_json::from_value(run.get("items")?.clone()).ok()?;
     let started = run
         .get("started_at")
-        .and_then(|v| serde_json::from_value(v.clone()).ok())
-        .unwrap_or_else(chrono::Utc::now);
+        .and_then(Value::as_str)
+        .and_then(|s| nafs_types::parse_rfc3339(s).ok())
+        .unwrap_or_else(nafs_types::now_utc);
     let total = run["progress"]["total"]
         .as_u64()
         .unwrap_or(items.len() as u64) as usize;
@@ -1046,7 +1049,7 @@ pub fn derive_params(
     let cfg = &orch.cfg;
     let mut p = DerivedParams {
         source_runs: ids,
-        derived_at: Some(chrono::Utc::now().to_rfc3339()),
+        derived_at: Some(nafs_types::now_utc().to_rfc3339()),
         ..Default::default()
     };
     let mut details = serde_json::Map::new();
@@ -1574,7 +1577,7 @@ mod tests {
             &req,
             &items,
             items.len(),
-            chrono::Utc::now(),
+            nafs_types::now_utc(),
             "done",
             &o,
             true,

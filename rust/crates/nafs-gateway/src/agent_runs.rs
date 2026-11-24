@@ -15,7 +15,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use nafs_types::{CodeAgentRequest, CodeAgentStep, NafsError};
+use nafs_types::{CodeAgentRequest, CodeAgentStep, NafsError, Rfc3339Ext};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -80,7 +80,7 @@ pub async fn start(
     }
     let tests = req.verification.tests.as_ref().map_or(0, Vec::len);
     let mut doc = json!({
-        "id": id, "kind": KIND, "status": "running", "created_at": chrono::Utc::now().to_rfc3339(),
+        "id": id, "kind": KIND, "status": "running", "created_at": nafs_types::now_utc().to_rfc3339(),
         "task": req.task, "file_names": req.files.keys().collect::<Vec<_>>(), "tests": tests,
         "model": req.model.clone().unwrap_or_else(|| s.cfg.harness.model.clone()),
         "max_steps": req.max_steps.unwrap_or(s.cfg.harness.max_steps),
@@ -128,7 +128,7 @@ pub async fn start(
                 "failed"
             }
         };
-        doc["ended_at"] = json!(chrono::Utc::now().to_rfc3339());
+        doc["ended_at"] = json!(nafs_types::now_utc().to_rfc3339());
         save(&s2, id, status, &doc);
     });
     Ok((StatusCode::ACCEPTED, Json(json!({ "run_id": id }))))
