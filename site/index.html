@@ -346,6 +346,30 @@
   </div>
 </section>
 
+<section class="section" aria-labelledby="engines-title">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">New: two engines</span>
+      <h2 id="engines-title">Smiley Core and Peregrine, chosen per model.</h2>
+      <p>Nafs-Aql runs on two Rust CPU engines: <strong>Smiley Core</strong> by ParagonCorp, the default, and <strong>Peregrine</strong> by <a href="https://rantai.dev">RantAI</a>. The quick and the reasoning model can each run on either, and the Speed page compares them on the same questions, taking turns. Measured on the shared reference machine; all answers right on both.</p>
+    </div>
+    <div class="grid g3">
+      <article class="card">
+        <h3>Quick answers: a tie</h3>
+        <p>0.49 s against 0.53 s for a typical answer (p&nbsp;=&nbsp;0.77). Peregrine reads prompts 1.3× faster; Smiley Core writes 1.14× faster.</p>
+      </article>
+      <article class="card">
+        <h3>Reasoning: Smiley Core</h3>
+        <p><strong>51.2 s against 62.7 s</strong>, faster in 9 of 9 pairs. It stays the default and keeps the features only it has: reading ahead between turns and memory tokens.</p>
+      </article>
+      <article class="card">
+        <h3>Several people, documents: Peregrine</h3>
+        <p><strong>1.25×</strong> the total speed with four people at once, <strong>1.41×</strong> faster embedding with the same vectors, and the knowledge graph built <strong>2.5×</strong> faster with every reply valid.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
 <section class="section section-alt" aria-labelledby="new-title">
   <div class="wrap">
     <div class="section-head">
@@ -492,11 +516,12 @@
         <ul>
           <li><a href="https://dirac.id">dirac.id</a></li>
         </ul>
-        <p style="margin-top:10px">Built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+        <p style="margin-top:10px">Nafs-Aql is a product of Dirac, built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+        <p style="margin-top:10px">Inference engines: <strong>Smiley Core</strong> by ParagonCorp and <strong>Peregrine</strong> by <a href="https://rantai.dev">RantAI</a>.</p>
       </div>
     </div>
     <div class="footer-legal">
-      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
+      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, Peregrine, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
       <p>This site sets no cookies and loads nothing from third parties. It is hosted on GitHub Pages, which logs visitors' IP addresses.</p>
     </div>
   </div>

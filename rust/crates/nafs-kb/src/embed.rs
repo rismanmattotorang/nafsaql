@@ -12,6 +12,11 @@ use crate::KbError;
 pub const QUERY_INSTRUCTION: &str =
     "Given a question, retrieve passages of the knowledge base that answer it";
 
+/// A retrieval query in Qwen3-Embedding's query format (`Instruct: {instruction}\nQuery:{question}`).
+pub fn query_text(instruction: &str, question: &str) -> String {
+    format!("Instruct: {instruction}\nQuery:{question}")
+}
+
 #[derive(Debug, Clone)]
 pub struct EmbedConfig {
     pub url: String,
@@ -48,10 +53,15 @@ impl Embedder {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-        let mut body = json!({ "input": texts });
-        if let Some(i) = instruction {
-            body["instruction"] = json!(i);
-        }
+        // Phase 39: the query is written in Qwen3-Embedding's query format here, not left to the server: Smiley Core
+        // accepted an `instruction` field and formatted it the same way, but other engines (Peregrine, llama.cpp)
+        // ignore that field and would embed the bare question. The text is identical, so the vectors are too.
+        let body = match instruction {
+            Some(i) => {
+                json!({ "input": texts.iter().map(|t| query_text(i, t)).collect::<Vec<_>>() })
+            }
+            None => json!({ "input": texts }),
+        };
         let resp = self
             .http
             .post(format!(
@@ -186,6 +196,18 @@ mod tests {
         assert_eq!(f[0].0, "y");
         assert_eq!(f.len(), 4);
         assert!((f[0].1 - (1.0 / 62.0 + 1.0 / 61.0)).abs() < 1e-12);
+    }
+
+    /// Phase 39: the query format Smiley Core's server wrote from its `instruction` field, now written by the client.
+    #[test]
+    fn queries_carry_the_instruction_in_the_text() {
+        assert_eq!(
+            query_text(
+                "Given a question, retrieve passages that answer it",
+                "what is K?"
+            ),
+            "Instruct: Given a question, retrieve passages that answer it\nQuery:what is K?"
+        );
     }
 
     #[test]

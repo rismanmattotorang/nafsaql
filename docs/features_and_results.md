@@ -196,6 +196,21 @@ Measured on 12 problems and 64 variants (`benchmarks/arc_phase38/`):
 Details: [assessment](research/reasoning_cache.md), [specification](spec/reasoning_cache_spec.md),
 [decision 028](decisions/028-reasoning-cache-phase38.md).
 
+## Phase 39: two inference engines, and faster graph construction (2026-11-27)
+
+Nafs-Aql runs on ParagonCorp's **Smiley Core** (default) or RantAI's **Peregrine**, chosen per model (System page, `[backend] system1/system2`, `POST /v1/system/backend`). Measured on the shared reference machine, arms interleaved (`benchmarks/engines_phase39/`):
+
+| | Smiley Core | Peregrine |
+|---|---|---|
+| System 1 typical answer (12 pairs) | 0.49 s | 0.53 s (ratio 0.97, p = 0.77) |
+| System 1 reading / writing | 67 / 17.0 tok/s | 88 / 14.9 tok/s |
+| System 2 typical answer (9 pairs) | 51.2 s | 62.7 s (Smiley faster 9/9, p = 0.004) |
+| 4 users, System 1, total | 31.6 tok/s | 39.4 tok/s |
+| Embeddings | 1x | 1.41x, cosine >= 0.9996 to Smiley's |
+| Graph, 4 passages at once (+ schema on Peregrine) | 1.63x the old setting, identical graph | 2.5x the old setting, 12/12 replies parsed |
+
+Correctness: 42 of 42 engine-level answers right on both. End to end through the gateway: partial (2 requests), not a basis for a claim. Details: [assessment](research/peregrine_assessment.md), [decision 029](decisions/029-two-engines-phase39.md).
+
 ## The numbers at a glance (moved from the README, Phase 25)
 
 Measured on one 4-core Intel i3-8100 with no GPU, shared with other work, so absolute speeds are lower bounds. Every figure comes from a stored run in [`benchmarks/`](../benchmarks/).

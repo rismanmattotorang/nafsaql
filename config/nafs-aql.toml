@@ -13,7 +13,11 @@ profile = "A"
 system_prompt = "You are Nafs-Aql, a careful assistant that pairs a fast first answer with deliberate reasoning when a question needs it. If asked who or what you are, say you are Nafs-Aql, built on open Qwen models, and describe that fast-and-careful design. Be accurate and concise. If you are unsure, say so."
 
 [backend]
-active = "smiley"                      # smiley | llama | vllm (Phase 15: Smiley Core is the default; switchable at runtime from the System page)
+active = "smiley"                      # smiley | peregrine | llama | vllm (Phase 15: Smiley Core is the default; switchable at runtime from the System page)
+# Phase 39: each role may run on its own engine; unset = `active`. E.g. system1 = "peregrine", system2 = "smiley".
+# The gateway then serves the pair "peregrine/smiley" (also NAFS_BACKEND=peregrine/smiley, or the System page).
+# system1 = "smiley"
+# system2 = "smiley"
 
 [backends.llama]
 label = "llama.cpp (native macOS, GGUF Q4_K_M)"
@@ -37,6 +41,15 @@ kind = "smiley"
 # no n-choice requests, no raw continuation: the gateway uses its standard path, as for vLLM. One stream per process.
 system1 = { url = "http://127.0.0.1:8201/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "GGUF Q4_K_M (unsloth/Qwen3-1.7B-GGUF)", thinking = false, max_in_flight = 1 }
 system2 = { url = "http://127.0.0.1:8202/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 1 }
+
+[backends.peregrine]
+label = "Peregrine (RantAI's Rust CPU engine, GGUF Q4_K_M; batched slots)"
+kind = "peregrine"
+# Phase 39: RantAI's engine (github.com/RantAI-dev/peregrine, third_party/peregrine, scripts/serve_peregrine.sh), one process
+# per model. Batches concurrent requests in one weight pass, so it takes several at once; streamed n > 1 is sent as separate
+# requests. No GBNF grammar, no raw continuation, no ShadowPrefill, no Memorilla memory tokens (Smiley Core's).
+system1 = { url = "http://127.0.0.1:8211/v1", model = "system1", hf_id = "Qwen/Qwen3-1.7B", quantization = "GGUF Q4_K_M (unsloth/Qwen3-1.7B-GGUF)", thinking = false, max_in_flight = 4 }
+system2 = { url = "http://127.0.0.1:8212/v1", model = "system2", hf_id = "Qwen/Qwen3-4B-Thinking-2507", quantization = "GGUF Q4_K_M (unsloth/Qwen3-4B-Thinking-2507-GGUF)", thinking = true, max_in_flight = 4 }
 
 [backend_retry]                        # IF-007 / IF-008
 max_attempts = 3
@@ -264,6 +277,8 @@ rag_lexical_rescue = 10.0               # chat: a passage whose words match this
 graph_llm_url = "http://127.0.0.1:8201/v1"   # Phase 3: the quick model extracts entities and relations ("" = graph off)
 graph_model = "system1"
 graph_max_tokens = 400
+graph_concurrency = 4                  # Phase 39: passages extracted at once, stored in order (identical graph): 1.63x on Smiley Core, 1.86x on Peregrine
+graph_constrain = true                 # Phase 39: reply constrained to the extraction schema where the engine can (Peregrine, llama.cpp): 12/12 parsed vs 11/12; Smiley Core ignores it
 entity_merge_similarity = 0.92         # same-type entities with name vectors this similar are one entity
 graph_facts = 12                       # chat, graph mode: facts put in the prompt
 graph_weight = 1.0                     # FR-K50: the graph's ranking as an arm beside the search's (0 = facts only)

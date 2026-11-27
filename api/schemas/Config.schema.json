@@ -47,6 +47,12 @@
       "properties": {
         "active": {
           "type": "string"
+        },
+        "system1": {
+          "type": "string"
+        },
+        "system2": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -644,6 +650,9 @@
         "model_extraction": {
           "type": "boolean"
         },
+        "same_check": {
+          "type": "boolean"
+        },
         "build_rounds": {
           "type": "integer"
         },
@@ -853,6 +862,12 @@
         "graph_max_tokens": {
           "type": "integer",
           "minimum": 0
+        },
+        "graph_concurrency": {
+          "type": "integer"
+        },
+        "graph_constrain": {
+          "type": "boolean"
         },
         "entity_merge_similarity": {
           "type": "number"

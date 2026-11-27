@@ -26,6 +26,9 @@ info:
     retrieved) and the security posture in /v1/system.
 
 
+    Version 1.6 (Phase 39) adds the Peregrine engine, per-role engine selection on /v1/system/backend and the engine
+    comparison POST /v1/bench/engines.
+
     Version 1.5 (Phase 7) adds per-stage latency in usage.stages (queue, prefill, decode and KV-cache reuse for model stages)
     and GET /v1/perf/stages, the latency breakdown by stage.
 
@@ -1820,19 +1823,26 @@ paths:
       tags:
       - system
       operationId: setBackend
-      summary: Switch the active backend set at runtime (llama | vllm) Refused with 503 when the target backend is not reachable,
-        unless force is true.
+      summary: Switch the active backend set at runtime (smiley | peregrine | llama | vllm), for both roles or per role (Phase 39).
+        Refused with 503 when a target server is not reachable, unless force is true.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required:
-              - name
+              description: At least one of name, system1 and system2.
               properties:
                 name:
                   type: string
+                  description: One engine for both roles ("smiley"), or one per role ("peregrine/smiley" = System 1 on
+                    Peregrine, System 2 on Smiley Core)
+                system1:
+                  type: string
+                  description: 'Phase 39: the engine for System 1 only; System 2 keeps its engine unless named too'
+                system2:
+                  type: string
+                  description: 'Phase 39: the engine for System 2 only'
                 force:
                   type: boolean
                   default: false
@@ -1846,6 +1856,10 @@ paths:
                 type: object
                 properties:
                   active_backend:
+                    type: string
+                  system1_engine:
+                    type: string
+                  system2_engine:
                     type: string
                   previous:
                     type: string
@@ -2439,6 +2453,49 @@ paths:
                 type: object
         '403':
           $ref: '#/components/responses/Forbidden'
+  /v1/bench/engines:
+    post:
+      tags:
+      - bench
+      operationId: startEngineCompare
+      summary: 'Phase 39: compare the inference engines (Smiley Core, Peregrine, ...) on System 1 and System 2 directly,
+        interleaved per round; time to first token, prefill and decode tokens/s, wall time, correctness, paired sign test'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                engines:
+                  type: array
+                  items:
+                    type: string
+                  description: Engine names under [backends]; default every engine whose two servers answer
+                roles:
+                  type: array
+                  items:
+                    type: string
+                    enum:
+                    - system1
+                    - system2
+                rounds:
+                  type: integer
+                  minimum: 1
+                  maximum: 20
+                  default: 3
+                s1_max_tokens:
+                  type: integer
+                  default: 160
+                s2_max_tokens:
+                  type: integer
+                  default: 768
+                s2_thinking_budget:
+                  type: integer
+                  default: 512
+      responses:
+        '202':
+          description: Started; poll GET /v1/bench/runs/{run_id} (kind "engines")
   /v1/bench/protocol:
     post:
       tags:

@@ -1,0 +1,30 @@
+{
+ "passages": 48,
+ "batch": 8,
+ "rounds": 2,
+ "engines": {
+  "smiley": {
+   "batches": 12,
+   "passages_per_s": 0.5038106483422964,
+   "batch_s_median": 14.951093912124634
+  },
+  "peregrine": {
+   "batches": 12,
+   "passages_per_s": 0.7207340661644714,
+   "batch_s_median": 10.060727000236511
+  }
+ },
+ "peregrine_faster_batches": 12,
+ "pairs": 12,
+ "speed_ratio_median": 1.4097925229861912,
+ "passage_cosine": {
+  "min": 0.9996300624379194,
+  "mean": 0.9997490011902236
+ },
+ "query_cosine": {
+  "min": 0.9997106598815471,
+  "mean": 0.9997748732740528
+ },
+ "top5_overlap_mean": 0.9333333333333333,
+ "load1": 10.48193359375
+}

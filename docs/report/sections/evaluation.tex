@@ -107,6 +107,49 @@ against 17.9\,s and the twelve 131\,s against 303\,s (faster in 10 of 12
 pairs, one-sided sign test $p=0.02$), while the median first token was later
 (1.50\,s against 0.97\,s).
 
+\textbf{Two engines.} Table~\ref{tab:engines} compares Smiley Core and
+Peregrine on the same files, with identical greedy requests sent straight to
+each engine. The engines took turns within each of three rounds, with the
+order swapped between rounds; the host load was 5 to 26. All 42 answers were
+right on both. On \Sone\ the wall times do not differ (Peregrine faster in 7 of
+12 pairs, median ratio 0.97, sign test $p=0.77$): Peregrine reads prompts 1.3
+times faster and Smiley Core writes 1.14 times faster. On \Stwo\ Smiley Core
+was faster in 9 of 9 pairs (ratio 1.11, $p=0.004$), so it stays the default.
+With four simultaneous \Sone\ requests Peregrine wrote 39.4 tokens/s in
+total against 31.6. Its embeddings were faster in 12 of 12 batches (1.41
+times) with cosine at least 0.9996 to Smiley Core's vectors, so a base built
+on one engine can be searched with the other.
+
+\begin{table}[t]
+\centering
+\caption{Smiley Core against Peregrine (medians; shared host).}
+\label{tab:engines}
+\scriptsize
+\begin{tabular}{@{}llrrrr@{}}
+\toprule
+Model & Engine & TTFT & Read & Write & Wall \\
+ & & ms & tok/s & tok/s & s \\
+\midrule
+\Sone & Smiley Core & 384 & 67 & 17.0 & 0.49 \\
+\Sone & Peregrine & 406 & 88 & 14.9 & 0.53 \\
+\Stwo & Smiley Core & 215 & 23 & 10.0 & 51.2 \\
+\Stwo & Peregrine & 244 & 21 & 9.0 & 62.7 \\
+\midrule
+\multicolumn{2}{@{}l}{4 users, \Sone, total tok/s} & \multicolumn{4}{r@{}}{31.6 (Smiley) / 39.4 (Peregrine)} \\
+\multicolumn{2}{@{}l}{Embeddings, passages/s} & \multicolumn{4}{r@{}}{1.41$\times$ faster on Peregrine} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Building the graph.} On 12 passages of one paper, extraction ran at
+3.0 passages a minute on Smiley Core one at a time (the old setting), 3.45 on
+Peregrine one at a time and 6.42 four at a time, with the same 74 entities
+and 40 relations as one at a time. Under the schema it ran at 7.61 with 12 of
+12 replies parsed, against 11 of 12. On Smiley Core four at a time ran at
+5.54 against 3.39 passages a minute, again with an identical graph. The two
+engines extract different entities (mean Jaccard 0.63). Both outputs pass the
+same grounding and quote checks; which graph answers better was not measured.
+
 \textbf{Not repeating work.} Table~\ref{tab:speedups} collects the measured
 effect of each mechanism of Section~\ref{sec:inference}.
 

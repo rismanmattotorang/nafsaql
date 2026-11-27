@@ -28,7 +28,7 @@ Qwen3-1.7B Q4\_K\_M & 1.26\,GiB & $94.1\pm9.5$ & $15.5\pm3.4$ \\
 
 \subsection{The engine}
 \label{sec:engine}
-The default backend is Smiley Core, our own CPU inference engine: a Rust
+The default backend is Smiley Core, ParagonCorp's CPU inference engine: a Rust
 library with a GGUF loader, a byte-level BPE tokenizer, the Qwen forward
 passes with AVX2 and FMA kernels, an F16 or int8 key--value cache, grouped
 online-softmax attention, and telemetry that reports the bytes moved per
@@ -40,6 +40,23 @@ reasoning span and continuing the turn. The engine's phase split puts 86 to
 97\,\% of decode in the matrix products and the output head; sampling is 0.1
 to 0.3\,\% and attention 1 to 3\,\% at these context lengths. It runs within
 60 to 95\,\% of the machine's bandwidth.
+
+\textbf{A second engine, chosen per model.} Peregrine, RantAI's Rust CPU
+engine \cite{peregrine2026}, serves the same GGUF files behind the same
+contract. It batches every active request into one pass over the weights,
+accepts $n>1$ without streaming, and constrains a reply to a JSON Schema.
+Smiley Core keeps ShadowPrefill and memory tokens, which Peregrine lacks. Each
+role names its engine (\texttt{[backend] system1}, \texttt{system2}); a
+selection such as \texttt{peregrine/smiley} runs \Sone\ on Peregrine and
+\Stwo\ on Smiley Core, and the two roles share no server. Three client-side
+rules hide the engines' differences. Peregrine reads an absent seed as 42, so
+the client seeds every unseeded sample; otherwise the gate's agreement samples
+would always agree. Peregrine refuses streamed $n$, so $n$ choices become $n$
+concurrent streams that it batches. Query embeddings carry Qwen3-Embedding's
+instruction in the text, not in an engine-specific field. The gateway's
+engine comparison sends identical greedy requests to both engines, taking
+turns within rounds and swapping their order between rounds, and pauses
+idle-time work while it runs (Section~\ref{sec:eval:inference}).
 
 \textbf{Three threads to write, four to read.} Three decode threads beat four
 in all six interleaved pairs ($+4\,\%$ on \Sone, $+8\,\%$ on \Stwo\ at the

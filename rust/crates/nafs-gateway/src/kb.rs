@@ -55,6 +55,8 @@ pub fn from_config(k: &KnowledgeCfg) -> Option<Arc<Kb>> {
             model: k.graph_model.clone(),
             max_tokens: k.graph_max_tokens.max(64),
             merge_similarity: k.entity_merge_similarity,
+            concurrency: k.graph_concurrency.clamp(1, 16),
+            constrain: k.graph_constrain,
         }),
         graph_weight: k.graph_weight,
         vector_weight: k.vector_weight,

@@ -6,7 +6,8 @@
 
 **An AI assistant that runs on four CPU cores, answers from your own documents, and tells you when it is not sure.**
 
-Built by the [Dirac](https://dirac.id) R&D Team.
+**A product of [Dirac.id](https://dirac.id)**, built by the Dirac R&D Team.
+Runs on two CPU inference engines: **Smiley Core** by ParagonCorp and **Peregrine** by [RantAI](https://rantai.dev).
 
 [![CI](https://github.com/rismanmattotorang/nafsaql/actions/workflows/ci.yml/badge.svg)](https://github.com/rismanmattotorang/nafsaql/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -47,7 +48,9 @@ Neither tells you which of its answers to trust.
 
 **08 — Worked out once, reused.** When the careful model works a maths problem out, its working is turned into a small program while the machine is idle. The same problem asked again with other numbers is answered by running that program in about a tenth of a second, with no model; in other words, after the quick model checks it is the same question. A stored method answers only after it has agreed with the models on real questions, and you can read, stop or delete every one. After NVIDIA's CPU-ARC; [how it works](docs/research/reasoning_cache.md).
 
-**09 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
+**09 — Two engines, your choice.** The quick and the reasoning model each run on the engine you pick: Smiley Core (ParagonCorp, the default) or Peregrine (RantAI), and the Speed page compares them on the same questions, taking turns.
+
+**10 — Four CPU cores.** No GPU. No API key. Nothing leaves your machine.
 
 ## Proof
 
@@ -101,6 +104,20 @@ flowchart LR
 ```
 
 The gate escalates only when the error it expects to save is worth the waiting time. Where a checker exists its verdict is final; agreement between samples is a hint, never proof.
+
+## New: two inference engines, chosen per model
+
+Nafs-Aql now runs on either of two Rust CPU engines, and each model can run on its own engine. **Smiley Core**, by ParagonCorp, is the default. **[Peregrine](https://github.com/RantAI-dev/peregrine)**, by [RantAI](https://rantai.dev), answers several people in one pass over the weights. Pick them on the System page, with `make up-peregrine` (`ROLE=system1` for the quick model only), or with `POST /v1/system/backend {"system1": "peregrine", "system2": "smiley"}`. *Speed → Compare engines* sends the same questions to both engines, taking turns, and reports first-word time, reading and writing speed, answer time, correctness and a paired sign test. Measured on the shared 4-core reference machine (all answers right on both engines):
+
+| | Smiley Core | Peregrine |
+|---|---|---|
+| Quick model: typical answer · reading · writing | 0.49 s · 67 tok/s · 17.0 tok/s | 0.53 s · **88 tok/s** · 14.9 tok/s (equal overall, p = 0.77) |
+| Reasoning model: typical answer | **51.2 s** (faster in 9 of 9 pairs) | 62.7 s |
+| Four people at once, quick model | 31.6 tok/s in total | **39.4 tok/s** (1.25×) |
+| Embedding documents for search | 1× | **1.41×**, same vectors (cosine ≥ 0.9996) |
+| Building the knowledge graph, 4 passages at once | **1.63×** the old one-at-a-time speed | **2.5×**, every reply valid with the JSON schema |
+
+So Smiley Core stays the default, and Peregrine is the choice for several users and for indexing. The knowledge graph is now built four passages at a time, giving the same graph faster on either engine. Where the engine supports it, each extraction is constrained to its JSON schema, so no passage is skipped for a malformed reply. [Assessment](docs/research/peregrine_assessment.md) · [Decision 029](docs/decisions/029-two-engines-phase39.md) · [Measurements](benchmarks/engines_phase39/).
 
 ## New since 0.2.0: a reasoning cache
 
@@ -198,14 +215,22 @@ Issues and pull requests are welcome. Run `make test`, keep `cargo fmt` and `car
 }
 ```
 
+## Credits
+
+- **Smiley Core**, the default inference engine, is ParagonCorp's Rust CPU engine. It is built into this repository (`rust/crates/smiley-core`).
+- **Peregrine**, the second inference engine, is [RantAI](https://rantai.dev)'s CPU engine ([RantAI-dev/peregrine](https://github.com/RantAI-dev/peregrine), Apache-2.0). It is built from `third_party/peregrine`.
+- Qwen3 models by the Qwen team; llama.cpp, vLLM, SurrealDB and the other components listed in [NOTICE](NOTICE).
+
 ## License
 
-[Apache License 2.0](LICENSE). Qwen3 model weights, llama.cpp, vLLM and the evaluation datasets keep their own licences; see [NOTICE](NOTICE).
+[Apache License 2.0](LICENSE). Qwen3 model weights, Peregrine, llama.cpp, vLLM and the evaluation datasets keep their own licences; see [NOTICE](NOTICE).
 
 ---
 
 <div align="center">
 
-**About Dirac.** [Dirac](https://dirac.id) is an Indonesian deep-tech startup focused on quantum computing.
+**Nafs-Aql is a product of [Dirac.id](https://dirac.id).** Dirac is an Indonesian deep-tech startup focused on quantum computing.
+
+Inference engines: Smiley Core by ParagonCorp · Peregrine by [RantAI](https://rantai.dev)
 
 </div>

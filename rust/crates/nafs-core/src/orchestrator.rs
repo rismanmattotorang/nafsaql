@@ -296,6 +296,24 @@ fn judge_feedback_prompt(reason: &str) -> String {
     )
 }
 
+/// Phase 39: the pair a selection names. A plain name is one configured engine; `"<a>/<b>"` takes System 1 from engine
+/// `a` and System 2 from engine `b` (the same `Backend` objects, so their slot permits are shared with the plain pairs).
+pub fn compose_pair(pairs: &[Arc<BackendPair>], name: &str) -> Option<Arc<BackendPair>> {
+    let (a, b) = crate::config::split_selection(name);
+    let pa = pairs.iter().find(|p| p.name == a)?;
+    if a == b {
+        return Some(pa.clone());
+    }
+    let pb = pairs.iter().find(|p| p.name == b)?;
+    Some(Arc::new(BackendPair {
+        name: crate::config::join_selection(&a, &b),
+        label: format!("System 1: {} · System 2: {}", pa.label, pb.label),
+        kind: format!("{}/{}", pa.kind, pb.kind),
+        s1: pa.s1.clone(),
+        s2: pb.s2.clone(),
+    }))
+}
+
 const REFUSAL: &str = "I can't help with that request. If you have a related question I can answer safely, I'm happy to help.";
 
 impl Orchestrator {
@@ -338,10 +356,7 @@ impl Orchestrator {
                 )),
             }));
         }
-        let active = pairs
-            .iter()
-            .find(|p| p.name == cfg.backend.active)
-            .cloned()
+        let active = compose_pair(&pairs, &cfg.active_selection())
             .expect("active backend exists (validated in Config::load)");
         let calibration = std::fs::read_to_string(&cfg.gate.calibration_file)
             .ok()
@@ -443,10 +458,7 @@ impl Orchestrator {
     }
     pub fn set_active(&self, name: &str) -> Result<()> {
         let p = self
-            .pairs
-            .iter()
-            .find(|p| p.name == name)
-            .cloned()
+            .pair(name)
             .ok_or_else(|| NafsError::BadRequest(format!("unknown backend '{name}'")))?;
         *self.active.write_locked() = p;
         Ok(())
@@ -3299,8 +3311,9 @@ Reply with JSON only: {{\"honesty\": x, \"harm_avoidance\": x, \"helpfulness\": 
     }
 
     /// The backend pair by name, for a warm-up before a switch.
+    /// Phase 39: `"<a>/<b>"` composes System 1 of engine `a` with System 2 of engine `b`.
     pub fn pair(&self, name: &str) -> Option<Arc<BackendPair>> {
-        self.pairs.iter().find(|p| p.name == name).cloned()
+        compose_pair(&self.pairs, name)
     }
 
     /// Prime `pair`'s servers with the constant prefixes of every request (the system prompt per domain, the
@@ -3498,6 +3511,56 @@ mod tests {
         delimit, fit_budget, full_answer_probe, is_lean_identifier, question_of, round_budget,
         tokens_that_fit,
     };
+
+    /// Phase 39: "a/b" takes System 1 from engine a and System 2 from engine b, sharing their Backend objects.
+    #[test]
+    fn a_pair_can_mix_engines_per_role() {
+        use super::{compose_pair, Backend, BackendPair};
+        use crate::config::{EndpointCfg, RetryCfg};
+        use std::sync::Arc;
+        let ep = |port: u16| EndpointCfg {
+            url: format!("http://127.0.0.1:{port}/v1"),
+            model: "m".into(),
+            hf_id: "h".into(),
+            quantization: String::new(),
+            thinking: false,
+            max_in_flight: 1,
+        };
+        let mk = |name: &str, kind: &str, p: u16| {
+            Arc::new(BackendPair {
+                name: name.into(),
+                label: name.into(),
+                kind: kind.into(),
+                s1: Arc::new(Backend::new("system1", kind, ep(p), RetryCfg::default())),
+                s2: Arc::new(Backend::new(
+                    "system2",
+                    kind,
+                    ep(p + 1),
+                    RetryCfg::default(),
+                )),
+            })
+        };
+        let pairs = vec![
+            mk("smiley", "smiley", 8201),
+            mk("peregrine", "peregrine", 8211),
+        ];
+        let p = compose_pair(&pairs, "peregrine/smiley").unwrap();
+        assert_eq!(p.name, "peregrine/smiley");
+        assert_eq!(p.s1.kind, "peregrine");
+        assert_eq!(p.s2.kind, "smiley");
+        assert!(Arc::ptr_eq(&p.s1, &pairs[1].s1) && Arc::ptr_eq(&p.s2, &pairs[0].s2));
+        assert!(Arc::ptr_eq(
+            &compose_pair(&pairs, "smiley").unwrap(),
+            &pairs[0]
+        ));
+        assert_eq!(
+            compose_pair(&pairs, "smiley/smiley").unwrap().name,
+            "smiley"
+        );
+        assert!(compose_pair(&pairs, "nope/smiley").is_none());
+        // Peregrine refuses streamed n > 1, Smiley Core and llama-server take it.
+        assert!(!p.s1.supports_stream_n() && p.s2.supports_stream_n());
+    }
 
     #[test]
     fn the_question_is_read_without_its_attached_files() {

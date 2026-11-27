@@ -1,7 +1,15 @@
 Nafs-Aql
 Copyright 2026 Dirac R&D Team (https://dirac.id)
+Nafs-Aql is a product of Dirac (https://dirac.id).
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Inference engines:
+- Smiley Core (ParagonCorp): the default CPU inference engine, vendored as rust/crates/smiley-core and served by
+  rust/crates/nafs-smiley-server. Changes made for Nafs-Aql are marked `// nafs-aql:` in its source.
+- Peregrine (RantAI, https://rantai.dev, github.com/RantAI-dev/peregrine): Apache-2.0, Copyright RantAI and the
+  Peregrine contributors. The second selectable CPU inference engine (Phase 39). Not vendored: built from a separate
+  checkout in third_party/peregrine (commit 194bfb7, v0.3.0) and run as its own process by scripts/serve_peregrine.sh.
 
 Third-party components keep their own licences:
 - Qwen3 models (Alibaba Cloud / Qwen Team): Apache-2.0. Weights are not part of this repository.

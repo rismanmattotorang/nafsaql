@@ -178,6 +178,33 @@ pub fn extraction_schema() -> &'static Value {
     })
 }
 
+/// Phase 39: the schema the reply is constrained to when `GraphConfig::constrain` is on. Stricter than
+/// [`extraction_schema`] (every field present, at most 10 of each, as the prompt asks) and in the prompt's field
+/// order: a constrained decoder writes properties in schema order, and the context line first is what the prompt's
+/// example teaches. Uses only keywords Peregrine and llama.cpp both honour.
+pub fn constrained_extraction_schema() -> &'static Value {
+    static S: OnceLock<Value> = OnceLock::new();
+    S.get_or_init(|| {
+        json!({
+            "type": "object",
+            "properties": {
+                "context": { "type": "string", "maxLength": 300 },
+                "entities": { "type": "array", "maxItems": 10, "items": {
+                    "type": "object",
+                    "properties": { "name": { "type": "string", "minLength": 1, "maxLength": 80 }, "type": { "type": "string", "maxLength": 40 } },
+                    "required": ["name", "type"], "additionalProperties": false } },
+                "relations": { "type": "array", "maxItems": 10, "items": {
+                    "type": "object",
+                    "properties": { "source": { "type": "string", "minLength": 1, "maxLength": 80 }, "predicate": { "type": "string", "minLength": 1, "maxLength": 60 },
+                                    "target": { "type": "string", "minLength": 1, "maxLength": 80 }, "quote": { "type": "string", "maxLength": 400 } },
+                    "required": ["source", "predicate", "target", "quote"], "additionalProperties": false } }
+            },
+            "required": ["context", "entities", "relations"],
+            "additionalProperties": false
+        })
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct ExtractedEntity {
     pub name: String,
@@ -504,6 +531,26 @@ pub struct GraphConfig {
     pub max_tokens: usize,
     /// Two entities of the same type whose name vectors are at least this similar are one entity.
     pub merge_similarity: f64,
+    /// Phase 39: passages of one document extracted at once. The replies are still stored in passage order, so the
+    /// graph is the same as with one at a time (greedy decoding). Worth more than 1 only on an engine that batches
+    /// concurrent requests (Peregrine, llama.cpp); Smiley Core serves one stream per model and queues them.
+    pub concurrency: usize,
+    /// Phase 39: send the extraction's JSON Schema as `response_format`, so an engine with constrained decoding
+    /// (Peregrine, llama.cpp) can only write a reply that parses. An engine without it ignores the field.
+    pub constrain: bool,
+}
+
+impl Default for GraphConfig {
+    fn default() -> Self {
+        Self {
+            llm_url: String::new(),
+            model: "system1".into(),
+            max_tokens: 400,
+            merge_similarity: 0.9,
+            concurrency: 1,
+            constrain: false,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -564,12 +611,16 @@ impl Extractor {
         prompt: &str,
     ) -> Result<ExtractCall, KbError> {
         let t0 = std::time::Instant::now();
-        let body = json!({
+        let mut body = json!({
             "model": self.cfg.model,
             "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": format!("Passage:\n{}", extraction_input(passage))}],
             "temperature": 0, "max_tokens": self.cfg.max_tokens,
             "chat_template_kwargs": {"enable_thinking": false},
         });
+        if self.cfg.constrain {
+            body["response_format"] = json!({"type": "json_schema",
+                "json_schema": {"name": "extraction", "schema": constrained_extraction_schema()}});
+        }
         let resp = self
             .http
             .post(format!(

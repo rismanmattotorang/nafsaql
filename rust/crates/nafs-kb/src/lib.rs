@@ -837,8 +837,28 @@ impl Kb {
             .unwrap_or_default();
         // Keys resolved in this job, so a name is embedded and matched once.
         let mut resolved: HashMap<String, String> = HashMap::new();
-        for (chunk_id, _heading, text) in &todo {
-            let call = x.extract_with(text, &ontology, &prompt).await.map_err(|e| {
+        // Phase 39: up to `concurrency` extractions run ahead of the store loop; `buffered` yields them in passage
+        // order, so entity resolution and storage see the same sequence as before.
+        use futures::StreamExt;
+        let mut calls = {
+            let width = x.cfg.concurrency.clamp(1, 16);
+            let (x, ontology, prompt) = (
+                x.clone(),
+                Arc::new(ontology.clone()),
+                Arc::new(prompt.clone()),
+            );
+            futures::stream::iter(todo.iter().map(|t| t.2.clone()).collect::<Vec<_>>())
+                .map(move |text| {
+                    let (x, ontology, prompt) = (x.clone(), ontology.clone(), prompt.clone());
+                    async move { x.extract_with(&text, &ontology, &prompt).await }
+                })
+                .buffered(width)
+        };
+        for (chunk_id, _heading, _text) in &todo {
+            let Some(call) = calls.next().await else {
+                break;
+            };
+            let call = call.map_err(|e| {
                 format!("The knowledge graph could not be built: {e}. Passages read so far are kept; build again to continue.")
             })?;
             tokens += call.completion_tokens;

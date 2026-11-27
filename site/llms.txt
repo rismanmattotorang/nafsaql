@@ -4,7 +4,8 @@
 
 Facts for readers of this file:
 
-- Models: Qwen3-1.7B (quick) and Qwen3-4B-Thinking (reasoning), 4-bit GGUF, on the project's own Rust CPU engine, Smiley Core. llama.cpp and vLLM are alternative backends.
+- Models: Qwen3-1.7B (quick) and Qwen3-4B-Thinking (reasoning), 4-bit GGUF, on two Rust CPU engines chosen per model: Smiley Core (ParagonCorp, default) and Peregrine (RantAI). llama.cpp and vLLM are alternative backends.
+- Nafs-Aql is a product of Dirac.id (https://dirac.id).
 - Reference machine for every number: one shared 4-core Intel i3-8100, 32 GB, no GPU. Comparisons use tens of items and interleaved runs; they show direction, not release-grade statistics.
 - Labels on answers: Checked (an exact check passed), Cross-checked (independent attempts agree; not a proof), Not checked, and "Not sure" when nothing earned acceptance.
 - Quick start: `git clone https://github.com/rismanmattotorang/nafsaql.git && cd nafsaql`, then `make models`, then `make up`; open http://127.0.0.1:8080; `make down` stops it. Needs Rust 1.96+, Python 3.10+, about 4 GB of disk.

@@ -2,13 +2,16 @@
 TECTONIC := $(abspath tools/tectonic)
 
 PHONY_EXTRA = acceptance tazkiya-build regression-suite
-.PHONY: help up down up-llama down-llama up-vllm down-vllm build test $(PHONY_EXTRA) contract rooms-test docs report slides spec roadmap tables validate models models-vllm datasets vm-setup clean
+.PHONY: help up down up-peregrine down-peregrine compare-engines up-llama down-llama up-vllm down-vllm build test $(PHONY_EXTRA) contract rooms-test docs report slides spec roadmap tables validate models models-vllm datasets vm-setup clean
 
 help:
 	@echo "Run the system (Phase 1):"
 	@echo "  make models        download GGUF weights for the native llama.cpp backend (~3.6 GB)"
 	@echo "  make up            build, start Smiley Core (S1 :8201, S2 :8202, the default engine) and the gateway -> http://127.0.0.1:8080"
 	@echo "  make down          stop the gateway and both engines"
+	@echo "  make up-peregrine  start RantAI's Peregrine engine (S1 :8211, S2 :8212) and switch the gateway to it"
+	@echo "                     (one role only: ROLE=system1 or ROLE=system2; the other keeps its engine)"
+	@echo "  make compare-engines  Smiley Core vs Peregrine, engine level and end to end (benchmarks/engines_phase39/)"
 	@echo "  make up-llama      start llama-server (S1 :8001, S2 :8002) and switch the gateway to it (batching, grammar, n-choice rescue)"
 	@echo "  make vm-setup      create the nafs-vllm Lima VM and install vLLM (CPU, no Docker)"
 	@echo "  make models-vllm   download Hugging Face weights for vLLM"
@@ -51,7 +54,20 @@ down:
 	scripts/gateway.sh stop
 	scripts/serve_smiley.sh stop
 	scripts/serve_llama.sh stop
+	scripts/serve_peregrine.sh stop
 	scripts/serve_surreal.sh stop
+
+up-peregrine:
+	@if [ -n "$(ROLE)" ]; then scripts/serve_peregrine.sh start-one $(ROLE); else scripts/serve_peregrine.sh start; fi
+	@if [ -n "$(ROLE)" ]; then curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"$(ROLE)":"peregrine"}'; \
+	else curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"name":"peregrine"}'; fi; echo
+
+down-peregrine:
+	curl -s -X POST localhost:8080/v1/system/backend -H 'Content-Type: application/json' -d '{"name":"smiley"}'; echo
+	scripts/serve_peregrine.sh stop
+
+compare-engines: ## Phase 39: Smiley Core vs Peregrine (both engines and the gateway must be running)
+	python3 -I scripts/engine_compare.py all
 
 up-llama:
 	scripts/serve_llama.sh start

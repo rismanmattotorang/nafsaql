@@ -331,6 +331,11 @@ impl Backend {
         }
         if let Some(s) = req.seed {
             b["seed"] = json!(s);
+        } else if self.kind == "peregrine" && req.temperature > 0.0 {
+            // Phase 39: Peregrine draws from (seed, turn, position) and reads an absent seed as 42, so two unseeded
+            // samples of one prompt would be the same text. The gate's agreement feature and the rescue samples need
+            // independent draws, as llama-server and Smiley Core give them.
+            b["seed"] = json!(fastrand::u32(..));
         }
         if let Some(rf) = &req.response_format {
             b["response_format"] = rf.clone();
@@ -465,6 +470,9 @@ impl Backend {
             .await?
         };
         let queue_ms = tq.elapsed().as_millis() as u64;
+        if !self.supports_stream_n() {
+            return self.stream_n_separate(req, n, tx, queue_ms).await;
+        }
         let _g = InflightGuard::new(&self.role);
         let t0 = Instant::now();
         let mut body = self.body(req, true);
@@ -591,6 +599,48 @@ impl Backend {
         }
         let _ = timings;
         Ok(prompt_tokens)
+    }
+
+    /// Whether one streaming request may ask for `n > 1` choices. Peregrine refuses `n` with `stream` (400) and serves
+    /// concurrent requests in one batched weight pass instead, so its choices are sent as separate requests.
+    pub fn supports_stream_n(&self) -> bool {
+        self.kind != "peregrine"
+    }
+
+    /// `stream_n` for a server without streamed `n`: `n` concurrent single streams (the permits are already held),
+    /// each with its own seed, each choice sent on `tx` the moment it ends.
+    async fn stream_n_separate(
+        &self,
+        req: &GenRequest,
+        n: usize,
+        tx: tokio::sync::mpsc::UnboundedSender<(usize, Result<GenOutput>)>,
+        queue_ms: u64,
+    ) -> Result<u32> {
+        let _g = InflightGuard::new(&self.role);
+        let t0 = Instant::now();
+        let runs = (0..n).map(|i| {
+            let mut r = req.clone();
+            r.seed = Some(match req.seed {
+                Some(s) => s.wrapping_add(i as u64),
+                None => fastrand::u32(..) as u64,
+            });
+            let tx = tx.clone();
+            async move {
+                let mut sink = |_: &str, _: bool| {};
+                let res = self.stream_inner(&r, &mut sink, t0).await.map(|mut o| {
+                    o.queue_ms = queue_ms;
+                    o
+                });
+                let prompt = res.as_ref().map(|o| o.prompt_tokens).unwrap_or(0);
+                let _ = tx.send((i, res));
+                prompt
+            }
+        });
+        let prompts = futures::future::join_all(runs).await;
+        if req.cancel.as_ref().map(|c| c.is_set()).unwrap_or(false) {
+            return Err(NafsError::Cancelled);
+        }
+        Ok(prompts.into_iter().max().unwrap_or(0))
     }
 
     async fn stream_inner(

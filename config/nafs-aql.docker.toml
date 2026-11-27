@@ -243,6 +243,8 @@ rag_lexical_rescue = 10.0               # chat: a passage whose words match this
 graph_llm_url = ""   # Phase 3: the quick model extracts entities and relations ("" = graph off)
 graph_model = "system1"
 graph_max_tokens = 400
+graph_concurrency = 4                  # Phase 39: passages extracted at once, stored in order (identical graph): 1.63x on Smiley Core, 1.86x on Peregrine
+graph_constrain = true                 # Phase 39: reply constrained to the extraction schema where the engine can (Peregrine, llama.cpp): 12/12 parsed vs 11/12; Smiley Core ignores it
 entity_merge_similarity = 0.92         # same-type entities with name vectors this similar are one entity
 graph_facts = 12                       # chat, graph mode: facts put in the prompt
 graph_weight = 1.0                     # FR-K50: the graph's ranking as an arm beside the search's (0 = facts only)

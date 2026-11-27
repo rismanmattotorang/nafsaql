@@ -145,12 +145,17 @@
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">Other ways to run it</span>
-      <h2 id="run-title">Three backends behind one gateway.</h2>
+      <h2 id="run-title">Four backends behind one gateway.</h2>
+      <p>The quick model and the reasoning model can each run on their own engine: choose them on the System page, or with <code>{"system1": "peregrine", "system2": "smiley"}</code> to <code>POST /v1/system/backend</code>. The Speed page compares the engines on the same questions.</p>
     </div>
-    <div class="grid g3">
+    <div class="grid g2">
       <article class="card">
         <h3>Smiley Core (default)</h3>
-        <p>The project's own Rust CPU engine, started by <code>make up</code>. The quick model is served on port 8201, the reasoning model on 8202, the app on 8080.</p>
+        <p>ParagonCorp's Rust CPU engine, built into the project and started by <code>make up</code>. The quick model is served on port 8201, the reasoning model on 8202, the app on 8080.</p>
+      </article>
+      <article class="card">
+        <h3>Peregrine</h3>
+        <p>RantAI's Rust CPU engine (<a href="https://github.com/RantAI-dev/peregrine">RantAI-dev/peregrine</a>, Apache-2.0), built from <code>third_party/peregrine</code>. <code>make up-peregrine</code> serves the quick model on 8211 and the reasoning model on 8212; <code>ROLE=system1</code> moves one model only. It answers several people in one pass over the weights.</p>
       </article>
       <article class="card">
         <h3>llama.cpp</h3>
@@ -287,11 +292,12 @@
         <ul>
           <li><a href="https://dirac.id">dirac.id</a></li>
         </ul>
-        <p style="margin-top:10px">Built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+        <p style="margin-top:10px">Nafs-Aql is a product of Dirac, built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+        <p style="margin-top:10px">Inference engines: <strong>Smiley Core</strong> by ParagonCorp and <strong>Peregrine</strong> by <a href="https://rantai.dev">RantAI</a>.</p>
       </div>
     </div>
     <div class="footer-legal">
-      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
+      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, Peregrine, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
       <p>This site sets no cookies and loads nothing from third parties. It is hosted on GitHub Pages, which logs visitors' IP addresses.</p>
     </div>
   </div>

@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How it works · Nafs-Aql</title>
-<meta name="description" content="The architecture of Nafs-Aql: two models and a gate, exact checkers, knowledge with citations and a support check, inspectable memory, a context filesystem, the Smiley Core engine and the code agent.">
+<meta name="description" content="The architecture of Nafs-Aql: two models and a gate, exact checkers, knowledge with citations and a support check, inspectable memory, a context filesystem, the Smiley Core and Peregrine engines and the code agent.">
 <meta name="color-scheme" content="light dark">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Nafs-Aql">
 <meta property="og:title" content="How Nafs-Aql works">
-<meta property="og:description" content="The architecture of Nafs-Aql: two models and a gate, exact checkers, knowledge with citations and a support check, inspectable memory, a context filesystem, the Smiley Core engine and the code agent.">
+<meta property="og:description" content="The architecture of Nafs-Aql: two models and a gate, exact checkers, knowledge with citations and a support check, inspectable memory, a context filesystem, the Smiley Core and Peregrine engines and the code agent.">
 <meta property="og:image" content="assets/img/chat.png">
 <meta property="og:image:alt" content="The Nafs-Aql chat page showing an answer with a numbered source and the passages it was answered from.">
 <meta name="twitter:card" content="summary_large_image">
@@ -345,8 +345,22 @@
   <div class="wrap">
     <div class="section-head">
       <span class="eyebrow">06 · Engine</span>
-      <h2 id="engine-title">Smiley Core: a Rust inference engine for four cores.</h2>
-      <p>The default backend is the project's own CPU engine. llama.cpp is one command away (<code>make up-llama</code>) and serves several people at once better. vLLM's CPU backend in Docker is the third profile.</p>
+      <h2 id="engine-title">Two Rust engines for four cores: Smiley Core and Peregrine.</h2>
+      <p>The default engine is <strong>Smiley Core</strong>, ParagonCorp's Rust CPU engine. <strong>Peregrine</strong>, RantAI's Rust CPU engine, is the second. The quick and the reasoning model can each run on either, and the Speed page compares them on the same questions, taking turns. llama.cpp is one command away (<code>make up-llama</code>), and vLLM's CPU backend in Docker is the fourth profile.</p>
+    </div>
+    <div class="grid g3" style="margin-bottom:20px">
+      <article class="card">
+        <h3>Quick model: a tie</h3>
+        <p>Typical answer 0.49 s on Smiley Core and 0.53 s on Peregrine (Peregrine faster in 7 of 12 pairs, p&nbsp;=&nbsp;0.77). Peregrine reads prompts faster (88 against 67 tokens a second); Smiley Core writes faster (17.0 against 14.9).</p>
+      </article>
+      <article class="card">
+        <h3>Reasoning model: Smiley Core</h3>
+        <p>51.2 s against 62.7 s for a typical reasoned answer, faster in <strong>9 of 9</strong> pairs (p&nbsp;=&nbsp;0.004), all answers right on both. Smiley Core stays the default.</p>
+      </article>
+      <article class="card">
+        <h3>Several people and indexing: Peregrine</h3>
+        <p>Four people at once: <strong>39.4 against 31.6</strong> tokens a second in total. Embedding documents: <strong>1.41×</strong> faster with the same vectors. Building the knowledge graph four passages at a time: <strong>2.5×</strong> the old speed, with every reply valid JSON.</p>
+      </article>
     </div>
     <div class="grid g3">
       <article class="card">
@@ -555,11 +569,12 @@
         <ul>
           <li><a href="https://dirac.id">dirac.id</a></li>
         </ul>
-        <p style="margin-top:10px">Built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+        <p style="margin-top:10px">Nafs-Aql is a product of Dirac, built by the Dirac R&amp;D Team. Dirac is an Indonesian deep-tech startup focused on quantum computing.</p>
+        <p style="margin-top:10px">Inference engines: <strong>Smiley Core</strong> by ParagonCorp and <strong>Peregrine</strong> by <a href="https://rantai.dev">RantAI</a>.</p>
       </div>
     </div>
     <div class="footer-legal">
-      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
+      <p>Nafs-Aql version 0.2.0 (2026-11-22), a research preview. Apache License 2.0. Qwen3 model weights, Peregrine, llama.cpp, vLLM and the evaluation datasets keep their own licences.</p>
       <p>This site sets no cookies and loads nothing from third parties. It is hosted on GitHub Pages, which logs visitors' IP addresses.</p>
     </div>
   </div>

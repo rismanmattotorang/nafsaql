@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
             )
         });
         let isolation = nafs_verify::sandbox::isolation_available();
-        let report = serde_json::json!({"config": args.config, "config_hash": cfg.hash, "bind": cfg.server.bind, "backend": cfg.backend.active,
+        let report = serde_json::json!({"config": args.config, "config_hash": cfg.hash, "bind": cfg.server.bind, "backend": cfg.active_selection(),
             "auth_tokens": match &tokens { Ok(t) => serde_json::json!(t.len()), Err(e) => serde_json::json!({"error": e}) },
             "bind_policy": match &bind { Ok(_) => serde_json::json!("ok"), Err(e) => serde_json::json!({"error": e}) },
             "sandbox_isolation": isolation, "retention_days": cfg.storage.retention_days});
@@ -96,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
         "Nafs-Aql gateway listening on http://{} (config hash {}, backend '{}')",
         cfg.server.bind,
         cfg.hash,
-        cfg.backend.active
+        cfg.active_selection()
     );
     axum::serve(
         listener,

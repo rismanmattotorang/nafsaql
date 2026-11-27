@@ -123,6 +123,9 @@ async fn graph_build_search_and_prune() {
             model: "mock".into(),
             max_tokens: 300,
             merge_similarity: 0.92,
+            // Phase 39: several passages at once must store the same graph as one at a time.
+            concurrency: 3,
+            constrain: false,
         }),
         graph_weight: 1.0,
         vector_weight: 1.0,

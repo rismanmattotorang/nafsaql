@@ -120,6 +120,13 @@ pub struct KnowledgeCfg {
     /// Knowledge graph (Phase 3): the OpenAI-compatible server and model that extract entities and relations; empty
     /// turns the graph off.
     pub graph_llm_url: String,
+    /// Phase 39: passages extracted at once while building the graph (1 = one at a time). Pays off on an engine that
+    /// batches requests (Peregrine, llama.cpp).
+    #[serde(default = "d_one")]
+    pub graph_concurrency: usize,
+    /// Phase 39: constrain the extraction reply to its JSON Schema (`response_format`) on engines that support it.
+    #[serde(default)]
+    pub graph_constrain: bool,
     pub graph_model: String,
     pub graph_max_tokens: usize,
     /// Entities of one type whose name vectors are at least this similar are merged.
@@ -221,6 +228,8 @@ impl Default for KnowledgeCfg {
             vector_cache_mb: 0,
             rag_lexical_rescue: 10.0,
             graph_llm_url: String::new(),
+            graph_concurrency: 1,
+            graph_constrain: false,
             graph_model: "system1".into(),
             graph_max_tokens: 400,
             entity_merge_similarity: 0.92,
@@ -742,6 +751,9 @@ pub struct AssistantCfg {
     #[serde(default = "d_true")]
     pub visual_hints: bool,
 }
+fn d_one() -> usize {
+    1
+}
 fn d_profile() -> String {
     "A".into()
 }
@@ -749,6 +761,32 @@ fn d_profile() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackendSelect {
     pub active: String,
+    /// Phase 39: the engine that serves System 1 when it is not `active` (a name under `[backends]`). With
+    /// `system2` this lets the quick and the reasoning model run on different engines, e.g. System 1 on Peregrine
+    /// and System 2 on Smiley Core. The pair is then named `"<system1>/<system2>"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system1: Option<String>,
+    /// Phase 39: the engine that serves System 2 when it is not `active`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system2: Option<String>,
+}
+
+/// Phase 39: a selection names one engine (`"smiley"`) or one per role (`"peregrine/smiley"`: System 1 on the first,
+/// System 2 on the second). Returns (System 1 engine, System 2 engine).
+pub fn split_selection(name: &str) -> (String, String) {
+    match name.split_once('/') {
+        Some((a, b)) => (a.trim().to_string(), b.trim().to_string()),
+        None => (name.trim().to_string(), name.trim().to_string()),
+    }
+}
+
+/// Phase 39: the name of the selection that runs System 1 on `s1` and System 2 on `s2` (one name when they agree).
+pub fn join_selection(s1: &str, s2: &str) -> String {
+    if s1 == s2 {
+        s1.to_string()
+    } else {
+        format!("{s1}/{s2}")
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1289,7 +1327,23 @@ impl Config {
             cfg.server.bind = b;
         }
         if let Ok(b) = std::env::var("NAFS_BACKEND") {
-            cfg.backend.active = b;
+            // `NAFS_BACKEND=peregrine/smiley` chooses one engine per role; a plain name clears the per-role choices.
+            let (a, c) = split_selection(&b);
+            if a == c {
+                cfg.backend.active = a;
+                cfg.backend.system1 = None;
+                cfg.backend.system2 = None;
+            } else {
+                cfg.backend.active = a.clone();
+                cfg.backend.system1 = Some(a);
+                cfg.backend.system2 = Some(c);
+            }
+        }
+        if let Ok(b) = std::env::var("NAFS_BACKEND_SYSTEM1") {
+            cfg.backend.system1 = Some(b);
+        }
+        if let Ok(b) = std::env::var("NAFS_BACKEND_SYSTEM2") {
+            cfg.backend.system2 = Some(b);
         }
         // A test gateway can point at its own SurrealDB without editing the file.
         if let Ok(u) = std::env::var("NAFS_KB_URL") {
@@ -1300,6 +1354,18 @@ impl Config {
                 "backend.active = '{}' is not defined under [backends]",
                 cfg.backend.active
             )));
+        }
+        for (key, v) in [
+            ("backend.system1", &cfg.backend.system1),
+            ("backend.system2", &cfg.backend.system2),
+        ] {
+            if let Some(n) = v {
+                if !cfg.backends.contains_key(n) {
+                    return Err(NafsError::Config(format!(
+                        "{key} = '{n}' is not defined under [backends]"
+                    )));
+                }
+            }
         }
         // Phase 35: a value outside what the program understands stops the start, with the key and what is allowed;
         // before, a mistyped name was read as its default and a count of zero as "never".
@@ -1429,8 +1495,8 @@ impl Config {
     pub fn unusual_values(&self) -> Vec<String> {
         let mut out = Vec::new();
         for (name, b) in &self.backends {
-            if !["llama", "vllm", "smiley"].contains(&b.kind.as_str()) {
-                out.push(format!("backends.{name}.kind = \"{}\" is not \"llama\", \"vllm\" or \"smiley\": it is served as a plain OpenAI-compatible server, without that engine's extras", b.kind));
+            if !["llama", "vllm", "smiley", "peregrine"].contains(&b.kind.as_str()) {
+                out.push(format!("backends.{name}.kind = \"{}\" is not \"llama\", \"vllm\", \"smiley\" or \"peregrine\": it is served as a plain OpenAI-compatible server, without that engine's extras", b.kind));
             }
         }
         if !["system1", "system2"].contains(&self.judge.backend.as_str()) {
@@ -1444,16 +1510,27 @@ impl Config {
 
     /// Options that are switched on but that the active engine cannot honour, in words for the person who set them.
     pub fn inactive_options(&self) -> Vec<String> {
-        self.inactive_options_for(&self.backend.active)
+        self.inactive_options_for(&self.active_selection())
+    }
+
+    /// Phase 39: the selection the service starts with: `backend.active`, or `"<system1>/<system2>"` when
+    /// `backend.system1` / `backend.system2` put the two roles on different engines.
+    pub fn active_selection(&self) -> String {
+        let a = &self.backend.active;
+        join_selection(
+            self.backend.system1.as_deref().unwrap_or(a),
+            self.backend.system2.as_deref().unwrap_or(a),
+        )
     }
 
     /// The same for a named engine: the active one can be changed while the service runs.
     pub fn inactive_options_for(&self, name: &str) -> Vec<String> {
         let mut out = Vec::new();
-        let Some(active) = self.backends.get(name) else {
+        let (n1, n2) = split_selection(name);
+        let (Some(active), Some(second)) = (self.backends.get(&n1), self.backends.get(&n2)) else {
             return out;
         };
-        if active.kind != "llama" {
+        if active.kind != "llama" || second.kind != "llama" {
             if self.harness.code_agent_enabled && self.harness.constrain {
                 out.push(format!("harness.constrain is on, but the active engine ({name}) has no constrained sampling: the code agent's replies are parsed as free text"));
             }
@@ -1643,6 +1720,46 @@ mod tests {
         cfg.backend.active = "llama".into();
         assert!(!cfg
             .inactive_options()
+            .iter()
+            .any(|x| x.contains("harness.constrain")));
+    }
+
+    /// Phase 39: each role may run on its own engine; the pair is then named "<system1>/<system2>".
+    #[test]
+    fn roles_can_run_on_different_engines() {
+        assert_eq!(
+            split_selection("smiley"),
+            ("smiley".into(), "smiley".into())
+        );
+        assert_eq!(
+            split_selection("peregrine/smiley"),
+            ("peregrine".into(), "smiley".into())
+        );
+        assert_eq!(join_selection("smiley", "smiley"), "smiley");
+        assert_eq!(join_selection("peregrine", "smiley"), "peregrine/smiley");
+        let mut cfg = Config::load(&shipped("nafs-aql.sample.toml")).unwrap();
+        assert!(
+            cfg.backends.contains_key("peregrine"),
+            "the sample ships the Peregrine engine"
+        );
+        assert_eq!(cfg.backends["peregrine"].kind, "peregrine");
+        assert_eq!(cfg.active_selection(), cfg.backend.active);
+        cfg.backend.system1 = Some("peregrine".into());
+        assert_eq!(
+            cfg.active_selection(),
+            format!("peregrine/{}", cfg.backend.active)
+        );
+        cfg.backend.system2 = Some("peregrine".into());
+        assert_eq!(cfg.active_selection(), "peregrine");
+        // Peregrine has no constrained sampling: the option that needs it is named, also when only one role uses it.
+        cfg.harness.code_agent_enabled = true;
+        cfg.harness.constrain = true;
+        assert!(cfg
+            .inactive_options_for("llama/peregrine")
+            .iter()
+            .any(|x| x.contains("harness.constrain")));
+        assert!(!cfg
+            .inactive_options_for("llama")
             .iter()
             .any(|x| x.contains("harness.constrain")));
     }

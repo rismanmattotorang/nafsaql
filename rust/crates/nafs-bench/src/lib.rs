@@ -1,4 +1,5 @@
 //! nafs-bench: closed-loop load generation for the performance console (FR-052, ER-007).
+pub mod engines;
 use nafs_core::orchestrator::{Emitter, Orchestrator};
 use nafs_types::LockExt;
 use nafs_types::{ChatRequest, Message, ReasoningMode, Rfc3339Ext, StreamEvent};

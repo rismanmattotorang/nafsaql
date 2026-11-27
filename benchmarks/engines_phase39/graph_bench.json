@@ -1,0 +1,87 @@
+{
+  "arms": [
+    {
+      "arm": "smiley",
+      "concurrency": 1,
+      "constrain": false,
+      "entities": 89,
+      "entity_jaccard_vs_first": 1.0,
+      "errors": [
+        "the reply is not valid JSON: EOF while parsing a string at line 1 column 1858"
+      ],
+      "parsed": 11,
+      "passages": 12,
+      "passages_per_min": 3.0017805589949202,
+      "quote_drops": 4,
+      "relations": 39,
+      "skipped": 1,
+      "tokens": 3479,
+      "url": "http://127.0.0.1:8201/v1",
+      "wall_s": 239.857639774
+    },
+    {
+      "arm": "peregrine",
+      "concurrency": 1,
+      "constrain": false,
+      "entities": 74,
+      "entity_jaccard_vs_first": 0.6342735042735042,
+      "errors": [
+        "the reply is not valid JSON: EOF while parsing a string at line 1 column 1959"
+      ],
+      "parsed": 11,
+      "passages": 12,
+      "passages_per_min": 3.4533035744574856,
+      "quote_drops": 2,
+      "relations": 40,
+      "skipped": 1,
+      "tokens": 3156,
+      "url": "http://127.0.0.1:8211/v1",
+      "wall_s": 208.496005195
+    },
+    {
+      "arm": "peregrine-x4",
+      "concurrency": 4,
+      "constrain": false,
+      "entities": 74,
+      "entity_jaccard_vs_first": 0.6342735042735042,
+      "errors": [
+        "the reply is not valid JSON: EOF while parsing a string at line 1 column 1959"
+      ],
+      "parsed": 11,
+      "passages": 12,
+      "passages_per_min": 6.422734640986619,
+      "quote_drops": 2,
+      "relations": 40,
+      "skipped": 1,
+      "tokens": 3156,
+      "url": "http://127.0.0.1:8211/v1",
+      "wall_s": 112.101782223
+    },
+    {
+      "arm": "peregrine-x4-schema",
+      "concurrency": 4,
+      "constrain": true,
+      "entities": 73,
+      "entity_jaccard_vs_first": 0.6004689754689756,
+      "errors": [],
+      "parsed": 12,
+      "passages": 12,
+      "passages_per_min": 7.609346140678398,
+      "quote_drops": 5,
+      "relations": 35,
+      "skipped": 0,
+      "tokens": 3006,
+      "url": "http://127.0.0.1:8211/v1",
+      "wall_s": 94.620482061
+    }
+  ],
+  "block": 4,
+  "files": [
+    "papers/2309.06180v1.pdf"
+  ],
+  "host_load": {
+    "max": 11.5,
+    "min": 6.27
+  },
+  "passages": 12
+}

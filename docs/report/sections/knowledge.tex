@@ -129,8 +129,16 @@ fused with the search's as one more arm over the whole pool; a two-hop walk
 keeps the best eight relations per reached entity, scored by weight times 0.6
 per hop, and shows the chain. Treating the graph as an arm rather than an
 override was the decisive change (Section~\ref{sec:eval:knowledge}).
-Extraction costs 17 to 28\,s per passage on this machine, so this layer is
-opt-in; the rule-built graph is always there.
+Extraction costs 17 to 28\,s per passage on this machine when passages are
+read one at a time, so this layer is opt-in; the rule-built graph is always
+there. Passages are now extracted four at a time: the replies are taken back
+in passage order, so entity resolution sees the same sequence and, with greedy
+decoding, the graph is identical. Where the engine supports it, the reply is
+constrained to a stricter schema (context, entities and relations all
+present, at most ten of each, in the prompt's order), so no passage is lost to
+a malformed reply. Construction became 1.63 times faster on Smiley Core and
+2.5 times on Peregrine, where 12 of 12 replies parsed against 11 of 12
+(Section~\ref{sec:eval:knowledge}).
 
 \subsection{One context filesystem}
 \label{sec:kb:fs}

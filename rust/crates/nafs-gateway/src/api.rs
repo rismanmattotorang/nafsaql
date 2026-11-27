@@ -228,6 +228,7 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/alerts/drill", post(alert_drill))
         .route("/v1/lab/insights", get(lab_insights))
         .route("/v1/bench/protocol", post(start_protocol))
+        .route("/v1/bench/engines", post(start_engine_compare))
         .route("/v1/eval/runs/{id}/export", get(export_run))
         .route("/v1/tazkiya/review", get(review_queue))
         .route("/v1/tazkiya/review/{id}", post(set_review))
@@ -907,6 +908,31 @@ async fn start_protocol(
         guard.finish();
     });
     Ok((StatusCode::ACCEPTED, Json(base)))
+}
+/// Phase 39: compare the inference engines (Smiley Core, Peregrine, ...) on System 1 and System 2 directly. The run
+/// is stored with the bench runs (kind "engines") and read at /v1/bench/runs/{id}.
+async fn start_engine_compare(
+    State(s): State<AppState>,
+    Json(req): Json<nafs_bench::engines::EngineCompareRequest>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let id = Uuid::new_v4();
+    let base = json!({"run_id": id, "kind": "engines", "status": "running", "request": req, "created_at": nafs_types::now_utc().to_rfc3339()});
+    s.store.save_run("bench", id, "running", &base)?;
+    let (mut guard, cancel) = RunGuard::start(&s, "bench", "engines", id);
+    let progress = progress_saver(&s, "bench", "engines", id, Duration::from_millis(1500));
+    tokio::spawn(async move {
+        let mut v = nafs_bench::engines::compare(guard.s.orch.clone(), req, cancel, progress).await;
+        v["run_id"] = json!(id);
+        v["created_at"] = base["created_at"].clone();
+        v["finished_at"] = json!(nafs_types::now_utc().to_rfc3339());
+        let st = v["status"].as_str().unwrap_or("done").to_string();
+        let _ = guard.s.store.save_run("bench", id, &st, &v);
+        guard.finish();
+    });
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(json!({"run_id": id, "kind": "engines", "status": "running"})),
+    ))
 }
 #[derive(Deserialize)]
 struct ExportQ {
@@ -1708,17 +1734,18 @@ async fn self_model(State(s): State<AppState>) -> ApiResult<Json<Value>> {
 async fn system(State(s): State<AppState>) -> Json<Value> {
     let health = s.orch.health().await;
     let active = s.orch.active().name.clone();
+    let (active1, active2) = nafs_core::config::split_selection(&active);
     let c = &s.cfg;
     // The engine can be changed while the service runs, so what it cannot honour is worked out now, not at start.
     let mut warnings = c.key_warnings.clone();
     warnings.extend(c.inactive_options_for(&active));
     Json(json!({
-        "version": env!("CARGO_PKG_VERSION"), "config_hash": c.hash, "config_warnings": warnings, "profile": c.assistant.profile, "active_backend": active, "auth_enabled": !s.tokens.is_empty(),
+        "version": env!("CARGO_PKG_VERSION"), "config_hash": c.hash, "config_warnings": warnings, "profile": c.assistant.profile, "active_backend": active, "active_engines": {"system1": active1, "system2": active2}, "auth_enabled": !s.tokens.is_empty(),
         "security": {"auth_enabled": !s.tokens.is_empty(), "bind": c.server.bind, "loopback_only": crate::security::is_loopback(&c.server.bind),
             "sandbox_isolation": nafs_verify::sandbox::isolation_available(), "retention_days": c.storage.retention_days, "tls": "terminate at a reverse proxy (deploy/tls/)", "same_origin_only": true},
         "uptime_s": s.started.elapsed().as_secs(), "inflight": s.orch.inflight.load(Ordering::Relaxed),
         "host": {"os": std::env::consts::OS, "arch": std::env::consts::ARCH, "cpus": std::thread::available_parallelism().map(|n| n.get()).unwrap_or(0)},
-        "backends": health.into_iter().map(|(name, label, kind, a, b)| json!({"name": name, "label": label, "kind": kind, "active": name == active, "system1": a, "system2": b})).collect::<Vec<_>>(),
+        "backends": health.into_iter().map(|(name, label, kind, a, b)| json!({"name": name, "label": label, "kind": kind, "active": name == active, "serves_system1": name == active1, "serves_system2": name == active2, "system1": a, "system2": b})).collect::<Vec<_>>(),
         "gate": {"k_samples": c.gate.k_samples, "lambda_default": c.gate.lambda_default, "cost_unit_s": c.gate.cost_unit_s, "loss_wrong": c.gate.loss_wrong,
                  "fixed": c.gate.fixed, "audit_fraction": c.gate.audit_fraction, "state": gate_view(&s)},
         "judge": c.judge, "audit": {"config": c.audit, "counts": s.store.audit_counts().unwrap_or(Value::Null)},
@@ -1729,7 +1756,15 @@ async fn system(State(s): State<AppState>) -> Json<Value> {
 }
 #[derive(Deserialize)]
 struct SetBackend {
-    name: String,
+    /// One engine for both roles (`"smiley"`), or one per role (`"peregrine/smiley"`).
+    #[serde(default)]
+    name: Option<String>,
+    /// Phase 39: the engine for System 1 alone (the other role keeps its engine unless named too).
+    #[serde(default)]
+    system1: Option<String>,
+    /// Phase 39: the engine for System 2 alone.
+    #[serde(default)]
+    system2: Option<String>,
     /// Switch even when the backend's servers do not answer a health check.
     #[serde(default)]
     force: bool,
@@ -1738,23 +1773,36 @@ async fn set_backend(
     State(s): State<AppState>,
     Json(b): Json<SetBackend>,
 ) -> ApiResult<Json<Value>> {
+    let (cur1, cur2) = nafs_core::config::split_selection(&s.orch.active().name);
+    let target = match (&b.name, &b.system1, &b.system2) {
+        (_, Some(_), _) | (_, _, Some(_)) => nafs_core::config::join_selection(
+            b.system1.as_deref().unwrap_or(&cur1),
+            b.system2.as_deref().unwrap_or(&cur2),
+        ),
+        (Some(n), None, None) => n.clone(),
+        (None, None, None) => {
+            return Err(NafsError::BadRequest("name, system1 or system2 is required".into()).into())
+        }
+    };
+    let Some(pair) = s.orch.pair(&target) else {
+        return Err(NafsError::BadRequest(format!("unknown backend '{target}'")).into());
+    };
     // Switching to a backend that is not running sends every request to dead servers (503), so it is
-    // refused unless forced.
+    // refused unless forced. Only the roles that move are checked.
     if !b.force {
-        let health = s.orch.health().await;
-        if let Some((_, label, _, h1, h2)) = health.iter().find(|h| h.0 == b.name) {
-            if !(h1.ok && h2.ok) {
-                let why = [h1, h2]
-                    .iter()
-                    .filter(|h| !h.ok)
-                    .map(|h| format!("{} at {} is not reachable", h.role, h.url))
-                    .collect::<Vec<_>>()
-                    .join("; ");
-                return Err(NafsError::BackendUnavailable(format!(
-                    "{label}: {why}. Start it first (see the System page), or pass \"force\": true."
-                ))
-                .into());
-            }
+        let (h1, h2) = tokio::join!(pair.s1.health(), pair.s2.health());
+        if !(h1.ok && h2.ok) {
+            let why = [&h1, &h2]
+                .iter()
+                .filter(|h| !h.ok)
+                .map(|h| format!("{} at {} is not reachable", h.role, h.url))
+                .collect::<Vec<_>>()
+                .join("; ");
+            return Err(NafsError::BackendUnavailable(format!(
+                "{}: {why}. Start it first (see the System page), or pass \"force\": true.",
+                pair.label
+            ))
+            .into());
         }
     }
     let before = s.orch.active().name.clone();
@@ -1762,18 +1810,20 @@ async fn set_backend(
     // prefill; the swap itself is one atomic pointer exchange, and requests already in flight keep the pair they
     // started on (they hold it by reference), so nothing is interrupted or re-sent.
     let t = std::time::Instant::now();
-    let warmed = match s.orch.pair(&b.name) {
-        Some(p) if before != b.name => s.orch.warm_pair(&p).await,
-        _ => 0,
+    let warmed = if before != pair.name {
+        s.orch.warm_pair(&pair).await
+    } else {
+        0
     };
     let warm_ms = t.elapsed().as_millis() as u64;
-    s.orch.set_active(&b.name)?;
+    s.orch.set_active(&pair.name)?;
     tracing::info!(
         "active backend switched from '{before}' to '{}' ({warmed} prefixes warmed in {warm_ms} ms)",
-        b.name
+        pair.name
     );
+    let (e1, e2) = nafs_core::config::split_selection(&pair.name);
     Ok(Json(
-        json!({"active_backend": b.name, "previous": before, "warmed_prefixes": warmed, "warm_ms": warm_ms,
+        json!({"active_backend": pair.name, "system1_engine": e1, "system2_engine": e2, "previous": before, "warmed_prefixes": warmed, "warm_ms": warm_ms,
         "in_flight": s.orch.inflight.load(std::sync::atomic::Ordering::SeqCst)}),
     ))
 }

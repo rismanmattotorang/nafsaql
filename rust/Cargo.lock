@@ -2394,6 +2394,7 @@ name = "nafs-kb"
 version = "0.2.0"
 dependencies = [
  "ciborium",
+ "futures",
  "htmd",
  "jsonschema",
  "nafs-context",

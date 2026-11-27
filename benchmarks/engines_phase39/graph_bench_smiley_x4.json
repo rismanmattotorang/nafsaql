@@ -1,0 +1,51 @@
+{
+  "arms": [
+    {
+      "arm": "smiley",
+      "concurrency": 1,
+      "constrain": false,
+      "entities": 53,
+      "entity_jaccard_vs_first": 1.0,
+      "errors": [
+        "the reply is not valid JSON: EOF while parsing a string at line 1 column 1858"
+      ],
+      "parsed": 7,
+      "passages": 8,
+      "passages_per_min": 3.392690175900223,
+      "quote_drops": 1,
+      "relations": 26,
+      "skipped": 1,
+      "tokens": 2277,
+      "url": "http://127.0.0.1:8201/v1",
+      "wall_s": 141.480646659
+    },
+    {
+      "arm": "smiley-x4",
+      "concurrency": 4,
+      "constrain": true,
+      "entities": 53,
+      "entity_jaccard_vs_first": 1.0,
+      "errors": [
+        "the reply is not valid JSON: EOF while parsing a string at line 1 column 1858"
+      ],
+      "parsed": 7,
+      "passages": 8,
+      "passages_per_min": 5.538947437214343,
+      "quote_drops": 1,
+      "relations": 26,
+      "skipped": 1,
+      "tokens": 2277,
+      "url": "http://127.0.0.1:8201/v1",
+      "wall_s": 86.65906391799999
+    }
+  ],
+  "block": 4,
+  "files": [
+    "papers/2309.06180v1.pdf"
+  ],
+  "host_load": {
+    "max": 7.36,
+    "min": 6.25
+  },
+  "passages": 8
+}

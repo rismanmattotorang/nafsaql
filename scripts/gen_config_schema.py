@@ -27,6 +27,8 @@ def schema_of(v, path=""):
     return {}
 sample = tomllib.load(open(os.path.join(ROOT, "config/nafs-aql.sample.toml"), "rb"))
 s = schema_of(sample)
+# Phase 39: optional per-role engines (commented out in the sample, where both roles follow `active`).
+s["properties"]["backend"]["properties"].update({"system1": {"type": "string"}, "system2": {"type": "string"}})
 s["required"] = REQUIRED_SECTIONS
 s = {"$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "https://nafs-aql.example/schemas/Config.schema.json",
      "title": "Nafs-Aql gateway configuration (config/nafs-aql.toml)", **s}

@@ -1,0 +1,53 @@
+{
+ "users": 4,
+ "rows": [
+  {
+   "round": 0,
+   "engine": "smiley",
+   "users": 4,
+   "wall_s": 6.1,
+   "tokens": 192,
+   "agg_tok_s": 31.48,
+   "p50_s": 6.04,
+   "max_s": 6.1,
+   "errors": 0,
+   "load1": 6.97
+  },
+  {
+   "round": 0,
+   "engine": "peregrine",
+   "users": 4,
+   "wall_s": 9.42,
+   "tokens": 352,
+   "agg_tok_s": 37.35,
+   "p50_s": 9.28,
+   "max_s": 9.42,
+   "errors": 0,
+   "load1": 7.61
+  },
+  {
+   "round": 1,
+   "engine": "peregrine",
+   "users": 4,
+   "wall_s": 8.49,
+   "tokens": 352,
+   "agg_tok_s": 41.46,
+   "p50_s": 8.49,
+   "max_s": 8.49,
+   "errors": 0,
+   "load1": 7.07
+  },
+  {
+   "round": 1,
+   "engine": "smiley",
+   "users": 4,
+   "wall_s": 6.06,
+   "tokens": 192,
+   "agg_tok_s": 31.66,
+   "p50_s": 6.06,
+   "max_s": 6.06,
+   "errors": 0,
+   "load1": 6.45
+  }
+ ]
+}

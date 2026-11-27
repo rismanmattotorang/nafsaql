@@ -1,0 +1,45 @@
+{
+ "runs": [
+  {
+   "ok": true,
+   "client_s": 9.7,
+   "wall_s": 9.66,
+   "ttft_s": 2.739,
+   "mode": "fast",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 1,
+   "completion_tokens": 115,
+   "reasoning_tokens": 0,
+   "answer": "Step 1: Calculate the time from 3:40 pm to 6:05 pm.  \n- From 3:40 pm to 4:40 pm is 60 minutes.  \n- From 4:40 pm to 6:05 pm is 1 hour and 25 minutes (60 + 25 = 8",
+   "round": 0,
+   "i": 0,
+   "kind": "math",
+   "selection": "smiley",
+   "active": "smiley",
+   "switch_s": 0.0,
+   "load1": 9.26
+  },
+  {
+   "ok": true,
+   "client_s": 120.7,
+   "wall_s": 120.611,
+   "ttft_s": 1.052,
+   "mode": "slow",
+   "assurance": "verified",
+   "verified": true,
+   "model_calls": 6,
+   "completion_tokens": 1218,
+   "reasoning_tokens": 542,
+   "answer": "To find the duration between 3:40 pm and 6:05 pm:\n\n1. **Break into hours and minutes**:\n   - From 3:40 pm to 6:05 pm = (6 - 3) hours + (5 - 40) minutes.\n   - Si",
+   "round": 0,
+   "i": 0,
+   "kind": "math",
+   "selection": "peregrine/smiley",
+   "active": "peregrine/smiley",
+   "switch_s": 5.9,
+   "load1": 10.39
+  }
+ ],
+ "started": "2026-11-27T08:25:19"
+}

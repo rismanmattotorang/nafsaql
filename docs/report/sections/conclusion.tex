@@ -22,6 +22,37 @@ cheap candidates from the quick model, judged by an exact verifier before the
 expensive model is consulted, are the best use of idle cores, in the chat
 path and in the agent alike.
 
+A fourth lesson comes from running two engines behind one contract. The
+engines differ in what each request needs to state, such as an explicit
+seed, how $n$ choices are asked for and where an embedding instruction goes.
+A client that states these explicitly makes the engines interchangeable per
+model, and the choice can then follow the measurement: Smiley Core for the
+reasoning model, Peregrine for several users at once and for indexing.
+
+\subsection*{Further research}
+\begin{itemize}
+\item \emph{Retrieval for reworded questions}, still the largest gap: a
+cross-encoder reranker (Peregrine serves BERT rerankers), questions written
+for each passage at indexing time with the batched quick model, and a public
+retrieval benchmark.
+\item \emph{Engine choice by measurement}, per request rather than per
+deployment: route by load and prompt length, since one engine reads faster and
+the other writes faster, and measure one process that serves both models in
+turns against two processes.
+\item \emph{Shared prefill for $n$ choices on a batching engine}, and lossy
+prompt modes (8-bit prompt weights) judged by the ledger's accuracy, not by
+speed alone.
+\item \emph{Graph quality}: which engine's graph answers better, community
+summaries, and relation confidence from the quote check.
+\item \emph{Calibration at scale}: a ledger large enough to promote the
+calibrated gate (2,900 labelled drafts), and certified risk bins on live
+traffic.
+\item \emph{Training on a GPU}: the first distillation cycle, memory-token
+pre-training with the corrected recipe, and a stronger embedder.
+\item \emph{Release-scale evaluation} on public benchmarks, and a
+filesystem-isolating sandbox on Linux.
+\end{itemize}
+
 The open work is stated in Section~\ref{sec:limits}: a ledger large enough to
 promote the calibrated gate, retrieval for reworded questions, evaluation at
 release scale and on public benchmarks, and the training steps that need a
