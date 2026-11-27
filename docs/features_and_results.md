@@ -209,7 +209,7 @@ Nafs-Aql runs on ParagonCorp's **Smiley Core** (default) or RantAI's **Peregrine
 | Embeddings | 1x | 1.41x, cosine >= 0.9996 to Smiley's |
 | Graph, 4 passages at once (+ schema on Peregrine) | 1.63x the old setting, identical graph | 2.5x the old setting, 12/12 replies parsed |
 
-Correctness: 42 of 42 engine-level answers right on both. End to end through the gateway: partial (2 requests), not a basis for a claim. Details: [assessment](research/peregrine_assessment.md), [decision 029](decisions/029-two-engines-phase39.md).
+Correctness: 42 of 42 engine-level answers right on both. End to end through the gateway (8 questions in Auto mode, 3 selections, rotating order): 7 of 7 checkable answers checked on all three; Smiley Core 52 s in total with no escalation, Peregrine 179 s and the mixed pair 254 s, each with 2 escalations (a single small run: the gap is whose quick draft happened to pass). Details: [assessment](research/peregrine_assessment.md), [decision 029](decisions/029-two-engines-phase39.md).
 
 ## The numbers at a glance (moved from the README, Phase 25)
 

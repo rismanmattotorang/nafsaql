@@ -91,7 +91,8 @@ in 12 of 12 batches (median 1.41x; 0.72 passages/s). The vectors agree: cosine a
 0.9997 for queries, and the same top-5 passages for 93 % of questions. A base embedded on one engine can be searched
 with the other.
 
-**Through the whole service** (`e2e.json`): partial, see section 5.
+**Through the whole service** (`e2e.json`): see section 5. Smiley Core 52 s, Peregrine 179 s and the mixed pair 254 s
+for eight questions, all checked answers right; the gap is two escalations.
 
 ## 4. What was adopted
 
@@ -104,13 +105,23 @@ with the other.
 
 ## 5. End to end
 
-**Partial: 2 of 24 planned requests** (`e2e.json`). The run was stopped to finish the release, because each question
-escalated to System 2 takes about 2 minutes on this machine. On the first maths question (the train trip, 145
-minutes), Smiley Core's System 1 drafted an answer that passed the check in 9.7 s. With System 1 on Peregrine, the
-draft failed the check, and System 2 (Smiley Core) answered correctly after 120.6 s. That is one question, and greedy
-drafts from the two engines differ because their arithmetic differs, so it says nothing about rates. The full run is
-`python3 -I scripts/engine_compare.py e2e --rounds 2 --resume`. It resumes from the stored rows, and every selection
-goes first equally often. Until it has run, the recommendation rests on the engine-level results above.
+Eight checkable-or-factual questions in Auto mode (4 maths, 2 code, 1 structured, 1 factual), the gateway switched
+between selections before every request, the order rotating (`e2e.json`; host load 3.6 to 10.4, shared):
+
+| Selection (System 1 / System 2) | Checked | Escalated | Median request | Eight requests | First token |
+|---|---|---|---|---|---|
+| Smiley Core / Smiley Core | 7 of 7 | 0 | 6.2 s | **52 s** | 0.72 s |
+| Peregrine / Peregrine | 7 of 7 | 2 | 8.0 s | 179 s | 0.26 s |
+| Peregrine / Smiley Core | 7 of 7 | 2 | 7.8 s | 254 s | 0.71 s |
+
+All three checked every answer that can be checked. Peregrine's first token is the earliest (0.26 s against 0.72 s).
+The totals are dominated by escalations: an escalated question costs 36 to 120 s, a quick one 2 to 11 s. On Peregrine
+the quick model's greedy draft failed the check on two questions that Smiley Core's draft passed (a maths problem and
+the factual one), and System 2 then answered. With eight questions this is one observation of which drafts happen to
+be right, not a rate; the two engines' arithmetic differs slightly and so do their drafts. For questions both quick
+models answered, the median times are close (Peregrine faster in 2 of 8 pairs, median ratio 1.12). The result agrees
+with the engine-level one: Smiley Core is the better default. A rate of escalations per engine needs the labelled
+dataset the gate already collects when idle.
 
 ## 6. Further work
 

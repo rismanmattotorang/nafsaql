@@ -120,6 +120,15 @@ total against 31.6. Its embeddings were faster in 12 of 12 batches (1.41
 times) with cosine at least 0.9996 to Smiley Core's vectors, so a base built
 on one engine can be searched with the other.
 
+Through the whole gateway, eight questions in automatic mode with the
+selection switched before every request (order rotated), all three
+selections (\Sone/\Stwo\ on Smiley/Smiley, Peregrine/Peregrine and
+Peregrine/Smiley) checked 7 of 7 checkable answers. Smiley Core needed 52\,s
+and no escalation, Peregrine 179\,s and the mixed pair 254\,s, each with two
+escalations; Peregrine's first token was the earliest (0.26\,s against
+0.72\,s). The gap is the two questions on which Peregrine's greedy draft
+failed the check; with eight questions this is an observation, not a rate.
+
 \begin{table}[t]
 \centering
 \caption{Smiley Core against Peregrine (medians; shared host).}
